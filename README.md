@@ -1,7 +1,8 @@
-
 # Lone's EFT DMA Radar
 
-![icon-static](https://github.com/user-attachments/assets/d2b02f5a-298c-45fd-8154-2331f1f21c0f)
+### As of 1/03/2026, no more features will be added & only offsets will be maintained
+
+<img width="512" height="512" alt="image" src="https://github.com/user-attachments/assets/e2bb2567-539c-43c7-87c5-1ffe59e97d4d" />
 
 ## What is this?
 - This is an up-to-date build of Lone DMA EFT/Arena Radar. This is a standalone copy of the software with *No Restrictions*.
