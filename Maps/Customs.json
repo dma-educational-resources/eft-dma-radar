@@ -1,0 +1,40 @@
+{
+	"mapID": ["bigmap"],
+	"x": 372.9,
+	"y": 265.6,
+	"scale": 0.992,
+	"svgScale" : 4.00,
+	"disableDimming" : true,
+	"mapLayers": [
+		{
+			"minHeight": null,
+			"maxHeight": null,
+			"filename": "Customs.svg"
+		},
+				{
+			"minHeight": null,
+			"maxHeight": -1.8,
+			"filename": "Customs_-1f.svg"
+		},
+				{
+			"minHeight": -1.8,
+			"maxHeight": null,
+			"filename": "Customs_1f.svg"
+		},
+				{
+			"minHeight": 1.82,
+			"maxHeight": null,
+			"filename": "Customs_2f.svg"
+		},
+				{
+			"minHeight": 4.7,
+			"maxHeight": 8.6,
+			"filename": "Customs_3f.svg"
+		},
+		{
+			"minHeight": 8.6,
+			"maxHeight": null,
+			"filename": "Customs_4f.svg"
+		}
+	]
+}

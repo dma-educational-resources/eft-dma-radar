@@ -1,0 +1,14 @@
+{
+  "mapID": ["woods"],
+  "x": 834.6,
+  "y": 469.6,
+  "scale": 1.048,
+  "svgScale": 4.5,
+  "mapLayers": [
+    {
+      "minHeight": null,
+	  "maxHeight": null,
+      "filename": "Woods.svg"
+    }
+  ]
+}

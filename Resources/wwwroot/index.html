@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>XM WebRadar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+
+<body>
+
+<div id="root">
+  <canvas id="radar"></canvas>
+</div>
+
+<div id="status" class="warn">Connecting...</div>
+
+<button id="menuBtn" title="Toggle sidebar">
+  <div class="lines" aria-hidden="true">
+    <span></span><span></span><span></span>
+  </div>
+</button>
+
+<div id="edgeZone" title=""></div>
+
+<div id="sidebar">
+  <header>
+    <div id="titlewrap">
+      <div id="title">XM WebRadar</div>
+      <div id="subline" class="mono">menu | unknown</div>
+    </div>
+    <button id="toggle" title="Collapse">&lt;</button>
+  </header>
+
+  <div class="tabbar">
+    <div class="tab active" data-tab="players">Players</div>
+    <div class="tab" data-tab="loot">Loot</div>
+    <div class="tab" data-tab="general">General</div>
+  </div>
+
+  <div class="tab-content active" id="players">
+    <div class="section">
+      <label class="row">
+        <span>Center on</span>
+        <select id="centerTargetSelect">
+          <option value="local">Local Player</option>
+        </select>
+      </label>
+
+      <h3>Colors</h3>
+      <label>Local <input type="color" id="localColor"></label>
+      <label>Teammate <input type="color" id="teammateColor"></label>
+      <label>USEC <input type="color" id="usecColor"></label>
+      <label>BEAR <input type="color" id="bearColor"></label>
+      <label>Scav <input type="color" id="scavColor"></label>
+      <label>PScav <input type="color" id="psavColor"></label>
+      <label>Raider <input type="color" id="raiderColor"></label>
+      <label>Boss <input type="color" id="bossColor"></label>
+      <label>Dead <input type="color" id="deadColor"></label>
+    </div>
+
+    <div class="section">
+      <h3>Display</h3>
+      <label>Show Players <input type="checkbox" id="showPlayers"></label>
+      <label>Show Aim Lines <input type="checkbox" id="showAim"></label>
+      <label>Show Names <input type="checkbox" id="showNames"></label>
+      <label>Show Height Arrows <input type="checkbox" id="showHeight"></label>
+      <label>
+        Player Size
+        <input type="range" id="playerSize" min="2" max="10" step="1">
+      </label>
+
+      <label class="lbl">Dead Min Value</label>
+      <input id="deadMinValue" type="range" min="0" max="500000" step="1000" value="0">
+      <span id="deadMinValueText" class="mono">0</span>
+
+      <label>Players Widget <input type="checkbox" id="showPlayersWidget"></label>
+    </div>
+
+    <div class="section">
+      <h3>Groups</h3>
+      <label>Show Group Connectors <input type="checkbox" id="showGroups"></label>
+      <label>
+        Group Line Alpha
+        <input type="range" id="groupAlpha" min="0" max="1" step="0.05">
+      </label>
+    </div>
+  </div>
+
+  <div class="tab-content" id="loot">
+    <div class="section">
+      <h3>Loot</h3>
+      <label>Show Loot <input type="checkbox" id="showLoot"></label>
+
+      <label>Show Name <input type="checkbox" id="showLootName"></label>
+      <label>Show Price <input type="checkbox" id="showLootPrice"></label>
+
+      <div class="row">
+        <label style="margin:0;">Basic Loot Color <input type="color" id="basicLootColor"></label>
+        <label style="margin:0;">Important Loot Color <input type="color" id="importantLootColor"></label>
+      </div>
+
+      <label>
+        Basic Price (min) <span class="mono" id="basicPriceText"></span>
+        <input type="range" id="basicPrice" min="0" max="200000" step="1000">
+      </label>
+
+      <label>
+        Important Price <span class="mono" id="importantPriceText"></span>
+        <input type="range" id="importantPrice" min="0" max="2000000" step="5000">
+      </label>
+
+      <label>
+        Loot Size
+        <input type="range" id="lootSize" min="1" max="6" step="1">
+      </label>
+
+      <label>Use Loot Filters <input type="checkbox" id="lootFiltersEnabled"></label>
+
+      <div class="row" style="margin-top:8px;">
+        <button class="small" id="openLootFilters">Edit Loot Filters</button>
+        <span class="badge mono" id="lootFilterBadge">0 groups</span>
+      </div>
+
+      <div class="row" style="margin-top:8px;">
+        <label style="width:100%;justify-content:space-between;">
+          Loot Widget
+          <input type="checkbox" id="showLootWidget">
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="general">
+    <div class="section">
+      <h3>UI</h3>
+      <label>Hover-open Sidebar <input type="checkbox" id="hoverOpenSidebar"></label>
+    </div>
+
+    <div class="section">
+      <h3>Map</h3>
+      <label>Show Map <input type="checkbox" id="showMap"></label>
+      <label>
+        Zoom
+        <input type="range" id="zoom" min="0.05" max="4" step="0.05">
+      </label>
+      <label>
+        Rotate With Local
+        <input type="checkbox" id="rotateWithLocal">
+      </label>
+      <label>
+        Poll Rate (ms)
+        <input type="range" id="pollMs" min="20" max="200" step="5">
+      </label>
+
+      <label>
+        Free Mode (drag to pan)
+        <input type="checkbox" id="freeMode">
+      </label>
+
+      <div class="row">
+        <button class="small" id="centerOnLocal">Center on Local</button>
+        <span class="badge mono" id="modeBadge">follow</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Extracts & Transits</h3>
+
+      <label>Show Extracts <input type="checkbox" id="showExtracts"></label>
+      <label>Show Transits <input type="checkbox" id="showTransits"></label>
+      <label>Show Names <input type="checkbox" id="showPoiNames"></label>
+
+      <div class="row">
+        <label style="margin:0;">Extract Color <input type="color" id="extractColor"></label>
+        <label style="margin:0;">Transit Color <input type="color" id="transitColor"></label>
+      </div>
+
+      <div class="kv"><span>POI source</span><span class="mono" id="poiStatus">default_data: loading...</span></div>
+    </div>
+
+    <div class="section">
+      <h3>Cache</h3>
+      <div class="row">
+        <button class="small" id="resetSettings">Reset Settings</button>
+        <span class="badge" id="cacheBadge">cache</span>
+      </div>
+      <div class="kv"><span>Map cache</span><span class="mono" id="mapCacheInfo">0</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Floating Widgets -->
+<div id="lootWidget" class="widget hidden" role="dialog" aria-label="Loot Widget">
+  <div class="w-header">
+    <div class="w-title">
+      <strong>Loot</strong>
+      <span class="mono" id="lootWidgetSub">top</span>
+    </div>
+    <div class="w-actions">
+      <button class="w-btn" id="lootWidgetMinBtn" title="Minimize">-</button>
+    </div>
+  </div>
+  <div class="w-body">
+    <div class="w-toprow">
+      <input type="text" id="lootWidgetSearch" placeholder="Search loot (filters the list)бн">
+      <span class="w-chip mono" id="lootWidgetCount">0</span>
+    </div>
+    <div class="w-list" id="lootWidgetList"></div>
+  </div>
+</div>
+
+<div id="playersWidget" class="widget hidden" role="dialog" aria-label="Players Widget">
+  <div class="w-header">
+    <div class="w-title">
+      <strong>Players</strong>
+      <span class="mono" id="playersWidgetSub">list</span>
+    </div>
+    <div class="w-actions">
+      <button class="w-btn" id="playersWidgetMinBtn" title="Minimize">-</button>
+    </div>
+  </div>
+  <div class="w-body">
+    <!-- searchbar removed -->
+    <div class="w-toprow" style="justify-content:flex-end;">
+      <span class="w-chip mono" id="playersWidgetCount">0</span>
+    </div>
+
+    <div class="w-toggle">
+      <input type="checkbox" id="playersWidgetOnlyPMCs">
+      <label for="playersWidgetOnlyPMCs" style="margin:0;justify-content:flex-start;gap:8px;">
+        Show only PMCs
+      </label>
+    </div>
+
+    <div class="w-list" id="playersWidgetList"></div>
+  </div>
+</div>
+
+<div id="tooltip" class="tooltip hidden"></div>
+
+<!-- Loot Filter Modal -->
+<div id="lootFilterModal" class="hidden" aria-hidden="true">
+  <div class="backdrop"></div>
+  <div class="card">
+    <div class="header">
+      <div class="title">
+        <strong>Loot Filters</strong>
+        <span id="lootDbStatus" class="mono">item db: loading...</span>
+      </div>
+      <button class="close" id="closeLootFilters">Close</button>
+    </div>
+    <div class="body" id="lootFilterBody">
+      <div class="modalTopRow">
+        <div class="left">
+          <button class="small" id="addLootGroup">Add Group</button>
+          <button class="small" id="copyLootGroups">Copy</button>
+          <button class="small" id="pasteLootGroups">Paste</button>
+          <span class="badge mono" id="lootGroupsMeta">0 groups</span>
+        </div>
+        <div class="right">
+          <span class="mono" style="color:var(--muted);font-size:12px;">
+            tip: type to search, shows first 10 matches
+          </span>
+        </div>
+      </div>
+
+      <div id="lootGroupsList"></div>
+    </div>
+  </div>
+</div>
+
+<div id="srPortal" class="searchResults portal"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

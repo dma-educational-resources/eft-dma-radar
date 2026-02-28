@@ -1,0 +1,25 @@
+{
+  "mapID": ["interchange"],
+  "x": 612,
+  "y": 483.0,
+  "scale": 1.09,
+  "svgScale": 5.00,
+  "disableDimming" : true,
+  "mapLayers": [
+    {
+      "minHeight": null,
+	  "maxHeight": null,
+      "filename": "Interchange.svg"
+    },
+    {
+      "minHeight": 26,
+	  "maxHeight": 31,
+      "filename": "Interchange_1f.svg"
+    },
+    {
+      "minHeight": 31,
+	  "maxHeight": null,
+      "filename": "Interchange_2f.svg"
+    }
+  ]
+}

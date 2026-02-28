@@ -1,0 +1,99 @@
+<UserControl x:Class="eft_dma_radar.UI.Pages.SettingsSearchControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:hc="https://handyorg.github.io/handycontrol"
+             xmlns:local="clr-namespace:eft_dma_radar.Converters"
+             MinWidth="200" MinHeight="200">
+
+    <UserControl.Resources>
+        <local:Boolean2VisibilityConverter x:Key="Boolean2VisibilityConverter"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border x:Name="DragHandle" Grid.Row="0" Style="{StaticResource PanelHeader}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Search Settings" Style="{StaticResource PanelHeaderText}"/>
+                <Border Grid.Column="1" Style="{StaticResource CloseButtonBorder}">
+                    <Button x:Name="btnCloseHeader" Style="{StaticResource CloseButton}"/>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Body -->
+        <Grid Grid.Row="1">
+            <Border Background="{DynamicResource RegionBrush}" CornerRadius="0,0,8,8"/>
+
+            <Grid Margin="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Search box -->
+                <Grid Grid.Row="0" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <hc:TextBox x:Name="txtSearchSettings"
+                                hc:InfoElement.Placeholder="Search by name, label, key (Tag), or path"
+                                Height="32"
+                                VerticalAlignment="Center"/>
+
+                    <Button x:Name="btnClearSearch" Grid.Column="1" Content="Clear"
+                            Height="32" Margin="8,0,0,0"/>
+                </Grid>
+
+                <!--search results-->
+                <Border Grid.Row="1" Padding="0">
+                    <ListBox x:Name="ResultsList"
+                             MouseDoubleClick="ResultsList_MouseDoubleClick"
+                             BorderThickness="0"
+                             Background="Transparent"
+                             VirtualizingPanel.IsVirtualizing="True"
+                             VirtualizingPanel.ScrollUnit="Pixel">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,6" Padding="8"
+                                        CornerRadius="6"
+                                        Background="{DynamicResource ItemBackgroundBrush}">
+                                    <StackPanel>
+                                        <!--Title-->
+                                        <TextBlock Text="{Binding Text}" FontWeight="SemiBold" FontSize="14"/>
+
+                                        <!--Meta-->
+                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,6">
+                                            <TextBlock Text="{Binding Type}" Opacity="0.7" FontSize="12"/>
+                                            <TextBlock Text="  ?  " Opacity="0.5" FontSize="12"/>
+                                            <TextBlock Text="{Binding Path}" Opacity="0.7" FontSize="12"/>
+                                        </StackPanel>
+
+                                        <!--The live mirrored control-->
+                                        <ContentPresenter Content="{Binding Mirror}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+            </Grid>
+
+            <!-- Resize handle -->
+            <Grid Style="{StaticResource ResizeHandle}"
+                  MouseLeftButtonDown="ResizeHandle_MouseLeftButtonDown">
+                <Path Style="{StaticResource ResizeHandleIcon}"/>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>
