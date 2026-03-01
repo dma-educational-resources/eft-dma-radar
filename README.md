@@ -47,4 +47,4 @@
 - Report any major outages (after a game update,etc.) by opening an [Issue](https://github.com/Lone83427/lone-eft-dma-radar/issues). Please be *as detailed as possible*, don't just say "it's broke".
   - This is **NOT** for feature requests or suggestions.
   - Misuse of the Issues category will result in the privilege being revoked for that user.
-  - If misuse is rampant, the ability to open Issues may be disabled for all users.
+  - If misuse is rampant, the ability to open Issues may be disabled for all users..
