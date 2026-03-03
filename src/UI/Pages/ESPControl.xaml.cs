@@ -1483,6 +1483,8 @@ namespace eft_dma_radar.UI.Pages
 
                 sldrMinimumKD.Value = settings.MinKD;
 
+                chkUseOverrideTextColor.IsChecked = settings.UseOverrideTextColor;
+
                 foreach (CheckComboBoxItem item in ccbFuserPlayerInformation.Items)
                 {
                     var info = item.Content.ToString();
@@ -1540,6 +1542,7 @@ namespace eft_dma_radar.UI.Pages
             settings.ShowImportantLoot = chkShowImportantPlayerLoot.IsChecked == true;
             settings.RenderDistance = (int)sldrPlayerTypeRenderDistance.Value;
             settings.MinKD = (float)sldrMinimumKD.Value;
+            settings.UseOverrideTextColor = chkUseOverrideTextColor.IsChecked == true;
 
             foreach (CheckComboBoxItem item in ccbFuserPlayerInformation.SelectedItems)
             {
@@ -1835,6 +1838,7 @@ namespace eft_dma_radar.UI.Pages
             SKPaints.TextStreamerESP.TextSize = 12f * fontScale;
             SKPaints.TextAimbotLockedESP.TextSize = 12f * fontScale;
             SKPaints.TextFocusedESP.TextSize = 12f * fontScale;
+            SKPaints.TextOverridePlayerESP.TextSize = 12f * fontScale;
             SKPaints.TextLootESP.TextSize = 12f * fontScale;
             SKPaints.TextCorpseESP.TextSize = 12f * fontScale;
             SKPaints.TextImpLootESP.TextSize = 12f * fontScale;

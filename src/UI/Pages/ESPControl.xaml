@@ -485,13 +485,17 @@
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
-                                        
+
                                         <CheckBox x:Name="chkHighAlert" Content="High Alert Indicator" Tag="HighAlertIndicator"
                                               Margin="0,0,0,10" Grid.Row="0" Grid.Column="0"
                                               Style="{StaticResource DynamicCheckBoxStyle}"/>
 
                                         <CheckBox x:Name="chkImportantIndicators" Content="Important Indicator" Tag="ImportantIndicators"
                                               Margin="0,0,0,10" Grid.Row="0" Grid.Column="1"
+                                              Style="{StaticResource DynamicCheckBoxStyle}"/>
+
+                                        <CheckBox x:Name="chkUseOverrideTextColor" Content="Override Text Color" Tag="UseOverrideTextColor"
+                                              Margin="0,0,0,10" Grid.Row="1" Grid.Column="0"
                                               Style="{StaticResource DynamicCheckBoxStyle}"/>
 
                                         <CheckBox x:Name="chkShowImportantPlayerLoot" Content="Show Important Loot" Tag="ShowImportantPlayerLoot"

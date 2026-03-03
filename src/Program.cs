@@ -24,6 +24,7 @@ using eft_dma_radar;
 using eft_dma_radar.Tarkov;
 using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.Features.MemoryWrites.Patches;
+using eft_dma_radar.Tarkov.MissionPlanner;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.Common.DMA.Features;
@@ -513,6 +514,7 @@ namespace eft_dma_radar
 
                 loading.UpdateStatus("Loading Remaining Modules...", 75);
                 FeatureManager.ModuleInit();
+                MissionPlannerService.ModuleInit(); // Quest Planner background service
 
                 ResourceJanitor.ModuleInit(new Action(CleanupWindowResources));
 

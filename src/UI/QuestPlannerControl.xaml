@@ -1,0 +1,694 @@
+<UserControl x:Class="eft_dma_radar.UI.Pages.QuestPlannerControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:hc="https://handyorg.github.io/handycontrol"
+             mc:Ignorable="d"
+             d:DesignHeight="600" d:DesignWidth="340"
+             MinWidth="280" MinHeight="300">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header - Draggable area -->
+        <Border x:Name="DragHandle" Grid.Row="0" Style="{StaticResource PanelHeader}"
+                MouseLeftButtonDown="DragHandle_MouseLeftButtonDown">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Quest Planner" Style="{StaticResource PanelHeaderText}"/>
+
+                <!-- 3-dots filter menu button -->
+                <Button x:Name="BtnMenu" Grid.Column="1"
+                        Tag="ContextMenu"
+                        Width="26" Height="26" Margin="0,0,5,0"
+                        Style="{StaticResource ButtonIcon}"
+                        ToolTip="Quest Planner Options"
+                        hc:IconElement.Width="18"
+                        hc:IconElement.Geometry="{StaticResource EllipsisVerticalGeometry}"
+                        Click="QuestPlannerButton_Click">
+                    <Button.ContextMenu>
+                        <ContextMenu x:Name="FilterMenu"
+                                     Placement="Bottom"
+                                     HorizontalOffset="-85"
+                                     MaxWidth="200"
+                                     Opened="FilterMenu_Opened">
+                            <MenuItem x:Name="MnuKappaFilter"
+                                      Header="Kappa Required"
+                                      IsCheckable="True"
+                                      Tag="KappaFilter"
+                                      Click="FilterMenuItem_Click"/>
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                </Button>
+
+                <!-- Close button -->
+                <Border Grid.Column="2" Style="{StaticResource CloseButtonBorder}">
+                    <Button x:Name="BtnCloseHeader" Style="{StaticResource CloseButton}" Click="BtnClose_Click"/>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Border Background="{DynamicResource RegionBrush}"
+                    CornerRadius="0,0,8,8"/>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Status Banner (shows when disconnected or stale data) -->
+                <Border x:Name="StatusBanner" Grid.Row="0"
+                        Visibility="Collapsed"
+                        Background="#2A2A00"
+                        Padding="8,6"
+                        Margin="8,8,8,0">
+                    <TextBlock x:Name="StatusBannerText" FontSize="11" Opacity="0.9"/>
+                </Border>
+
+                <!-- AvailableForStart Banner (green - quests ready to accept) -->
+                <Border x:Name="AvailableForStartBanner" Grid.Row="1"
+                        Background="#1A3A1A"
+                        Padding="10,8"
+                        Margin="8,4,8,0"
+                        CornerRadius="4">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowAvailableForStartBanner}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="{Binding AvailableForStartText}"
+                               FontSize="12" FontWeight="Bold" Foreground="#80CC80" Opacity="0.95" TextWrapping="Wrap"/>
+                </Border>
+
+                <!-- AvailableForFinish Banner (green - quests ready to turn in) -->
+                <Border x:Name="AvailableForFinishBanner" Grid.Row="2"
+                        Background="#1A2E1A"
+                        Padding="10,8"
+                        Margin="8,4,8,0"
+                        CornerRadius="4">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowAvailableForFinishBanner}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="{Binding AvailableForFinishText}"
+                               FontSize="12" FontWeight="Bold" Foreground="#80CC80" Opacity="0.95" TextWrapping="Wrap"/>
+                </Border>
+
+                <!-- Hand Over Items Banner (teal - quests where only giveQuestItem steps remain) -->
+                <Border x:Name="HandOverItemsBanner" Grid.Row="3"
+                        Background="#1A2232"
+                        Padding="10,8"
+                        Margin="8,4,8,0"
+                        CornerRadius="4">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowHandOverItemsBanner}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <TextBlock Text="Hand over items"
+                                   FontSize="11" FontWeight="Bold" Foreground="#70A8CC"
+                                   Opacity="0.9" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding HandOverItemsText}"
+                                   FontSize="11" Foreground="#70A8CC"
+                                   Opacity="0.85" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Pinned recommended map card — always visible, always expanded, not scrollable -->
+                <ItemsControl x:Name="PinnedMapControl" Grid.Row="4"
+                              ItemsSource="{Binding RecommendedMap}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="#FF1A1A1A" CornerRadius="6" Margin="4,4,4,0">
+                                <StackPanel Background="#18FFCC00">
+                                    <!-- Map Row Header (display only — pinned card never collapses) -->
+                                    <Border Background="Transparent"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="0,0,0,1"
+                                            Padding="8,6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                                <TextBlock Text="{Binding MapName}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                <TextBlock Text=" (" Opacity="0.6" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding CompletableObjectiveCount}" Opacity="0.6" VerticalAlignment="Center"/>
+                                                <TextBlock Text=" obj / " Opacity="0.6" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding ActiveQuestCount}" Opacity="0.6" VerticalAlignment="Center"/>
+                                                <TextBlock Text=" quests)" Opacity="0.6" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="★"
+                                                       FontSize="10" Foreground="#FFCC00" Opacity="0.8" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+                                    <!-- Always-expanded content -->
+                                    <StackPanel>
+                                        <!-- Missions Sub-Section -->
+                                        <StackPanel Margin="12,6,8,0">
+                                            <TextBlock Text="MISSIONS" FontSize="10" Opacity="0.5" Margin="0,0,0,4"/>
+                                            <ItemsControl ItemsSource="{Binding Missions}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Margin="0,0,0,8">
+                                                            <TextBlock Text="{Binding MissionName}" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,2"/>
+                                                            <ItemsControl ItemsSource="{Binding Objectives}" Margin="8,0,0,0">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <StackPanel Orientation="Horizontal" Margin="0,1">
+                                                                            <TextBlock FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0">
+                                                                                <TextBlock.Style>
+                                                                                    <Style TargetType="TextBlock">
+                                                                                        <Setter Property="Text" Value="&#x25CB;"/>
+                                                                                        <Setter Property="Opacity" Value="0.5"/>
+                                                                                        <Style.Triggers>
+                                                                                            <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                                                <Setter Property="Text" Value="&#x2713;"/>
+                                                                                                <Setter Property="Foreground" Value="#4CAF50"/>
+                                                                                                <Setter Property="Opacity" Value="1"/>
+                                                                                            </DataTrigger>
+                                                                                        </Style.Triggers>
+                                                                                    </Style>
+                                                                                </TextBlock.Style>
+                                                                            </TextBlock>
+                                                                            <TextBlock FontSize="11" Opacity="0.7" Margin="0,0,3,0"
+                                                                                       Text="{Binding ProgressText}">
+                                                                                <TextBlock.Style>
+                                                                                    <Style TargetType="TextBlock">
+                                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                        <Style.Triggers>
+                                                                                            <DataTrigger Binding="{Binding HasProgress}" Value="True">
+                                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                                            </DataTrigger>
+                                                                                        </Style.Triggers>
+                                                                                    </Style>
+                                                                                </TextBlock.Style>
+                                                                            </TextBlock>
+                                                                            <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.85" TextWrapping="Wrap"/>
+                                                                        </StackPanel>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                        <!-- Bring List Sub-Section -->
+                                        <StackPanel Margin="12,4,8,0">
+                                            <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,0,0,6"/>
+                                            <TextBlock Text="BRING LIST" FontSize="10" Opacity="0.5" Margin="0,0,0,4"/>
+                                            <ItemsControl ItemsSource="{Binding FilteredBringList}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Horizontal" Margin="0,1">
+                                                            <Border Background="#3F51B5" CornerRadius="2" Padding="4,1" Margin="0,0,6,0">
+                                                                <TextBlock FontSize="9" Foreground="White" FontWeight="SemiBold">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Text" Value="[Item]"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding Type}" Value="Key">
+                                                                                    <Setter Property="Text" Value="[Key]"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                            </Border>
+                                                            <ItemsControl ItemsSource="{Binding Alternatives}" Margin="0,0,4,0">
+                                                                <ItemsControl.ItemsPanel>
+                                                                    <ItemsPanelTemplate>
+                                                                        <StackPanel Orientation="Horizontal"/>
+                                                                    </ItemsPanelTemplate>
+                                                                </ItemsControl.ItemsPanel>
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <TextBlock Text="{Binding}" FontSize="11" Opacity="0.85"/>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                            <TextBlock Margin="0,0,4,0" FontSize="11" Opacity="0.75"
+                                                                       Text="{Binding Count, StringFormat='(x{0})'}">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Count}" Value="1">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                            <TextBlock Text="{Binding QuestName, StringFormat='({0})'}" FontSize="9" Opacity="0.5" FontStyle="Italic"/>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                        <!-- Unlocks Sub-Section -->
+                                        <StackPanel Margin="12,4,8,8">
+                                            <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,0,0,6"/>
+                                            <TextBlock Text="UNLOCKS" FontSize="10" Opacity="0.5" Margin="0,0,0,4"/>
+                                            <ItemsControl ItemsSource="{Binding UnlockedQuests}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Horizontal" Margin="0,1">
+                                                            <TextBlock Text="{Binding QuestName}" FontSize="11" Opacity="0.85"/>
+                                                            <TextBlock Text=" &#x2192; " FontSize="11" Opacity="0.5"/>
+                                                            <TextBlock Text="{Binding MapName}" FontSize="11" Opacity="0.7"/>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Map List Area -->
+                <ScrollViewer Grid.Row="5" Style="{StaticResource PanelScrollViewer}">
+                    <ContentControl x:Name="MapListContent">
+                        <!-- Content will be set via DataTemplate based on CurrentSummary -->
+
+                        <!-- Placeholder when no data -->
+                        <ContentControl.Style>
+                            <Style TargetType="ContentControl">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CurrentSummary}" Value="{x:Null}">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate>
+                                                    <TextBlock Text="Quest plan will appear when connected in lobby."
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                               Opacity="0.6" TextWrapping="Wrap"
+                                                               Margin="16"/>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ContentControl.Style>
+
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+
+                            <!-- Empty state when connected but no map objectives -->
+                            <TextBlock Grid.Row="0"
+                                       Text="{Binding EmptyStateMessage}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Opacity="0.6" TextWrapping="Wrap" Margin="16"
+                                       Visibility="Collapsed">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowEmptyState}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                        <!-- Main content when data exists -->
+                        <ItemsControl x:Name="MapListControl"
+                                      Grid.Row="0"
+                                      ItemsSource="{Binding OtherMaps}"
+                                      AlternationCount="9999">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#FF1A1A1A" CornerRadius="6" Margin="4,4,4,0">
+                                    <StackPanel>
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsRecommended}" Value="True">
+                                                        <Setter Property="Background" Value="#18FFCC00"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+                                        <!-- Map Row Header (clickable) -->
+                                        <Border Background="Transparent"
+                                                Cursor="Hand"
+                                                BorderBrush="{DynamicResource BorderBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="8,6"
+                                                Tag="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex)}"
+                                                MouseLeftButtonUp="MapRow_Click">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource SecondaryRegionBrush}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding MapName}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                    <TextBlock Text=" (" Opacity="0.6" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding CompletableObjectiveCount}" Opacity="0.6" VerticalAlignment="Center"/>
+                                                    <TextBlock Text=" obj / " Opacity="0.6" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding ActiveQuestCount}" Opacity="0.6" VerticalAlignment="Center"/>
+                                                    <TextBlock Text=" quests)" Opacity="0.6" VerticalAlignment="Center"/>
+                                                </StackPanel>
+
+                                                <TextBlock x:Name="ChevronIndicator" Grid.Column="1" Text="&#x25B6;"
+                                                           FontSize="10" Opacity="0.5" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Expandable Content -->
+                                        <StackPanel Tag="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex)}"
+                                                    Visibility="Collapsed">
+
+                                            <!-- Missions Sub-Section -->
+                                            <StackPanel Margin="12,6,8,0">
+                                                <TextBlock Text="MISSIONS" FontSize="10" Opacity="0.5" Margin="0,0,0,4"/>
+                                                <ItemsControl ItemsSource="{Binding Missions}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel Margin="0,0,0,8">
+                                                                <TextBlock Text="{Binding MissionName}" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,2"/>
+                                                                <ItemsControl ItemsSource="{Binding Objectives}" Margin="8,0,0,0">
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate>
+                                                                            <StackPanel Orientation="Horizontal" Margin="0,1">
+                                                                                <TextBlock FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0">
+                                                                                    <TextBlock.Style>
+                                                                                        <Style TargetType="TextBlock">
+                                                                                            <Setter Property="Text" Value="&#x25CB;"/>
+                                                                                            <Setter Property="Opacity" Value="0.5"/>
+                                                                                            <Style.Triggers>
+                                                                                                <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                                                    <Setter Property="Text" Value="&#x2713;"/>
+                                                                                                    <Setter Property="Foreground" Value="#4CAF50"/>
+                                                                                                    <Setter Property="Opacity" Value="1"/>
+                                                                                                </DataTrigger>
+                                                                                            </Style.Triggers>
+                                                                                        </Style>
+                                                                                    </TextBlock.Style>
+                                                                                </TextBlock>
+                                                                                <!-- Progress indicator (e.g., "2/3") when TargetCount > 1 -->
+                                                                                <TextBlock FontSize="11" Opacity="0.7" Margin="0,0,3,0"
+                                                                                           Text="{Binding ProgressText}">
+                                                                                    <TextBlock.Style>
+                                                                                        <Style TargetType="TextBlock">
+                                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                            <Style.Triggers>
+                                                                                                <DataTrigger Binding="{Binding HasProgress}" Value="True">
+                                                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                                                </DataTrigger>
+                                                                                            </Style.Triggers>
+                                                                                        </Style>
+                                                                                    </TextBlock.Style>
+                                                                                </TextBlock>
+                                                                                <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.85" TextWrapping="Wrap"/>
+                                                                            </StackPanel>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+
+                                            <!-- Bring List Sub-Section -->
+                                            <StackPanel Margin="12,4,8,0">
+                                                <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,0,0,6"/>
+                                                <TextBlock Text="BRING LIST" FontSize="10" Opacity="0.5" Margin="0,0,0,4"/>
+                                                <ItemsControl ItemsSource="{Binding FilteredBringList}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel Orientation="Horizontal" Margin="0,1">
+                                                                <!-- Type Badge -->
+                                                                <Border Background="#3F51B5" CornerRadius="2" Padding="4,1" Margin="0,0,6,0">
+                                                                    <TextBlock FontSize="9" Foreground="White" FontWeight="SemiBold">
+                                                                        <TextBlock.Style>
+                                                                            <Style TargetType="TextBlock">
+                                                                                <Setter Property="Text" Value="[Item]"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding Type}" Value="Key">
+                                                                                        <Setter Property="Text" Value="[Key]"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </TextBlock.Style>
+                                                                    </TextBlock>
+                                                                </Border>
+                                                                <!-- Alternatives -->
+                                                                <ItemsControl ItemsSource="{Binding Alternatives}" Margin="0,0,4,0">
+                                                                    <ItemsControl.ItemsPanel>
+                                                                        <ItemsPanelTemplate>
+                                                                            <StackPanel Orientation="Horizontal"/>
+                                                                        </ItemsPanelTemplate>
+                                                                    </ItemsControl.ItemsPanel>
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding}" FontSize="11" Opacity="0.85"/>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+
+                                                                </ItemsControl>
+                                                                <!-- Count suffix — hidden when Count is 1 -->
+                                                                <TextBlock Margin="0,0,4,0" FontSize="11" Opacity="0.75"
+                                                                           Text="{Binding Count, StringFormat='(x{0})'}">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding Count}" Value="1">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <!-- Quest attribution -->
+                                                                <TextBlock Text="{Binding QuestName, StringFormat='({0})'}" FontSize="9" Opacity="0.5" FontStyle="Italic"/>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+
+                                            <!-- Unlocks Sub-Section -->
+                                            <StackPanel Margin="12,4,8,8">
+                                                <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,0,0,6"/>
+                                                <TextBlock Text="UNLOCKS" FontSize="10" Opacity="0.5" Margin="0,0,0,4"/>
+                                                <ItemsControl ItemsSource="{Binding UnlockedQuests}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel Orientation="Horizontal" Margin="0,1">
+                                                                <TextBlock Text="{Binding QuestName}" FontSize="11" Opacity="0.85"/>
+                                                                <TextBlock Text=" &#x2192; " FontSize="11" Opacity="0.5"/>
+                                                                <TextBlock Text="{Binding MapName}" FontSize="11" Opacity="0.7"/>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+
+                                        </StackPanel>
+                                    </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                            <!-- All Maps Section — quests with no-map objectives (e.g. Gunsmith, trader hand-overs) -->
+                            <StackPanel Grid.Row="1" x:Name="AllMapsSectionPanel" VerticalAlignment="Top">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowAllMapsSection}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <Border Background="#FF1A1A1A" CornerRadius="6" Margin="4,4,4,4">
+                                <StackPanel>
+                                <!-- All Maps header row -->
+                                <Border Background="Transparent"
+                                        Cursor="Hand"
+                                        BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="8,6"
+                                        MouseLeftButtonUp="AllMapsRow_Click">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource SecondaryRegionBrush}"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="ALL MAPS"
+                                                   FontWeight="SemiBold" FontSize="12"
+                                                   Opacity="0.85" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="AllMapsChevron" Grid.Column="1"
+                                                   Text="&#x25BC;"
+                                                   FontSize="10" Opacity="0.5" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                                <!-- Expandable All Maps content -->
+                                <StackPanel x:Name="AllMapsContentPanel" Visibility="Visible">
+                                    <!-- Find in Raid category — collapsed pairs shown as progress rows above All Maps quests -->
+                                    <StackPanel x:Name="FirCategoryPanel" Margin="12,6,8,4">
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ShowFirCategory}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+                                        <TextBlock Text="FIND IN RAID" FontSize="10" Opacity="0.5" Margin="0,0,0,4"/>
+                                        <ItemsControl ItemsSource="{Binding FirItems}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <!-- "1/3 Salewa (Shortage)" -->
+                                                    <StackPanel Orientation="Horizontal" Margin="0,1">
+                                                        <TextBlock Text="{Binding ProgressText}"
+                                                                   FontSize="11" Opacity="0.7" Margin="0,0,4,0"/>
+                                                        <TextBlock Text="{Binding ItemShortName}"
+                                                                   FontSize="11" Opacity="0.85"/>
+                                                        <TextBlock Text=" (" FontSize="11" Opacity="0.5"/>
+                                                        <TextBlock Text="{Binding QuestName}"
+                                                                   FontSize="11" Opacity="0.65" FontStyle="Italic"/>
+                                                        <TextBlock Text=")" FontSize="11" Opacity="0.5"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <!-- Separator before the All Maps quest list -->
+                                        <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="12,6,8,0">
+                                        <ItemsControl ItemsSource="{Binding AllMapsMissions}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="0,0,0,8">
+                                                        <TextBlock Text="{Binding MissionName}" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,2"/>
+                                                        <ItemsControl ItemsSource="{Binding Objectives}" Margin="8,0,0,0">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <StackPanel Orientation="Horizontal" Margin="0,1">
+                                                                        <TextBlock FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0">
+                                                                            <TextBlock.Style>
+                                                                                <Style TargetType="TextBlock">
+                                                                                    <Setter Property="Text" Value="&#x25CB;"/>
+                                                                                    <Setter Property="Opacity" Value="0.5"/>
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                                            <Setter Property="Text" Value="&#x2713;"/>
+                                                                                            <Setter Property="Foreground" Value="#4CAF50"/>
+                                                                                            <Setter Property="Opacity" Value="1"/>
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </TextBlock.Style>
+                                                                        </TextBlock>
+                                                                        <!-- Progress indicator (e.g., "2/3") when TargetCount > 1 -->
+                                                                        <TextBlock FontSize="11" Opacity="0.7" Margin="0,0,3,0"
+                                                                                   Text="{Binding ProgressText}">
+                                                                            <TextBlock.Style>
+                                                                                <Style TargetType="TextBlock">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding HasProgress}" Value="True">
+                                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </TextBlock.Style>
+                                                                        </TextBlock>
+                                                                        <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.85" TextWrapping="Wrap"/>
+                                                                    </StackPanel>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
+                                </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                        </Grid>
+                    </ContentControl>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- Resize handle -->
+            <Grid Style="{StaticResource ResizeHandle}"
+                  MouseLeftButtonDown="ResizeHandle_MouseLeftButtonDown">
+                <Path Style="{StaticResource ResizeHandleIcon}"/>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

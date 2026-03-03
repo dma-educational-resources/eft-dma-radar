@@ -485,6 +485,8 @@ namespace eft_dma_radar.UI.ESP
                         return Config.ShowLootInfoWidget;
                     case "Quest Info Widget":
                         return Config.ShowQuestInfoWidget;
+                    case "Quest Planner Widget":
+                        return Config.ShowQuestPlannerWidget;
                     case "Connect Groups":
                         return Config.ConnectGroups;
                     case "Mask Names":

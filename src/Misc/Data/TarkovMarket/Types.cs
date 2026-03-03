@@ -210,11 +210,41 @@ namespace eft_dma_radar.Common.Misc.Data.TarkovMarket
         [JsonPropertyName("name")]
         public string Name { get; set; }
 
+        [JsonPropertyName("trader")]
+        public TraderElement Trader { get; set; }
+
+        [JsonPropertyName("map")]
+        public BasicDataElement Map { get; set; }
+
         [JsonPropertyName("kappaRequired")]
         public bool KappaRequired { get; set; }
 
         [JsonPropertyName("objectives")]
         public List<ObjectiveElement> Objectives { get; set; }
+
+        [JsonPropertyName("taskRequirements")]
+        public List<TaskRequirementElement> TaskRequirements { get; set; }
+
+        public partial class TaskRequirementElement
+        {
+            [JsonPropertyName("task")]
+            public TaskRefElement Task { get; set; }
+
+            [JsonPropertyName("status")]
+            public List<string> Status { get; set; }
+        }
+
+        public partial class TaskRefElement
+        {
+            [JsonPropertyName("id")]
+            public string Id { get; set; }
+        }
+
+        public partial class TraderElement
+        {
+            [JsonPropertyName("name")]
+            public string Name { get; set; }
+        }
 
         public partial class ObjectiveElement
         {

@@ -435,7 +435,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
         /// Gets all required item IDs from an API objective.
         /// Checks both 'item' (regular items) and 'questItem' (quest-specific items like Jaeger's Letter).
         /// </summary>
-        private static List<string> GetRequiredItemIdsFromApi(EftDataManager.TaskElement.ObjectiveElement apiObj)
+        private static List<string> GetRequiredItemIdsFromApi(TaskElement.ObjectiveElement apiObj)
         {
             var itemIds = new List<string>();
             

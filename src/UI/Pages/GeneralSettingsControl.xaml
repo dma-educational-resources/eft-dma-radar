@@ -1146,13 +1146,22 @@
                                             </Button.Background>
                                         </Button>
 
-                                        <!-- Mini Radar Theme & n/a -->
-                                        <TextBlock Text="Radar Theme" Grid.Row="6" Grid.Column="0" 
+                                        <!-- Mini Radar Theme & Override Player Text -->
+                                        <TextBlock Text="Radar Theme" Grid.Row="6" Grid.Column="0"
                                                    Style="{StaticResource ColorPickerLabel}"/>
                                         <Button x:Name="btnMiniRadarThemeColor" Grid.Row="6" Grid.Column="1" Tag="MiniRadarTheme"
                                                 Style="{StaticResource ColorPickerButton}">
                                             <Button.Background>
                                                 <SolidColorBrush x:Name="miniRadarThemeBrush" Color="WhiteSmoke"/>
+                                            </Button.Background>
+                                        </Button>
+
+                                        <TextBlock Text="Override Player Text" Grid.Row="6" Grid.Column="3"
+                                                   Style="{StaticResource ColorPickerLabel}"/>
+                                        <Button x:Name="btnOverridePlayerTextColor" Grid.Row="6" Grid.Column="4" Tag="OverridePlayerText"
+                                                Style="{StaticResource ColorPickerButton}">
+                                            <Button.Background>
+                                                <SolidColorBrush x:Name="overridePlayerTextBrush" Color="White"/>
                                             </Button.Background>
                                         </Button>
                                     </Grid>

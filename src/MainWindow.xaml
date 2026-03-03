@@ -175,8 +175,8 @@
 
                     <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
 
-                    <Button x:Name="btnRestart" 
-                            Style="{StaticResource ButtonIcon}" 
+                    <Button x:Name="btnRestart"
+                            Style="{StaticResource ButtonIcon}"
                             ToolTip="Restarts the Radar for the current raid instance"
                             Background="Transparent"
                             BorderThickness="0"
@@ -185,6 +185,18 @@
                             hc:IconElement.Width="18"
                             hc:IconElement.Geometry="{StaticResource ArrowsRotateGeometry}"
                             Click="btnRestart_Click"/>
+
+                    <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
+                    <Button x:Name="btnQuestPlanner"
+                            Style="{StaticResource ButtonIcon}"
+                            ToolTip="Opens the quest planner panel"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Width="32" Height="32"
+                            Padding="6"
+                            hc:IconElement.Width="18"
+                            hc:IconElement.Geometry="{StaticResource MapGeometry}"
+                            Click="btnQuestPlanner_Click"/>
                 </hc:SimpleStackPanel>
             </Border>
         </Canvas>
@@ -336,15 +348,33 @@
                 <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
             </Canvas.Resources>
 
-            <Border x:Name="MapSetupPanel" 
+            <Border x:Name="MapSetupPanel"
                     Width="365" Height="145"
                     Canvas.Left="550" Canvas.Top="110"
-                    CornerRadius="8" 
+                    CornerRadius="8"
                     Visibility="Collapsed"
                     Effect="{StaticResource PanelShadow}"
                     Background="Transparent"
                     BorderThickness="0">
                 <local:MapSetupControl x:Name="MapSetupControl"/>
+            </Border>
+        </Canvas>
+
+        <!-- quest planner panel -->
+        <Canvas Name="QuestPlannerCanvas" Panel.ZIndex="1000">
+            <Canvas.Resources>
+                <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
+            </Canvas.Resources>
+
+            <Border x:Name="QuestPlannerPanel"
+                    Width="340" Height="600"
+                    Canvas.Left="650" Canvas.Top="50"
+                    CornerRadius="8"
+                    Visibility="Collapsed"
+                    Effect="{StaticResource PanelShadow}"
+                    Background="Transparent"
+                    BorderThickness="0">
+                <local:QuestPlannerControl x:Name="QuestPlannerControl"/>
             </Border>
         </Canvas>
 

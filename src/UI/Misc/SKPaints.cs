@@ -2234,6 +2234,19 @@ namespace eft_dma_radar.UI.Misc
             FilterQuality = SKFilterQuality.Low
         };
 
+        public static SKPaint TextOverridePlayerESP { get; } = new()
+        {
+            SubpixelText = true,
+            Color = SKColors.White,
+            IsStroke = false,
+            TextSize = 12f,
+            TextAlign = SKTextAlign.Center,
+            TextEncoding = SKTextEncoding.Utf8,
+            IsAntialias = true,
+            Typeface = CustomFonts.SKFontFamilyMedium,
+            FilterQuality = SKFilterQuality.Low
+        };
+
         public static SKPaint PaintAimbotLockedLineESP { get; } = new()
         {
             Color = SKColors.Blue,

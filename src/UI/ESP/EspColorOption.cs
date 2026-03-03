@@ -51,7 +51,8 @@ namespace eft_dma_radar.UI
         AimbotLock,
         ClosestPlayer,
         TopLoot,
-        MiniRadarTheme
+        MiniRadarTheme,
+        OverridePlayerText
     }
 
     internal static class EspColorOptions
@@ -122,7 +123,8 @@ namespace eft_dma_radar.UI
                 [EspColorOption.AimbotLock] = SKColors.WhiteSmoke.ToString(),
                 [EspColorOption.ClosestPlayer] = SKColors.WhiteSmoke.ToString(),
                 [EspColorOption.TopLoot] = SKColors.WhiteSmoke.ToString(),
-                [EspColorOption.MiniRadarTheme] = SKColors.WhiteSmoke.ToString()
+                [EspColorOption.MiniRadarTheme] = SKColors.WhiteSmoke.ToString(),
+                [EspColorOption.OverridePlayerText] = SKColors.White.ToString()
             };
 
         /// <summary>
@@ -312,6 +314,9 @@ namespace eft_dma_radar.UI
                         case EspColorOption.MiniRadarTheme:
                             SKPaints.PaintMiniRadarOutlineESP.Color = skColor;
                             SKPaints.PaintMiniRadarResizeHandleESP.Color = skColor;
+                            break;
+                        case EspColorOption.OverridePlayerText:
+                            SKPaints.TextOverridePlayerESP.Color = skColor;
                             break;
                     }
                 }

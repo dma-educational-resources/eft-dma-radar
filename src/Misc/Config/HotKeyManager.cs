@@ -125,6 +125,7 @@ namespace eft_dma_radar.Common.Misc.Data.EFT
         [JsonPropertyName("playerInfoWidget")] public HotkeyEntry PlayerInfoWidget { get; set; } = new();
         [JsonPropertyName("lootInfoWidget")] public HotkeyEntry LootInfoWidget { get; set; } = new();
         [JsonPropertyName("questInfoWidget")] public HotkeyEntry QuestInfoWidget { get; set; } = new();
+        [JsonPropertyName("questPlannerWidget")] public HotkeyEntry QuestPlannerWidget { get; set; } = new();
         [JsonPropertyName("connectGroups")] public HotkeyEntry ConnectGroups { get; set; } = new();
         [JsonPropertyName("maskNames")] public HotkeyEntry MaskNames { get; set; } = new();
         [JsonPropertyName("playersOnTop")] public HotkeyEntry PlayersOnTop { get; set; } = new();

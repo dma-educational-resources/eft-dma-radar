@@ -433,7 +433,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         {
             get
             {
-                // HARD GUARD ¡ª prevents ALL render crashes
+                // HARD GUARD ï¿½ï¿½ prevents ALL render crashes
                 if (Skeleton == null || Skeleton.Root == null)
                     return ref _cachedPosition;
 
@@ -718,7 +718,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                         }
                         catch
                         {
-                            // Transform chain likely invalidated ¡ú rebuild just this bone
+                            // Transform chain likely invalidated ï¿½ï¿½ rebuild just this bone
                             Skeleton.ResetTransform(tr.Key);
                             bonesOk = false;
                         }
@@ -749,7 +749,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     ErrorTimer.ElapsedMilliseconds > 800)
                 {
                     XMLogging.WriteLine(
-                        $"[SKELETON FIX] {Name} skeleton frozen ¡ú soft reset");
+                        $"[SKELETON FIX] {Name} skeleton frozen ï¿½ï¿½ soft reset");
 
                     SoftResetRuntimeState();
                     Skeleton.ResetESPCacheAndTransforms();
@@ -2054,13 +2054,16 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 return;
         
             var paints = GetESPPaints();
+            var textPaint = espSettings.UseOverrideTextColor
+                ? SKPaints.TextOverridePlayerESP
+                : paints.Item2;
             var renderMode = espSettings.RenderMode;
         
             // ---------------- BTR ----------------
             if (renderMode != ESPPlayerRenderMode.None && this is BtrOperator btr)
             {
                 if (CameraManagerBase.WorldToScreen(ref btr.Position, out var btrScreen))
-                    btrScreen.DrawESPText(canvas, btr, localPlayer, espSettings.ShowDistance, paints.Item2, "BTR");
+                    btrScreen.DrawESPText(canvas, btr, localPlayer, espSettings.ShowDistance, textPaint, "BTR");
                 return;
             }
         
@@ -2087,7 +2090,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     var p0 = Skeleton.ESPBuffer[idx];
                     var p1 = Skeleton.ESPBuffer[idx + 1];
         
-                    // HARD GUARD ¡ú prevents long diagonal lines
+                    // HARD GUARD ï¿½ï¿½ prevents long diagonal lines
                     if (!p0.IsFinite() || !p1.IsFinite())
                         continue;
         
@@ -2127,21 +2130,21 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             // ---------------- TEXT ----------------
             var observed = this as ObservedPlayer;
             float textY = headPoint.Y - 5f * ESP.Config.FontScale;
-            float lineHeight = paints.Item2.TextSize * 1.2f * ESP.Config.FontScale;
-        
+            float lineHeight = textPaint.TextSize * 1.2f * ESP.Config.FontScale;
+
             if (espSettings.ShowADS && IsAiming && observed != null)
             {
-                canvas.DrawText("ADS", new SKPoint(headPoint.X, textY), paints.Item2);
+                canvas.DrawText("ADS", new SKPoint(headPoint.X, textY), textPaint);
                 textY -= lineHeight;
             }
-        
+
             if (espSettings.ShowName)
             {
                 string name = Name;
                 if (IsHostilePmc)
                     name = (PlayerSide == Enums.EPlayerSide.Usec ? "U:" : "B:") + name;
-        
-                canvas.DrawText(name, new SKPoint(headPoint.X, textY), paints.Item2);
+
+                canvas.DrawText(name, new SKPoint(headPoint.X, textY), textPaint);
             }
         
             if (espSettings.ShowHealth && observed != null)
@@ -2184,7 +2187,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             if (count > 0)
             {
                 var label = string.Join("\n", lines[..count]);
-                var metrics = paints.Item2.FontMetrics;
+                var metrics = textPaint.FontMetrics;
 
                 // Ascent is negative in Skia
                 float ascent = -metrics.Ascent * ESP.Config.FontScale;
@@ -2197,7 +2200,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 float textBaseY = playerBox.Bottom + padding + ascent;
 
                 new SKPoint(playerBox.MidX, textBaseY)
-                    .DrawESPText(canvas, this, localPlayer, false, paints.Item2, label, null);
+                    .DrawESPText(canvas, this, localPlayer, false, textPaint, label, null);
             }
         }
         private static readonly (Bones Start, Bones End)[] SkeletonSegments =

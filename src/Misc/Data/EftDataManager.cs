@@ -117,7 +117,10 @@ namespace eft_dma_radar.Common.Misc.Data
         }
 
         /// <summary>
-        /// Attempts to load data from various sources, with clean fallbacks
+        /// Attempts to load data from various sources, with clean fallbacks.
+        ///
+        /// Normal startup (defaultOnly=false): API first, then cached data.json, then embedded DEFAULT_DATA.json.
+        /// Default-only mode (defaultOnly=true): Cached data.json first, then embedded DEFAULT_DATA.json.
         /// </summary>
         private static async Task<TarkovMarketData> LoadDataWithFallbacksAsync(LoadingWindow loading, bool defaultOnly)
         {
@@ -129,52 +132,7 @@ namespace eft_dma_radar.Common.Misc.Data
                 NumberHandling = JsonNumberHandling.AllowReadingFromString
             };
 
-            if (File.Exists(_dataFile))
-            {
-                try
-                {
-                    loading.UpdateStatus("Loading cached data file...", loading.PercentComplete);
-                    string json = await File.ReadAllTextAsync(_dataFile);
-                    data = JsonSerializer.Deserialize<TarkovMarketData>(json, jsonOptions);
-
-                    if (data != null && data.Items != null && data.Tasks != null)
-                    {
-                        loading.UpdateStatus("Cached data loaded successfully", loading.PercentComplete);
-
-                        if (!defaultOnly && IsDataFileOutdated(_dataFile, _defaultDataUpdateInterval))
-                        {
-                            loading.UpdateStatus($"Cached data is outdated (older than {_defaultDataUpdateInterval.TotalHours} hours), will update after initialization", loading.PercentComplete);
-
-                            _ = Task.Run(async () =>
-                            {
-                                await Task.Delay(4000);
-                                await UpdateDataFileAsync();
-                            });
-                        }
-                        else
-                        {
-                            loading.UpdateStatus($"Using cached data (updated in the last {_defaultDataUpdateInterval.TotalHours} hours)", loading.PercentComplete);
-                        }
-
-                        return data;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    XMLogging.WriteLine($"Error loading cached data: {ex}");
-                    loading.UpdateStatus("Cached data is invalid, will create new data", loading.PercentComplete);
-
-                    try
-                    {
-                        File.Delete(_dataFile);
-                    }
-                    catch
-                    {
-                        // Ignore deletion errors
-                    }
-                }
-            }
-
+            // Normal startup: Always try API fetch first for fresh data
             if (!defaultOnly)
             {
                 try
@@ -207,10 +165,33 @@ namespace eft_dma_radar.Common.Misc.Data
                 catch (Exception ex)
                 {
                     XMLogging.WriteLine($"Error fetching API data: {ex}");
-                    loading.UpdateStatus("API fetch failed, falling back to embedded data", loading.PercentComplete);
+                    loading.UpdateStatus("API fetch failed, trying cached data...", loading.PercentComplete);
                 }
             }
 
+            // Fallback to cached data.json (for defaultOnly mode, or if API fetch failed)
+            if (File.Exists(_dataFile))
+            {
+                try
+                {
+                    loading.UpdateStatus("Loading cached data file...", loading.PercentComplete);
+                    string cachedJson = await File.ReadAllTextAsync(_dataFile);
+                    data = JsonSerializer.Deserialize<TarkovMarketData>(cachedJson, jsonOptions);
+
+                    if (data != null && data.Items != null && data.Tasks != null)
+                    {
+                        loading.UpdateStatus("Cached data loaded successfully", loading.PercentComplete);
+                        return data;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    XMLogging.WriteLine($"Error loading cached data: {ex}");
+                    loading.UpdateStatus("Cached data is invalid, trying embedded data", loading.PercentComplete);
+                }
+            }
+
+            // Final fallback: embedded default data
             try
             {
                 loading.UpdateStatus("Loading embedded default data...", loading.PercentComplete);
@@ -527,128 +508,6 @@ namespace eft_dma_radar.Common.Misc.Data
             public System.Numerics.Vector3 ToVector3() => new(X, Y, Z);
         }
 
-        public partial class TaskElement
-        {
-            [JsonPropertyName("id")]
-            public string Id { get; set; }
-
-            [JsonPropertyName("name")]
-            public string Name { get; set; }
-
-            [JsonPropertyName("kappaRequired")]
-            public bool KappaRequired { get; set; }
-
-            [JsonPropertyName("objectives")]
-            public List<ObjectiveElement> Objectives { get; set; } = new List<ObjectiveElement>();
-
-            public partial class ObjectiveElement
-            {
-                [JsonPropertyName("id")]
-                public string Id { get; set; }
-
-                [JsonPropertyName("type")]
-                public string Type { get; set; }
-
-                [JsonPropertyName("optional")]
-                public bool Optional { get; set; }
-
-                [JsonPropertyName("description")]
-                public string Description { get; set; }
-
-                [JsonPropertyName("requiredKeys")]
-                public List<List<MarkerItemClass>> RequiredKeys { get; set; }
-
-                [JsonPropertyName("maps")]
-                public List<BasicDataElement> Maps { get; set; }
-
-                [JsonPropertyName("zones")]
-                public List<ZoneElement> Zones { get; set; }
-
-                [JsonPropertyName("count")]
-                public int Count { get; set; }
-
-                [JsonPropertyName("foundInRaid")]
-                public bool FoundInRaid { get; set; }
-
-                [JsonPropertyName("item")]
-                public MarkerItemClass Item { get; set; }
-
-                [JsonPropertyName("questItem")]
-                public ObjectiveQuestItem QuestItem { get; set; }
-
-                [JsonPropertyName("markerItem")]
-                public MarkerItemClass MarkerItem { get; set; }
-
-                public partial class MarkerItemClass
-                {
-                    [JsonPropertyName("id")]
-                    public string Id { get; set; }
-
-                    [JsonPropertyName("name")]
-                    public string Name { get; set; }
-
-                    [JsonPropertyName("shortName")]
-                    public string ShortName { get; set; }
-                }
-
-                public partial class ObjectiveQuestItem
-                {
-                    [JsonPropertyName("id")]
-                    public string Id { get; set; }
-
-                    [JsonPropertyName("name")]
-                    public string Name { get; set; }
-
-                    [JsonPropertyName("shortName")]
-                    public string ShortName { get; set; }
-
-                    [JsonPropertyName("normalizedName")]
-                    public string NormalizedName { get; set; }
-
-                    [JsonPropertyName("description")]
-                    public string Description { get; set; }
-                }
-
-                public partial class ZoneElement
-                {
-                    [JsonPropertyName("id")]
-                    public string Id { get; set; }
-
-                    [JsonPropertyName("outline")]
-                    public List<PositionElement> Outline { get; set; }
-
-                    [JsonPropertyName("position")]
-                    public PositionElement Position { get; set; }
-
-                    [JsonPropertyName("map")]
-                    public BasicDataElement Map { get; set; }
-                }
-
-                public partial class BasicDataElement
-                {
-                    [JsonPropertyName("id")]
-                    public string Id { get; set; }
-
-                    [JsonPropertyName("normalizedName")]
-                    public string NormalizedName { get; set; }
-
-                    [JsonPropertyName("name")]
-                    public string Name { get; set; }
-                }
-
-                public partial class PositionElement
-                {
-                    [JsonPropertyName("y")]
-                    public float Y { get; set; }
-
-                    [JsonPropertyName("x")]
-                    public float X { get; set; }
-
-                    [JsonPropertyName("z")]
-                    public float Z { get; set; }
-                }
-            }
-        }
         #endregion
     }
 }

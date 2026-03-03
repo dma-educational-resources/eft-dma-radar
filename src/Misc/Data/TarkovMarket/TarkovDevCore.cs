@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using eft_dma_radar.Common.Misc;
 
 namespace eft_dma_radar.Common.Misc.Data.TarkovMarket
 {
@@ -73,7 +74,15 @@ namespace eft_dma_radar.Common.Misc.Data.TarkovMarket
                   tasks {
                     id
                     name
+                    trader {
+                      name
+                    }
                     kappaRequired
+                    map {
+                      id
+                      normalizedName
+                      name
+                    }
                     objectives {
                       id
                       type
@@ -241,18 +250,42 @@ namespace eft_dma_radar.Common.Misc.Data.TarkovMarket
                         }
                       }
                     }
+                    taskRequirements {
+                      task {
+                        id
+                      }
+                      status
+                    }
                   }
                 }
                 """
                 }
             };
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(100));
-            using var response = await SharedProgram.HttpClient.PostAsJsonAsync(
-                requestUri: "https://api.tarkov.dev/graphql", 
-                value: query,
-                cancellationToken: cts.Token);
-            response.EnsureSuccessStatusCode();
-            return await JsonSerializer.DeserializeAsync<TarkovDevQuery>(await response.Content.ReadAsStreamAsync(), _jsonOptions);
+            const int maxAttempts = 5;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(100));
+                using var response = await SharedProgram.HttpClient.PostAsJsonAsync(
+                    requestUri: "https://api.tarkov.dev/graphql",
+                    value: query,
+                    cancellationToken: cts.Token);
+                XMLogging.WriteLine($"[TarkovDev] Attempt {attempt}/{maxAttempts} — HTTP {(int)response.StatusCode}");
+                if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                {
+                    if (attempt < maxAttempts)
+                    {
+                        XMLogging.WriteLine($"[TarkovDev] 403 from Cloudflare, retrying in 3s...");
+                        await Task.Delay(3000);
+                        continue;
+                    }
+                }
+                response.EnsureSuccessStatusCode();
+                var responseBody = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<TarkovDevQuery>(responseBody, _jsonOptions);
+                XMLogging.WriteLine($"[TarkovDev] Deserialized: tasks={result?.Data?.Tasks?.Count ?? -1}, items={result?.Data?.Items?.Count ?? -1}");
+                return result;
+            }
+            throw new InvalidOperationException("tarkov.dev returned 403 on all attempts");
         }
     }
 }

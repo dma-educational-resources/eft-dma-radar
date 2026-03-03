@@ -60,7 +60,7 @@ namespace eft_dma_shared.Common.Unity.LowLevel.Hooks
                 _codeCave.ThrowIfInvalidVirtualAddress();
 
                 _originalBytes = new byte[STOLEN_BYTES];
-                Memory.ReadBufferEnsure(_hookTarget, _originalBytes);
+                Memory.ReadBufferEnsure(_hookTarget, _originalBytes.AsSpan());
 
                 WriteTrampoline();
                 PatchAbsoluteJump(_hookTarget, TrampolineAddr);
@@ -135,7 +135,7 @@ namespace eft_dma_shared.Common.Unity.LowLevel.Hooks
                 0x41,0x57,              // push r15
                 0x48,0x83,0xEC,0x28     // sub rsp,28h  ?
             };
-            Memory.WriteBufferEnsure(cursor, prologue);
+            Memory.WriteBufferEnsure(cursor, prologue.AsSpan());
             cursor += (ulong)prologue.Length;
 
             // RBX = &CallData
@@ -158,11 +158,11 @@ namespace eft_dma_shared.Common.Unity.LowLevel.Hooks
             };
 
             BinaryPrimitives.WriteUInt64LittleEndian(exec.AsSpan(2), CallDataAddr);
-            Memory.WriteBufferEnsure(cursor, exec);
+            Memory.WriteBufferEnsure(cursor, exec.AsSpan());
             cursor += (ulong)exec.Length;
 
             // Restore stolen bytes
-            Memory.WriteBufferEnsure(cursor, _originalBytes);
+            Memory.WriteBufferEnsure(cursor, _originalBytes.AsSpan());
             cursor += (ulong)_originalBytes.Length;
 
             PatchAbsoluteJump(cursor, _hookTarget + STOLEN_BYTES);

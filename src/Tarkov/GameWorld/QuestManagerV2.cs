@@ -12,18 +12,18 @@ using eft_dma_radar.Common.Unity.Collections;
 using System.Collections.Frozen;
 using System.Diagnostics;
 
-using TaskElement = eft_dma_radar.Common.Misc.Data.EftDataManager.TaskElement;
+using TaskElement = eft_dma_radar.Common.Misc.Data.TarkovMarket.TaskElement;
 
 namespace eft_dma_radar.Tarkov.GameWorld
 {
     /// <summary>
     /// QuestManagerV2 - Full Memory-based quest reading
-    /// 
+    ///
     /// Key differences from V1:
     /// - Uses correct inline HashSet<MongoID> parsing for CompletedConditions
     /// - Attempts to read quest conditions directly from memory (ConditionsDict)
     /// - Falls back to API data when memory parsing fails
-    /// 
+    ///
     /// Memory structures discovered:
     /// - CompletedConditionsCollection: +0x10 = _backendData (HashSet), +0x18 = _localChanges (HashSet)
     /// - HashSet<MongoID> uses INLINE storage (not pointer-based entries)
@@ -32,6 +32,12 @@ namespace eft_dma_radar.Tarkov.GameWorld
     ///   - Entry structure: hashCode(4) + next(4) + MongoID._bytes(12) + pad(4) + _stringID ptr(8)
     /// - Dictionary<EQuestStatus, ConditionCollection>: standard IL2CPP Dict
     ///   - Entry: hashCode(4) + next(4) + key(4) + pad(4) + value ptr(8) = 24 bytes
+    ///
+    /// IMPORTANT: Distinction from QuestReader
+    /// This class reads quest ZONES IN-RAID from LocalGameWorld -> Player -> QuestManager
+    /// for radar map display. It has nothing to do with QuestReader in MissionPlanner/.
+    /// QuestReader reads quest STATUS from the player Profile (lobby + in-raid fallback)
+    /// for session planning. These are separate memory paths serving separate purposes.
     /// </summary>
     public sealed class QuestManagerV2
     {

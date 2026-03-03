@@ -97,11 +97,15 @@ namespace eft_dma_radar
         private const int MIN_SETTINGS_PANEL_HEIGHT = 200;
         private const int MIN_SEARCH_SETTINGS_PANEL_WIDTH = 200;
         private const int MIN_SEARCH_SETTINGS_PANEL_HEIGHT = 200;
+        private const int MIN_QUEST_PLANNER_PANEL_WIDTH = 300;
+        private const int MIN_QUEST_PLANNER_PANEL_HEIGHT = 300;
 
         private readonly object _renderLock = new object();
         private volatile bool _isRendering = false;
         private volatile bool _uiInteractionActive = false;
         private DispatcherTimer _uiActivityTimer;
+        private bool _lastInRaidState = false;
+        private bool _wasQuestPlannerOpenBeforeRaid = false;
 
         private readonly Stopwatch _statusSw = Stopwatch.StartNew();
         private int _statusOrder = 1;
@@ -120,6 +124,9 @@ namespace eft_dma_radar
 
         private QuestInfoWidget _questInfo;
         public QuestInfoWidget QuestInfo { get => _questInfo; private set => _questInfo = value; }
+
+        private QuestPlannerWidget _questPlanner;
+        public QuestPlannerWidget QuestPlanner { get => _questPlanner; private set => _questPlanner = value; }
 
         /// <summary>
         /// Determines if MainWindow is ready or not
@@ -665,6 +672,9 @@ namespace eft_dma_radar
         
                     if (Config.ShowQuestInfoWidget)
                         _questInfo?.Draw(canvas);
+
+                    if (Config.ShowQuestPlannerWidget)
+                        _questPlanner?.Draw(canvas);
                 }
                 else
                 {
@@ -1091,6 +1101,7 @@ namespace eft_dma_radar
 
                     try
                     {
+                        UpdateQuestPlannerRaidState();
                         skCanvas.InvalidateVisual();
                     }
                     finally
@@ -1166,6 +1177,9 @@ namespace eft_dma_radar
             _debugInfo = new DebugInfoWidget(skCanvas, Config.Widgets.DebugInfoLocation, Config.Widgets.DebugInfoMinimized, UIScale);
             _lootInfo = new LootInfoWidget(skCanvas, Config.Widgets.LootInfoLocation, Config.Widgets.LootInfoMinimized, UIScale);
             _questInfo = new QuestInfoWidget(skCanvas, Config.Widgets.QuestInfoLocation, Config.Widgets.QuestInfoMinimized, UIScale);
+            if (Config.Widgets.QuestPlannerWidgetLocation == default)
+                Config.Widgets.QuestPlannerWidgetLocation = new SKRect(left, top + 60, left + 280, top + 60 + 120);
+            _questPlanner = new QuestPlannerWidget(skCanvas, Config.Widgets.QuestPlannerWidgetLocation, Config.Widgets.QuestPlannerWidgetMinimized, UIScale);
         }
 
         public void UpdateRenderTimerInterval(int targetFPS)
@@ -1725,6 +1739,48 @@ namespace eft_dma_radar
             LootItem.ClearNotificationHistory();
         }
 
+        /// <summary>
+        /// Updates Quest Planner panel visibility and button state based on raid status.
+        /// Hides panel and disables button when in raid, re-enables when in lobby.
+        /// </summary>
+        private void UpdateQuestPlannerRaidState()
+        {
+            var inRaid = Memory.InRaid;
+
+            // Only process state transitions
+            if (inRaid == _lastInRaidState) return;
+            _lastInRaidState = inRaid;
+
+            if (inRaid)
+            {
+                // Entering raid - remember if panel was open, then hide it
+                if (_panels.TryGetValue("QuestPlanner", out var panelInfo))
+                {
+                    _wasQuestPlannerOpenBeforeRaid = panelInfo.Panel.Visibility == Visibility.Visible;
+                    if (_wasQuestPlannerOpenBeforeRaid)
+                    {
+                        SetPanelVisibility("QuestPlanner", false);
+                    }
+                }
+                btnQuestPlanner.IsEnabled = false;
+            }
+            else
+            {
+                // Leaving raid - re-enable button and restore panel if it was open
+                btnQuestPlanner.IsEnabled = true;
+                if (_wasQuestPlannerOpenBeforeRaid)
+                {
+                    SetPanelVisibility("QuestPlanner", true);
+                    _wasQuestPlannerOpenBeforeRaid = false;
+                }
+            }
+        }
+
+        private void btnQuestPlanner_Click(object sender, RoutedEventArgs e)
+        {
+            TogglePanelVisibility("QuestPlanner");
+        }
+
         private void btnFreeMode_Click(object sender, RoutedEventArgs e)
         {
             _freeMode = !_freeMode;
@@ -1793,6 +1849,8 @@ namespace eft_dma_radar
                 Config.Widgets.LootInfoMinimized = _lootInfo.Minimized;
                 Config.Widgets.QuestInfoLocation = _questInfo.ClientRect;
                 Config.Widgets.QuestInfoMinimized = _questInfo.Minimized;
+                Config.Widgets.QuestPlannerWidgetLocation = _questPlanner.ClientRect;
+                Config.Widgets.QuestPlannerWidgetMinimized = _questPlanner.Minimized;
                 Config.Zoom = _zoom;
 
                 if (ESPForm.Window != null)
@@ -1961,6 +2019,7 @@ namespace eft_dma_radar
                 PlayerHistoryControl.BringToFrontRequested += (s, args) => BringPanelToFront(PlayerHistoryCanvas);
                 MapSetupControl.BringToFrontRequested += (s, args) => BringPanelToFront(MapSetupCanvas);
                 SettingsSearchControl.BringToFrontRequested += (s, e) => BringPanelToFront(SettingsSearchCanvas);
+                QuestPlannerControl.BringToFrontRequested += (s, e) => BringPanelToFront(QuestPlannerCanvas);
 
                 AttachPanelClickHandlers();
                 RestorePanelPositions();
@@ -2201,6 +2260,7 @@ namespace eft_dma_radar
                 "PlayerHistoryPanel" => MIN_PLAYERHISTORY_PANEL_WIDTH,
                 "LootFilterPanel" => MIN_LOOT_FILTER_PANEL_WIDTH,
                 "MapSetupPanel" => 300,
+                "QuestPlannerPanel" => MIN_QUEST_PLANNER_PANEL_WIDTH,
                 _ => 200
             };
         }
@@ -2217,6 +2277,7 @@ namespace eft_dma_radar
                 "PlayerHistoryPanel" => MIN_PLAYERHISTORY_PANEL_HEIGHT,
                 "LootFilterPanel" => MIN_LOOT_FILTER_PANEL_HEIGHT,
                 "MapSetupPanel" => 300,
+                "QuestPlannerPanel" => MIN_QUEST_PLANNER_PANEL_HEIGHT,
                 _ => 200
             };
         }
@@ -2315,6 +2376,15 @@ namespace eft_dma_radar
                     BringPanelToFront(panelInfo.Canvas);
                 }
 
+                SaveSinglePanelPosition(panelKey);
+            }
+        }
+
+        private void SetPanelVisibility(string panelKey, bool visible)
+        {
+            if (_panels.TryGetValue(panelKey, out var panelInfo))
+            {
+                panelInfo.Panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
                 SaveSinglePanelPosition(panelKey);
             }
         }
@@ -2425,6 +2495,10 @@ namespace eft_dma_radar
             SettingsSearchControl.DragRequested   += sharedDragHandler;
             SettingsSearchControl.ResizeRequested += sharedResizeHandler;
             SettingsSearchControl.CloseRequested  += sharedCloseHandler;
+
+            QuestPlannerControl.DragRequested += sharedDragHandler;
+            QuestPlannerControl.ResizeRequested += sharedResizeHandler;
+            QuestPlannerControl.CloseRequested += sharedCloseHandler;
         }
 
         private void InitializePanelsCollection()
@@ -2439,7 +2513,8 @@ namespace eft_dma_radar
                 ["PlayerHistory"] = new PanelInfo(PlayerHistoryPanel, PlayerHistoryCanvas, "PlayerHistory", MIN_PLAYERHISTORY_PANEL_WIDTH, MIN_PLAYERHISTORY_PANEL_HEIGHT),
                 ["LootFilter"] = new PanelInfo(LootFilterPanel, LootFilterCanvas, "LootFilter", MIN_LOOT_FILTER_PANEL_WIDTH, MIN_LOOT_FILTER_PANEL_HEIGHT),
                 ["MapSetup"] = new PanelInfo(MapSetupPanel, MapSetupCanvas, "MapSetup", 300, 300),
-                ["SettingsSearch"] = new PanelInfo(SettingsSearchPanel, SettingsSearchCanvas, "SettingsSearch", MIN_SEARCH_SETTINGS_PANEL_WIDTH, MIN_SEARCH_SETTINGS_PANEL_HEIGHT)
+                ["SettingsSearch"] = new PanelInfo(SettingsSearchPanel, SettingsSearchCanvas, "SettingsSearch", MIN_SEARCH_SETTINGS_PANEL_WIDTH, MIN_SEARCH_SETTINGS_PANEL_HEIGHT),
+                ["QuestPlanner"] = new PanelInfo(QuestPlannerPanel, QuestPlannerCanvas, "QuestPlanner", MIN_QUEST_PLANNER_PANEL_WIDTH, MIN_QUEST_PLANNER_PANEL_HEIGHT)
             };
         }
 

@@ -125,6 +125,7 @@ namespace eft_dma_radar.UI.Pages
             "Player Info Widget",
             "Loot Info Widget",
             "Quest Info Widget",
+            "Quest Planner Widget",
             "HotKey Info Widget"
         };
 
@@ -252,16 +253,16 @@ namespace eft_dma_radar.UI.Pages
 
                 var warningResult = MessageBox.Show(
                         "WARNING: Importing a configuration will replace current settings including:\n\n" +
-                        "ï¿? General settings & UI preferences\n" +
-                        "ï¿? Player/Entity display settings\n" +
-                        "ï¿? Color configurations\n" +
-                        "ï¿? Hotkey assignments\n" +
-                        "ï¿? ESP configurations\n" +
-                        "ï¿? Panel and toolbar positions\n" +
-                        "ï¿? Memory writing settings\n" +
-                        "ï¿? Loot settings\n" +
-                        "ï¿? Quest helper settings\n" +
-                        "ï¿? Container settings\n\n" +
+                        "ï¿½? General settings & UI preferences\n" +
+                        "ï¿½? Player/Entity display settings\n" +
+                        "ï¿½? Color configurations\n" +
+                        "ï¿½? Hotkey assignments\n" +
+                        "ï¿½? ESP configurations\n" +
+                        "ï¿½? Panel and toolbar positions\n" +
+                        "ï¿½? Memory writing settings\n" +
+                        "ï¿½? Loot settings\n" +
+                        "ï¿½? Quest helper settings\n" +
+                        "ï¿½? Container settings\n\n" +
                         "NOTE: Cache & Web Radar data will not be preserved.\n\n" +
                         "This action cannot be undone. Continue?",
                         "Import Configuration Warning",
@@ -847,6 +848,7 @@ namespace eft_dma_radar.UI.Pages
                 ["Player Info Widget"] = Config.ShowInfoTab,
                 ["Loot Info Widget"] = Config.ShowLootInfoWidget,
                 ["Quest Info Widget"] = Config.ShowQuestInfoWidget,
+                ["Quest Planner Widget"] = Config.ShowQuestPlannerWidget,
                 ["HotKey Info Widget"] = Config.ESP.ShowHotkeyInfoWidget
             };
 
@@ -1473,7 +1475,7 @@ namespace eft_dma_radar.UI.Pages
             if (hasKey)
             {
                 txtApiStatus.Text = $"API key loaded successfully";
-                btnCreateApiFile.Content = "Edit API Fileï¿?";
+                btnCreateApiFile.Content = "Edit API Fileï¿½?";
                 btnCreateApiFile.ToolTip = "Replace the stored API key";
                 btnClearApiFile.IsEnabled = true;
                 btnOpenApiFolder.IsEnabled = true;
@@ -1481,7 +1483,7 @@ namespace eft_dma_radar.UI.Pages
             else
             {
                 txtApiStatus.Text = "No API key saved.";
-                btnCreateApiFile.Content = "Create API Fileï¿?";
+                btnCreateApiFile.Content = "Create API Fileï¿½?";
                 btnCreateApiFile.ToolTip = "Create and store an API key securely";
                 btnClearApiFile.IsEnabled = false;
                 btnOpenApiFolder.IsEnabled = false;
@@ -1932,6 +1934,9 @@ namespace eft_dma_radar.UI.Pages
                     case "Quest Info Widget":
                         Config.ShowQuestInfoWidget = isSelected;
                         break;
+                    case "Quest Planner Widget":
+                        Config.ShowQuestPlannerWidget = isSelected;
+                        break;
                     case "HotKey Info Widget":
                         Config.ESP.ShowHotkeyInfoWidget = isSelected;
                         break;
@@ -2067,6 +2072,7 @@ namespace eft_dma_radar.UI.Pages
             btnClosestPlayerColor.Click += ColorButton_Clicked;
             btnTopLootColor.Click += ColorButton_Clicked;
             btnMiniRadarThemeColor.Click += ColorButton_Clicked;
+            btnOverridePlayerTextColor.Click += ColorButton_Clicked;
 
             // Interface
             btnAccentColor.Click += ColorButton_Clicked;
@@ -2218,6 +2224,7 @@ namespace eft_dma_radar.UI.Pages
             _brushFields["ClosestPlayer"] = closestPlayerBrush;
             _brushFields["TopLoot"] = topLootBrush;
             _brushFields["MiniRadarTheme"] = miniRadarThemeBrush;
+            _brushFields["OverridePlayerText"] = overridePlayerTextBrush;
 
             // Interface colors
             _brushFields["Interface.Accent"] = accentColor;
@@ -2932,6 +2939,10 @@ namespace eft_dma_radar.UI.Pages
                     Config.ShowLootInfoWidget = isActive;
                     UpdateSpecificWidgetOption("Quest Info Widget", isActive);
                     break;
+                case nameof(HotkeyConfig.QuestPlannerWidget):
+                    Config.ShowQuestPlannerWidget = isActive;
+                    UpdateSpecificWidgetOption("Quest Planner Widget", isActive);
+                    break;
                 //case nameof(HotkeyConfig.ConnectGroups):
                 //    Config.ConnectGroups = isActive;
                 //    UpdateSpecificGeneralOption("Connect Groups", isActive);
@@ -3435,16 +3446,16 @@ namespace eft_dma_radar.UI.Pages
 
                 var confirm = MessageBox.Show(
                     "WARNING: Importing a configuration will replace current settings including:\n\n" +
-                    "ï¿? General settings & UI preferences\n" +
-                    "ï¿? Player/Entity display settings\n" +
-                    "ï¿? Color configurations\n" +
-                    "ï¿? Hotkey assignments\n" +
-                    "ï¿? ESP configurations\n" +
-                    "ï¿? Panel and toolbar positions\n" +
-                    "ï¿? Memory writing settings\n" +
-                    "ï¿? Loot settings\n" +
-                    "ï¿? Quest helper settings\n" +
-                    "ï¿? Container settings\n\n" +
+                    "ï¿½? General settings & UI preferences\n" +
+                    "ï¿½? Player/Entity display settings\n" +
+                    "ï¿½? Color configurations\n" +
+                    "ï¿½? Hotkey assignments\n" +
+                    "ï¿½? ESP configurations\n" +
+                    "ï¿½? Panel and toolbar positions\n" +
+                    "ï¿½? Memory writing settings\n" +
+                    "ï¿½? Loot settings\n" +
+                    "ï¿½? Quest helper settings\n" +
+                    "ï¿½? Container settings\n\n" +
                     "NOTE: Cache data will not be preserved.\n\n" +
                     "This action cannot be undone. Continue?",
                     "Import Configuration Warning",

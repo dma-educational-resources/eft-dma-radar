@@ -378,6 +378,13 @@ namespace eft_dma_radar.UI.Misc
         public ExpanderStatesConfig ExpanderStates { get; set; } = new();
 
         /// <summary>
+        /// Quest planner settings.
+        /// </summary>
+        [JsonPropertyName("questPlanner")]
+        [JsonInclude]
+        public QuestPlannerSettings QuestPlanner { get; set; } = new QuestPlannerSettings();
+
+        /// <summary>
         /// Config Name.
         /// </summary>
         [JsonPropertyName("configName")]
@@ -461,6 +468,12 @@ namespace eft_dma_radar.UI.Misc
         /// </summary>
         [JsonPropertyName("showQuestInfoWidget")]
         public bool ShowQuestInfoWidget { get; set; } = false;
+
+        /// <summary>
+        /// Shows Quest Planner Widget (compact mission summary overlay).
+        /// </summary>
+        [JsonPropertyName("showQuestPlannerWidget")]
+        public bool ShowQuestPlannerWidget { get; set; } = false;
 
         /// <summary>
         /// Enables ESP Widget window in Main Window.
@@ -828,6 +841,9 @@ namespace eft_dma_radar.UI.Misc
             if (config.InterfaceColors == null)
                 config.InterfaceColors = InterfaceColorOptions.GetDefaultColors();
 
+            if (config.MissionPlanner == null)
+                config.MissionPlanner = new MissionPlannerSettings();
+
             if (config.PanelPositions != null)
             {
                 if (config.PanelPositions.GeneralSettings == null)
@@ -856,6 +872,12 @@ namespace eft_dma_radar.UI.Misc
 
                 if (config.PanelPositions.MapSetup == null)
                     config.PanelPositions.MapSetup = new PanelPositionConfig();
+
+                if (config.PanelPositions.SettingsSearch == null)
+                    config.PanelPositions.SettingsSearch = new PanelPositionConfig();
+
+                if (config.PanelPositions.QuestPlanner == null)
+                    config.PanelPositions.QuestPlanner = new PanelPositionConfig();
             }
 
             if (config.ExpanderStates != null)
@@ -1078,6 +1100,18 @@ namespace eft_dma_radar.UI.Misc
         /// </summary>
         [JsonPropertyName("mapSetup")]
         public PanelPositionConfig MapSetup { get; set; } = new PanelPositionConfig();
+
+        /// <summary>
+        /// Settings search panel position
+        /// </summary>
+        [JsonPropertyName("settingsSearch")]
+        public PanelPositionConfig SettingsSearch { get; set; } = new PanelPositionConfig();
+
+        /// <summary>
+        /// Quest planner panel position
+        /// </summary>
+        [JsonPropertyName("questPlanner")]
+        public PanelPositionConfig QuestPlanner { get; set; } = new PanelPositionConfig();
     }
 
     /// <summary>
@@ -1483,6 +1517,12 @@ namespace eft_dma_radar.UI.Misc
         /// </summary>
         [JsonPropertyName("minimumKD")]
         public float MinKD { get; set; } = 1f;
+
+        /// <summary>
+        /// Use the override text color instead of faction color for this player type
+        /// </summary>
+        [JsonPropertyName("useOverrideTextColor")]
+        public bool UseOverrideTextColor { get; set; } = false;
 
         /// <summary>
         /// Display name in ESP
@@ -2026,6 +2066,12 @@ namespace eft_dma_radar.UI.Misc
         /// </summary>
         [JsonPropertyName("espColors")]
         public Dictionary<EspColorOption, string> Colors { get; set; } = EspColorOptions.GetDefaultColors();
+
+        /// <summary>
+        /// Enable override player text color.
+        /// </summary>
+        [JsonPropertyName("enableOverridePlayerText")]
+        public bool EnableOverridePlayerText { get; set; } = false;
 
         /// <summary>
         /// Crosshair configuration options
@@ -2687,6 +2733,27 @@ namespace eft_dma_radar.UI.Misc
         }
 
         #endregion
+
+        #region Quest Planner Widget
+
+        [JsonInclude]
+        [JsonPropertyName("questPlannerWidgetLocation")]
+        public RectFSer _qPlannerLoc { private get; set; }
+
+        [JsonPropertyName("questPlannerWidgetMinimized")]
+        public bool QuestPlannerWidgetMinimized { get; set; } = false;
+
+        /// <summary>
+        /// Quest Planner Widget location on radar canvas.
+        /// </summary>
+        [JsonIgnore]
+        public SKRect QuestPlannerWidgetLocation
+        {
+            get => new(_qPlannerLoc.Left, _qPlannerLoc.Top, _qPlannerLoc.Right, _qPlannerLoc.Bottom);
+            set => _qPlannerLoc = new RectFSer(value.Left, value.Top, value.Right, value.Bottom);
+        }
+
+        #endregion
     }
 
     public sealed class ESPWidgetsConfig
@@ -2782,5 +2849,20 @@ namespace eft_dma_radar.UI.Misc
         [JsonPropertyName("cache")]
         [JsonInclude]
         public ConcurrentDictionary<string, ProfileData> Profiles { get; private set; } = new();
+    }
+
+    /// <summary>
+    /// Quest Planner filter settings.
+    /// Speed/Safety/DependencyWeight fields removed — they were never wired to the algorithm (dead code).
+    /// </summary>
+    public sealed class MissionPlannerSettings
+    {
+        /// <summary>
+        /// When true, restricts the active quest display to Kappa-required quests only.
+        /// Maps with zero Kappa objectives are hidden and re-ranked.
+        /// </summary>
+        [JsonPropertyName("kappaFilter")]
+        public bool KappaFilter { get; set; } = false;
+
     }
 }

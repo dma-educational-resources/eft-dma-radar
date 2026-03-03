@@ -83,7 +83,7 @@ namespace eft_dma_radar.Common.Unity
 
             try
             {
-                Memory.ReadBuffer(componentArr.ArrayBase, entries);
+                Memory.ReadBuffer(componentArr.ArrayBase, entries.AsSpan());
             }
             catch
             {
