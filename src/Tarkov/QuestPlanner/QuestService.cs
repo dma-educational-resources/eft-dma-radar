@@ -1,11 +1,11 @@
 using System.Collections.Frozen;
 using System.Diagnostics;
-using eft_dma_radar.Tarkov.MissionPlanner.Models;
+using eft_dma_radar.Tarkov.QuestPlanner.Models;
 using eft_dma_radar.Common.Misc.Data.TarkovMarket;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.Common.Misc;
 
-namespace eft_dma_radar.Tarkov.MissionPlanner;
+namespace eft_dma_radar.Tarkov.QuestPlanner;
 
 /// <summary>
 /// Core session planning service that produces ordered map recommendations with bring lists.

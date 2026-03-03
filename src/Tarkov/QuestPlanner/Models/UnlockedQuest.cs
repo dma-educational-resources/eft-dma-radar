@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Tarkov.MissionPlanner.Models;
+namespace eft_dma_radar.Tarkov.QuestPlanner.Models;
 
 /// <summary>
 /// Information about a quest that will be unlocked by completing quests on this map.

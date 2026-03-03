@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Tarkov.MissionPlanner;
+namespace eft_dma_radar.Tarkov.QuestPlanner;
 
 /// <summary>
 /// Default stash filter used when CORE-04 (stash reading) is not yet implemented.

@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Tarkov.MissionPlanner.Models;
+namespace eft_dma_radar.Tarkov.QuestPlanner.Models;
 
 /// <summary>
 /// Per-objective data within a mission plan, carrying completion state from memory.

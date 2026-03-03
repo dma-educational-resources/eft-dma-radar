@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Tarkov.MissionPlanner
+namespace eft_dma_radar.Tarkov.QuestPlanner
 {
     /// <summary>
     /// Quest state data contract between QuestReader and MissionService.

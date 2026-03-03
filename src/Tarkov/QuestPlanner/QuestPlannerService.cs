@@ -2,10 +2,10 @@ using System.Collections.Frozen;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Misc.Data;
 using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Tarkov.MissionPlanner.Models;
+using eft_dma_radar.Tarkov.QuestPlanner.Models;
 using static eft_dma_radar.Tarkov.MemoryInterface;
 
-namespace eft_dma_radar.Tarkov.MissionPlanner;
+namespace eft_dma_radar.Tarkov.QuestPlanner;
 
 /// <summary>
 /// Connection state for quest planning purposes.

@@ -4,7 +4,7 @@ using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 using SDK;
 
-namespace eft_dma_radar.Tarkov.MissionPlanner
+namespace eft_dma_radar.Tarkov.QuestPlanner
 {
     /// <summary>
     /// Resolves the player Profile pointer from EFT memory.

@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Tarkov.MissionPlanner.Models;
+namespace eft_dma_radar.Tarkov.QuestPlanner.Models;
 
 /// <summary>
 /// Per-map entry in the session plan.

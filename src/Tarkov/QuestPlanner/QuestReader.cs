@@ -5,7 +5,7 @@ using eft_dma_radar.Common.Unity.Collections;
 using SDK;
 using System.Text;
 
-namespace eft_dma_radar.Tarkov.MissionPlanner
+namespace eft_dma_radar.Tarkov.QuestPlanner
 {
     /// <summary>
     /// Container for quests grouped by their availability status.

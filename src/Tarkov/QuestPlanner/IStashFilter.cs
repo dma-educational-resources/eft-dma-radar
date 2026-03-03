@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Tarkov.MissionPlanner;
+namespace eft_dma_radar.Tarkov.QuestPlanner;
 
 /// <summary>
 /// Interface for stash ownership queries.
