@@ -117,10 +117,7 @@ namespace eft_dma_radar.Common.Misc.Data
         }
 
         /// <summary>
-        /// Attempts to load data from various sources, with clean fallbacks.
-        ///
-        /// Normal startup (defaultOnly=false): API first, then cached data.json, then embedded DEFAULT_DATA.json.
-        /// Default-only mode (defaultOnly=true): Cached data.json first, then embedded DEFAULT_DATA.json.
+        /// Attempts to load data from various sources, with clean fallbacks
         /// </summary>
         private static async Task<TarkovMarketData> LoadDataWithFallbacksAsync(LoadingWindow loading, bool defaultOnly)
         {
@@ -132,7 +129,52 @@ namespace eft_dma_radar.Common.Misc.Data
                 NumberHandling = JsonNumberHandling.AllowReadingFromString
             };
 
-            // Normal startup: Always try API fetch first for fresh data
+            if (File.Exists(_dataFile))
+            {
+                try
+                {
+                    loading.UpdateStatus("Loading cached data file...", loading.PercentComplete);
+                    string json = await File.ReadAllTextAsync(_dataFile);
+                    data = JsonSerializer.Deserialize<TarkovMarketData>(json, jsonOptions);
+
+                    if (data != null && data.Items != null && data.Tasks != null)
+                    {
+                        loading.UpdateStatus("Cached data loaded successfully", loading.PercentComplete);
+
+                        if (!defaultOnly && IsDataFileOutdated(_dataFile, _defaultDataUpdateInterval))
+                        {
+                            loading.UpdateStatus($"Cached data is outdated (older than {_defaultDataUpdateInterval.TotalHours} hours), will update after initialization", loading.PercentComplete);
+
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(4000);
+                                await UpdateDataFileAsync();
+                            });
+                        }
+                        else
+                        {
+                            loading.UpdateStatus($"Using cached data (updated in the last {_defaultDataUpdateInterval.TotalHours} hours)", loading.PercentComplete);
+                        }
+
+                        return data;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    XMLogging.WriteLine($"Error loading cached data: {ex}");
+                    loading.UpdateStatus("Cached data is invalid, will create new data", loading.PercentComplete);
+
+                    try
+                    {
+                        File.Delete(_dataFile);
+                    }
+                    catch
+                    {
+                        // Ignore deletion errors
+                    }
+                }
+            }
+
             if (!defaultOnly)
             {
                 try
@@ -165,33 +207,11 @@ namespace eft_dma_radar.Common.Misc.Data
                 catch (Exception ex)
                 {
                     XMLogging.WriteLine($"Error fetching API data: {ex}");
-                    loading.UpdateStatus("API fetch failed, trying cached data...", loading.PercentComplete);
+                    loading.UpdateStatus("API fetch failed, falling back to embedded data", loading.PercentComplete);
                 }
             }
 
-            // Fallback to cached data.json (for defaultOnly mode, or if API fetch failed)
-            if (File.Exists(_dataFile))
-            {
-                try
-                {
-                    loading.UpdateStatus("Loading cached data file...", loading.PercentComplete);
-                    string cachedJson = await File.ReadAllTextAsync(_dataFile);
-                    data = JsonSerializer.Deserialize<TarkovMarketData>(cachedJson, jsonOptions);
-
-                    if (data != null && data.Items != null && data.Tasks != null)
-                    {
-                        loading.UpdateStatus("Cached data loaded successfully", loading.PercentComplete);
-                        return data;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    XMLogging.WriteLine($"Error loading cached data: {ex}");
-                    loading.UpdateStatus("Cached data is invalid, trying embedded data", loading.PercentComplete);
-                }
-            }
-
-            // Final fallback: embedded default data
+            try
             try
             {
                 loading.UpdateStatus("Loading embedded default data...", loading.PercentComplete);

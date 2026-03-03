@@ -2333,6 +2333,7 @@ namespace eft_dma_radar
             AttachPreviewMouseDown(LootFilterPanel, LootFilterCanvas);
             AttachPreviewMouseDown(MapSetupPanel, MapSetupCanvas);
             AttachPreviewMouseDown(SettingsSearchPanel, SettingsSearchCanvas);
+            AttachPreviewMouseDown(QuestPlannerPanel, QuestPlannerCanvas);
 
             ESPCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(ESPCanvas);
             GeneralSettingsCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(GeneralSettingsCanvas);
@@ -2343,6 +2344,7 @@ namespace eft_dma_radar
             LootFilterCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(LootFilterCanvas);
             MapSetupCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(MapSetupCanvas);
             SettingsSearchCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(SettingsSearchCanvas);
+            QuestPlannerCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(QuestPlannerCanvas);
         }
 
         private void TogglePanelVisibility(string panelKey)

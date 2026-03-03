@@ -67,7 +67,7 @@ namespace eft_dma_radar.UI.SKWidgetControl
 
                 // Line 3: bring count
                 var bringLine = summary.Maps.Count > 0
-                    ? $"Bring: {summary.Maps[0].BringList.Count} items"
+                    ? $"Bring: {summary.Maps[0].FilteredBringList.Count} items"
                     : "Bring: \u2014";
                 canvas.DrawText(bringLine, drawPt, _textPaint);
                 drawPt.Y += lineSpacing;

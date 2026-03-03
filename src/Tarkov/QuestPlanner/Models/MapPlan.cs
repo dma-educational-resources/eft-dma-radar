@@ -47,8 +47,4 @@ public sealed class MapPlan
     /// </summary>
     public IReadOnlyList<BringItem> FilteredBringList { get; init; } = [];
 
-    /// <summary>
-    /// Items to bring to this map for quest completion (legacy, unfiltered).
-    /// </summary>
-    public IReadOnlyList<BringItem> BringList { get; init; } = [];
 }

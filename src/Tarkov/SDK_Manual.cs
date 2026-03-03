@@ -55,25 +55,6 @@ namespace SDK
             public const uint Value = 0x10; // Value : EFT.HealthSystem.ValueStruct
         }
 
-        /// <summary>
-        /// AbstractBackEndSession offsets.
-        /// Lobby path: GOM["Application (Main Client)"] → TarkovApplication.BackEnd → BackEndSession → Profile.
-        /// Verified 2026-02-24 via eft-mission-reader probe.
-        /// </summary>
-        public readonly partial struct BackEndSession
-        {
-            public const uint Profile = 0x50; // EFT.Profile (lobby path)
-        }
-
-        public readonly partial struct TarkovApplication
-        {
-            /// <summary>
-            /// AbstractBackEndSession field (lobby path).
-            /// Chain: GOM["Application (Main Client)"] → app+0x130 → BackEnd → Profile.
-            /// Verified 2026-02-24 via eft-mission-reader probe. Distinct from ClientBackEnd (0x30).
-            /// </summary>
-            public const uint BackEnd = 0x130; // AbstractBackEndSession (lobby, verified 2026-02-24)
-        }
     }
 
     public readonly partial struct Enums

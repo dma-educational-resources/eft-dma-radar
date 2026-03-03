@@ -74,7 +74,6 @@ public static class QuestService
             var questPlans = BuildQuestsForMap(score.MapId, completable, quests.Started, stash);
             var unlockedQuests = GetUnlockedQuestsForMap(score.QuestIds, taskData);
             var filteredBringList = BuildFilteredBringList(questPlans);
-            var bringList = BuildBringList(score.MapId, completable, stash);
 
             return new MapPlan
             {
@@ -85,8 +84,7 @@ public static class QuestService
                 ActiveQuestCount = score.QuestIds.Count,
                 Quests = questPlans,
                 UnlockedQuests = unlockedQuests,
-                FilteredBringList = filteredBringList,
-                BringList = bringList
+                FilteredBringList = filteredBringList
             };
         }).ToList();
 
@@ -430,94 +428,6 @@ public static class QuestService
     }
 
     /// <summary>
-    /// PLAN-06, PLAN-07: Builds bring list for a specific map.
-    /// Includes RequiredKeys (as alternative groups), QuestItems, and MS2000 Markers (inferred from mark/plantItem types).
-    /// Excludes FIR items, kill objectives, visit objectives - only items brought FROM stash.
-    /// Filters through IStashFilter to exclude owned items.
-    /// </summary>
-    private static List<BringItem> BuildBringList(
-        string mapId,
-        List<(TaskElement Task, TaskElement.ObjectiveElement Objective)> completableObjectives,
-        IStashFilter stash)
-    {
-        var items = new List<BringItem>();
-
-        foreach (var (task, obj) in completableObjectives)
-        {
-            // Only objectives on this map (case-insensitive, with normalization)
-            // Uses quest-level map override: task.Map takes precedence over obj.Maps
-            if (!ObjectiveBelongsToMap(task, obj, mapId))
-                continue;
-
-            // RequiredKeys - each slot is a set of alternatives
-            if (obj.RequiredKeys != null)
-            {
-                foreach (var keySlot in obj.RequiredKeys)
-                {
-                    // Skip if player already owns ANY of the alternatives
-                    if (keySlot.Any(k => stash.Owns(k.Id)))
-                        continue;
-
-                    items.Add(new BringItem
-                    {
-                        Alternatives = keySlot.Select(k => k.Name).ToList(),
-                        QuestName = task.Name,
-                        Type = BringItemType.Key
-                    });
-                }
-            }
-
-            // For mark objectives: use MarkerItem field (e.g., MS2000, etags, etc.)
-            // For plantItem objectives: use Item field (e.g., Iskra ration pack, etc.)
-            if (obj.Type == "mark")
-            {
-                if (obj.MarkerItem != null && !stash.Owns(obj.MarkerItem.Id))
-                {
-                    items.Add(new BringItem { Alternatives = [obj.MarkerItem.Name], QuestName = task.Name, Type = BringItemType.QuestItem });
-                }
-                else if (obj.MarkerItem == null)
-                {
-                    // Fallback: some mark objectives might not have MarkerItem set
-                    items.Add(new BringItem { Alternatives = ["MS2000 Marker"], QuestName = task.Name, Type = BringItemType.QuestItem });
-                }
-            }
-            else if (obj.Type == "plantItem")
-            {
-                // PlantItem objectives store the item to plant in Item field
-                if (obj.Item != null && !stash.Owns(obj.Item.Id))
-                {
-                    items.Add(new BringItem { Alternatives = [obj.Item.Name], QuestName = task.Name, Type = BringItemType.QuestItem });
-                }
-            }
-
-            // QuestItem (for giveQuestItem type or other objectives with non-null QuestItem, excluding plantItem which is handled above)
-            if (obj.QuestItem != null && !stash.Owns(obj.QuestItem.Id) && obj.Type != "plantItem")
-            {
-                items.Add(new BringItem
-                {
-                    Alternatives = [obj.QuestItem.Name],
-                    QuestName = task.Name,
-                    Type = BringItemType.QuestItem
-                });
-            }
-
-            // DO NOT include objective.Item (FIR items are raid objectives, not bring items)
-        }
-
-        // Aggregate: same item+quest combination summed by Count
-        return items
-            .GroupBy(i => (string.Join("|", i.Alternatives), i.QuestName))
-            .Select(g => new BringItem
-            {
-                Alternatives = g.First().Alternatives,
-                QuestName = g.First().QuestName,
-                Type = g.First().Type,
-                Count = g.Sum(x => x.Count)
-            })
-            .ToList();
-    }
-
-    /// <summary>
     /// Builds per-quest data for a specific map.
     /// Groups completable objectives by quest, with filtered bring items per quest.
     /// Applies findQuestItem/giveQuestItem pairing filter to hide giveQuestItem until findQuestItem is complete.
@@ -559,7 +469,7 @@ public static class QuestService
         }
 
         // Build QuestPlan for each task
-        var quests = new List<QuestPlan>();
+        var result = new List<QuestPlan>();
 
         // Need task names from completableObjectives
         var taskNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -608,7 +518,7 @@ public static class QuestService
                 ));
             }
 
-            quests.Add(new QuestPlan
+            result.Add(new QuestPlan
             {
                 QuestName = taskName,
                 Objectives = filteredObjectives,
@@ -616,7 +526,7 @@ public static class QuestService
             });
         }
 
-        return quests;
+        return result;
     }
 
     /// <summary>
@@ -803,11 +713,11 @@ public static class QuestService
         var countersByQuestId = quests.ToDictionary(q => q.Id, q => q.ConditionCounters, StringComparer.OrdinalIgnoreCase);
 
         // Build task reference dictionary for accessing ALL objectives
-        var taskRefById2 = new Dictionary<string, TaskElement>(StringComparer.OrdinalIgnoreCase);
+        var taskRefById = new Dictionary<string, TaskElement>(StringComparer.OrdinalIgnoreCase);
         foreach (var (task, obj) in completableObjectives)
         {
-            if (!taskRefById2.ContainsKey(task.Id))
-                taskRefById2[task.Id] = task;
+            if (!taskRefById.ContainsKey(task.Id))
+                taskRefById[task.Id] = task;
         }
 
         var objectivesByTask = new Dictionary<string, (string Name, List<TaskElement.ObjectiveElement> Objectives)>(StringComparer.OrdinalIgnoreCase);
@@ -828,21 +738,21 @@ public static class QuestService
             entry.Objectives.Add(obj);
         }
 
-        var quests = new List<QuestPlan>();
+        var result = new List<QuestPlan>();
         foreach (var (taskId, (taskName, objectives)) in objectivesByTask)
         {
             // Build findQuestItem pairing lookup
-            var taskRef2 = taskRefById2.GetValueOrDefault(taskId);
-            var allObjs2 = taskRef2?.Objectives ?? new List<TaskElement.ObjectiveElement>();
-            var findLookup2 = allObjs2
+            var taskRef = taskRefById.GetValueOrDefault(taskId);
+            var allObjs = taskRef?.Objectives ?? new List<TaskElement.ObjectiveElement>();
+            var findLookup = allObjs
                 .Where(o => o.Type == "findQuestItem" && o.QuestItem != null)
                 .ToDictionary(o => o.QuestItem!.Id, o => o.Id, StringComparer.OrdinalIgnoreCase);
 
             // Build FIR pair IDs to exclude from All Maps objective list
             // (FIR pairs go to the FirItems category instead)
             var firPairObjectiveIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var firFindObjs = allObjs2.Where(o => o.Type == "findItem" && o.FoundInRaid && o.Item != null).ToList();
-            var firGiveObjs = allObjs2.Where(o => o.Type == "giveItem" && o.Item != null).ToList();
+            var firFindObjs = allObjs.Where(o => o.Type == "findItem" && o.FoundInRaid && o.Item != null).ToList();
+            var firGiveObjs = allObjs.Where(o => o.Type == "giveItem" && o.Item != null).ToList();
             foreach (var findObj in firFindObjs)
             {
                 var matchingGive = firGiveObjs.FirstOrDefault(g =>
@@ -854,11 +764,11 @@ public static class QuestService
                 }
             }
 
-            var completedSet2 = completedByQuestId.GetValueOrDefault(taskId) ?? new HashSet<string>();
-            var questCounters2 = countersByQuestId.GetValueOrDefault(taskId);
+            var completedSet = completedByQuestId.GetValueOrDefault(taskId) ?? new HashSet<string>();
+            var questCounters = countersByQuestId.GetValueOrDefault(taskId);
 
-            var filteredObjectives2 = new List<ObjectiveInfo>();
-            foreach (var o in objectives.Where(o => !completedSet2.Contains(o.Id)))
+            var filteredObjectives = new List<ObjectiveInfo>();
+            foreach (var o in objectives.Where(o => !completedSet.Contains(o.Id)))
             {
                 // Skip FIR pair objectives — they go in the FIR category
                 if (firPairObjectiveIds.Contains(o.Id))
@@ -866,35 +776,35 @@ public static class QuestService
 
                 if (o.Type == "giveQuestItem" && o.QuestItem != null)
                 {
-                    if (findLookup2.TryGetValue(o.QuestItem.Id, out var findObjId2))
+                    if (findLookup.TryGetValue(o.QuestItem.Id, out var findObjId))
                     {
-                        if (!completedSet2.Contains(findObjId2))
+                        if (!completedSet.Contains(findObjId))
                             continue;
                     }
                 }
-                filteredObjectives2.Add(new ObjectiveInfo(
+                filteredObjectives.Add(new ObjectiveInfo(
                     o.Id,
                     o.Description,
                     false,
-                    questCounters2 != null && questCounters2.TryGetValue(o.Id, out var cnt2) ? cnt2 : 0,
+                    questCounters != null && questCounters.TryGetValue(o.Id, out var cnt) ? cnt : 0,
                     o.Count,
                     o.Type
                 ));
             }
 
             // Only add quest if there are objectives remaining (skip pure FIR quests)
-            if (filteredObjectives2.Count > 0)
+            if (filteredObjectives.Count > 0)
             {
-                quests.Add(new QuestPlan
+                result.Add(new QuestPlan
                 {
                     QuestName = taskName,
-                    Objectives = filteredObjectives2,
+                    Objectives = filteredObjectives,
                     BringItems = BuildBringListForQuest(objectives, taskName, stash)
                 });
             }
         }
 
-        return quests;
+        return result;
     }
 
     /// <summary>
