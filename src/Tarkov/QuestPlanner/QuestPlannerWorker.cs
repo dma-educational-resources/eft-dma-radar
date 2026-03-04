@@ -73,7 +73,7 @@ internal static class QuestPlannerWorker
     /// <summary>
     /// Force recompute on first tick and after state transitions.
     /// </summary>
-    private static bool _forceRecompute = true;
+    private static volatile bool _forceRecompute = true;
 
     /// <summary>
     /// Tracks when the last state transition occurred for grace period handling.
