@@ -165,7 +165,6 @@ namespace eft_dma_radar.Tarkov.QuestPlanner
         /// <summary>
         /// Reads TaskConditionCounters from the player profile.
         /// Memory path: Profile + 0x90 -> Dictionary&lt;MongoID, TaskConditionCounter&gt;
-        /// Each TaskConditionCounter value pointer -> object + 0x40 -> _value (int)
         /// </summary>
         /// <param name="profile">The profile pointer address.</param>
         /// <returns>Dictionary mapping condition ID string to current counter value.</returns>
@@ -200,8 +199,7 @@ namespace eft_dma_radar.Tarkov.QuestPlanner
                         if (counterPtr == 0)
                             continue;
 
-                        // TaskConditionCounter object: fields at +0x10, _value at fields+0x30 = object+0x40
-                        var value = Memory.ReadValue<int>(counterPtr + 0x40);
+                        var value = Memory.ReadValue<int>(counterPtr + Offsets.TaskConditionCounter.Value);
 
                         counters[conditionId] = value;
                     }
