@@ -77,25 +77,24 @@ namespace SDK
 		}
 		public readonly partial struct GameWorld
 		{
-			public const uint Location = 0x90; // String (UNKN) - Note: dump shows LocationId at 0xC0 in GameWorld, but parser searches for Location field
-			public const uint GameDateTime = 0xD0;
-			public const uint SynchronizableObjectLogicProcessor = 0x240; // <SynchronizableObjectLogicProcessor>k__BackingField
+			public const uint GameDateTime = 0xD8;
+			public const uint SynchronizableObjectLogicProcessor = 0x248; // <SynchronizableObjectLogicProcessor>k__BackingField
 		}
 
 		public readonly partial struct ClientLocalGameWorld
 		{
-			public const uint BtrController = 0x20; // BtrController (DEC 3)
-			public const uint TransitController = 0x30; // TransitController (DEC 3)
-			public const uint ExfilController = 0x50; // ExfiltrationController (DEC 3)
-			public const uint ClientShellingController = 0xA0; // ArtilleryShellingControllerClient (DEC 3)
-			public const uint LocationId = 0xC8; // String (DEC 3)
-			public const uint LootList = 0x190; // List<IKillable> (DEC 3)
-			public const uint RegisteredPlayers = 0x1B0; // List<EFT.IPlayer> (DEC 3)
-			public const uint BorderZones = 0x1E8; // BorderZone[] (DEC 3)
-			public const uint MainPlayer = 0x208; // EFT.Player (DEC 3)
-			public const uint World = 0x210; // EFT.World (DEC 3)
-			public const uint SynchronizableObjectLogicProcessor = 0x240; // SynchronizableObjectLogicProcessor (DEC 3)
-			public const uint Grenades = 0x280; // DictionaryListHydra<Int32, Throwable> (DEC 3)
+			public const uint BtrController = 0x28; // BtrController (DEC 3)
+			public const uint TransitController = 0x38; // TransitController (DEC 3)
+			public const uint ExfilController = 0x58; // ExfiltrationController (DEC 3)
+			public const uint ClientShellingController = 0xA8; // ArtilleryShellingControllerClient (DEC 3)
+			public const uint LocationId = 0xD0; // String (DEC 3)
+			public const uint LootList = 0x198; // List<IKillable> (DEC 3)
+			public const uint RegisteredPlayers = 0x1B8; // List<EFT.IPlayer> (DEC 3)
+			public const uint BorderZones = 0x1F0; // BorderZone[] (DEC 3)
+			public const uint MainPlayer = 0x210; // EFT.Player (DEC 3)
+			public const uint World = 0x218; // EFT.World (DEC 3)
+			public const uint SynchronizableObjectLogicProcessor = 0x248; // SynchronizableObjectLogicProcessor (DEC 3)
+			public const uint Grenades = 0x288; // DictionaryListHydra<Int32, Throwable> (DEC 3)
 		}
 
 		public readonly partial struct TransitController
@@ -1071,7 +1070,7 @@ namespace SDK
 		{
 			public const uint OpticCameraManager = 0x10; // UNCHANGED DEC 2025
 			public const uint Camera = 0x60; // UnityEngine.Camera - FPS Camera (UNCHANGED DEC 2025)
-            public const uint GetInstance_RVA = 0x105A4F0; // DEC 2025 - from Camera-PWA
+            public const uint GetInstance_RVA = 0x3921890; // DEC 2025 - from Camera-PWA
             public const uint CameraDerefOffset = 0x10; // UNCHANGED DEC 2025 - dereference offset for Camera objects
 		}
 
@@ -1107,20 +1106,20 @@ namespace SDK
         }		
         public static class Special
         {
-            public const ulong TypeInfoTableRva = 0x6B3B5E8; // TYPE_INFO_TABLE //updated feb11
+            public const ulong TypeInfoTableRva = 0x5AA9158; // TYPE_INFO_TABLE //updated feb11
 
-            public const uint FirearmController_WeaponDirectionGetterRva = 0x3CC77A0; // FirearmController.get_WeaponDirection_RVA 
+            public const uint FirearmController_WeaponDirectionGetterRva = 0x1386390; // FirearmController.get_WeaponDirection_RVA 
             public const uint EFTHardSettings_TypeIndex = 225;
-            public const uint EftScreenManager_TypeIndex = 15090;
-            public const uint GPUInstancerManager_TypeIndex = 4915;
-            public const uint WeatherController_TypeIndex = 10043;
-            public const uint FirearmController_TypeIndex = 6934;
-            public const uint LevelSettings_TypeIndex = 2052;
-            public const uint GamePlayerOwner_TypeIndex = 8522;
-            public const uint CameraManager_TypeIndex = 13107;
-            public const uint ClientBackendSession_TypeIndex = 8151;
-            public const uint EftClientBackendSession_TypeIndex = 8229;
-            public const uint GlobalConfiguration_TypeIndex = 6404;
+            public const uint EftScreenManager_TypeIndex = 15154;
+            public const uint GPUInstancerManager_TypeIndex = 4917;
+            public const uint WeatherController_TypeIndex = 10104;
+            public const uint FirearmController_TypeIndex = 6939;
+            public const uint LevelSettings_TypeIndex = 2053;
+            public const uint GamePlayerOwner_TypeIndex = 8568;
+            public const uint CameraManager_TypeIndex = 13167;
+            public const uint ClientBackendSession_TypeIndex = 8201;
+            public const uint EftClientBackendSession_TypeIndex = 8275;
+            public const uint GlobalConfiguration_TypeIndex = 6406;
 
         }        
         public readonly partial struct Il2CppClass
