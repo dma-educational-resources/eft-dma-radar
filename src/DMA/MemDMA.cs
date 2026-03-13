@@ -199,6 +199,10 @@ namespace eft_dma_radar.Tarkov
 
                     _starting = true;
 
+                    //IL2CPP.Il2CppDumper.Dump(
+                    //    System.IO.Path.Combine(
+                    //        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    //        "eft-dma-radar", "dump", "AppSDK.cs"));
                     InputManager.Initialize();
                     CameraManager.Initialize(); // IL2CPP ported - signature scan
                     _ready = true;

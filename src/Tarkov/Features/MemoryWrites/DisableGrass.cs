@@ -131,7 +131,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     if (!manager.IsValidVirtualAddress())
                         continue;
     
-                    var runtimeDataPtr = Memory.ReadPtr(manager + Offsets.GPUInstancerManager.runtimeDataList);
+                    var runtimeDataPtr = Memory.ReadPtr(manager + Offsets.EFT.GPUInstancerManager.runtimeDataList);
                     if (!runtimeDataPtr.IsValidVirtualAddress())
                         continue;
     
