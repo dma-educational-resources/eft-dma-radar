@@ -1,4 +1,5 @@
-﻿using eft_dma_radar.Common.Maps;
+﻿#nullable enable
+using eft_dma_radar.Common.Maps;
 using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;

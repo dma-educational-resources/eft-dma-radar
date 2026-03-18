@@ -19,143 +19,6 @@ namespace eft_dma_radar.UI.Misc
         public string Short { get; init; }
     }
 
-    /// <summary>
-    /// Represents a PMC in the PMC History log.
-    /// </summary>
-    public sealed class PlayerHistoryEntry
-    {
-        private readonly Player _player;
-        private DateTime _lastSeen;
-
-        /// <summary>
-        /// The Player Object that this entry is bound to.
-        /// </summary>
-        public Player Player => _player;
-
-        public string Name => _player.Name;
-
-        public string ID => _player.AccountID;
-
-        public string Acct
-        {
-            get
-            {
-                if (_player is ObservedPlayer observed)
-                    return observed.Profile?.Acct;
-                return "--";
-            }
-        }
-
-        public string Type => $"{_player.Type.GetDescription()}";
-
-        public string KD
-        {
-            get
-            {
-                if (_player is ObservedPlayer observed && observed.Profile?.Overall_KD is float kd)
-                    return kd.ToString("n2");
-                return "--";
-            }
-        }
-
-        public string Hours
-        {
-            get
-            {
-                if (_player is ObservedPlayer observed && observed.Profile?.Hours is int hours)
-                    return hours.ToString();
-                return "--";
-            }
-        }
-
-        /// <summary>
-        /// When this player was last seen
-        /// </summary>
-        public DateTime LastSeen
-        {
-            get => _lastSeen;
-            private set => _lastSeen = value;
-        }
-
-        /// <summary>
-        /// Formatted LastSeen for display in UI
-        /// </summary>
-        public string LastSeenFormatted
-        {
-            get
-            {
-                var timeSpan = DateTime.Now - _lastSeen;
-
-                if (timeSpan.TotalMinutes < 1)
-                    return "Just now";
-                else if (timeSpan.TotalMinutes < 60)
-                    return $"{(int)timeSpan.TotalMinutes}m ago";
-                else if (timeSpan.TotalHours < 24)
-                    return $"{(int)timeSpan.TotalHours}h ago";
-                else if (timeSpan.TotalDays < 7)
-                    return $"{(int)timeSpan.TotalDays}d ago";
-                else
-                    return _lastSeen.ToString("MM/dd/yyyy");
-            }
-        }
-
-        /// <summary>
-        /// Constructor.
-        /// </summary>
-        /// <param name="player">Player Object to bind to.</param>
-        public PlayerHistoryEntry(Player player)
-        {
-            ArgumentNullException.ThrowIfNull(player, nameof(player));
-            _player = player;
-            _lastSeen = DateTime.Now;
-        }
-
-        /// <summary>
-        /// Updates the LastSeen timestamp to current time
-        /// </summary>
-        public void UpdateLastSeen()
-        {
-            LastSeen = DateTime.Now;
-        }
-
-        /// <summary>
-        /// Updates the LastSeen timestamp to a specific time
-        /// </summary>
-        /// <param name="timestamp">The timestamp when the player was seen</param>
-        public void UpdateLastSeen(DateTime timestamp)
-        {
-            LastSeen = timestamp;
-        }
-    }
-    /// <summary>
-    /// JSON Wrapper for Player Watchlist.
-    /// </summary>
-    public sealed class PlayerWatchlistEntry
-    {
-        /// <summary>
-        /// Player's Account ID as obtained from Player History.
-        /// </summary>
-        [JsonPropertyName("acctID")]
-        public string AccountID { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Reason for adding player to Watchlist (ex: Cheater, streamer name,etc.)
-        /// </summary>
-        [JsonPropertyName("reason")]
-        public string Reason { get; set; } = string.Empty;
-
-        /// <summary>
-        /// The streaming platform (Twitch, YouTube, etc.)
-        /// </summary>
-        [JsonPropertyName("platform")]
-        public StreamingPlatform StreamingPlatform { get; set; } = StreamingPlatform.None;
-
-        /// <summary>
-        /// The platform username
-        /// </summary>
-        [JsonPropertyName("username")]
-        public string Username { get; set; } = string.Empty;
-    }
     public sealed class ScreenEntry
     {
         private readonly int _screenNumber;
@@ -402,28 +265,6 @@ namespace eft_dma_radar.UI.Misc
         Square,
         [Description("Diamond")]
         Diamond
-    }
-
-    /// <summary>
-    /// Enum representing different streaming platforms
-    /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
-    public enum StreamingPlatform
-    {
-        /// <summary>
-        /// No streaming platform
-        /// </summary>
-        None,
-
-        /// <summary>
-        /// Twitch.tv streaming platform
-        /// </summary>
-        Twitch,
-
-        /// <summary>
-        /// YouTube streaming platform
-        /// </summary>
-        YouTube
     }
 
     /// <summary>
@@ -795,8 +636,10 @@ namespace eft_dma_radar.UI.Misc
                         TextAlign = SKTextAlign.Center,
                         TextEncoding = SKTextEncoding.Utf8,
                         IsAntialias = true,
+#pragma warning disable CS0618 // Typeface/FilterQuality obsolete — codebase-wide SkiaSharp migration needed
                         Typeface = CustomFonts.SKFontFamilyMedium,
                         FilterQuality = SKFilterQuality.Low
+#pragma warning restore CS0618
                     };
                 }
             }

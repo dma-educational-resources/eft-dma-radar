@@ -1347,7 +1347,6 @@
 
                                             <!-- Bindable Hotkey List -->
                                             <ListView Grid.Row="1" x:Name="hotkeyListView"
-                                                      ItemsSource="{Binding Hotkeys}"
                                                       BorderThickness="0" Background="Transparent"
                                                       Height="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
 

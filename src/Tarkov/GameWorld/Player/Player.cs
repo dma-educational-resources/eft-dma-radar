@@ -19,10 +19,6 @@ using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Common.Unity.Collections;
 using eft_dma_radar.Common.Unity.LowLevel;
 using System;
-using System.Linq;
-using System.Windows.Shapes;
-using static System.Windows.Forms.LinkLabel;
-using eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer
 {
@@ -77,15 +73,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         protected static readonly GroupManager _groups = new();
         protected static int _playerScavNumber = 0;
         public virtual int VoipId { get; }
-        /// <summary>
-        /// Player History Log.
-        /// </summary>
-        public static PlayerHistory PlayerHistory { get; } = new();
 
-        /// <summary>
-        /// Player Watchlist Entries.
-        /// </summary>
-        public static PlayerWatchlist PlayerWatchlist { get; } = new();
         /// <summary>
         /// Resets/Updates 'static' assets in preparation for a new game/raid instance.
         /// </summary>
@@ -93,7 +81,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         {
             _groups.Clear();
             _rateLimit.Clear();
-            PlayerHistory.Reset();             
             _playerScavNumber = 0;
         }
 
@@ -123,7 +110,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"ERROR during Player Allocation for player @ 0x{playerBase:X}: {ex}");
+                XMLogging.WriteLine($"ERROR during Player Allocation for player @ 0x{playerBase:X}: {ex.Message}");
                 return false;
             }
             finally
@@ -248,16 +235,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         public PlayerType Type { get; protected set; }
 
         /// <summary>
-        /// Streaming platform username.
-        /// </summary>
-        public string StreamingUsername { get; set; }
-
-        /// <summary>
-        /// The streaming platform URL they're streaming
-        /// </summary>
-        public string StreamingURL { get; set; }
-
-        /// <summary>
         /// Player's Rotation in Local Game World.
         /// </summary>
         public Vector2 Rotation { get; private set; }
@@ -310,11 +287,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         protected int _verticesCount;
         
         /// <summary>
-        /// Flag to prevent skeleton error log spam.
-        /// </summary>
-        private bool _skeletonErrorLogged;
-
-        /// <summary>
         /// Player's Gear/Loadout Information and contained items.
         /// </summary>
         public GearManager Gear { get; private set; }
@@ -350,11 +322,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         public LootContainer LootObject { get; set; }
 
         /// <summary>
-        /// True if the player is streaming
-        /// </summary>
-        public bool IsStreaming { get; set; }
-
-        /// <summary>
         /// Alerts for this Player Object.
         /// Used by Player History UI Interop.
         /// </summary>
@@ -373,11 +340,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// Player name.
         /// </summary>
         public virtual string Name { get; set; }
-
-        /// <summary>
-        /// Account UUID for Human Controlled Players.
-        /// </summary>
-        public virtual string AccountID { get; set; }
 
         /// <summary>
         /// Group that the player belongs to.
@@ -579,11 +541,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             this.Type = newType;
         }
 
-        public void UpdateStreamingUsername(string url)
-        {
-            this.StreamingUsername = url;
-        }
-
         /// <summary>
         /// Validates the Rotation Address.
         /// </summary>
@@ -665,7 +622,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             LootObject = null;
             IsActive = true;
         }
-        private ulong _lastMovementPlayer;
         internal int BtrStickTicks;
         /// <summary>
         /// Executed on each Realtime Loop.
@@ -1912,8 +1868,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     return new ValueTuple<SKPaint, SKPaint>(SKPaints.PaintPScav, SKPaints.TextPScav);
                 case PlayerType.SpecialPlayer:
                     return new ValueTuple<SKPaint, SKPaint>(SKPaints.PaintSpecial, SKPaints.TextSpecial);
-                case PlayerType.Streamer:
-                    return new ValueTuple<SKPaint, SKPaint>(SKPaints.PaintStreamer, SKPaints.TextStreamer);
                 default:
                     return new ValueTuple<SKPaint, SKPaint>(SKPaints.PaintUSEC, SKPaints.TextUSEC);
             }
@@ -1941,9 +1895,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 if (observed.Profile?.Overall_KD is float kdResult)
                     kd = kdResult.ToString("n2");
             }
-
-            if (IsStreaming) // Streamer Notice
-                lines.Add(($"[LIVE - Double Click]", SKPaints.TextMouseover));
 
             var alert = this.Alerts?.Trim();
 
@@ -2342,8 +2293,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     return new ValueTuple<SKPaint, SKPaint>(SKPaints.PaintPlayerScavESP, SKPaints.TextPlayerScavESP);
                 case PlayerType.SpecialPlayer:
                     return new ValueTuple<SKPaint, SKPaint>(SKPaints.PaintSpecialESP, SKPaints.TextSpecialESP);
-                case PlayerType.Streamer:
-                    return new ValueTuple<SKPaint, SKPaint>(SKPaints.PaintStreamerESP, SKPaints.TextStreamerESP);
                 default:
                     return new ValueTuple<SKPaint, SKPaint>(SKPaints.PaintUSECESP, SKPaints.TextUSECESP);
             }
@@ -2381,8 +2330,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     return SKPaints.PaintMiniPScav;
                 case PlayerType.SpecialPlayer:
                     return SKPaints.PaintMiniSpecial;
-                case PlayerType.Streamer:
-                    return SKPaints.PaintMiniStreamer;
                 default:
                     return SKPaints.PaintMiniUSEC;
             }
@@ -2458,12 +2405,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             /// 'Special' Human Controlled Hostile PMC/Scav (on the watchlist, or a special account type).
             /// </summary>
             [Description("Special Player")]
-            SpecialPlayer,
-            /// <summary>
-            /// Human Controlled Hostile PMC/Scav that has a Twitch account name as their IGN.
-            /// </summary>
-            [Description("Streamer")]
-            Streamer
+            SpecialPlayer
         }
 
         #endregion

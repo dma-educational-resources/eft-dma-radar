@@ -1,5 +1,4 @@
 ﻿using eft_dma_radar.UI.Misc;
-using SkiaSharp.Views.WPF;
 
 namespace eft_dma_radar.UI
 {

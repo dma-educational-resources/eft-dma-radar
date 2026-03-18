@@ -12,6 +12,7 @@
  * - FILE IS TOUCHED ONLY WHEN SESSION ID CHANGES
  */
 
+#nullable enable
 using System.Collections.Concurrent;
 using System.Numerics;
 using System.Text.Json;
@@ -184,24 +185,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                     ? $"U:PMC{entry.PmcIndex}"
                     : $"B:PMC{entry.PmcIndex}";
             }
-        }
-
-        public static bool TryGetIdentity(
-            string profileId,
-            out string? nickname,
-            out string? accountId)
-        {
-            nickname = null;
-            accountId = null;
-
-            if (_players.TryGetValue(profileId, out var entry))
-            {
-                nickname = entry.Nickname;
-                accountId = entry.AccountId;
-                return !string.IsNullOrEmpty(nickname);
-            }
-
-            return false;
         }
 
         public static void UpdateIdentity(

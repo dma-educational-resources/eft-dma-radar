@@ -20,7 +20,6 @@ global using System.Runtime.InteropServices;
 global using System.Text;
 global using System.Text.Json;
 global using System.Text.Json.Serialization;
-using eft_dma_radar;
 using eft_dma_radar.Tarkov;
 using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.Features.MemoryWrites.Patches;
@@ -537,21 +536,31 @@ namespace eft_dma_radar
 
             Directory.CreateDirectory(iconCachePath);
 
-            Parallel.ForEach(EftDataManager.AllItems.Keys, itemId =>
+            var itemsToCache = EftDataManager.AllItems.Keys
+                .Where(itemId =>
+                {
+                    string pngPath = Path.Combine(iconCachePath, $"{itemId}.png");
+                    return !File.Exists(pngPath) || new FileInfo(pngPath).Length <= 1024;
+                })
+                .ToList();
+
+            if (itemsToCache.Count == 0)
+                return;
+
+            var options = new ParallelOptions { MaxDegreeOfParallelism = 4 };
+
+            Parallel.ForEachAsync(itemsToCache, options, async (itemId, ct) =>
             {
                 try
                 {
-                    string pngPath = Path.Combine(iconCachePath, $"{itemId}.png");
-                    if (File.Exists(pngPath) && new FileInfo(pngPath).Length > 1024) return;
-
                     XMLogging.WriteLine($"[IconCache] Caching item icon: {itemId}");
-                    Converters.ItemIconConverter.SaveItemIconAsPng(itemId, iconCachePath).Wait();
+                    await Converters.ItemIconConverter.SaveItemIconAsPng(itemId, iconCachePath);
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"[IconCache] Failed to cache item {itemId}: {ex}");
                 }
-            });
+            }).GetAwaiter().GetResult();
         }
 
         private static void CleanupWindowResources()

@@ -31,7 +31,6 @@ namespace eft_dma_radar.UI.SKWidgetControl
         private SKPath _resizeTriangle;
         private float _relativeX;
         private float _relativeY;
-        private bool _isDragging = false;
         private int _zIndex;  // Z-Index for controlling widget stacking order
         #endregion
 
@@ -268,7 +267,6 @@ namespace eft_dma_radar.UI.SKWidgetControl
                 {
                     _capturedWidget._titleDrag = false;
                     _capturedWidget._resizeDrag = false;
-                    _capturedWidget._isDragging = false;
 
                     var parent = _capturedWidget._parent;
                     if (parent.IsMouseCaptured)
@@ -304,7 +302,6 @@ namespace eft_dma_radar.UI.SKWidgetControl
             {
                 case WidgetClickEvent.ClickedTitleBar:
                     _titleDrag = true;
-                    _isDragging = true;
                     _capturedWidget = this;
                     _parent.CaptureMouse();
                     e.Handled = true;
@@ -314,7 +311,6 @@ namespace eft_dma_radar.UI.SKWidgetControl
                     if (CanResize)
                     {
                         _resizeDrag = true;
-                        _isDragging = true;
                         _capturedWidget = this;
                         _parent.CaptureMouse();
                         e.Handled = true;
@@ -331,7 +327,6 @@ namespace eft_dma_radar.UI.SKWidgetControl
         {
             _titleDrag = false;
             _resizeDrag = false;
-            _isDragging = false;
 
             e.Handled = true;
         }

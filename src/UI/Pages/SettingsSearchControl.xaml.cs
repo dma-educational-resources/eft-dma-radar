@@ -1,4 +1,5 @@
-﻿using eft_dma_radar.Common.Misc.Data;
+﻿#nullable enable
+using eft_dma_radar.Common.Misc.Data;
 using eft_dma_radar.UI.Misc;
 using System;
 using System.Collections.Generic;

@@ -1265,14 +1265,6 @@ namespace eft_dma_radar.UI.Pages
             XMLogging.WriteLine("Saved aimbot options settings");
         }
 
-        private struct NativeHookTestState
-        {
-            public uint HasRun;
-            public uint IsRunning;
-            public ulong UserData;
-            public ulong ReturnAddr;
-        }
-
         private async void btnAntiAFK_Click(object sender, RoutedEventArgs e)
         {
             btnAntiAFK.Content = "Please Wait...";

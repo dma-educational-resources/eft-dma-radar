@@ -14,7 +14,9 @@ namespace eft_dma_shared.Common.Unity.LowLevel.Hooks
 
         private static readonly object SyncRoot = new();
 
+        #pragma warning disable CS0649 // Field is never assigned to
         private static ulong _unityBase;
+#pragma warning restore CS0649
         private static ulong _hookTarget;
         private static ulong _codeCave;
         private static byte[] _originalBytes = Array.Empty<byte>();

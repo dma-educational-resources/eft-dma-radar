@@ -3093,7 +3093,6 @@ namespace eft_dma_radar.UI.Pages
         #endregion
 
         #region ConfigTab
-        private bool _isRefreshingConfigList = false;
         private bool _ignoreConfigSelectionChanged = false;
         private async Task InitializeConfigTab()
         {
@@ -3125,8 +3124,6 @@ namespace eft_dma_radar.UI.Pages
         }
         private void RefreshConfigList()
         {
-            _isRefreshingConfigList = true;
-        
             try
             {
                 _ignoreConfigSelectionChanged = true;
@@ -3155,7 +3152,6 @@ namespace eft_dma_radar.UI.Pages
             finally
             {
                 _ignoreConfigSelectionChanged = false;
-                _isRefreshingConfigList = false;
             }
         }
 

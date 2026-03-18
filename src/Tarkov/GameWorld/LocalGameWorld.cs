@@ -17,10 +17,8 @@ using eft_dma_radar.Common.DMA;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Data;
 using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Tarkov.API;
-using eft_dma_radar.Common.Unity.Collections;
 
 namespace eft_dma_radar.Tarkov.GameWorld
 {
@@ -107,7 +105,6 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         private static void Memory_GameStopped(object sender, EventArgs e)
         {
-            _screenManagerStaticClass = 0;
             LevelSettings = 0;
             LevelSettingsResolver.Reset();
             Il2CppClass.ForceReset();      // <?? REQUIRED
@@ -626,8 +623,6 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         public bool RaidHasStarted => _raidStarted;
 
-        private static ulong _screenManagerStaticClass;
-
         /// <summary>
         /// Checks if the Raid has started (players can move about).
         /// Pure check + one-shot side effect when raid first becomes "real".
@@ -1090,9 +1085,8 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 EftWeatherControllerResolver.InvalidateCache();
 
                 Il2CppClass.ForceReset();
-                _screenManagerStaticClass = 0;
 
-                // 10¡§C15 seconds cooldown recommended
+                // 10
                 RaidCooldown.BeginCooldown(12);
 
                 _cts.Cancel();

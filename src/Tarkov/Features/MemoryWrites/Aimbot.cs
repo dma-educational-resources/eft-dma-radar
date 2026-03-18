@@ -6,7 +6,6 @@ using eft_dma_radar.Common.DMA;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.Features.Ballistics;
 using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Common.Unity.Collections;
@@ -63,7 +62,6 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 
         public override void OnGameStop()
         {
-            _weaponDirectionGetter = null;
         }
 
         public override bool Enabled
@@ -482,7 +480,6 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         #endregion
 
         #region Helper Methods
-        private static ScatterWriteHandle writes;
         private static Player GetBestAimbotTarget(LocalGameWorld game, Player localPlayer)
         {
             var players = game.Players?
@@ -990,7 +987,6 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 
         #region Silent Aim Internal
 
-        private static ulong? _weaponDirectionGetter;       
         private static long _lastPatchTicks = 0;
         private static Vector3 _lastPatchedDirection = Vector3.Zero;
         
@@ -1007,7 +1003,6 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         
         private static bool _shotDirectionDiagLogged = false;
         private static long _lastDryRunLogTicks = 0;
-        private static bool _shotDirectionNeutral = true; // Track if we're writing (false) or letting game handle it (true)     
   
         /// <summary>
         /// DATA-BASED SILENT AIM: Write directly to _shotDirection field on PWA.
@@ -1091,7 +1086,6 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             
             _lastPatchTicks = now;
             _lastPatchedDirection = localDirection;
-            _shotDirectionNeutral = false; // Mark as non-neutral (aimbot is active)
         }
         
         /// <summary>
@@ -1139,7 +1133,6 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         {
             _shotDirectionDiagLogged = false; // Reset diagnostic flag for next engagement
             _lastDryRunLogTicks = 0; // Reset dry run log timer
-            _shotDirectionNeutral = true; // Mark as neutral (we're not writing anymore)
         }
 
         #endregion

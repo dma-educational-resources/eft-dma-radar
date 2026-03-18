@@ -10,7 +10,9 @@ namespace eft_dma_radar.Common.Unity.LowLevel.Types
     {
         public static implicit operator ulong(RemoteBytes x) => x._pmem;
 
+        #pragma warning disable CS0649 // Field is never assigned to
         private readonly uint _size;
+#pragma warning restore CS0649
         private ulong _pmem;
         public readonly struct MonoString
         {

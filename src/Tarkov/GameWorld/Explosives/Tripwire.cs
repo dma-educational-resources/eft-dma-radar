@@ -13,7 +13,6 @@ using SDK;
 using static SDK.Offsets;
 using SkiaSharp;
 using eft_dma_radar.UI.Misc;
-using eft_dma_radar.UI.ESP;
 
 namespace eft_dma_radar.Tarkov.GameWorld.Explosives
 {

@@ -17,7 +17,6 @@ namespace eft_dma_radar.Tarkov.Loot
     {
         private static Config Config => Program.Config;
         private readonly TarkovMarketItem _item;
-        private DateTime? _lastNotifyTime;
         private static readonly Dictionary<string, DateTime> _lastNotifyTimes = new();
         private static readonly TimeSpan NotifyCooldown = TimeSpan.FromSeconds(30);
 

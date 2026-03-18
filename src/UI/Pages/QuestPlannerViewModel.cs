@@ -1,3 +1,4 @@
+#nullable enable
 using System.ComponentModel;
 using System.Windows.Threading;
 using eft_dma_radar.Tarkov.QuestPlanner;

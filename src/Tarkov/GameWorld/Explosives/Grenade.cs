@@ -11,7 +11,6 @@ using eft_dma_radar.Common.Misc.Data;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Tarkov.EFTPlayer;
-using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using SkiaSharp;
 

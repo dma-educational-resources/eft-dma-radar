@@ -1272,6 +1272,14 @@ function updateCenterTargetSelect(){
   }
 
   const current = (typeof state.centerTarget === "string" && state.centerTarget) ? state.centerTarget : "local";
+  const exists = final.some(o => o.v === current);
+
+  // If the selected player is temporarily missing (e.g. player list rebuilding),
+  // keep a placeholder option so the selection is preserved across transient gaps.
+  if(!exists && current !== "local"){
+    final.push({ v: current, t: current + " (pending\u2026)" });
+  }
+
   const html = final.map(o => `<option value="${escapeHtml(o.v)}">${escapeHtml(o.t)}</option>`).join("");
 
   if(sel._lastHtml !== html){
@@ -1279,12 +1287,7 @@ function updateCenterTargetSelect(){
     sel._lastHtml = html;
   }
 
-  const exists = final.some(o => o.v === current);
-  sel.value = exists ? current : "local";
-  if(!exists && state.centerTarget !== "local"){
-    state.centerTarget = "local";
-    saveSettings();
-  }
+  sel.value = current;
 }
 
 /* =========================

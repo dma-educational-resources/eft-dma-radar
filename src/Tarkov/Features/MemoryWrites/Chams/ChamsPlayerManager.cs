@@ -30,8 +30,6 @@ namespace eft_dma_radar.Tarkov.Features
         private static readonly ConcurrentDictionary<ulong, CachedPlayerMaterials> _cachedMaterials = new();
         private static readonly ConcurrentDictionary<ulong, DateTime> _playerDeathTimes = new();
 
-        public static event Action MaterialsUpdated;
-
         private static Config Config => Program.Config;
         private static ChamsConfig ChamsConfig => Config.ChamsConfig;
 
@@ -1400,7 +1398,7 @@ namespace eft_dma_radar.Tarkov.Features
         {
             return player.Type switch
             {
-                Player.PlayerType.USEC or Player.PlayerType.BEAR or Player.PlayerType.SpecialPlayer or Player.PlayerType.Streamer => ChamsEntityType.PMC,
+                Player.PlayerType.USEC or Player.PlayerType.BEAR or Player.PlayerType.SpecialPlayer => ChamsEntityType.PMC,
                 Player.PlayerType.Teammate => ChamsEntityType.Teammate,
                 Player.PlayerType.AIScav => ChamsEntityType.AI,
                 Player.PlayerType.AIBoss => ChamsEntityType.Boss,

@@ -1,4 +1,5 @@
-﻿using eft_dma_radar.Tarkov;
+﻿#nullable enable
+using eft_dma_radar.Tarkov;
 using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
@@ -89,10 +90,6 @@ namespace eft_dma_radar
         private const int MIN_ESP_PANEL_HEIGHT = 200;
         private const int MIN_MEMORY_WRITING_PANEL_WIDTH = 200;
         private const int MIN_MEMORY_WRITING_PANEL_HEIGHT = 200;
-        private const int MIN_WATCHLIST_PANEL_WIDTH = 200;
-        private const int MIN_WATCHLIST_PANEL_HEIGHT = 200;
-        private const int MIN_PLAYERHISTORY_PANEL_WIDTH = 350;
-        private const int MIN_PLAYERHISTORY_PANEL_HEIGHT = 130;
         private const int MIN_SETTINGS_PANEL_WIDTH = 200;
         private const int MIN_SETTINGS_PANEL_HEIGHT = 200;
         private const int MIN_SEARCH_SETTINGS_PANEL_WIDTH = 200;
@@ -129,7 +126,7 @@ namespace eft_dma_radar
         /// <summary>
         /// Determines if MainWindow is ready or not
         /// </summary>
-        public static bool Initialized = false;
+        public static new bool Initialized = false;
 
         private static List<PingEffect> _activePings = new();
 
@@ -695,7 +692,6 @@ namespace eft_dma_radar
         private static int DrawPriority(PlayerType t) => t switch
         {
             PlayerType.SpecialPlayer => 7,
-            PlayerType.Streamer => 6,
             PlayerType.USEC or PlayerType.BEAR => 5,
             PlayerType.PScav => 4,
             PlayerType.AIBoss=> 3,
@@ -1385,105 +1381,7 @@ namespace eft_dma_radar
             EnsurePanelInBounds(ESPPanel, mainContentGrid, adjustSize: false);
         }
         #endregion
-        #region Watchlist
-        /// <summary>
-        /// Handles setting Watchlist panel visibility
-        /// </summary>
-        private void btnWatchlist_Click(object sender, RoutedEventArgs e)
-        {
-            NotifyUIActivity();
-            TogglePanelVisibility("Watchlist");
-        }
 
-        /// <summary>
-        /// Handle close request from Watchlist control
-        /// </summary>
-        private void WatchlistControl_CloseRequested(object sender, EventArgs e)
-        {
-            WatchlistPanel.Visibility = Visibility.Collapsed;
-        }
-
-        /// <summary>
-        /// Handle drag request from Watchlist control
-        /// </summary>
-        private void WatchlistControl_DragRequested(object sender, PanelDragEventArgs e)
-        {
-            var left = Canvas.GetLeft(WatchlistPanel) + e.OffsetX;
-            var top = Canvas.GetTop(WatchlistPanel) + e.OffsetY;
-
-            Canvas.SetLeft(WatchlistPanel, left);
-            Canvas.SetTop(WatchlistPanel, top);
-
-            EnsurePanelInBounds(WatchlistPanel, mainContentGrid, adjustSize: false);
-        }
-
-        /// <summary>
-        /// Handle resize request from Watchlist control
-        /// </summary>
-        private void WatchlistControl_ResizeRequested(object sender, PanelResizeEventArgs e)
-        {
-            var width = WatchlistPanel.Width + e.DeltaWidth;
-            var height = WatchlistPanel.Height + e.DeltaHeight;
-
-            width = Math.Max(width, MIN_WATCHLIST_PANEL_WIDTH);
-            height = Math.Max(height, MIN_WATCHLIST_PANEL_HEIGHT);
-
-            WatchlistPanel.Width = width;
-            WatchlistPanel.Height = height;
-
-            EnsurePanelInBounds(WatchlistPanel, mainContentGrid, adjustSize: false);
-        }
-        #endregion
-
-        #region Player History
-        /// <summary>
-        /// Handles setting Player History panel visibility
-        /// </summary>
-        private void btnPlayerHistory_Click(object sender, RoutedEventArgs e)
-        {
-            NotifyUIActivity();
-            TogglePanelVisibility("PlayerHistory");
-        }
-
-        /// <summary>
-        /// Handle close request from Player History control
-        /// </summary>
-        private void PlayerHistoryControl_CloseRequested(object sender, EventArgs e)
-        {
-            PlayerHistoryPanel.Visibility = Visibility.Collapsed;
-        }
-
-        /// <summary>
-        /// Handle drag request from Player History control
-        /// </summary>
-        private void PlayerHistoryControl_DragRequested(object sender, PanelDragEventArgs e)
-        {
-            var left = Canvas.GetLeft(PlayerHistoryPanel) + e.OffsetX;
-            var top = Canvas.GetTop(PlayerHistoryPanel) + e.OffsetY;
-
-            Canvas.SetLeft(PlayerHistoryPanel, left);
-            Canvas.SetTop(PlayerHistoryPanel, top);
-
-            EnsurePanelInBounds(PlayerHistoryPanel, mainContentGrid, adjustSize: false);
-        }
-
-        /// <summary>
-        /// Handle resize request from Player History control
-        /// </summary>
-        private void PlayerHistoryControl_ResizeRequested(object sender, PanelResizeEventArgs e)
-        {
-            var width = PlayerHistoryPanel.Width + e.DeltaWidth;
-            var height = PlayerHistoryPanel.Height + e.DeltaHeight;
-
-            width = Math.Max(width, MIN_PLAYERHISTORY_PANEL_WIDTH);
-            height = Math.Max(height, MIN_PLAYERHISTORY_PANEL_HEIGHT);
-
-            PlayerHistoryPanel.Width = width;
-            PlayerHistoryPanel.Height = height;
-
-            EnsurePanelInBounds(PlayerHistoryPanel, mainContentGrid, adjustSize: false);
-        }
-        #endregion
         #region Loot Filter Settings
         /// <summary>
         /// Handles setting loot filter panel visibility
@@ -1876,15 +1774,6 @@ namespace eft_dma_radar
 
         private void MainWindow_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (InRaid && _mouseOverItem is Player player && player.IsStreaming)
-                try
-                {
-                    Process.Start(new ProcessStartInfo(player.StreamingURL) { UseShellExecute = true });
-                }
-                catch
-                {
-                    NotificationsShared.Error("Unable to open this player's Twitch. Do you have a default browser set?");
-                }
         }
 
         private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -1992,8 +1881,6 @@ namespace eft_dma_radar
             coordinator.RegisterRequiredPanel("ESP");
             coordinator.RegisterRequiredPanel("LootFilter");
             coordinator.RegisterRequiredPanel("LootSettings");
-            coordinator.RegisterRequiredPanel("Watchlist");
-            coordinator.RegisterRequiredPanel("PlayerHistory");
             coordinator.RegisterRequiredPanel("SettingsSearch");
             coordinator.AllPanelsReady += OnAllPanelsReady;
         }
@@ -2009,8 +1896,6 @@ namespace eft_dma_radar
                 LootSettingsControl.BringToFrontRequested += (s, args) => BringPanelToFront(LootSettingsCanvas);
                 MemoryWritingControl.BringToFrontRequested += (s, args) => BringPanelToFront(MemoryWritingCanvas);
                 LootFilterControl.BringToFrontRequested += (s, args) => BringPanelToFront(LootFilterCanvas);
-                WatchlistControl.BringToFrontRequested += (s, args) => BringPanelToFront(WatchlistCanvas);
-                PlayerHistoryControl.BringToFrontRequested += (s, args) => BringPanelToFront(PlayerHistoryCanvas);
                 MapSetupControl.BringToFrontRequested += (s, args) => BringPanelToFront(MapSetupCanvas);
                 SettingsSearchControl.BringToFrontRequested += (s, e) => BringPanelToFront(SettingsSearchCanvas);
                 QuestPlannerControl.BringToFrontRequested += (s, e) => BringPanelToFront(QuestPlannerCanvas);
@@ -2250,8 +2135,6 @@ namespace eft_dma_radar
                 "LootSettingsPanel" => MIN_LOOT_PANEL_WIDTH,
                 "MemoryWritingPanel" => MIN_MEMORY_WRITING_PANEL_WIDTH,
                 "ESPPanel" => MIN_ESP_PANEL_WIDTH,
-                "WatchlistPanel" => MIN_WATCHLIST_PANEL_WIDTH,
-                "PlayerHistoryPanel" => MIN_PLAYERHISTORY_PANEL_WIDTH,
                 "LootFilterPanel" => MIN_LOOT_FILTER_PANEL_WIDTH,
                 "MapSetupPanel" => 300,
                 "QuestPlannerPanel" => MIN_QUEST_PLANNER_PANEL_WIDTH,
@@ -2267,8 +2150,6 @@ namespace eft_dma_radar
                 "LootSettingsPanel" => MIN_LOOT_PANEL_HEIGHT,
                 "MemoryWritingPanel" => MIN_MEMORY_WRITING_PANEL_HEIGHT,
                 "ESPPanel" => MIN_ESP_PANEL_HEIGHT,
-                "WatchlistPanel" => MIN_WATCHLIST_PANEL_HEIGHT,
-                "PlayerHistoryPanel" => MIN_PLAYERHISTORY_PANEL_HEIGHT,
                 "LootFilterPanel" => MIN_LOOT_FILTER_PANEL_HEIGHT,
                 "MapSetupPanel" => 300,
                 "QuestPlannerPanel" => MIN_QUEST_PLANNER_PANEL_HEIGHT,
@@ -2295,8 +2176,6 @@ namespace eft_dma_radar
                 LootSettingsCanvas,
                 MemoryWritingCanvas,
                 ESPCanvas,
-                WatchlistCanvas,
-                PlayerHistoryCanvas,
                 LootFilterCanvas,
                 MapSetupCanvas
             };
@@ -2322,8 +2201,6 @@ namespace eft_dma_radar
             AttachPreviewMouseDown(LootSettingsPanel, LootSettingsCanvas);
             AttachPreviewMouseDown(MemoryWritingPanel, MemoryWritingCanvas);
             AttachPreviewMouseDown(ESPPanel, ESPCanvas);
-            AttachPreviewMouseDown(WatchlistPanel, WatchlistCanvas);
-            AttachPreviewMouseDown(PlayerHistoryPanel, PlayerHistoryCanvas);
             AttachPreviewMouseDown(LootFilterPanel, LootFilterCanvas);
             AttachPreviewMouseDown(MapSetupPanel, MapSetupCanvas);
             AttachPreviewMouseDown(SettingsSearchPanel, SettingsSearchCanvas);
@@ -2333,8 +2210,6 @@ namespace eft_dma_radar
             GeneralSettingsCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(GeneralSettingsCanvas);
             LootSettingsCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(LootSettingsCanvas);
             MemoryWritingCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(MemoryWritingCanvas);
-            WatchlistCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(WatchlistCanvas);
-            PlayerHistoryCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(PlayerHistoryCanvas);
             LootFilterCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(LootFilterCanvas);
             MapSetupCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(MapSetupCanvas);
             SettingsSearchCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(SettingsSearchCanvas);
@@ -2465,14 +2340,6 @@ namespace eft_dma_radar
             LootSettingsControl.ResizeRequested += sharedResizeHandler;
             LootSettingsControl.CloseRequested += sharedCloseHandler;
 
-            WatchlistControl.DragRequested += sharedDragHandler;
-            WatchlistControl.ResizeRequested += sharedResizeHandler;
-            WatchlistControl.CloseRequested += sharedCloseHandler;
-
-            PlayerHistoryControl.DragRequested += sharedDragHandler;
-            PlayerHistoryControl.ResizeRequested += sharedResizeHandler;
-            PlayerHistoryControl.CloseRequested += sharedCloseHandler;
-
             MemoryWritingControl.DragRequested += sharedDragHandler;
             MemoryWritingControl.ResizeRequested += sharedResizeHandler;
             MemoryWritingControl.CloseRequested += sharedCloseHandler;
@@ -2505,8 +2372,6 @@ namespace eft_dma_radar
                 ["LootSettings"] = new PanelInfo(LootSettingsPanel, LootSettingsCanvas, "LootSettings", MIN_LOOT_PANEL_WIDTH, MIN_LOOT_PANEL_HEIGHT),
                 ["MemoryWriting"] = new PanelInfo(MemoryWritingPanel, MemoryWritingCanvas, "MemoryWriting", MIN_MEMORY_WRITING_PANEL_WIDTH, MIN_MEMORY_WRITING_PANEL_HEIGHT),
                 ["ESP"] = new PanelInfo(ESPPanel, ESPCanvas, "ESP", MIN_ESP_PANEL_WIDTH, MIN_ESP_PANEL_HEIGHT),
-                ["Watchlist"] = new PanelInfo(WatchlistPanel, WatchlistCanvas, "Watchlist", MIN_WATCHLIST_PANEL_WIDTH, MIN_WATCHLIST_PANEL_HEIGHT),
-                ["PlayerHistory"] = new PanelInfo(PlayerHistoryPanel, PlayerHistoryCanvas, "PlayerHistory", MIN_PLAYERHISTORY_PANEL_WIDTH, MIN_PLAYERHISTORY_PANEL_HEIGHT),
                 ["LootFilter"] = new PanelInfo(LootFilterPanel, LootFilterCanvas, "LootFilter", MIN_LOOT_FILTER_PANEL_WIDTH, MIN_LOOT_FILTER_PANEL_HEIGHT),
                 ["MapSetup"] = new PanelInfo(MapSetupPanel, MapSetupCanvas, "MapSetup", 300, 300),
                 ["SettingsSearch"] = new PanelInfo(SettingsSearchPanel, SettingsSearchCanvas, "SettingsSearch", MIN_SEARCH_SETTINGS_PANEL_WIDTH, MIN_SEARCH_SETTINGS_PANEL_HEIGHT),

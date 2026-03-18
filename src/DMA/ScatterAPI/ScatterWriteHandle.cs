@@ -9,7 +9,6 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
     /// </summary>
     public sealed class ScatterWriteHandle : IDisposable
     {
-        private readonly uint _pid;
         private readonly VmmScatterMemory _handle;
         private int _count = 0;
         /// <summary>

@@ -1,4 +1,5 @@
-﻿using eft_dma_radar.Tarkov.API;
+﻿#nullable enable
+using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Common.Misc.Data;
 using HandyControl.Tools.Extension;
 using System.Threading;
@@ -11,6 +12,20 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         public PlayerProfile(ObservedPlayer player)
         {
             _player = player;
+        }
+
+        /// <summary>
+        /// Resolves the account ID from the API cache (via ProfileID → API lookup).
+        /// </summary>
+        private string ResolvedAccountID
+        {
+            get
+            {
+                var profileId = _player.ProfileID;
+                if (string.IsNullOrEmpty(profileId))
+                    return null;
+                return PlayerLookupApiClient.TryGetCached(profileId)?.AccountId;
+            }
         }
 
         /// <summary>
@@ -52,7 +67,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         {
             get
             {
-                var acctID = _player.AccountID;
+                var acctID = ResolvedAccountID;
                 if (string.IsNullOrEmpty(acctID)) return null;
                 return EFTProfileService.TryGetEftApiMeta(acctID, out var m) ? m : null;
             }
@@ -65,7 +80,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         {
             get
             {
-                string acctID = _player.AccountID;
+                string acctID = ResolvedAccountID;
                 if (string.IsNullOrEmpty(acctID))
                     return null;
                 else if (EFTProfileService.Profiles.TryGetValue(acctID, out var profile))

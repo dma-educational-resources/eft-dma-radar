@@ -12,6 +12,7 @@
  * - Raid-safe via SessionID
  */
 
+#nullable enable
 using System.Collections.Concurrent;
 using System.Numerics;
 using System.Text.Json;

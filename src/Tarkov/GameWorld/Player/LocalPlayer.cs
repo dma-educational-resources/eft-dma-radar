@@ -107,13 +107,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             {
                 // Health info will be unavailable but player will still work
             }
-
-            try
-            {
-            ulong id = ulong.Parse(AccountID);
-            ILocalPlayer.AccountId = id;
-            }
-            catch { }
         }
 
         /// <summary>
