@@ -1,4 +1,4 @@
-﻿using eft_dma_radar;
+using eft_dma_radar;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
@@ -511,7 +511,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                             allConditions.Add(conditionId);
                             foundCount++;
                             if (DEBUG_QUEST_CONDITIONS)
-                                XMLogging.WriteLine($"[QuestDebug]     ✓ {conditionId}");
+                                XMLogging.WriteLine($"[QuestDebug]     ? {conditionId}");
                         }
                     }
                     catch
@@ -1071,21 +1071,21 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 point.Offset(nameXOffset, nameYOffset);
                 if (!string.IsNullOrEmpty(QuestName))
                 {
-                    canvas.DrawText(QuestName, point, SKPaints.TextOutline);
-                    canvas.DrawText(QuestName, point, SKPaints.QuestHelperText);
+                    canvas.DrawText(QuestName, point, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                    canvas.DrawText(QuestName, point, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.QuestHelperText);
                 }
             }
 
             if (QuestManager.Settings.ShowDistance)
             {
                 var distText = $"{(int)dist}m";
-                var distWidth = SKPaints.QuestHelperText.MeasureText($"{(int)dist}");
+                var distWidth = SKPaints.RadarFontRegular12.MeasureText($"{(int)dist}", SKPaints.QuestHelperText);
                 var distPoint = new SKPoint(
                     point.X - (distWidth / 2) - nameXOffset,
                     point.Y + distanceYOffset - nameYOffset
                 );
-                canvas.DrawText(distText, distPoint, SKPaints.TextOutline);
-                canvas.DrawText(distText, distPoint, SKPaints.QuestHelperText);
+                canvas.DrawText(distText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(distText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.QuestHelperText);
             }
         }
 
@@ -1252,7 +1252,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                         foreach (var cond in quest.CompletedConditions.Take(10)) // Limit to 10
                         {
                             var match = (cond == ObjectiveId || cond == LocationName) ? " <-- THIS" : "";
-                            lines.Add($"  ✓ {cond}{match}");
+                            lines.Add($"  ? {cond}{match}");
                         }
                         if (quest.CompletedConditions.Count > 10)
                             lines.Add($"  ... and {quest.CompletedConditions.Count - 10} more");

@@ -1635,16 +1635,16 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
 
             if (!string.IsNullOrEmpty(nameText))
             {
-                var nameWidth = paints.Item2.MeasureText(nameText);
+                var nameWidth = SKPaints.RadarFontRegular12.MeasureText(nameText, paints.Item2);
                 var namePoint = new SKPoint(point.X - (nameWidth / 2), baseYPosition - 0);
 
-                canvas.DrawText(nameText, namePoint, SKPaints.TextOutline);
-                canvas.DrawText(nameText, namePoint, paints.Item2);
+                canvas.DrawText(nameText, namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(nameText, namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, paints.Item2);
 
                 if (showImportantIndicator)
                 {
-                    var asteriskWidth = SKPaints.TextPulsingAsterisk.MeasureText("*");
-                    var verticalOffset = (SKPaints.TextPulsingAsterisk.TextSize - paints.Item2.TextSize) / 2;
+                    var asteriskWidth = SKPaints.RadarFontEmbolden24.MeasureText("*", SKPaints.TextPulsingAsterisk);
+                    var verticalOffset = (SKPaints.RadarFontEmbolden24.Size - SKPaints.RadarFontRegular12.Size) / 2;
                     verticalOffset += 1.5f * MainWindow.UIScale;
 
                     var asteriskPoint = new SKPoint(
@@ -1652,28 +1652,28 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                         namePoint.Y + verticalOffset
                     );
 
-                    canvas.DrawText("*", asteriskPoint, SKPaints.TextPulsingAsteriskOutline);
-                    canvas.DrawText("*", asteriskPoint, SKPaints.TextPulsingAsterisk);
+                    canvas.DrawText("*", asteriskPoint, SKTextAlign.Left, SKPaints.RadarFontEmbolden24, SKPaints.TextPulsingAsteriskOutline);
+                    canvas.DrawText("*", asteriskPoint, SKTextAlign.Left, SKPaints.RadarFontEmbolden24, SKPaints.TextPulsingAsterisk);
                 }
             }
             else if (showImportantIndicator)
             {
-                var asteriskWidth = SKPaints.TextPulsingAsterisk.MeasureText("*");
+                var asteriskWidth = SKPaints.RadarFontEmbolden24.MeasureText("*", SKPaints.TextPulsingAsterisk);
                 var yPos = point.Y - 2 * MainWindow.UIScale;
                 var asteriskPoint = new SKPoint(point.X - (asteriskWidth / 2), yPos);
 
-                canvas.DrawText("*", asteriskPoint, SKPaints.TextPulsingAsteriskOutline);
-                canvas.DrawText("*", asteriskPoint, SKPaints.TextPulsingAsterisk);
+                canvas.DrawText("*", asteriskPoint, SKTextAlign.Left, SKPaints.RadarFontEmbolden24, SKPaints.TextPulsingAsteriskOutline);
+                canvas.DrawText("*", asteriskPoint, SKTextAlign.Left, SKPaints.RadarFontEmbolden24, SKPaints.TextPulsingAsterisk);
             }
 
             var currentBottomY = point.Y + 20 * MainWindow.UIScale;
             if (!string.IsNullOrEmpty(distanceText))
             {
-                var distWidth = paints.Item2.MeasureText(distanceText);
+                var distWidth = SKPaints.RadarFontRegular12.MeasureText(distanceText, paints.Item2);
                 var distPoint = new SKPoint(point.X - (distWidth / 2), currentBottomY);
 
-                canvas.DrawText(distanceText, distPoint, SKPaints.TextOutline);
-                canvas.DrawText(distanceText, distPoint, paints.Item2);
+                canvas.DrawText(distanceText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(distanceText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, paints.Item2);
             }
 
             if (importantLootItems?.Any() == true)
@@ -1684,11 +1684,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 {
                     var itemText = item.ShortName;
                     var itemPaint = GetPlayerLootItemTextPaint(item);
-                    var itemWidth = itemPaint.MeasureText(itemText);
+                    var itemWidth = SKPaints.RadarFontRegular12.MeasureText(itemText, itemPaint);
                     var itemPoint = new SKPoint(point.X - (itemWidth / 2), currentBottomY);
 
-                    canvas.DrawText(itemText, itemPoint, SKPaints.TextOutline);
-                    canvas.DrawText(itemText, itemPoint, itemPaint);
+                    canvas.DrawText(itemText, itemPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                    canvas.DrawText(itemText, itemPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, itemPaint);
 
                     currentBottomY += textSize + spacing;
                 }
@@ -1696,11 +1696,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
 
             if (!string.IsNullOrEmpty(heightText))
             {
-                var heightWidth = paints.Item2.MeasureText(heightText);
+                var heightWidth = SKPaints.RadarFontRegular12.MeasureText(heightText, paints.Item2);
                 var heightPoint = new SKPoint(point.X - heightWidth - 15 * MainWindow.UIScale, point.Y + 5 * MainWindow.UIScale);
 
-                canvas.DrawText(heightText, heightPoint, SKPaints.TextOutline);
-                canvas.DrawText(heightText, heightPoint, paints.Item2);
+                canvas.DrawText(heightText, heightPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(heightText, heightPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, paints.Item2);
             }
 
             if (rightSideInfo.Count > 0)
@@ -1715,8 +1715,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     if (string.IsNullOrEmpty(line?.Trim()))
                         continue;
 
-                    canvas.DrawText(line, rightPoint, SKPaints.TextOutline);
-                    canvas.DrawText(line, rightPoint, paints.Item2);
+                    canvas.DrawText(line, rightPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                    canvas.DrawText(line, rightPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, paints.Item2);
                     rightPoint.Offset(0, textSize);
                 }
             }
@@ -2081,11 +2081,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             // ---------------- TEXT ----------------
             var observed = this as ObservedPlayer;
             float textY = headPoint.Y - 5f * ESP.Config.FontScale;
-            float lineHeight = textPaint.TextSize * 1.2f * ESP.Config.FontScale;
+            float lineHeight = SKPaints.ESPFontMedium12.Size * 1.2f * ESP.Config.FontScale;
 
             if (espSettings.ShowADS && IsAiming && observed != null)
             {
-                canvas.DrawText("ADS", new SKPoint(headPoint.X, textY), textPaint);
+                canvas.DrawText("ADS", new SKPoint(headPoint.X, textY), SKTextAlign.Center, SKPaints.ESPFontMedium12, textPaint);
                 textY -= lineHeight;
             }
 
@@ -2095,7 +2095,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 if (IsHostilePmc)
                     name = (PlayerSide == Enums.EPlayerSide.Usec ? "U:" : "B:") + name;
 
-                canvas.DrawText(name, new SKPoint(headPoint.X, textY), textPaint);
+                canvas.DrawText(name, new SKPoint(headPoint.X, textY), SKTextAlign.Center, SKPaints.ESPFontMedium12, textPaint);
             }
         
             if (espSettings.ShowHealth && observed != null)
@@ -2138,7 +2138,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             if (count > 0)
             {
                 var label = string.Join("\n", lines[..count]);
-                var metrics = textPaint.FontMetrics;
+                var metrics = SKPaints.ESPFontMedium12.Metrics;
 
                 // Ascent is negative in Skia
                 float ascent = -metrics.Ascent * ESP.Config.FontScale;

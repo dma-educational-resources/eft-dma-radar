@@ -98,12 +98,12 @@ namespace eft_dma_radar.UI.SKWidgetControl
                 .Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries)
                 .ToList();
 
-            var lineSpacing = _textPlayersOverlay.FontSpacing;
+            var lineSpacing = _playerInfoFont.Spacing;
             float maxWidth = 0f;
 
             foreach (var line in lines)
             {
-                var width = _textPlayersOverlay.MeasureText(line);
+                var width = _playerInfoFont.MeasureText(line);
                 if (width > maxWidth)
                     maxWidth = width;
             }
@@ -126,7 +126,7 @@ namespace eft_dma_radar.UI.SKWidgetControl
 
             for (int i = 0; i < lines.Count; i++)
             {
-                canvas.DrawText(lines[i], drawPt, _textPlayersOverlay);
+                canvas.DrawText(lines[i], drawPt, SKTextAlign.Left, _playerInfoFont, _textPlayersOverlay);
 
                 if (i > 0 && i < lines.Count - 1)
                 {
@@ -258,7 +258,7 @@ namespace eft_dma_radar.UI.SKWidgetControl
 
             lock (_textPlayersOverlay)
             {
-                _textPlayersOverlay.TextSize = 12 * newScale;
+                _playerInfoFont.Size = 12 * newScale;
             }
 
             _rowSeparatorPaint.StrokeWidth = 1.0f * newScale;
@@ -267,15 +267,12 @@ namespace eft_dma_radar.UI.SKWidgetControl
 
         private static readonly SKPaint _textPlayersOverlay = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Consolas"),
-            FilterQuality = SKFilterQuality.High
         };
+
+        private static readonly SKFont _playerInfoFont = new(SKTypeface.FromFamilyName("Consolas"), 12) { Subpixel = true };
 
         private static readonly SKPaint _rowSeparatorPaint = new()
         {

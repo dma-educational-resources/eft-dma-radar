@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
@@ -150,8 +150,8 @@ namespace eft_dma_radar.Tarkov.GameWorld.Interactables
             }
             else
             {
-                canvas.DrawText("i", point, SKPaints.TextOutline);
-                canvas.DrawText("i", point, paint.Item2);
+                canvas.DrawText("i", point, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText("i", point, SKTextAlign.Left, SKPaints.RadarFontRegular12, paint.Item2);
                 distanceYOffset = 12f * MainWindow.UIScale;
                 nameYOffset = 0f * MainWindow.UIScale;
             }
@@ -160,20 +160,20 @@ namespace eft_dma_radar.Tarkov.GameWorld.Interactables
             {
                 var namePoint = point;
                 namePoint.Offset(nameXOffset, nameYOffset);
-                canvas.DrawText(KeyName, namePoint, SKPaints.TextOutline);
-                canvas.DrawText(KeyName, namePoint, paint.Item2);
+                canvas.DrawText(KeyName, namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(KeyName, namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, paint.Item2);
             }
 
             if (Settings.ShowDistance)
             {
                 var distText = $"{(int)dist}m";
-                var distWidth = paint.Item2.MeasureText($"{(int)dist}");
+                var distWidth = SKPaints.RadarFontRegular12.MeasureText($"{(int)dist}", paint.Item2);
                 var distPoint = new SKPoint(
                     point.X - (distWidth / 2),
                     point.Y + distanceYOffset
                 );
-                canvas.DrawText(distText, distPoint, SKPaints.TextOutline);
-                canvas.DrawText(distText, distPoint, paint.Item2);
+                canvas.DrawText(distText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(distText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, paint.Item2);
             }
         }
 

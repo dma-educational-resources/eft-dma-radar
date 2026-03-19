@@ -1,4 +1,4 @@
-﻿using eft_dma_radar.Tarkov.EFTPlayer;
+using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.Tarkov.Features.MemoryWrites.Patches;
@@ -142,9 +142,9 @@ namespace eft_dma_radar.UI.ESP
         private static IEnumerable<StaticLootContainer> Containers => Memory.Loot?.StaticLootContainers;
 
         private static EntityTypeSettingsESP MineSettings = ESP.Config.EntityTypeESPSettings.GetSettings("Mine");
-        // ─────────────────────────────────────────────
+        // ---------------------------------------------
         // TOP LOOT PER-FRAME CACHE
-        // ─────────────────────────────────────────────
+        // ---------------------------------------------
 
         private readonly List<TopLootEntry> _topLootCache = new(8);
         private string _topLootCachedText = "";
@@ -898,10 +898,10 @@ namespace eft_dma_radar.UI.ESP
                     return;
 
                 var clientArea = skglControl_ESP.ClientRectangle;
-                var labelWidth = SKPaints.TextESPStatusText.MeasureText(_lastStatusText);
+                var labelWidth = SKPaints.ESPFontMedium13.MeasureText(_lastStatusText);
                 var spacing = 1f * ESPConfig.FontScale;
                 var top = clientArea.Top + spacing;
-                var labelHeight = SKPaints.TextESPStatusText.FontSpacing;
+                var labelHeight = SKPaints.ESPFontMedium13.Spacing;
 
                 var anchorX = clientArea.Width / 2 + _statusTextOffset.X;
                 var anchorY = top + _statusTextOffset.Y;
@@ -915,7 +915,7 @@ namespace eft_dma_radar.UI.ESP
                 canvas.DrawRect(bgRect, SKPaints.PaintTransparentBacker);
 
                 var textLoc = new SKPoint(anchorX, anchorY + labelHeight);
-                canvas.DrawText(_lastStatusText, textLoc, SKPaints.TextESPStatusText);
+                canvas.DrawText(_lastStatusText, textLoc, SKTextAlign.Center, SKPaints.ESPFontMedium13, SKPaints.TextESPStatusText);
             }
             catch (Exception ex)
             {
@@ -939,7 +939,7 @@ private static void DrawFireportAim(SKCanvas canvas, LocalPlayer localPlayer)
 
     var aimbotCache = MemWriteFeature<Aimbot>.Instance.Cache;
 
-    // 🎯 AIM LOCK ACTIVE → snap line to target
+    // ?? AIM LOCK ACTIVE ? snap line to target
     if (ESP.Config.ShowAimLock &&
         aimbotCache?.AimbotLockedPlayer is Player locked &&
         locked.IsAlive &&
@@ -987,23 +987,23 @@ private static void DrawFireportAim(SKCanvas canvas, LocalPlayer localPlayer)
                 _lastMagazineText = magazineText;
             }
 
-            var counterWidth = SKPaints.TextMagazineESP.MeasureText(counter);
-            var wepInfoWidth = wepInfo is not null ? SKPaints.TextMagazineInfoESP.MeasureText(wepInfo) : 0f;
+            var counterWidth = SKPaints.ESPFontBold42.MeasureText(counter);
+            var wepInfoWidth = wepInfo is not null ? SKPaints.ESPFontItalic16.MeasureText(wepInfo) : 0f;
             var maxWidth = Math.Max(counterWidth, wepInfoWidth);
 
-            var textHeight = SKPaints.TextMagazineESP.FontSpacing + SKPaints.TextMagazineInfoESP.FontSpacing;
+            var textHeight = SKPaints.ESPFontBold42.Spacing + SKPaints.ESPFontItalic16.Spacing;
             var anchorX = CameraManagerBase.Viewport.Width - 15f * ESPConfig.FontScale + _magazineOffset.X;
             var anchorY = CameraManagerBase.Viewport.Height - CameraManagerBase.Viewport.Height * 0.10f - textHeight + 4f * ESPConfig.FontScale + _magazineOffset.Y;
 
             if (wepInfo is not null)
             {
                 var wepInfoX = anchorX - wepInfoWidth / 2;
-                canvas.DrawText(wepInfo, wepInfoX, anchorY, SKPaints.TextMagazineInfoESP);
+                canvas.DrawText(wepInfo, wepInfoX, anchorY, SKTextAlign.Left, SKPaints.ESPFontItalic16, SKPaints.TextMagazineInfoESP);
             }
 
             var counterX = anchorX - counterWidth / 2;
-            var counterY = anchorY + (SKPaints.TextMagazineESP.FontSpacing - SKPaints.TextMagazineInfoESP.FontSpacing + 6f * ESPConfig.FontScale);
-            canvas.DrawText(counter, counterX, counterY, SKPaints.TextMagazineESP);
+            var counterY = anchorY + (SKPaints.ESPFontBold42.Spacing - SKPaints.ESPFontItalic16.Spacing + 6f * ESPConfig.FontScale);
+            canvas.DrawText(counter, counterX, counterY, SKTextAlign.Left, SKPaints.ESPFontBold42, SKPaints.TextMagazineESP);
         }
 
         /// <summary>
@@ -1125,7 +1125,7 @@ private static void DrawFireportAim(SKCanvas canvas, LocalPlayer localPlayer)
         {
             var textPt = new SKPoint(CameraManagerBase.Viewport.Left + 4.5f * ESPConfig.FontScale,
                 CameraManagerBase.Viewport.Top + 14f * ESPConfig.FontScale);
-            canvas.DrawText("ESP Hidden", textPt, SKPaints.TextBasicESPLeftAligned);
+            canvas.DrawText("ESP Hidden", textPt, SKTextAlign.Left, SKPaints.ESPFontMedium12, SKPaints.TextBasicESPLeftAligned);
         }
 
         /// <summary>
@@ -1142,12 +1142,12 @@ private static void DrawFireportAim(SKCanvas canvas, LocalPlayer localPlayer)
                 _lastFPSText = fpsText;
             }
 
-            var textWidth = SKPaints.TextESPFPS.MeasureText(fpsText);
+            var textWidth = SKPaints.ESPFontMedium12.MeasureText(fpsText);
             var anchorX = CameraManagerBase.Viewport.Left + 25f * ESPConfig.FontScale + _fpsOffset.X;
             var anchorY = CameraManagerBase.Viewport.Top + 14f * ESPConfig.FontScale + _fpsOffset.Y;
 
             var textPt = new SKPoint(anchorX - textWidth / 2, anchorY);
-            canvas.DrawText(fpsText, textPt, SKPaints.TextESPFPS);
+            canvas.DrawText(fpsText, textPt, SKTextAlign.Left, SKPaints.ESPFontMedium12, SKPaints.TextESPFPS);
         }
 
         /// <summary>
@@ -1364,7 +1364,7 @@ private static void DrawFireportAim(SKCanvas canvas, LocalPlayer localPlayer)
                 InvalidateElementCache(UIElement.ClosestPlayer);
             }
 
-            var textWidth = SKPaints.TextESPClosestPlayer.MeasureText(closestText);
+            var textWidth = SKPaints.ESPFontMedium13.MeasureText(closestText);
 
             var anchorX =
                 CameraManagerBase.ViewportCenter.X +
@@ -1377,7 +1377,7 @@ private static void DrawFireportAim(SKCanvas canvas, LocalPlayer localPlayer)
                 _closestPlayerOffset.Y;
 
             var textPt = new SKPoint(anchorX - textWidth / 2f, anchorY);
-            canvas.DrawText(closestText, textPt, SKPaints.TextESPClosestPlayer);
+            canvas.DrawText(closestText, textPt, SKTextAlign.Left, SKPaints.ESPFontMedium13, SKPaints.TextESPClosestPlayer);
         }
 
 
@@ -1406,20 +1406,20 @@ private static void DrawFireportAim(SKCanvas canvas, LocalPlayer localPlayer)
             {
                 var e = _topLootCache[i];
                 nameCol = Math.Max(nameCol,
-                    SKPaints.TextESPTopLoot.MeasureText(
+                    SKPaints.ESPFontMedium13.MeasureText(
                         e.Count > 1 ? $"{e.Name} (x{e.Count})" : e.Name));
 
                 valueCol = Math.Max(valueCol,
-                    SKPaints.TextESPTopLoot.MeasureText(
+                    SKPaints.ESPFontMedium13.MeasureText(
                         TarkovMarketItem.FormatPrice(e.Value)));
 
                 distCol = Math.Max(distCol,
-                    SKPaints.TextESPTopLoot.MeasureText(
+                    SKPaints.ESPFontMedium13.MeasureText(
                         $"{MathF.Sqrt(e.ClosestDistSq):F0}m"));
             }
 
             float pad = 12f * ESPConfig.FontScale;
-            float lineH = SKPaints.TextESPTopLoot.FontSpacing;
+            float lineH = SKPaints.ESPFontMedium13.Spacing;
 
             float totalW = nameCol + valueCol + distCol + pad * 2;
 
@@ -1431,9 +1431,9 @@ private static void DrawFireportAim(SKCanvas canvas, LocalPlayer localPlayer)
 
             float anchorY =
                 CameraManagerBase.Viewport.Top +
-                SKPaints.TextESPRaidStats.TextSize +
+                SKPaints.ESPFontMedium12.Size +
                 CameraManagerBase.Viewport.Height * 0.0575f * ESPConfig.FontScale +
-                (SKPaints.TextESPRaidStats.FontSpacing * 4) +
+                (SKPaints.ESPFontMedium12.Spacing * 4) +
                 10f * ESPConfig.FontScale +
                 _topLootOffset.Y;
 
@@ -1446,9 +1446,9 @@ private static void DrawFireportAim(SKCanvas canvas, LocalPlayer localPlayer)
                 string val = TarkovMarketItem.FormatPrice(e.Value);
                 string dist = $"{MathF.Sqrt(e.ClosestDistSq):F0}m";
 
-                canvas.DrawText(name, anchorX, y, SKPaints.TextESPTopLoot);
-                canvas.DrawText(val, anchorX + nameCol + pad, y, SKPaints.TextESPTopLoot);
-                canvas.DrawText(dist, anchorX + nameCol + valueCol + pad * 2, y, SKPaints.TextESPTopLoot);
+                canvas.DrawText(name, anchorX, y, SKTextAlign.Left, SKPaints.ESPFontMedium13, SKPaints.TextESPTopLoot);
+                canvas.DrawText(val, anchorX + nameCol + pad, y, SKTextAlign.Left, SKPaints.ESPFontMedium13, SKPaints.TextESPTopLoot);
+                canvas.DrawText(dist, anchorX + nameCol + valueCol + pad * 2, y, SKTextAlign.Left, SKPaints.ESPFontMedium13, SKPaints.TextESPTopLoot);
             }
         }
 
@@ -1475,15 +1475,15 @@ private static void DrawFireportAim(SKCanvas canvas, LocalPlayer localPlayer)
                 new { Type = "Boss", Count = bossCount }
             };
 
-            var typeColumnWidth = statsData.Max(x => SKPaints.TextESPRaidStats.MeasureText(x.Type));
-            var countColumnWidth = statsData.Max(x => SKPaints.TextESPRaidStats.MeasureText(x.Count.ToString()));
+            var typeColumnWidth = statsData.Max(x => SKPaints.ESPFontMedium12.MeasureText(x.Type));
+            var countColumnWidth = statsData.Max(x => SKPaints.ESPFontMedium12.MeasureText(x.Count.ToString()));
 
             var columnPadding = 12f * ESPConfig.FontScale;
             var totalWidth = typeColumnWidth + countColumnWidth + columnPadding;
 
-            var lineHeight = SKPaints.TextESPRaidStats.FontSpacing;
+            var lineHeight = SKPaints.ESPFontMedium12.Spacing;
             var anchorX = CameraManagerBase.Viewport.Right - 3f * ESPConfig.FontScale + _raidStatsOffset.X;
-            var anchorY = CameraManagerBase.Viewport.Top + SKPaints.TextESPRaidStats.TextSize +
+            var anchorY = CameraManagerBase.Viewport.Top + SKPaints.ESPFontMedium12.Size +
                          CameraManagerBase.Viewport.Height * 0.0575f * ESPConfig.FontScale + _raidStatsOffset.Y;
 
             for (int i = 0; i < statsData.Length; i++)
@@ -1492,10 +1492,10 @@ private static void DrawFireportAim(SKCanvas canvas, LocalPlayer localPlayer)
                 var rowY = anchorY + (i * lineHeight);
 
                 var typeX = anchorX - totalWidth;
-                canvas.DrawText(data.Type, typeX, rowY, SKPaints.TextESPRaidStats);
+                canvas.DrawText(data.Type, typeX, rowY, SKTextAlign.Left, SKPaints.ESPFontMedium12, SKPaints.TextESPRaidStats);
 
                 var countX = anchorX - totalWidth + typeColumnWidth + columnPadding;
-                canvas.DrawText(data.Count.ToString(), countX, rowY, SKPaints.TextESPRaidStats);
+                canvas.DrawText(data.Count.ToString(), countX, rowY, SKTextAlign.Left, SKPaints.ESPFontMedium12, SKPaints.TextESPRaidStats);
             }
         }
 
@@ -1571,12 +1571,12 @@ private static void DrawFireportAim(SKCanvas canvas, LocalPlayer localPlayer)
             var textPaint = SKPaints.TextEnergyHydrationBarESP;
             var outlineTextPaint = SKPaints.TextEnergyHydrationBarOutlineESP;
 
-            var textWidth = textPaint.MeasureText(text);
+            var textWidth = SKPaints.ESPFontMedium12.MeasureText(text);
             var centerX = barX + (barWidth / 2f) - (textWidth / 2f);
-            var centerY = barY + (barHeight / 2f) + (textPaint.TextSize / 3f);
+            var centerY = barY + (barHeight / 2f) + (SKPaints.ESPFontMedium12.Size / 3f);
 
-            canvas.DrawText(text, centerX, centerY, outlineTextPaint);
-            canvas.DrawText(text, centerX, centerY, textPaint);
+            canvas.DrawText(text, centerX, centerY, SKTextAlign.Left, SKPaints.ESPFontMedium12, outlineTextPaint);
+            canvas.DrawText(text, centerX, centerY, SKTextAlign.Left, SKPaints.ESPFontMedium12, textPaint);
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -1727,7 +1727,7 @@ private static void DrawFireportAim(SKCanvas canvas, LocalPlayer localPlayer)
 
         #endregion
 
-#region Mini Radar (Optimized – Layer-Stable & Throttled)
+#region Mini Radar (Optimized � Layer-Stable & Throttled)
 
 private static readonly SKPaint _radarBgPaint =
     new SKPaint { Color = new SKColor(0, 0, 0, 180) };
@@ -1799,7 +1799,7 @@ private void DrawRadar(SKCanvas canvas, LocalPlayer localPlayer)
     var mapParams = map.GetParametersE(radarSize, _radarZoom, ref center);
 
     // ------------------------------------------------------------
-    // MAP CACHE — STABLE & FLOAT-SAFE
+    // MAP CACHE � STABLE & FLOAT-SAFE
     // ------------------------------------------------------------
 
     long now = Environment.TickCount64;
@@ -2021,7 +2021,6 @@ private void DrawRadarInfo(SKCanvas canvas)
     using var textPaint = new SKPaint
     {
         Color = SKColors.White,
-        TextSize = 12,
         IsAntialias = true
     };
 
@@ -2030,6 +2029,8 @@ private void DrawRadarInfo(SKCanvas canvas)
         $"RADAR [{mode}] Zoom: {_radarZoom:F1}x",
         _radarRect.Left + 5,
         _radarRect.Top + 15,
+        SKTextAlign.Left,
+        SKPaints.ESPFontMedium12,
         textPaint);
 }
 
@@ -2215,11 +2216,11 @@ private void DrawRadarInfo(SKCanvas canvas)
             var counter = lines.Last();
             var wepInfo = lines.Length > 1 ? lines.First() : null;
 
-            var counterWidth = SKPaints.TextMagazineESP.MeasureText(counter);
-            var wepInfoWidth = wepInfo is not null ? SKPaints.TextMagazineInfoESP.MeasureText(wepInfo) : 0f;
+            var counterWidth = SKPaints.ESPFontBold42.MeasureText(counter);
+            var wepInfoWidth = wepInfo is not null ? SKPaints.ESPFontItalic16.MeasureText(wepInfo) : 0f;
             var maxWidth = Math.Max(counterWidth, wepInfoWidth);
 
-            var textHeight = SKPaints.TextMagazineESP.FontSpacing + SKPaints.TextMagazineInfoESP.FontSpacing;
+            var textHeight = SKPaints.ESPFontBold42.Spacing + SKPaints.ESPFontItalic16.Spacing;
 
             var anchorX = CameraManagerBase.Viewport.Width - 15f * ESPConfig.FontScale + _magazineOffset.X;
             var anchorY = CameraManagerBase.Viewport.Height - CameraManagerBase.Viewport.Height * 0.10f - textHeight + 4f * ESPConfig.FontScale + _magazineOffset.Y;
@@ -2227,19 +2228,19 @@ private void DrawRadarInfo(SKCanvas canvas)
             if (wepInfo is not null)
             {
                 var wepInfoY = anchorY;
-                var counterSpacing = SKPaints.TextMagazineESP.FontSpacing - SKPaints.TextMagazineInfoESP.FontSpacing + 6f * ESPConfig.FontScale;
+                var counterSpacing = SKPaints.ESPFontBold42.Spacing - SKPaints.ESPFontItalic16.Spacing + 6f * ESPConfig.FontScale;
                 var counterY = anchorY + counterSpacing;
-                var topY = wepInfoY - SKPaints.TextMagazineInfoESP.TextSize;
+                var topY = wepInfoY - SKPaints.ESPFontItalic16.Size;
                 var bottomY = counterY;
 
                 return new SKRect(anchorX - maxWidth / 2, topY, anchorX + maxWidth / 2, bottomY);
             }
             else
             {
-                var counterSpacing = SKPaints.TextMagazineESP.FontSpacing - SKPaints.TextMagazineInfoESP.FontSpacing + 6f * ESPConfig.FontScale;
+                var counterSpacing = SKPaints.ESPFontBold42.Spacing - SKPaints.ESPFontItalic16.Spacing + 6f * ESPConfig.FontScale;
                 var counterY = anchorY + counterSpacing;
 
-                var topY = counterY - SKPaints.TextMagazineESP.TextSize;
+                var topY = counterY - SKPaints.ESPFontBold42.Size;
                 var bottomY = counterY;
 
                 return new SKRect(anchorX - counterWidth / 2, topY, anchorX + counterWidth / 2, bottomY);
@@ -2251,18 +2252,18 @@ private void DrawRadarInfo(SKCanvas canvas)
             var sampleCounter = "30 / 30";
             var sampleWepInfo = "Single: M61";
 
-            var counterWidth = SKPaints.TextMagazineESP.MeasureText(sampleCounter);
-            var wepInfoWidth = SKPaints.TextMagazineInfoESP.MeasureText(sampleWepInfo);
+            var counterWidth = SKPaints.ESPFontBold42.MeasureText(sampleCounter);
+            var wepInfoWidth = SKPaints.ESPFontItalic16.MeasureText(sampleWepInfo);
             var maxWidth = Math.Max(counterWidth, wepInfoWidth);
 
-            var textHeight = SKPaints.TextMagazineESP.FontSpacing + SKPaints.TextMagazineInfoESP.FontSpacing;
+            var textHeight = SKPaints.ESPFontBold42.Spacing + SKPaints.ESPFontItalic16.Spacing;
             var anchorX = CameraManagerBase.Viewport.Width - 15f * ESPConfig.FontScale;
             var anchorY = CameraManagerBase.Viewport.Height - CameraManagerBase.Viewport.Height * 0.10f - textHeight + 4f * ESPConfig.FontScale;
             var wepInfoY = anchorY;
-            var counterSpacing = SKPaints.TextMagazineESP.FontSpacing - SKPaints.TextMagazineInfoESP.FontSpacing + 6f * ESPConfig.FontScale;
+            var counterSpacing = SKPaints.ESPFontBold42.Spacing - SKPaints.ESPFontItalic16.Spacing + 6f * ESPConfig.FontScale;
             var counterY = anchorY + counterSpacing;
 
-            var topY = wepInfoY - SKPaints.TextMagazineInfoESP.TextSize;
+            var topY = wepInfoY - SKPaints.ESPFontItalic16.Size;
             var bottomY = counterY;
 
             return new SKRect(anchorX - maxWidth / 2, topY, anchorX + maxWidth / 2, bottomY);
@@ -2328,25 +2329,25 @@ private void DrawRadarInfo(SKCanvas canvas)
                 new { Type = "Boss", Count = 4 }
             };
 
-            var typeColumnWidth = sampleData.Max(x => SKPaints.TextESPRaidStats.MeasureText(x.Type));
-            var countColumnWidth = sampleData.Max(x => SKPaints.TextESPRaidStats.MeasureText(x.Count.ToString()));
+            var typeColumnWidth = sampleData.Max(x => SKPaints.ESPFontMedium12.MeasureText(x.Type));
+            var countColumnWidth = sampleData.Max(x => SKPaints.ESPFontMedium12.MeasureText(x.Count.ToString()));
 
             var columnPadding = 12f * ESPConfig.FontScale;
             var totalWidth = typeColumnWidth + countColumnWidth + columnPadding;
 
-            var lineHeight = SKPaints.TextESPRaidStats.FontSpacing;
+            var lineHeight = SKPaints.ESPFontMedium12.Spacing;
             var totalHeight = lineHeight * sampleData.Length;
 
             var scale = ESPConfig.FontScale;
             var anchorX = CameraManagerBase.Viewport.Right - 3f * scale + _raidStatsOffset.X;
-            var startY = CameraManagerBase.Viewport.Top + SKPaints.TextESPRaidStats.TextSize +
+            var startY = CameraManagerBase.Viewport.Top + SKPaints.ESPFontMedium12.Size +
                          CameraManagerBase.Viewport.Height * 0.0575f * scale + _raidStatsOffset.Y;
 
             return new SKRect(
                 anchorX - totalWidth,
-                startY - SKPaints.TextESPRaidStats.TextSize,
+                startY - SKPaints.ESPFontMedium12.Size,
                 anchorX,
-                startY + totalHeight - SKPaints.TextESPRaidStats.TextSize
+                startY + totalHeight - SKPaints.ESPFontMedium12.Size
             );
         }
 
@@ -2360,25 +2361,25 @@ private void DrawRadarInfo(SKCanvas canvas)
                 new { Type = "Boss", Count = 4 }
             };
 
-            var typeColumnWidth = sampleData.Max(x => SKPaints.TextESPRaidStats.MeasureText(x.Type));
-            var countColumnWidth = sampleData.Max(x => SKPaints.TextESPRaidStats.MeasureText(x.Count.ToString()));
+            var typeColumnWidth = sampleData.Max(x => SKPaints.ESPFontMedium12.MeasureText(x.Type));
+            var countColumnWidth = sampleData.Max(x => SKPaints.ESPFontMedium12.MeasureText(x.Count.ToString()));
 
             var columnPadding = 12f * ESPConfig.FontScale;
             var totalWidth = typeColumnWidth + countColumnWidth + columnPadding;
 
-            var lineHeight = SKPaints.TextESPRaidStats.FontSpacing;
+            var lineHeight = SKPaints.ESPFontMedium12.Spacing;
             var totalHeight = lineHeight * sampleData.Length;
 
             var scale = ESPConfig.FontScale;
             var anchorX = CameraManagerBase.Viewport.Right - 3f * scale;
-            var startY = CameraManagerBase.Viewport.Top + SKPaints.TextESPRaidStats.TextSize +
+            var startY = CameraManagerBase.Viewport.Top + SKPaints.ESPFontMedium12.Size +
                          CameraManagerBase.Viewport.Height * 0.0575f * scale;
 
             return new SKRect(
                 anchorX - totalWidth,
-                startY - SKPaints.TextESPRaidStats.TextSize,
+                startY - SKPaints.ESPFontMedium12.Size,
                 anchorX,
-                startY + totalHeight - SKPaints.TextESPRaidStats.TextSize
+                startY + totalHeight - SKPaints.ESPFontMedium12.Size
             );
         }
 
@@ -2388,8 +2389,8 @@ private void DrawRadarInfo(SKCanvas canvas)
             if (string.IsNullOrEmpty(currentFPSText))
                 return SKRect.Empty;
 
-            var textWidth = SKPaints.TextESPFPS.MeasureText(currentFPSText);
-            var textHeight = SKPaints.TextESPFPS.TextSize;
+            var textWidth = SKPaints.ESPFontMedium12.MeasureText(currentFPSText);
+            var textHeight = SKPaints.ESPFontMedium12.Size;
 
             var anchorX = CameraManagerBase.Viewport.Left + 25f * ESPConfig.FontScale + _fpsOffset.X;
             var anchorY = CameraManagerBase.Viewport.Top + 14f * ESPConfig.FontScale + _fpsOffset.Y;
@@ -2402,8 +2403,8 @@ private void DrawRadarInfo(SKCanvas canvas)
         private SKRect CalculateFPSBaseBounds()
         {
             var sampleFpsText = "9999fps";
-            var textWidth = SKPaints.TextESPFPS.MeasureText(sampleFpsText);
-            var textHeight = SKPaints.TextESPFPS.TextSize;
+            var textWidth = SKPaints.ESPFontMedium12.MeasureText(sampleFpsText);
+            var textHeight = SKPaints.ESPFontMedium12.Size;
 
             var anchorX = CameraManagerBase.Viewport.Left + 25f * ESPConfig.FontScale;
             var anchorY = CameraManagerBase.Viewport.Top + 14f * ESPConfig.FontScale;
@@ -2424,8 +2425,8 @@ private void DrawRadarInfo(SKCanvas canvas)
             if (string.IsNullOrEmpty(currentClosestPlayerText))
                 return SKRect.Empty;
 
-            var textWidth = SKPaints.TextESPClosestPlayer.MeasureText(currentClosestPlayerText);
-            var textHeight = SKPaints.TextESPClosestPlayer.TextSize;
+            var textWidth = SKPaints.ESPFontMedium13.MeasureText(currentClosestPlayerText);
+            var textHeight = SKPaints.ESPFontMedium13.Size;
 
             var anchorX = CameraManagerBase.ViewportCenter.X + _closestPlayerOffset.X;
             var anchorY = CameraManagerBase.ViewportCenter.Y + Aimbot.Config.FOV + 15f * ESPConfig.FontScale + _closestPlayerOffset.Y;
@@ -2439,7 +2440,7 @@ private void DrawRadarInfo(SKCanvas canvas)
             var entries = KillfeedManager.Entries;
 
             float scale = ESPConfig.FontScale;
-            float lineH = SKPaints.TextESPClosestPlayer.FontSpacing;
+            float lineH = SKPaints.ESPFontMedium13.Spacing;
 
             float anchorX =
                 CameraManagerBase.Viewport.Right -
@@ -2458,8 +2459,8 @@ private void DrawRadarInfo(SKCanvas canvas)
             {
                 const string placeholder = "Killfeed";
 
-                float w = SKPaints.TextESPClosestPlayer.MeasureText(placeholder);
-                float h = SKPaints.TextESPClosestPlayer.TextSize;
+                float w = SKPaints.ESPFontMedium13.MeasureText(placeholder);
+                float h = SKPaints.ESPFontMedium13.Size;
 
                 var rect = new SKRect(
                     anchorX - w - 8f * scale,
@@ -2485,6 +2486,8 @@ private void DrawRadarInfo(SKCanvas canvas)
                     placeholder,
                     anchorX - w,
                     anchorY,
+                    SKTextAlign.Left,
+                    SKPaints.ESPFontMedium13,
                     SKPaints.TextESPClosestPlayer);
 
                 return;
@@ -2504,48 +2507,46 @@ private void DrawRadarInfo(SKCanvas canvas)
                 using var paint = new SKPaint
                 {
                     Color = SKPaints.TextESPClosestPlayer.Color.WithAlpha(alpha),
-                    TextSize = SKPaints.TextESPClosestPlayer.TextSize,
-                    Typeface = SKPaints.TextESPClosestPlayer.Typeface,
                     IsAntialias = SKPaints.TextESPClosestPlayer.IsAntialias
                 };
-            
+
                 string killer = string.IsNullOrWhiteSpace(e.Killer)
                     ? "Probably AI"
                     : e.Killer;
-            
+
                 string levelPart = !string.IsNullOrWhiteSpace(e.Level)
                     ? $"L:{e.Level} "
                     : string.Empty;
-            
+
                 string weaponPart = !string.IsNullOrWhiteSpace(e.Weapon)
                     ? e.Weapon
                     : null;
-            
+
                 string ammoPart = !string.IsNullOrWhiteSpace(e.Ammo)
                     ? e.Ammo
                     : null;
-            
+
                 string weaponAmmoPart = weaponPart != null
                     ? ammoPart != null
                         ? $"{weaponPart} ({ammoPart})"
                         : weaponPart
                     : null;
-            
+
                 string bracketPart = weaponAmmoPart != null
                     ? $" [{weaponAmmoPart}]"
                     : string.Empty;
-            
+
                 string text =
                     $"{levelPart}{killer} Killed {e.Victim}{bracketPart}";
-            
-                float w = paint.MeasureText(text);
-                canvas.DrawText(text, anchorX - w, y, paint);
+
+                float w = SKPaints.ESPFontMedium13.MeasureText(text);
+                canvas.DrawText(text, anchorX - w, y, SKTextAlign.Left, SKPaints.ESPFontMedium13, paint);
             }
 
         }
         private static byte GetFadeAlpha(int index)
         {
-            // index: 0 (newest) → 4 (oldest)
+            // index: 0 (newest) ? 4 (oldest)
             return index switch
             {
                 0 => 255,
@@ -2569,8 +2570,8 @@ private void DrawRadarInfo(SKCanvas canvas)
                 150f * scale;
 
             // --- placeholder size ---
-            float w = SKPaints.TextESPClosestPlayer.MeasureText("Killfeed");
-            float h = SKPaints.TextESPClosestPlayer.TextSize;
+            float w = SKPaints.ESPFontMedium13.MeasureText("Killfeed");
+            float h = SKPaints.ESPFontMedium13.Size;
 
             return new SKRect(
                 anchorX - w - 8f * scale,
@@ -2589,14 +2590,14 @@ private void DrawRadarInfo(SKCanvas canvas)
                 return CalculateKillfeedBaseBounds();
         
             float scale = ESPConfig.FontScale;
-            float lineH = SKPaints.TextESPClosestPlayer.FontSpacing;
+            float lineH = SKPaints.ESPFontMedium13.Spacing;
         
             float maxW = 0;
             foreach (var e in entries)
                 maxW = Math.Max(
                     maxW,
-                    SKPaints.TextESPClosestPlayer.MeasureText(
-                        $"{e.Killer} → {e.Victim} [{e.Weapon}]"));
+                    SKPaints.ESPFontMedium13.MeasureText(
+                        $"{e.Killer} ? {e.Victim} [{e.Weapon}]"));
         
             float x =
                 CameraManagerBase.Viewport.Right -
@@ -2611,7 +2612,7 @@ private void DrawRadarInfo(SKCanvas canvas)
         
             return new SKRect(
                 x,
-                y - SKPaints.TextESPClosestPlayer.TextSize,
+                y - SKPaints.ESPFontMedium13.Size,
                 x + maxW,
                 y + entries.Count * lineH
             );
@@ -2623,8 +2624,8 @@ private void DrawRadarInfo(SKCanvas canvas)
             if (string.IsNullOrEmpty(currentClosestPlayerText))
             {
                 var sampleText = "B:VeryLongPlayerName123 (999m), L:99, KD:99.99, R:9999, SR:99.9, HR: 9999";
-                var sampleWidth = SKPaints.TextESPClosestPlayer.MeasureText(sampleText);
-                var sampleHeight = SKPaints.TextESPClosestPlayer.TextSize;
+                var sampleWidth = SKPaints.ESPFontMedium13.MeasureText(sampleText);
+                var sampleHeight = SKPaints.ESPFontMedium13.Size;
 
                 var sampleAnchorX = CameraManagerBase.ViewportCenter.X;
                 var sampleAnchorY = CameraManagerBase.ViewportCenter.Y + Aimbot.Config.FOV + 15f * ESPConfig.FontScale;
@@ -2634,8 +2635,8 @@ private void DrawRadarInfo(SKCanvas canvas)
                 return new SKRect(sampleX, sampleAnchorY - sampleHeight, sampleX + sampleWidth, sampleAnchorY);
             }
 
-            var textWidth = SKPaints.TextESPClosestPlayer.MeasureText(currentClosestPlayerText);
-            var textHeight = SKPaints.TextESPClosestPlayer.TextSize;
+            var textWidth = SKPaints.ESPFontMedium13.MeasureText(currentClosestPlayerText);
+            var textHeight = SKPaints.ESPFontMedium13.Size;
 
             var anchorX = CameraManagerBase.ViewportCenter.X;
             var anchorY = CameraManagerBase.ViewportCenter.Y + Aimbot.Config.FOV + 15f * ESPConfig.FontScale;
@@ -2720,28 +2721,28 @@ private void DrawRadarInfo(SKCanvas canvas)
                 DistanceText = $"{item.ClosestDistance:F0}m"
             }).ToList();
 
-            var nameColumnWidth = lootData.Max(x => SKPaints.TextESPTopLoot.MeasureText(x.NameText));
-            var valueColumnWidth = lootData.Max(x => SKPaints.TextESPTopLoot.MeasureText(x.ValueText));
-            var distanceColumnWidth = lootData.Max(x => SKPaints.TextESPTopLoot.MeasureText(x.DistanceText));
+            var nameColumnWidth = lootData.Max(x => SKPaints.ESPFontMedium13.MeasureText(x.NameText));
+            var valueColumnWidth = lootData.Max(x => SKPaints.ESPFontMedium13.MeasureText(x.ValueText));
+            var distanceColumnWidth = lootData.Max(x => SKPaints.ESPFontMedium13.MeasureText(x.DistanceText));
 
             var columnPadding = 12f * ESPConfig.FontScale;
             var totalWidth = nameColumnWidth + valueColumnWidth + distanceColumnWidth + (columnPadding * 2);
 
-            var lineHeight = SKPaints.TextESPTopLoot.FontSpacing;
+            var lineHeight = SKPaints.ESPFontMedium13.Spacing;
             var totalHeight = lineHeight * lootData.Count;
 
             var anchorX = CameraManagerBase.Viewport.Right - totalWidth - 3f * ESPConfig.FontScale + _topLootOffset.X;
-            var anchorY = CameraManagerBase.Viewport.Top + SKPaints.TextESPRaidStats.TextSize +
+            var anchorY = CameraManagerBase.Viewport.Top + SKPaints.ESPFontMedium12.Size +
                           CameraManagerBase.Viewport.Height * 0.0575f * ESPConfig.FontScale +
-                          (SKPaints.TextESPRaidStats.FontSpacing * 4) +
+                          (SKPaints.ESPFontMedium12.Spacing * 4) +
                           10f * ESPConfig.FontScale +
                           _topLootOffset.Y;
 
             return new SKRect(
                 anchorX,
-                anchorY - SKPaints.TextESPTopLoot.TextSize,
+                anchorY - SKPaints.ESPFontMedium13.Size,
                 anchorX + totalWidth,
-                anchorY + totalHeight - SKPaints.TextESPTopLoot.TextSize
+                anchorY + totalHeight - SKPaints.ESPFontMedium13.Size
             );
         }
 
@@ -2756,27 +2757,27 @@ private void DrawRadarInfo(SKCanvas canvas)
                 new { NameText = "Fifth Long Item Name (x55)", ValueText = "555K", DistanceText = "555m" }
             };
 
-            var nameColumnWidth = sampleData.Max(x => SKPaints.TextESPTopLoot.MeasureText(x.NameText));
-            var valueColumnWidth = sampleData.Max(x => SKPaints.TextESPTopLoot.MeasureText(x.ValueText));
-            var distanceColumnWidth = sampleData.Max(x => SKPaints.TextESPTopLoot.MeasureText(x.DistanceText));
+            var nameColumnWidth = sampleData.Max(x => SKPaints.ESPFontMedium13.MeasureText(x.NameText));
+            var valueColumnWidth = sampleData.Max(x => SKPaints.ESPFontMedium13.MeasureText(x.ValueText));
+            var distanceColumnWidth = sampleData.Max(x => SKPaints.ESPFontMedium13.MeasureText(x.DistanceText));
 
             var columnPadding = 12f * ESPConfig.FontScale;
             var totalWidth = nameColumnWidth + valueColumnWidth + distanceColumnWidth + (columnPadding * 2);
 
-            var lineHeight = SKPaints.TextESPTopLoot.FontSpacing;
+            var lineHeight = SKPaints.ESPFontMedium13.Spacing;
             var totalHeight = lineHeight * sampleData.Length;
 
             var anchorX = CameraManagerBase.Viewport.Right - totalWidth - 3f * ESPConfig.FontScale;
-            var anchorY = CameraManagerBase.Viewport.Top + SKPaints.TextESPRaidStats.TextSize +
+            var anchorY = CameraManagerBase.Viewport.Top + SKPaints.ESPFontMedium12.Size +
                           CameraManagerBase.Viewport.Height * 0.0575f * ESPConfig.FontScale +
-                          (SKPaints.TextESPRaidStats.FontSpacing * 4) +
+                          (SKPaints.ESPFontMedium12.Spacing * 4) +
                           10f * ESPConfig.FontScale;
 
             return new SKRect(
                 anchorX,
-                anchorY - SKPaints.TextESPTopLoot.TextSize,
+                anchorY - SKPaints.ESPFontMedium13.Size,
                 anchorX + totalWidth,
-                anchorY + totalHeight - SKPaints.TextESPTopLoot.TextSize
+                anchorY + totalHeight - SKPaints.ESPFontMedium13.Size
             );
         }
 
@@ -2818,9 +2819,9 @@ private void DrawRadarInfo(SKCanvas canvas)
             if (string.IsNullOrEmpty(currentText))
                 return SKRect.Empty;
 
-            var labelWidth = SKPaints.TextESPStatusText.MeasureText(currentText);
+            var labelWidth = SKPaints.ESPFontMedium13.MeasureText(currentText);
             var spacing = 1f * ESPConfig.FontScale;
-            var labelHeight = SKPaints.TextESPStatusText.FontSpacing;
+            var labelHeight = SKPaints.ESPFontMedium13.Spacing;
 
             var clientArea = skglControl_ESP.ClientRectangle;
             var anchorX = clientArea.Width / 2 + _statusTextOffset.X;
@@ -2838,9 +2839,9 @@ private void DrawRadarInfo(SKCanvas canvas)
         private SKRect CalculateStatusTextBaseBounds()
         {
             var sampleText = "AIMBOT: HEAD (MOVE) (LTW)";
-            var labelWidth = SKPaints.TextESPStatusText.MeasureText(sampleText);
+            var labelWidth = SKPaints.ESPFontMedium13.MeasureText(sampleText);
             var spacing = 1f * ESPConfig.FontScale;
-            var labelHeight = SKPaints.TextESPStatusText.FontSpacing;
+            var labelHeight = SKPaints.ESPFontMedium13.Spacing;
 
             var clientArea = skglControl_ESP.ClientRectangle;
             var anchorX = clientArea.Width / 2;
@@ -2962,7 +2963,7 @@ private void DrawRadarInfo(SKCanvas canvas)
                     return ESPConfig.MiniRadar.Enabled;
 
                 case UIElement.Killfeed:
-                    return ESPConfig.ShowKillFeed; // 👈 ALWAYS draggable
+                    return ESPConfig.ShowKillFeed; // ?? ALWAYS draggable
 
                 default:
                     return false;

@@ -31,8 +31,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
     public sealed class CameraManager : CameraManagerBase
     {
         private static ulong _eftCameraManagerInstance;
+        private static ulong _eftCameraManagerClassPtr;
         private static ulong _allCamerasAddr;
         private static int _resolveAttemptCount;
+        private static bool _staticInitDone;
+        private static bool _debugDumpDone;
 
         /// <summary>
         /// FPS Camera (unscoped).
@@ -70,15 +73,24 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         /// <summary>
         /// Initialize static data on game startup.
-        /// This only pre-resolves CameraManager.Instance; actual cameras are resolved in ctor via TryResolveCameras().
+        /// Signature scans and offset resolution run once per game session.
+        /// CameraManager.Instance is re-resolved each time (per-raid).
         /// </summary>
         public static void Initialize()
         {
             try
             {
+                // One-time: sig scans + offset resolution (stable per game session)
+                if (!_staticInitDone)
+                {
+                    _allCamerasAddr = ResolveAllCamerasAddr();
+                    ResolveCameraOffsets();
+                    _staticInitDone = true;
+                }
+
+                // Per-raid: re-resolve CameraManager.Instance
+                var prev = _eftCameraManagerInstance;
                 _eftCameraManagerInstance = FindCameraManagerInstance();
-                _allCamerasAddr = ResolveAllCamerasAddr();
-                ResolveCameraOffsets();
 
                 if (!_eftCameraManagerInstance.IsValidVirtualAddress())
                 {
@@ -90,8 +102,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     return;
                 }
 
-                DebugDumpState();
-                XMLogging.WriteLine($"[CameraManager] OK Initialized CameraManager.Instance @ 0x{_eftCameraManagerInstance:X}");
+                DebugDumpStateOnce();
+
+                if (prev != _eftCameraManagerInstance)
+                    XMLogging.WriteLine($"[CameraManager] OK Initialized CameraManager.Instance @ 0x{_eftCameraManagerInstance:X}");
             }
             catch (Exception ex)
             {
@@ -530,7 +544,42 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
 #if DEBUG
             _sigAuditLines = lines;
+
+            // Cache valid counts so DebugDumpState doesn't re-scan.
+            _cachedAllCamerasValidSigs = CountValidFromAudit(bodyLines, AllCamerasSigs.Length);
+            _cachedViewMatrixValidSigs = CountValidFromAudit(bodyLines, ViewMatrixSigs.Length, "ViewMatrix");
+            _cachedFovValidSigs = CountValidFromAudit(bodyLines, FovSigs.Length, "FOV");
+            _cachedAspectRatioValidSigs = CountValidFromAudit(bodyLines, AspectRatioSigs.Length, "AspectRatio");
 #endif
+        }
+
+        /// <summary>
+        /// Counts "OK" results from the already-collected audit lines, avoiding re-scanning.
+        /// </summary>
+        private static int CountValidFromAudit(List<string> bodyLines, int sigCount, string sectionHeader = null)
+        {
+            int count = 0;
+            bool inSection = false;
+            foreach (var line in bodyLines)
+            {
+                if (!inSection)
+                {
+                    // Find the target section header.
+                    // null means AllCameras (first section, header is "AllCameras Signatures").
+                    if (sectionHeader is null
+                        ? line.StartsWith("AllCameras", StringComparison.Ordinal)
+                        : line.StartsWith(sectionHeader, StringComparison.Ordinal))
+                    {
+                        inSection = true;
+                    }
+                    continue;
+                }
+                if (line.StartsWith('[') && line.Contains("] OK "))
+                    count++;
+                else if (!line.StartsWith('['))
+                    break; // Hit next section header
+            }
+            return count;
         }
 
         /// <summary>
@@ -607,7 +656,28 @@ namespace eft_dma_radar.Tarkov.GameWorld
         /// deferred output inside <see cref="DebugDumpState"/>.
         /// </summary>
         private static List<string>? _sigAuditLines;
+
+        /// <summary>
+        /// Cached signature valid counts from <see cref="DebugTestAllSignatures"/>,
+        /// used by <see cref="DebugDumpState"/> to avoid redundant sig scans.
+        /// </summary>
+        private static int _cachedAllCamerasValidSigs;
+        private static int _cachedViewMatrixValidSigs;
+        private static int _cachedFovValidSigs;
+        private static int _cachedAspectRatioValidSigs;
 #endif
+
+        /// <summary>
+        /// DEBUG: Dumps state once per game session.
+        /// </summary>
+        [Conditional("DEBUG")]
+        private static void DebugDumpStateOnce()
+        {
+            if (_debugDumpDone)
+                return;
+            _debugDumpDone = true;
+            DebugDumpState();
+        }
 
         /// <summary>
         /// DEBUG: Dumps a comprehensive summary of all resolved addresses and offsets.
@@ -649,7 +719,8 @@ namespace eft_dma_radar.Tarkov.GameWorld
             lines.Add($"{tag} {Row($"GameAssembly Base:  {FormatPtr(gaBase)}")}");
             lines.Add($"{tag} {Row($"UnityPlayer Base:   {FormatPtr(unityBase)}")}");
             lines.Add($"{tag} {Sep("Resolved Pointers")}");
-            lines.Add($"{tag} {Row($"CameraManager:      {FormatPtr(_eftCameraManagerInstance)}")}");
+            lines.Add($"{tag} {Row($"ClassPtr:           {FormatPtr(_eftCameraManagerClassPtr)}")}");
+            lines.Add($"{tag} {Row($"Instance:           {FormatPtr(_eftCameraManagerInstance)}")}");
             lines.Add($"{tag} {Row($"AllCameras Addr:    {FormatPtr(_allCamerasAddr)}")}");
             lines.Add($"{tag} {Sep("Camera Struct Offsets")}");
             lines.Add($"{tag} {Row($"ViewMatrix:         0x{UnityOffsets.Camera.ViewMatrix:X}")}");
@@ -660,10 +731,12 @@ namespace eft_dma_radar.Tarkov.GameWorld
             lines.Add($"{tag} {Row($"Camera:             0x{Offsets.EFTCameraManager.Camera:X}")}");
             lines.Add($"{tag} {Row($"OpticCameraManager: 0x{Offsets.EFTCameraManager.OpticCameraManager:X}")}");
             lines.Add($"{tag} {Sep("Signature Health")}");
-            lines.Add($"{tag} {Row($"AllCameras:   {CountValidSigs(AllCamerasSigs, "UnityPlayer.dll")}/{AllCamerasSigs.Length} sigs valid")}");
-            lines.Add($"{tag} {Row($"ViewMatrix:   {CountValidSigs(ViewMatrixSigs, "UnityPlayer.dll")}/{ViewMatrixSigs.Length} sigs valid")}");
-            lines.Add($"{tag} {Row($"FOV:          {CountValidSigs(FovSigs, "UnityPlayer.dll")}/{FovSigs.Length} sigs valid")}");
-            lines.Add($"{tag} {Row($"AspectRatio:  {CountValidSigs(AspectRatioSigs, "UnityPlayer.dll")}/{AspectRatioSigs.Length} sigs valid")}");
+#if DEBUG
+            lines.Add($"{tag} {Row($"AllCameras:   {_cachedAllCamerasValidSigs}/{AllCamerasSigs.Length} sigs valid")}");
+            lines.Add($"{tag} {Row($"ViewMatrix:   {_cachedViewMatrixValidSigs}/{ViewMatrixSigs.Length} sigs valid")}");
+            lines.Add($"{tag} {Row($"FOV:          {_cachedFovValidSigs}/{FovSigs.Length} sigs valid")}");
+            lines.Add($"{tag} {Row($"AspectRatio:  {_cachedAspectRatioValidSigs}/{AspectRatioSigs.Length} sigs valid")}");
+#endif
             lines.Add($"{tag} ╚{new string('═', W)}╝");
 
             XMLogging.WriteBlock(lines);
@@ -671,28 +744,6 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         private static string FormatPtr(ulong ptr) =>
             ptr.IsValidVirtualAddress() ? $"0x{ptr:X}" : "(not resolved)";
-
-        private static int CountValidSigs((string Sig, int, int, string)[] sigs, string module)
-        {
-            int count = 0;
-            foreach (var (sig, _, _, _) in sigs)
-            {
-                try { if (Memory.FindSignature(sig, module) != 0) count++; }
-                catch { /* skip */ }
-            }
-            return count;
-        }
-
-        private static int CountValidSigs(CameraOffsetSig[] sigs, string module)
-        {
-            int count = 0;
-            foreach (var entry in sigs)
-            {
-                try { if (Memory.FindSignature(entry.Sig, module) != 0) count++; }
-                catch { /* skip */ }
-            }
-            return count;
-        }
 
         #region Camera Struct Offset Resolution
 
@@ -885,14 +936,20 @@ namespace eft_dma_radar.Tarkov.GameWorld
                             ReadOnlySpan<uint> fallbackOffsets = [knownOffset - 0x10, knownOffset - 0x08, knownOffset + 0x08, knownOffset + 0x10, knownOffset + 0x18];
 
                             if (TryReadStaticInstance(classPtr, knownOffset, out var instance))
+                            {
+                                _eftCameraManagerClassPtr = classPtr;
                                 return instance;
+                            }
 
                             foreach (var offset in fallbackOffsets)
                             {
                                 if (offset == knownOffset)
                                     continue;
                                 if (TryReadStaticInstance(classPtr, offset, out instance))
+                                {
+                                    _eftCameraManagerClassPtr = classPtr;
                                     return instance;
+                                }
                             }
                         }
                     }
@@ -964,8 +1021,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
         private static void MemDMA_GameStopped(object sender, EventArgs e)
         {
             _eftCameraManagerInstance = default;
+            _eftCameraManagerClassPtr = default;
             _allCamerasAddr = default;
             _resolveAttemptCount = 0;
+            _staticInitDone = false;
+            _debugDumpDone = false;
         }
 
         /// <summary>

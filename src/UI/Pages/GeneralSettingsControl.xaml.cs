@@ -1245,95 +1245,57 @@ namespace eft_dma_radar.UI.Pages
             #region UpdatePaints
 
             // Outlines
-            SKPaints.TextOutline.TextSize = 12f * newScale;
             SKPaints.TextOutline.StrokeWidth = 2f * newScale;
             // Shape Outline is computed before usage due to different stroke widths
 
+            // Scale mutable radar fonts
+            SKPaints.RadarFontRegular12.Size = 12f * newScale;
+            SKPaints.RadarFontRegular48.Size = 48f * newScale;
+            SKPaints.RadarFontMedium13.Size = 13f * newScale;
+            SKPaints.RadarFontEmbolden24.Size = 24f * newScale;
+
             SKPaints.PaintConnectorGroup.StrokeWidth = 2.25f * newScale;
             SKPaints.PaintMouseoverGroup.StrokeWidth = 3 * newScale;
-            SKPaints.TextMouseoverGroup.TextSize = 12 * newScale;
             SKPaints.PaintLocalPlayer.StrokeWidth = 3 * newScale;
-            SKPaints.TextLocalPlayer.TextSize = 12 * newScale;
             SKPaints.PaintTeammate.StrokeWidth = 3 * newScale;
-            SKPaints.TextTeammate.TextSize = 12 * newScale;
             SKPaints.PaintUSEC.StrokeWidth = 3 * newScale;
-            SKPaints.TextUSEC.TextSize = 12 * newScale;
             SKPaints.PaintBEAR.StrokeWidth = 3 * newScale;
-            SKPaints.TextBEAR.TextSize = 12 * newScale;
             SKPaints.PaintSpecial.StrokeWidth = 3 * newScale;
-            SKPaints.TextSpecial.TextSize = 12 * newScale;
             SKPaints.PaintStreamer.StrokeWidth = 3 * newScale;
-            SKPaints.TextStreamer.TextSize = 12 * newScale;
             SKPaints.PaintAimbotLocked.StrokeWidth = 3 * newScale;
-            SKPaints.TextAimbotLocked.TextSize = 12 * newScale;
             SKPaints.PaintScav.StrokeWidth = 3 * newScale;
-            SKPaints.TextScav.TextSize = 12 * newScale;
             SKPaints.PaintRaider.StrokeWidth = 3 * newScale;
-            SKPaints.TextRaider.TextSize = 12 * newScale;
             SKPaints.PaintBoss.StrokeWidth = 3 * newScale;
-            SKPaints.TextBoss.TextSize = 12 * newScale;
             SKPaints.PaintFocused.StrokeWidth = 3 * newScale;
-            SKPaints.TextFocused.TextSize = 12 * newScale;
             SKPaints.PaintPScav.StrokeWidth = 3 * newScale;
-            SKPaints.TextPScav.TextSize = 12 * newScale;
-            SKPaints.TextMouseover.TextSize = 12 * newScale;
             SKPaints.PaintCorpse.StrokeWidth = 3 * newScale;
-            SKPaints.TextCorpse.TextSize = 12 * newScale;
             SKPaints.PaintMeds.StrokeWidth = 3 * newScale;
-            SKPaints.TextMeds.TextSize = 12 * newScale;
             SKPaints.PaintFood.StrokeWidth = 3 * newScale;
-            SKPaints.TextFood.TextSize = 12 * newScale;
             SKPaints.PaintWeapons.StrokeWidth = 3 * newScale;
-            SKPaints.TextWeapons.TextSize = 12 * newScale;
             SKPaints.PaintBackpacks.StrokeWidth = 3 * newScale;
-            SKPaints.TextBackpacks.TextSize = 12 * newScale;
             SKPaints.PaintQuestItem.StrokeWidth = 3 * newScale;
-            SKPaints.TextQuestItem.TextSize = 12 * newScale;
             SKPaints.PaintAirdrop.StrokeWidth = 3 * newScale;
-            SKPaints.TextAirdrop.TextSize = 12 * newScale;
             SKPaints.PaintWishlistItem.StrokeWidth = 3 * newScale;
-            SKPaints.TextWishlistItem.TextSize = 12 * newScale;
             SKPaints.QuestHelperPaint.StrokeWidth = 3 * newScale;
-            SKPaints.QuestHelperText.TextSize = 12 * newScale;
             SKPaints.QuestHelperOutline.StrokeWidth = 2.25f * newScale;
             SKPaints.PaintDeathMarker.StrokeWidth = 3 * newScale;
             SKPaints.PaintLoot.StrokeWidth = 3 * newScale;
             SKPaints.PaintImportantLoot.StrokeWidth = 3 * newScale;
             SKPaints.PaintContainerLoot.StrokeWidth = 3 * newScale;
-            SKPaints.TextContainer.TextSize = 12 * newScale;
-            SKPaints.TextLoot.TextSize = 12 * newScale;
-            SKPaints.TextImportantLoot.TextSize = 12 * newScale;
             SKPaints.PaintTransparentBacker.StrokeWidth = 1 * newScale;
-            SKPaints.TextRadarStatus.TextSize = 48 * newScale;
-            SKPaints.TextStatusSmall.TextSize = 13 * newScale;
             SKPaints.PaintExplosives.StrokeWidth = 3 * newScale;
             SKPaints.PaintExplosivesDanger.StrokeWidth = 3 * newScale;
-            SKPaints.TextExplosives.TextSize = 12 * newScale;
-            SKPaints.TextExplosivesDanger.TextSize = 12 * newScale;
             SKPaints.PaintExfilOpen.StrokeWidth = 3 * newScale;
-            SKPaints.TextExfilOpen.TextSize = 12 * newScale;
             SKPaints.PaintExfilPending.StrokeWidth = 3 * newScale;
-            SKPaints.TextExfilPending.TextSize = 12 * newScale;
             SKPaints.PaintExfilClosed.StrokeWidth = 3 * newScale;
-            SKPaints.TextExfilClosed.TextSize = 12 * newScale;
             SKPaints.PaintExfilInactive.StrokeWidth = 3 * newScale;
-            SKPaints.TextExfilInactive.TextSize = 12 * newScale;
             SKPaints.PaintExfilTransit.StrokeWidth = 3 * newScale;
-            SKPaints.TextExfilTransit.TextSize = 12 * newScale;
-            SKPaints.TextDoorOpen.TextSize = 12 * newScale;
             SKPaints.PaintDoorOpen.StrokeWidth = 3 * newScale;
-            SKPaints.TextDoorLocked.TextSize = 12 * newScale;
             SKPaints.PaintDoorLocked.StrokeWidth = 3 * newScale;
-            SKPaints.TextDoorShut.TextSize = 12 * newScale;
             SKPaints.PaintDoorShut.StrokeWidth = 3 * newScale;
-            SKPaints.TextDoorInteracting.TextSize = 12 * newScale;
             SKPaints.PaintDoorInteracting.StrokeWidth = 3 * newScale;
-            SKPaints.TextDoorBreaching.TextSize = 12 * newScale;
             SKPaints.PaintDoorBreaching.StrokeWidth = 3 * newScale;
-            SKPaints.TextPulsingAsterisk.TextSize = 24 * newScale;
-            SKPaints.TextPulsingAsteriskOutline.TextSize = 24 * newScale;
             SKPaints.PaintSwitch.StrokeWidth = 3 * newScale;
-            SKPaints.TextSwitch.TextSize = 12 * newScale;
             #endregion
         }
 

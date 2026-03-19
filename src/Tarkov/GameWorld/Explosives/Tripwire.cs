@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using eft_dma_radar.Common.DMA.ScatterAPI;
@@ -58,9 +58,9 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             //Log($"Initial: IsActive={IsActive}, Pos={_position}, FromPos={_fromPosition}, Name='{Name}'");
         }
 
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
         // Slow-path fallback (direct DMA)
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
         public void Refresh()
         {
             bool prevActive = IsActive;
@@ -119,9 +119,9 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             return "Tripwire";
         }
 
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
         // Scatter: queue reads
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
         public void QueueScatterReads(ScatterReadIndex idx)
         {
             // Always read state
@@ -145,9 +145,9 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             }
         }
 
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
         // Scatter: apply results
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
         public void OnRefresh(ScatterReadIndex idx)
         {
             if (idx.TryGetResult<int>(_scatterIdState, out var stateVal))
@@ -234,25 +234,25 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
 
             if (Settings.ShowName && !string.IsNullOrEmpty(Name))
             {
-                var nameWidth = SKPaints.TextExplosives.MeasureText(Name);
+                var nameWidth = SKPaints.RadarFontRegular12.MeasureText(Name, SKPaints.TextExplosives);
                 var namePt = new SKPoint(
                     toPos.X - (nameWidth / 2),
                     toPos.Y - 10f * MainWindow.UIScale);
 
-                canvas.DrawText(Name, namePt, SKPaints.TextOutline);
-                canvas.DrawText(Name, namePt, SKPaints.TextExplosives);
+                canvas.DrawText(Name, namePt, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(Name, namePt, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextExplosives);
             }
 
             if (Settings.ShowDistance)
             {
                 var distText = $"{(int)dist}m";
-                var distWidth = SKPaints.TextExplosives.MeasureText(distText);
+                var distWidth = SKPaints.RadarFontRegular12.MeasureText(distText, SKPaints.TextExplosives);
                 var distPt = new SKPoint(
                     toPos.X - (distWidth / 2),
                     toPos.Y + 18f * MainWindow.UIScale);
 
-                canvas.DrawText(distText, distPt, SKPaints.TextOutline);
-                canvas.DrawText(distText, distPt, SKPaints.TextExplosives);
+                canvas.DrawText(distText, distPt, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(distText, distPt, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextExplosives);
             }
         }
 

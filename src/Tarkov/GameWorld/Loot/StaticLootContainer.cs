@@ -1,4 +1,4 @@
-﻿using eft_dma_radar.Tarkov.EFTPlayer;
+using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.Common.Maps;
@@ -78,20 +78,20 @@ namespace eft_dma_radar.Tarkov.Loot
             {
                 var namePoint = point;
                 namePoint.Offset(nameXOffset, nameYOffset);
-                canvas.DrawText(Name, namePoint, SKPaints.TextOutline);
-                canvas.DrawText(Name, namePoint, SKPaints.TextContainer);
+                canvas.DrawText(Name, namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(Name, namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextContainer);
             }
 
             if (Settings.ShowDistance)
             {
                 var distText = $"{(int)dist}m";
-                var distWidth = SKPaints.TextContainer.MeasureText($"{(int)dist}");
+                var distWidth = SKPaints.RadarFontRegular12.MeasureText($"{(int)dist}", SKPaints.TextContainer);
                 var distPoint = new SKPoint(
                     point.X - (distWidth / 2),
                     point.Y + distanceYOffset
                 );
-                canvas.DrawText(distText, distPoint, SKPaints.TextOutline);
-                canvas.DrawText(distText, distPoint, SKPaints.TextContainer);
+                canvas.DrawText(distText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(distText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextContainer);
             }
         }
 

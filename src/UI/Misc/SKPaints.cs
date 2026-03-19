@@ -7,6 +7,77 @@ namespace eft_dma_radar.UI.Misc
         private static readonly Stopwatch _pulseTimer = Stopwatch.StartNew();
         private static SKColor _currentAsteriskColor = SKColors.Red;
 
+        #region Shared SKFont Instances
+
+        /// <summary>Regular typeface, 12pt, subpixel. Used by most radar text paints.</summary>
+        public static SKFont FontRegular12 { get; } = new(CustomFonts.SKFontFamilyRegular, 12) { Subpixel = true };
+
+        /// <summary>Medium typeface, 12pt, subpixel. Used by most ESP text paints.</summary>
+        public static SKFont FontMedium12 { get; } = new(CustomFonts.SKFontFamilyMedium, 12) { Subpixel = true };
+
+        /// <summary>Medium typeface, 11pt, subpixel. Used by TextContainerLootESP.</summary>
+        public static SKFont FontMedium11 { get; } = new(CustomFonts.SKFontFamilyMedium, 11) { Subpixel = true };
+
+        /// <summary>Medium typeface, 13pt, subpixel. Used by status text paints.</summary>
+        public static SKFont FontMedium13 { get; } = new(CustomFonts.SKFontFamilyMedium, 13) { Subpixel = true };
+
+        /// <summary>Medium typeface, 16pt, subpixel. Used by magazine info ESP.</summary>
+        public static SKFont FontMedium16 { get; } = new(CustomFonts.SKFontFamilyMedium, 16) { Subpixel = true };
+
+        /// <summary>Medium typeface, 18pt, subpixel. Used by pulsing asterisk ESP.</summary>
+        public static SKFont FontMedium18 { get; } = new(CustomFonts.SKFontFamilyMedium, 18) { Subpixel = true };
+
+        /// <summary>Regular typeface, 48pt, subpixel. Used by TextRadarStatus.</summary>
+        public static SKFont FontRegular48 { get; } = new(CustomFonts.SKFontFamilyRegular, 48) { Subpixel = true };
+
+        /// <summary>Bold typeface, 42pt, subpixel. Used by TextMagazineESP.</summary>
+        public static SKFont FontBold42 { get; } = new(CustomFonts.SKFontFamilyBold, 42) { Subpixel = true };
+
+        /// <summary>Italic typeface, 16pt, subpixel. Used by TextMagazineInfoESP.</summary>
+        public static SKFont FontItalic16 { get; } = new(CustomFonts.SKFontFamilyItalic, 16) { Subpixel = true };
+
+        /// <summary>Default typeface, 24pt, emboldened. Used by pulsing asterisk paints.</summary>
+        public static SKFont FontEmbolden24 { get; } = new() { Size = 24, Embolden = true };
+
+        /// <summary>Default typeface, 12pt. Used by PhysicsTextPaint.</summary>
+        public static SKFont FontDefault12 { get; } = new() { Size = 12 };
+
+        // ── Mutable ESP fonts (rescaled by ScaleESPFonts) ──
+
+        /// <summary>Medium typeface, 12pt base. Most ESP text paints.</summary>
+        public static SKFont ESPFontMedium12 { get; } = new(CustomFonts.SKFontFamilyMedium, 12) { Subpixel = true };
+
+        /// <summary>Medium typeface, 11pt base. Container loot ESP text.</summary>
+        public static SKFont ESPFontMedium11 { get; } = new(CustomFonts.SKFontFamilyMedium, 11) { Subpixel = true };
+
+        /// <summary>Medium typeface, 13pt base. Status, explosive, closest player, top loot ESP text.</summary>
+        public static SKFont ESPFontMedium13 { get; } = new(CustomFonts.SKFontFamilyMedium, 13) { Subpixel = true };
+
+        /// <summary>Medium typeface, 18pt base. Pulsing asterisk ESP text.</summary>
+        public static SKFont ESPFontMedium18 { get; } = new(CustomFonts.SKFontFamilyMedium, 18) { Subpixel = true };
+
+        /// <summary>Bold typeface, 42pt base. Magazine counter ESP text.</summary>
+        public static SKFont ESPFontBold42 { get; } = new(CustomFonts.SKFontFamilyBold, 42) { Subpixel = true };
+
+        /// <summary>Italic typeface, 16pt base. Magazine info ESP text.</summary>
+        public static SKFont ESPFontItalic16 { get; } = new(CustomFonts.SKFontFamilyItalic, 16) { Subpixel = true };
+
+        // ── Mutable Radar fonts (rescaled by GeneralSettings) ──
+
+        /// <summary>Regular typeface, 12pt base. Most radar text paints.</summary>
+        public static SKFont RadarFontRegular12 { get; } = new(CustomFonts.SKFontFamilyRegular, 12) { Subpixel = true };
+
+        /// <summary>Regular typeface, 48pt base. Radar status text.</summary>
+        public static SKFont RadarFontRegular48 { get; } = new(CustomFonts.SKFontFamilyRegular, 48) { Subpixel = true };
+
+        /// <summary>Medium typeface, 13pt base. Radar status small text.</summary>
+        public static SKFont RadarFontMedium13 { get; } = new(CustomFonts.SKFontFamilyMedium, 13) { Subpixel = true };
+
+        /// <summary>Default typeface, 24pt, emboldened base. Radar pulsing asterisk.</summary>
+        public static SKFont RadarFontEmbolden24 { get; } = new() { Size = 24, Embolden = true };
+
+        #endregion
+
         /// <summary>
         /// Updates the pulsing color for important player indicators. Should be called before using PaintPulsingAsterisk.
         /// </summary>
@@ -29,7 +100,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 2.25f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMouseoverGroup { get; } = new()
@@ -38,19 +108,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
                 
         public static SKPaint TextMouseoverGroup { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.LawnGreen,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintLocalPlayer { get; } = new()
@@ -59,7 +123,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniLocalPlayer { get; } = new()
@@ -68,19 +131,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextLocalPlayer { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Green,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintTeammate { get; } = new()
@@ -89,7 +146,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniTeammate { get; } = new()
@@ -98,19 +154,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextTeammate { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.LimeGreen,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintUSEC { get; } = new()
@@ -119,7 +169,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniUSEC { get; } = new()
@@ -128,19 +177,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextUSEC { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Red,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintBEAR { get; } = new()
@@ -149,7 +192,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniBEAR { get; } = new()
@@ -158,19 +200,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextBEAR { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Blue,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintSpecial { get; } = new()
@@ -179,7 +215,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniSpecial { get; } = new()
@@ -188,19 +223,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextSpecial { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.HotPink,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintStreamer { get; } = new()
@@ -209,7 +238,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniStreamer { get; } = new()
@@ -218,19 +246,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextStreamer { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.MediumPurple,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintAimbotLocked { get; } = new()
@@ -239,7 +261,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniAimbotLocked { get; } = new()
@@ -248,19 +269,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextAimbotLocked { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Blue,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintScav { get; } = new()
@@ -269,7 +284,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniScav { get; } = new()
@@ -278,19 +292,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextScav { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Yellow,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintRaider { get; } = new()
@@ -299,7 +307,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniRaider { get; } = new()
@@ -308,19 +315,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextRaider { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColor.Parse("ffc70f"),
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintBoss { get; } = new()
@@ -329,7 +330,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniBoss { get; } = new()
@@ -338,19 +338,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextBoss { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Fuchsia,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintFocused { get; } = new()
@@ -359,7 +353,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniFocused { get; } = new()
@@ -368,19 +361,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextFocused { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Coral,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintPScav { get; } = new()
@@ -389,7 +376,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniPScav { get; } = new()
@@ -398,31 +384,20 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextPScav { get; } = new() // Player Scav Text , Tooltip Text
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextMouseover { get; } = new() // Tooltip Text
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintDeathMarker { get; } = new()
@@ -431,7 +406,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         #endregion
@@ -443,7 +417,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniLoot { get; } = new()
@@ -452,7 +425,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintImportantLoot { get; } = new()
@@ -461,7 +433,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniImportantLoot { get; } = new()
@@ -470,7 +441,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintContainerLoot { get; } = new()
@@ -479,7 +449,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniContainerLoot { get; } = new()
@@ -488,55 +457,34 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextContainer { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColor.Parse("FFFFCC"),
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextLoot { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.WhiteSmoke,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextImportantLoot { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Turquoise,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextAirdrop { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.YellowGreen,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintAirdrop { get; } = new()
@@ -545,7 +493,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniAirdrop { get; } = new()
@@ -554,7 +501,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintCorpse { get; } = new()
@@ -563,7 +509,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniCorpse { get; } = new()
@@ -572,19 +517,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextCorpse { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Silver,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMeds { get; } = new()
@@ -593,7 +532,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniMeds { get; } = new()
@@ -602,19 +540,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextMeds { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.LightSalmon,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintFood { get; } = new()
@@ -623,7 +555,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniFood { get; } = new()
@@ -632,19 +563,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextFood { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.CornflowerBlue,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintBackpacks { get; } = new()
@@ -653,7 +578,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniBackpacks { get; } = new()
@@ -662,19 +586,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextBackpacks { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColor.Parse("00b02c"),
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintWeapons { get; } = new()
@@ -683,7 +601,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniWeapons{ get; } = new()
@@ -692,19 +609,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextWeapons { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColor.Parse("ffa756"),
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint QuestHelperPaint { get; } = new()
@@ -713,7 +624,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint MiniQuestHelperPaint { get; } = new()
@@ -722,19 +632,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint QuestHelperText { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.DeepPink,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint QuestHelperOutline { get; } = new()
@@ -743,7 +647,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 2.25f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintQuestItem { get; } = new()
@@ -752,7 +655,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniQuestItem { get; } = new()
@@ -761,19 +663,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextQuestItem { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.YellowGreen,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintWishlistItem { get; } = new()
@@ -782,7 +678,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniWishlistItem { get; } = new()
@@ -791,31 +686,20 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextWishlistItem { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Red,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static readonly SKPaint TextDoorOpen = new SKPaint
         {
-            SubpixelText = true,
             Color = SKColors.Green,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintDoorOpen { get; } = new()
@@ -824,19 +708,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static readonly SKPaint TextDoorShut = new SKPaint
         {
-            SubpixelText = true,
             Color = SKColors.Orange,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintDoorShut { get; } = new()
@@ -845,19 +723,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static readonly SKPaint TextDoorLocked = new SKPaint
         {
-            SubpixelText = true,
             Color = SKColors.Red,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintDoorLocked { get; } = new()
@@ -866,19 +738,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static readonly SKPaint TextDoorInteracting = new SKPaint
         {
-            SubpixelText = true,
             Color = SKColors.Blue,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintDoorInteracting{ get; } = new()
@@ -887,19 +753,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static readonly SKPaint TextDoorBreaching = new SKPaint
         {
-            SubpixelText = true,
             Color = SKColors.Yellow,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintDoorBreaching { get; } = new()
@@ -908,79 +768,48 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextSwitch { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Orange,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextExfilTransit { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Orange,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextExfilInactive { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Gray,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextExfilOpen { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.LimeGreen,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextExfilPending { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Yellow,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextExfilClosed{ get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Red,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         #endregion
@@ -996,40 +825,23 @@ namespace eft_dma_radar.UI.Misc
 
         public static SKPaint TextRadarStatus { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Red,
             IsStroke = false,
-            TextSize = 48,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            TextAlign = SKTextAlign.Left
         };
 
         public static SKPaint TextStatusSmall { get; } = new SKPaint()
         {
-            SubpixelText = true,
             Color = SKColors.Red,
             IsStroke = false,
-            TextSize = 13,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextStatusSmallEsp { get; } = new SKPaint()
         {
-            SubpixelText = true,
             Color = SKColors.Red,
             IsStroke = false,
-            TextSize = 13,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExplosives { get; } = new()
@@ -1038,7 +850,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExplosivesDanger { get; } = new()
@@ -1047,31 +858,20 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextExplosives { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.OrangeRed,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextExplosivesDanger { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.Red,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyRegular,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExfilOpen { get; } = new()
@@ -1080,7 +880,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExfilTransit { get; } = new()
@@ -1089,7 +888,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExfilPending { get; } = new()
@@ -1098,7 +896,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExfilClosed { get; } = new()
@@ -1107,7 +904,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExfilInactive { get; } = new()
@@ -1116,7 +912,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintSwitch { get; } = new()
@@ -1125,19 +920,15 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextOutline { get; } = new()
         {
-            SubpixelText = true,
             IsAntialias = true,
             Color = SKColors.Black,
-            TextSize = 12f,
             IsStroke = true,
             StrokeWidth = 2f,
             Style = SKPaintStyle.Stroke,
-            Typeface = CustomFonts.SKFontFamilyRegular
         };
 
         /// <summary>
@@ -1150,54 +941,35 @@ namespace eft_dma_radar.UI.Misc
             /*StrokeWidth = ??,*/ // Compute before use
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextPulsingAsterisk { get; } = new()
         {
             Color = SKColors.Red, // Initial color, will be updated
             IsAntialias = true,
-            TextSize = 24f,
-            FakeBoldText = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextPulsingAsteriskOutline { get; } = new()
         {
             Color = SKColors.Black,
             IsAntialias = true,
-            TextSize = 24f,
             IsStroke = true,
             StrokeWidth = 2f,
             Style = SKPaintStyle.Stroke,
-            FakeBoldText = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextPulsingAsteriskESP { get; } = new()
         {
             Color = SKColors.Red, // Initial color, will be updated
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 18f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextPulsingAsteriskOutlineESP { get; } = new()
         {
             Color = SKColors.Black,
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 18f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         #endregion
@@ -1208,38 +980,24 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.5f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextVisible { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
         public static SKPaint PaintUSECESP { get; } = new()
         {
             StrokeWidth = 1.5f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextUSECESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintBEARESP { get; } = new()
@@ -1247,31 +1005,18 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.5f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextBEARESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextBEARESPAligned { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Left,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintScavESP { get; } = new()
@@ -1279,19 +1024,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.5f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextScavESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintRaiderESP { get; } = new()
@@ -1299,19 +1037,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.5f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextRaiderESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintBossESP { get; } = new()
@@ -1319,19 +1050,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.5f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextBossESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintAimbotLockedESP { get; } = new()
@@ -1339,15 +1063,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.5f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
         public static SKPaint PhysicsTextPaint { get; } = new SKPaint
         {
             Color = SKColors.White,
-            TextSize = 12,
             IsAntialias = true,
             Style = SKPaintStyle.Fill,
-            TextAlign = SKTextAlign.Center
         };
         public static SKPaint PhysicsFillPaint { get; } = new SKPaint
         {
@@ -1367,14 +1088,8 @@ namespace eft_dma_radar.UI.Misc
         }
         public static SKPaint TextAimbotLockedESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintFocusedESP { get; } = new()
@@ -1382,19 +1097,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.5f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextFocusedESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintStreamerESP { get; } = new()
@@ -1402,19 +1110,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.5f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextStreamerESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintSpecialESP { get; } = new()
@@ -1422,19 +1123,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.5f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextSpecialESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintPlayerScavESP { get; } = new()
@@ -1442,19 +1136,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.5f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextPlayerScavESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintFriendlyESP { get; } = new()
@@ -1462,19 +1149,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.5f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextFriendlyESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintLootESP { get; } = new()
@@ -1482,19 +1162,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextLootESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintCorpseESP { get; } = new()
@@ -1502,19 +1175,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextCorpseESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintImpLootESP { get; } = new()
@@ -1522,19 +1188,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextImpLootESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintAirdropESP { get; } = new()
@@ -1542,19 +1201,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextAirdropESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintContainerLootESP { get; } = new()
@@ -1562,19 +1214,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextContainerLootESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 11f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMedsESP { get; } = new()
@@ -1582,19 +1227,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextMedsESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintFoodESP { get; } = new()
@@ -1602,19 +1240,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextFoodESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintBackpackESP { get; } = new()
@@ -1622,19 +1253,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextBackpackESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintWeaponsESP { get; } = new()
@@ -1642,19 +1266,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextWeaponsESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
 
@@ -1663,19 +1280,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextQuestItemESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintWishlistItemESP { get; } = new()
@@ -1683,19 +1293,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextWishlistItemESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintQuestHelperESP { get; } = new()
@@ -1703,19 +1306,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextQuestHelperESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExplosiveESP { get; } = new()
@@ -1723,7 +1319,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExplosiveRadiusESP { get; } = new()
@@ -1731,31 +1326,18 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.5f,
             IsAntialias = true,
             Style = SKPaintStyle.Stroke,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextExplosiveESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextExfilOpenESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExfilOpenESP { get; } = new()
@@ -1763,19 +1345,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextExfilPendingESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExfilPendingESP { get; } = new()
@@ -1783,19 +1358,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextExfilClosedESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExfilClosedESP { get; } = new()
@@ -1803,19 +1371,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextExfilInactiveESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExfilInactiveESP { get; } = new()
@@ -1823,19 +1384,12 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextExfilTransitESP { get; } = new()
         {
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintExfilTransitESP { get; } = new()
@@ -1843,7 +1397,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintSwitchESP { get; } = new()
@@ -1851,20 +1404,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextSwitchesESP { get; } = new()
         {
             Color = SKColors.Orange,
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintDoorOpenESP { get; } = new()
@@ -1872,21 +1418,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextDoorOpenESP { get; } = new()
         {
             Color = SKColors.Green,
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            FakeBoldText = true,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintDoorShutESP { get; } = new()
@@ -1894,21 +1432,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextDoorShutESP { get; } = new()
         {
             Color = SKColors.Orange,
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            FakeBoldText = true,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintDoorLockedESP { get; } = new()
@@ -1916,21 +1446,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextDoorLockedESP { get; } = new()
         {
             Color = SKColors.Red,
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            FakeBoldText = true,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintDoorInteractingESP { get; } = new()
@@ -1939,21 +1461,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextDoorInteractingESP { get; } = new()
         {
             Color = SKColors.Blue,
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            FakeBoldText = true,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintDoorBreachingESP { get; } = new()
@@ -1962,21 +1476,13 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 0.25f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextDoorBreachingESP { get; } = new()
         {
             Color = SKColors.Yellow,
-            SubpixelText = true,
             IsStroke = false,
-            TextSize = 12f,
-            FakeBoldText = true,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintESPHealthBar = new()
@@ -1984,7 +1490,6 @@ namespace eft_dma_radar.UI.Misc
             Color = SKColors.Green,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintESPHealthBarBg = new()
@@ -1992,7 +1497,6 @@ namespace eft_dma_radar.UI.Misc
             Color = new SKColor(30, 30, 30, 200),
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintESPHealthBarBorder = new()
@@ -2001,7 +1505,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         #region ESP Readonly Paints
@@ -2012,7 +1515,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.75f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintCrosshairESPDot { get; } = new()
@@ -2021,7 +1523,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1.75f,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintHighAlertAimlineESP { get; } = new()
@@ -2030,7 +1531,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintHighAlertBorderESP { get; } = new()
@@ -2039,7 +1539,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 3f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintBasicESP { get; } = new()
@@ -2048,111 +1547,62 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextBasicESP { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextBasicESPLeftAligned { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Left,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextESPFPS { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Left,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextESPRaidStats { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Left,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextESPStatusText { get; } = new SKPaint()
         {
-            SubpixelText = true,
             Color = SKColors.Red,
             IsStroke = false,
-            TextSize = 13,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextMagazineESP { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 42f,
-            TextAlign = SKTextAlign.Left,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyBold,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextMagazineInfoESP { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 16f,
-            TextAlign = SKTextAlign.Left,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyItalic,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextEnergyHydrationBarESP { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Left,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextEnergyHydrationBarOutlineESP { get; } = new()
@@ -2160,10 +1610,7 @@ namespace eft_dma_radar.UI.Misc
             Color = SKColors.Black,
             Style = SKPaintStyle.Stroke,
             StrokeWidth = 1.5f,
-            TextSize = 12f,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintEnergyFillESP { get; } = new()
@@ -2171,7 +1618,6 @@ namespace eft_dma_radar.UI.Misc
             Color = SKColor.Parse("#D4C48A"),
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintHydrationFillESP { get; } = new()
@@ -2179,7 +1625,6 @@ namespace eft_dma_radar.UI.Misc
             Color = SKColor.Parse("#5B9BD5"),
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintEnergyHydrationBackgroundESP { get; } = new()
@@ -2187,7 +1632,6 @@ namespace eft_dma_radar.UI.Misc
             Color = SKColors.Black.WithAlpha(180),
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintFireportAimESP { get; } = new()
@@ -2196,7 +1640,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintAimbotFOVESP { get; } = new()
@@ -2205,46 +1648,27 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextESPClosestPlayer { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 13f,
-            TextAlign = SKTextAlign.Left,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextESPTopLoot { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 13f,
-            TextAlign = SKTextAlign.Left,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint TextOverridePlayerESP { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Center,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = CustomFonts.SKFontFamilyMedium,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintAimbotLockedLineESP { get; } = new()
@@ -2253,7 +1677,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 1,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniRadarOutlineESP { get; } = new()
@@ -2262,7 +1685,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 2,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         public static SKPaint PaintMiniRadarResizeHandleESP { get; } = new()
@@ -2271,7 +1693,6 @@ namespace eft_dma_radar.UI.Misc
             StrokeWidth = 2,
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.Low
         };
 
         #endregion

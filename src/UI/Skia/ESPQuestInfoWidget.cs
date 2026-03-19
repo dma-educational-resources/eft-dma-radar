@@ -1,4 +1,4 @@
-﻿using eft_dma_radar.Tarkov.GameWorld;
+using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Misc.Data;
@@ -35,40 +35,7 @@ namespace eft_dma_radar.UI.ESP
         {
             base.SetScaleFactor(scale);
 
-            lock (_questTextPaint)
-            {
-                _questTextPaint.TextSize = 13 * scale;
-            }
-
-            lock (_questKeyPaint)
-            {
-                _questKeyPaint.TextSize = 13 * scale;
-            }
-
-            lock (_questCompletedPaint)
-            {
-                _questCompletedPaint.TextSize = 13 * scale;
-            }
-
-            lock (_questIncompletePaint)
-            {
-                _questIncompletePaint.TextSize = 13 * scale;
-            }
-
-            lock (_questNamePaint)
-            {
-                _questNamePaint.TextSize = 13 * scale;
-            }
-
-            lock (_questItemPaint)
-            {
-                _questItemPaint.TextSize = 13 * scale;
-            }
-
-            lock (_questOptionalPaint)
-            {
-                _questOptionalPaint.TextSize = 13 * scale;
-            }
+            _questFont.Size = 13 * scale;
 
             lock (_questStrikethroughPaint)
             {
@@ -88,11 +55,11 @@ namespace eft_dma_radar.UI.ESP
                 canvas.Save();
                 canvas.ClipRect(ClientRectangle);
 
-                var disabledLineSpacing = _questTextPaint.FontSpacing;
+                var disabledLineSpacing = _questFont.Spacing;
                 var disabledDrawPt = new SKPoint(ClientRectangle.Left + _padding, ClientRectangle.Top + disabledLineSpacing * 0.8f + _padding);
 
                 var disabledText = "Quest Helper not enabled";
-                canvas.DrawText(disabledText, disabledDrawPt, _questTextPaint);
+                canvas.DrawText(disabledText, disabledDrawPt, SKTextAlign.Left, _questFont, _questTextPaint);
 
                 canvas.Restore();
                 return;
@@ -139,7 +106,7 @@ namespace eft_dma_radar.UI.ESP
             canvas.Save();
             canvas.ClipRect(ClientRectangle);
 
-            var lineSpacing = _questTextPaint.FontSpacing;
+            var lineSpacing = _questFont.Spacing;
             var drawPt = new SKPoint(ClientRectangle.Left + _padding, ClientRectangle.Top + lineSpacing * 0.8f + _padding);
 
             foreach (var (text, isCompleted, isObjective) in textData)
@@ -206,7 +173,7 @@ namespace eft_dma_radar.UI.ESP
                         var objective = taskData.Objectives[i];
                         var maxObjectiveLength = GetDynamicMaxLength(45);
                         var isCompleted = quest.CompletedConditions.Contains(objective.Id);
-                        var completionSymbol = isCompleted ? "✓" : "○";
+                        var completionSymbol = isCompleted ? "?" : "?";
                         var description = objective.Description ?? "Complete objective";
 
                         QuestObjective parsedObjective = null;
@@ -264,7 +231,7 @@ namespace eft_dma_radar.UI.ESP
                             continue;
 
                         var maxObjectiveLength = GetDynamicMaxLength(45);
-                        var completionSymbol = objective.IsCompleted ? "✓" : "○";
+                        var completionSymbol = objective.IsCompleted ? "?" : "?";
 
                         var optionalPrefix = (objective.Optional && Config.QuestHelper.OptionalTaskFilter) ? "[Optional] " : "";
                         var objectiveText = $"  {completionSymbol} {optionalPrefix}{TruncateString(objective.Description, maxObjectiveLength - 4)}";
@@ -296,12 +263,12 @@ namespace eft_dma_radar.UI.ESP
 
         private void DrawTextWithStrikethrough(SKCanvas canvas, string text, SKPoint point, SKPaint textPaint, bool strikethrough)
         {
-            canvas.DrawText(text, point, textPaint);
+            canvas.DrawText(text, point, SKTextAlign.Left, _questFont, textPaint);
 
             if (strikethrough)
             {
-                var textWidth = textPaint.MeasureText(text);
-                var strikethroughY = point.Y - (textPaint.TextSize * 0.3f);
+                var textWidth = _questFont.MeasureText(text);
+                var strikethroughY = point.Y - (_questFont.Size * 0.3f);
 
                 canvas.DrawLine(
                     point.X,
@@ -315,7 +282,7 @@ namespace eft_dma_radar.UI.ESP
 
         public override bool HandleClientAreaClick(SKPoint point)
         {
-            var lineSpacing = _questTextPaint.FontSpacing;
+            var lineSpacing = _questFont.Spacing;
             var startY = ClientRectangle.Top + lineSpacing * 0.8f + _padding;
             var filterLineY = startY;
 
@@ -325,11 +292,11 @@ namespace eft_dma_radar.UI.ESP
                 var currentX = startX;
 
                 var filtersText = "Filters: ";
-                var filtersWidth = _questTextPaint.MeasureText(filtersText);
+                var filtersWidth = _questFont.MeasureText(filtersText);
                 currentX += filtersWidth;
 
                 var keysCheckbox = _showKeys ? "[x] Keys  " : "[ ] Keys  ";
-                var keysWidth = _questTextPaint.MeasureText(keysCheckbox);
+                var keysWidth = _questFont.MeasureText(keysCheckbox);
                 if (point.X >= currentX && point.X <= currentX + keysWidth)
                 {
                     _showKeys = !_showKeys;
@@ -338,7 +305,7 @@ namespace eft_dma_radar.UI.ESP
                 currentX += keysWidth;
 
                 var itemsCheckbox = _showRequiredItems ? "[x] Items  " : "[ ] Items  ";
-                var itemsWidth = _questTextPaint.MeasureText(itemsCheckbox);
+                var itemsWidth = _questFont.MeasureText(itemsCheckbox);
                 if (point.X >= currentX && point.X <= currentX + itemsWidth)
                 {
                     _showRequiredItems = !_showRequiredItems;
@@ -347,7 +314,7 @@ namespace eft_dma_radar.UI.ESP
                 currentX += itemsWidth;
 
                 var otherQuestsCheckbox = _showOtherQuests ? "[x] Other Quests  " : "[ ] Other Quests  ";
-                var otherQuestsWidth = _questTextPaint.MeasureText(otherQuestsCheckbox);
+                var otherQuestsWidth = _questFont.MeasureText(otherQuestsCheckbox);
                 if (point.X >= currentX && point.X <= currentX + otherQuestsWidth)
                 {
                     _showOtherQuests = !_showOtherQuests;
@@ -356,7 +323,7 @@ namespace eft_dma_radar.UI.ESP
                 currentX += otherQuestsWidth;
 
                 var hideCompletedCheckbox = _hideCompleted ? "[x] Hide Completed" : "[ ] Hide Completed";
-                var hideCompletedWidth = _questTextPaint.MeasureText(hideCompletedCheckbox);
+                var hideCompletedWidth = _questFont.MeasureText(hideCompletedCheckbox);
                 if (point.X >= currentX && point.X <= currentX + hideCompletedWidth)
                 {
                     _hideCompleted = !_hideCompleted;
@@ -380,7 +347,7 @@ namespace eft_dma_radar.UI.ESP
                 if (point.Y >= currentY - lineSpacing / 2 && point.Y <= currentY + lineSpacing / 2)
                 {
                     var collapseSymbol = _collapsedQuests.GetValueOrDefault(quest.Id, false) ? "[+] " : "[-] ";
-                    var collapseWidth = _questTextPaint.MeasureText(collapseSymbol);
+                    var collapseWidth = _questFont.MeasureText(collapseSymbol);
 
                     if (point.X >= ClientRectangle.Left + _padding && point.X <= ClientRectangle.Left + _padding + collapseWidth)
                     {
@@ -453,7 +420,7 @@ namespace eft_dma_radar.UI.ESP
                     if (point.Y >= currentY - lineSpacing / 2 && point.Y <= currentY + lineSpacing / 2)
                     {
                         var collapseSymbol = _collapsedQuests.GetValueOrDefault(quest.Id, false) ? "[+] " : "[-] ";
-                        var collapseWidth = _questTextPaint.MeasureText(collapseSymbol);
+                        var collapseWidth = _questFont.MeasureText(collapseSymbol);
 
                         if (point.X >= ClientRectangle.Left + _padding && point.X <= ClientRectangle.Left + _padding + collapseWidth)
                         {
@@ -552,7 +519,7 @@ namespace eft_dma_radar.UI.ESP
         private int GetDynamicMaxLength(int baseLength)
         {
             var availableWidth = Size.Width - (_padding * 2);
-            var avgCharWidth = _questTextPaint.MeasureText("A");
+            var avgCharWidth = _questFont.MeasureText("A");
             var maxChars = (int)(availableWidth / avgCharWidth);
             return Math.Max(10, maxChars);
         }
@@ -560,86 +527,51 @@ namespace eft_dma_radar.UI.ESP
         #region Static Paint Objects
         private static readonly SKPaint _questTextPaint = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 13,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Consolas"),
-            FilterQuality = SKFilterQuality.High
         };
 
         private static readonly SKPaint _questKeyPaint = new()
         {
-            SubpixelText = true,
             Color = SKColors.Yellow,
             IsStroke = false,
-            TextSize = 13,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Consolas"),
-            FilterQuality = SKFilterQuality.High
         };
 
         private static readonly SKPaint _questCompletedPaint = new()
         {
-            SubpixelText = true,
             Color = SKColors.Green,
             IsStroke = false,
-            TextSize = 13,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Consolas"),
-            FilterQuality = SKFilterQuality.High
         };
 
         private static readonly SKPaint _questIncompletePaint = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 13,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Consolas"),
-            FilterQuality = SKFilterQuality.High
         };
 
         private static readonly SKPaint _questNamePaint = new()
         {
-            SubpixelText = true,
             Color = SKColors.LightBlue,
             IsStroke = false,
-            TextSize = 13,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Consolas"),
-            FilterQuality = SKFilterQuality.High
         };
 
         private static readonly SKPaint _questItemPaint = new()
         {
-            SubpixelText = true,
             Color = SKColors.Orange,
             IsStroke = false,
-            TextSize = 13,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Consolas"),
-            FilterQuality = SKFilterQuality.High
         };
 
         private static readonly SKPaint _questOptionalPaint = new()
         {
-            SubpixelText = true,
             Color = SKColors.Gray,
             IsStroke = false,
-            TextSize = 13,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Consolas"),
-            FilterQuality = SKFilterQuality.High
         };
 
         private static readonly SKPaint _questStrikethroughPaint = new()
@@ -649,6 +581,8 @@ namespace eft_dma_radar.UI.ESP
             Style = SKPaintStyle.Stroke,
             IsAntialias = true
         };
+
+        private static readonly SKFont _questFont = new(SKTypeface.FromFamilyName("Consolas"), 13) { Subpixel = true };
         #endregion
     }
 }

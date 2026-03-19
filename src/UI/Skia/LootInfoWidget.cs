@@ -27,15 +27,12 @@ namespace eft_dma_radar.UI.SKWidgetControl
 
         internal static SKPaint TextLootOverlay { get; } = new()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 12,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Consolas"), // Do NOT change this font
-            FilterQuality = SKFilterQuality.High
         };
+
+        internal static SKFont LootOverlayFont { get; } = new(SKTypeface.FromFamilyName("Consolas"), 12) { Subpixel = true };
 
         /// <summary>
         /// Represents a grouped loot item with quantity and total value
@@ -116,11 +113,11 @@ namespace eft_dma_radar.UI.SKWidgetControl
             }
 
             var data = sb.ToString().Split(Environment.NewLine);
-            var lineSpacing = TextLootOverlay.FontSpacing;
+            var lineSpacing = LootOverlayFont.Spacing;
             var maxLength = 0f;
             foreach (var line in data)
             {
-                var lineLength = TextLootOverlay.MeasureText(line);
+                var lineLength = LootOverlayFont.MeasureText(line);
                 if (lineLength > maxLength)
                     maxLength = lineLength;
             }
@@ -133,7 +130,7 @@ namespace eft_dma_radar.UI.SKWidgetControl
 
             var drawPt = new SKPoint(ClientRectangle.Left + pad, ClientRectangle.Top + lineSpacing / 2 + pad);
             canvas.DrawText($"Total Loot: {totalLootCount} items (Value: {TarkovMarketItem.FormatPrice(totalLootValue)})",
-                drawPt, TextLootOverlay);
+                drawPt, SKTextAlign.Left, LootOverlayFont, TextLootOverlay);
             drawPt.Y += lineSpacing;
 
             var itemIndex = 0;
@@ -142,7 +139,7 @@ namespace eft_dma_radar.UI.SKWidgetControl
                 if (string.IsNullOrEmpty(line?.Trim()))
                     continue;
 
-                canvas.DrawText(line, drawPt, TextLootOverlay);
+                canvas.DrawText(line, drawPt, SKTextAlign.Left, LootOverlayFont, TextLootOverlay);
 
                 if (itemIndex > 0 && itemIndex - 1 < sortedLoot.Count)
                 {
@@ -178,7 +175,7 @@ namespace eft_dma_radar.UI.SKWidgetControl
         public override void SetScaleFactor(float newScale)
         {
             base.SetScaleFactor(newScale);
-            TextLootOverlay.TextSize = 12 * newScale;
+            LootOverlayFont.Size = 12 * newScale;
         }
     }
 }

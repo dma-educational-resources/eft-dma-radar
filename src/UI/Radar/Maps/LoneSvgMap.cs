@@ -24,7 +24,6 @@ namespace eft_dma_radar.Common.Maps
         private static readonly SKPaint SvgPaint = new()
         {
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.High
         };
 
         public XMSvgMap(string mapsDirectory, string id, XMMapConfig config)

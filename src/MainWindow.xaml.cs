@@ -951,9 +951,9 @@ namespace eft_dma_radar
         private void GameNotRunningStatus(SKCanvas canvas)
         {
             const string notRunning = "Game Process Not Running!";
-            float textWidth = SKPaints.TextRadarStatus.MeasureText(notRunning);
+            float textWidth = SKPaints.RadarFontRegular48.MeasureText(notRunning);
             canvas.DrawText(notRunning, ((float)skCanvas.ActualWidth / 2) - textWidth / 2f, (float)skCanvas.ActualHeight / 2,
-                SKPaints.TextRadarStatus);
+                SKTextAlign.Left, SKPaints.RadarFontRegular48, SKPaints.TextRadarStatus);
             IncrementStatus();
         }
 
@@ -965,9 +965,9 @@ namespace eft_dma_radar
             string status = _statusOrder == 1 ?
                 startingUp1 : _statusOrder == 2 ?
                 startingUp2 : startingUp3;
-            float textWidth = SKPaints.TextRadarStatus.MeasureText(startingUp1);
+            float textWidth = SKPaints.RadarFontRegular48.MeasureText(startingUp1);
             canvas.DrawText(status, ((float)skCanvas.ActualWidth / 2) - textWidth / 2f, (float)skCanvas.ActualHeight / 2,
-                SKPaints.TextRadarStatus);
+                SKTextAlign.Left, SKPaints.RadarFontRegular48, SKPaints.TextRadarStatus);
             IncrementStatus();
         }
 
@@ -979,9 +979,9 @@ namespace eft_dma_radar
             string status = _statusOrder == 1 ?
                 waitingFor1 : _statusOrder == 2 ?
                 waitingFor2 : waitingFor3;
-            float textWidth = SKPaints.TextRadarStatus.MeasureText(waitingFor1);
+            float textWidth = SKPaints.RadarFontRegular48.MeasureText(waitingFor1);
             canvas.DrawText(status, ((float)skCanvas.ActualWidth / 2) - textWidth / 2f, (float)skCanvas.ActualHeight / 2,
-                SKPaints.TextRadarStatus);
+                SKTextAlign.Left, SKPaints.RadarFontRegular48, SKPaints.TextRadarStatus);
             IncrementStatus();
         }
 
@@ -1047,10 +1047,10 @@ namespace eft_dma_radar
 
                 var width = (float)skCanvas.CanvasSize.Width;
                 var height = (float)skCanvas.CanvasSize.Height;
-                var labelWidth = SKPaints.TextStatusSmall.MeasureText(label);
+                var labelWidth = SKPaints.RadarFontMedium13.MeasureText(label);
                 var spacing = 1f * UIScale;
                 var top = spacing; // Start from top of the canvas
-                var labelHeight = SKPaints.TextStatusSmall.FontSpacing;
+                var labelHeight = SKPaints.RadarFontMedium13.Spacing;
                 var bgRect = new SKRect(
                     width / 2 - labelWidth / 2,
                     top,
@@ -1058,7 +1058,7 @@ namespace eft_dma_radar
                     top + labelHeight + spacing);
                 canvas.DrawRect(bgRect, SKPaints.PaintTransparentBacker);
                 var textLoc = new SKPoint(width / 2, top + labelHeight);
-                canvas.DrawText(label, textLoc, SKPaints.TextStatusSmall);
+                canvas.DrawText(label, textLoc, SKTextAlign.Center, SKPaints.RadarFontMedium13, SKPaints.TextStatusSmall);
             }
             catch (Exception ex)
             {

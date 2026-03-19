@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -77,9 +77,9 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
 
         private bool _forceInactive;
 
-        // ─────────────────────────────────────────────────────
-        // Scatter IDs — unique per grenade instance
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
+        // Scatter IDs � unique per grenade instance
+        // -----------------------------------------------------
         private static int _nextScatterBaseId = 100_000;
         private readonly int _scatterIdIsDead;
         private readonly int _scatterIdPos;
@@ -109,11 +109,11 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
 
             if (IsDetonatedDirect)
             {
-                //Log($"Detonated at creation → discarding.");
+                //Log($"Detonated at creation ? discarding.");
                 throw new Exception("Grenade detonated (at creation)");
             }
 
-            // TEMPLATE → NAME RESOLUTION
+            // TEMPLATE ? NAME RESOLUTION
             var templatePtr = Memory.ReadPtrChain(baseAddr, _toWeaponTemplate, false);
             ////Log($$"TemplatePtr = 0x{templatePtr:X}");
 
@@ -135,7 +135,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             else
             {
                 Name = rawName;
-                //Log($"Template not found in AllItems → using rawName.");
+                //Log($"Template not found in AllItems ? using rawName.");
             }
 
             if (!string.IsNullOrEmpty(Name) &&
@@ -152,12 +152,12 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
 
             // initial slow refresh to populate trail + position
             Refresh();
-            ////Log($$"Post-constructor Refresh → Initial Position={_position}");
+            ////Log($$"Post-constructor Refresh ? Initial Position={_position}");
         }
 
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
         // SLOW PATH REFRESH (direct DMA)
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
         public void Refresh()
         {
             if (!IsActive)
@@ -168,7 +168,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
 
             if (IsDetonatedDirect)
             {
-                //Log($"Refresh: detonated (direct DMA) → removing from parent.");
+                //Log($"Refresh: detonated (direct DMA) ? removing from parent.");
                 _trailPositions.Clear();
                 _parent.TryRemove(Addr, out _);
                 _forceInactive = true;
@@ -186,9 +186,9 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             UpdateTrailAndPosition(newPos);
         }
 
-        // ─────────────────────────────────────────────────────
-        // FAST PATH (scatter) — queue reads
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
+        // FAST PATH (scatter) � queue reads
+        // -----------------------------------------------------
         public void QueueScatterReads(ScatterReadIndex idx)
         {
             if (!IsActive)
@@ -217,9 +217,9 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             }
         }
 
-        // ─────────────────────────────────────────────────────
-        // FAST PATH (scatter) — apply results
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
+        // FAST PATH (scatter) � apply results
+        // -----------------------------------------------------
          public void OnRefresh(ScatterReadIndex idx)
         {
             if (!IsActive)
@@ -231,7 +231,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             // destroyed?
             if (idx.TryGetResult<bool>(_scatterIdIsDead, out var isDead) && isDead)
             {
-                //Log($"OnRefresh: scatter says IsDestroyed == true → removing.");
+                //Log($"OnRefresh: scatter says IsDestroyed == true ? removing.");
                 _trailPositions.Clear();
                 _parent.TryRemove(Addr, out _);
                 _forceInactive = true;
@@ -247,16 +247,16 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             if (!_loggedFirstScatterApply)
             {
                 _loggedFirstScatterApply = true;
-                ////Log($$"OnRefresh: using UnityTransform.UpdatePosition → {newPos}");
+                ////Log($$"OnRefresh: using UnityTransform.UpdatePosition ? {newPos}");
             }
 
             UpdateTrailAndPosition(newPos);
         }
 
 
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
         // Shared trail update logic
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
         private void UpdateTrailAndPosition(in Vector3 newPos)
         {
             _position = newPos;
@@ -354,20 +354,20 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             if (Settings.ShowName && !string.IsNullOrEmpty(Name))
             {
                 var namePoint = new SKPoint(point.X + nameXOffset, point.Y + nameYOffset);
-                canvas.DrawText(Name, namePoint, SKPaints.TextOutline);
-                canvas.DrawText(Name, namePoint, textPaintToUse);
+                canvas.DrawText(Name, namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(Name, namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, textPaintToUse);
             }
 
             if (Settings.ShowDistance)
             {
                 var distText = $"{(int)dist}m";
-                var distWidth = SKPaints.TextExplosives.MeasureText($"{(int)dist}");
+                var distWidth = SKPaints.RadarFontRegular12.MeasureText($"{(int)dist}", SKPaints.TextExplosives);
                 var distPoint = new SKPoint(
                     point.X - (distWidth / 2),
                     point.Y + distanceYOffset
                 );
-                canvas.DrawText(distText, distPoint, SKPaints.TextOutline);
-                canvas.DrawText(distText, distPoint, textPaintToUse);
+                canvas.DrawText(distText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(distText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, textPaintToUse);
             }
         }
 
