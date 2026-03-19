@@ -50,7 +50,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         /// <summary>
         /// Aimbot Info.
         /// </summary>
-        public AimbotCache Cache { get; private set; }
+        public AimbotCache Cache { get; private set; } = null!;
 
         public Aimbot()
         {

@@ -576,8 +576,8 @@ namespace eft_dma_radar.Tarkov.Loot
                                     !string.IsNullOrWhiteSpace(w))
                                 {
                                     weapon = w;
-                                    ammo = killerPlayer?.Hands?.CurrentAmmo;
-                                    side = killerPlayer.Type;
+                                    ammo = killerPlayer.Hands?.CurrentAmmo;
+                                    side = killerPlayer!.Type;
                                     if (killerPlayer is ObservedPlayer op)
                                     {
                                         if (op.Profile?.Level is int lvl)

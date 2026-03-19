@@ -1,3 +1,5 @@
+#nullable enable
+
 using System.Diagnostics;
 using System.Reflection;
 using eft_dma_radar.Common.Misc;
@@ -35,8 +37,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         private static bool ResolveTypeInfoTableRva(ulong gaBase)
         {
             DebugTestAllSignatures(gaBase);
-
-            foreach (var (sig, relOff, instrLen, desc) in TypeInfoTableSigs)
+            foreach (var (sig, relOff, instrLen, _) in TypeInfoTableSigs)
             {
                 var sigAddr = Memory.FindSignature(sig, "GameAssembly.dll");
                 if (sigAddr == 0)
@@ -202,7 +203,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
                 if (nameToIndex.TryGetValue(il2cppName, out var index))
                 {
-                    var previous = (uint)fi.GetValue(null);
+                    var previous = (uint)(fi.GetValue(null) ?? 0u);
                     fi.SetValue(null, (uint)index);
 
                     if (previous != (uint)index)
@@ -210,7 +211,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 }
                 else
                 {
-                    XMLogging.WriteLine($"[Il2CppDumper] WARN: '{il2cppName}' not found in type table — {fieldName} using fallback ({fi.GetValue(null)}).");
+                    XMLogging.WriteLine($"[Il2CppDumper] WARN: '{il2cppName}' not found in type table — {fieldName} using fallback ({fi.GetValue(null) ?? 0u}).");
                 }
             }
         }
@@ -314,7 +315,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             const string tag = "[Il2CppDumper]";
             var gaBase = Memory.GameAssemblyBase;
 
-            string Row(string text) => $"║  {text.PadRight(W - 2)}║";
+            string Row(string text) => $"║  {text,-(W - 2)}║";
             string Header(string text)
             {
                 int pad = W - text.Length;

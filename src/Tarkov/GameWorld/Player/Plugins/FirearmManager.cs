@@ -170,6 +170,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                         // FAST PATH ¡ª direct read for immediate visual update
                         try
                         {
+                            if (FireportTransform is null)
+                            {
+                                ResetFireport();
+                                return;
+                            }
                             var pos = FireportTransform.UpdatePosition();
                             var rot = FireportTransform.GetRotation();
 

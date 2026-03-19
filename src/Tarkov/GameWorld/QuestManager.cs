@@ -669,8 +669,8 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     
                     var hasApiData = EftDataManager.TaskData.TryGetValue(qID, out var taskData);
                     sb.AppendLine($"    In API TaskData: {(hasApiData ? "YES" : "NO")}");
-                    
-                    if (hasApiData && taskData != null)
+
+                    if (hasApiData && taskData is not null)
                     {
                         sb.AppendLine($"    API Name: {taskData.Name ?? "(null)"}");
                         sb.AppendLine($"    KappaRequired: {taskData.KappaRequired} Objectives: {taskData.Objectives?.Count ?? 0}");

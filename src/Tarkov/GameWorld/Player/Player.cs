@@ -1487,7 +1487,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     Type != PlayerType.Teammate &&
                     (gearLoot != null &&
                      (gearLoot.Any(i => i.IsImportant) ||
-                      (Config.QuestHelper.Enabled && Gear.HasQuestItems)));
+                      (Config.QuestHelper.Enabled && Gear!.HasQuestItems)));
 
                 if (typeSettings.ShowName)
                 {

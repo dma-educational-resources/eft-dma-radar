@@ -36,7 +36,7 @@ namespace eft_dma_radar.Tarkov.WebRadar.Data
         [Key(13)] public bool IsAiming { get; init; }
         [Key(14)] public float ZoomLevel { get; init; }
 
-        [Key(15)] public IEnumerable<WebRadarLoot> Loot { get; init; }
+        [Key(15)] public IEnumerable<WebRadarLoot>? Loot { get; init; }
         [Key(16)] public int GroupId { get; init; }
 
         // ============================================================

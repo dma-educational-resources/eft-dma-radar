@@ -24,7 +24,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Interactables
 
         public ulong Base { get; set; }
         public EDoorState DoorState { get; set; }
-        public string Id { get; set; }
+        public string Id { get; set; } = string.Empty;
         public string? KeyId { get; set; }
         public string? KeyName { get; private set; }
         public string? KeyItemID { get; private set; }

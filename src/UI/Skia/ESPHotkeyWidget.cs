@@ -70,7 +70,7 @@ namespace eft_dma_radar.UI.ESP
 
                 if (this.GetType().BaseType?.GetMethod("UpdateSize") != null)
                 {
-                    this.GetType().BaseType.GetMethod("UpdateSize")?.Invoke(this, new object[] { newSize });
+                    this.GetType().BaseType?.GetMethod("UpdateSize")?.Invoke(this, new object[] { newSize });
                 }
                 else
                 {

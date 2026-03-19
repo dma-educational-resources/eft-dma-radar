@@ -67,7 +67,7 @@ namespace eft_dma_radar.Tarkov.Features
                     bool inRaid     = Memory.InRaid;
                     bool hasLocal   = Memory.LocalPlayer is not null;
                     bool handsValid = hasLocal &&
-                                      Memory.LocalPlayer.Firearm.HandsController.Item1.IsValidVirtualAddress();
+                                      Memory.LocalPlayer!.Firearm.HandsController.Item1.IsValidVirtualAddress();
 
                     if (!enabled || !ready || !inRaid || !hasLocal || !handsValid)
                     {

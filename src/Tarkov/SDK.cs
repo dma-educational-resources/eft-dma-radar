@@ -1,3 +1,5 @@
+#pragma warning disable CA2211 // Non-constant fields should not be visible
+
 namespace SDK
 {
 	public readonly partial struct Offsets
@@ -263,7 +265,7 @@ namespace SDK
 			public static uint InventoryController = 0x10; //_InventoryController_k__BackingField
 			public static uint Player = 0x18; //_PlayerView_k__BackingField
 			public static uint InfoContainer = 0xD0; //_InfoContainer_k__BackingField
-			public static readonly uint[] MovementController = new uint[] { 0xD8, 0x98 }; //_MovementController_k__BackingField
+			public static readonly uint[] MovementController = [0xD8, 0x98]; //_MovementController_k__BackingField
 			public static uint HealthController = 0xE8; //_HealthController_k__BackingField
 			public static uint HandsController = 0x120; //_HandsController_k__BackingField
 		}

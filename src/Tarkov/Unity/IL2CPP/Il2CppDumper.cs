@@ -104,7 +104,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             // Retry up to 10 times (with 1s delay) for transient DMA failures during loading.
             const int MinExpectedClasses = 1_000;
             const int maxRetries = 10;
-            List<(string Name, string Namespace, ulong KlassPtr, int Index)> classes = null;
+            List<(string Name, string Namespace, ulong KlassPtr, int Index)> classes = [];
 
             for (int attempt = 1; attempt <= maxRetries; attempt++)
             {

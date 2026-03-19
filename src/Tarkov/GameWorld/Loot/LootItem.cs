@@ -131,6 +131,9 @@ namespace eft_dma_radar.Tarkov.Loot
                 var groups = LootFilterManager.CurrentGroups?.Groups?
                     .OrderBy(g => g.Index);
 
+                if (groups is null)
+                    return null;
+
                 foreach (var group in groups)
                 {
                     if (!group.Enabled)
@@ -158,7 +161,10 @@ namespace eft_dma_radar.Tarkov.Loot
         {
             var groups = LootFilterManager.CurrentGroups?.Groups?
                 .OrderBy(g => g.Index);
-        
+
+            if (groups is null)
+                return null;
+
             foreach (var group in groups)
             {
                 if (!group.Enabled)
