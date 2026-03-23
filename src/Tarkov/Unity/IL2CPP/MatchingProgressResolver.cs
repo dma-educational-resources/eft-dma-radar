@@ -377,7 +377,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                     $"{Tag} ViewSnapshot @ 0x{view:X} | " +
                     $"ServersLimited={serversLimited} CanUpdateStatus={canUpdateStatus} " +
                     $"MaxMatchingTime={maxMatchingTime}s " +
-                    $"MatchingWarning={(warningRaw.HasValue ? warningRaw.Value.ToString() : "null")}");
+                    $"MatchingWarning={(warningRaw.HasValue ? warningRaw.Value.ToString() : "null")} ");
             }
             catch (Exception ex)
             {

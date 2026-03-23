@@ -19,7 +19,7 @@
         // ─────────────────────────────────────────────
         // UnityPlayer.dll
         // ─────────────────────────────────────────────
-public const ulong Time_get_time_rva = 0x432A560;
+        public const ulong Time_get_time_rva = 0x432A560;
         public const ulong Behaviour_SetEnabled = 0x4499E0;
         public const ulong Material_CUSTOM_SetColorImpl_Injected = 0xB7CC0;
         public const ulong Shader_CUSTOM_PropertyToID = 0xAB260;
