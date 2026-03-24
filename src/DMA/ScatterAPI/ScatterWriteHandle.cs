@@ -55,7 +55,7 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
         public void AddValueEntry<T>(ulong va, T value)
             where T : unmanaged
         {
-            if (!_handle.PrepareWriteValue<T>(va, ref value))
+            if (!_handle.PrepareWriteValue<T>(va, in value))
                 throw new Exception("Failed to prepare write entry.");
             Interlocked.Increment(ref _count);
         }
@@ -70,7 +70,7 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
         public void AddValueEntry<T>(ulong va, ref T value)
             where T : unmanaged
         {
-            if (!_handle.PrepareWriteValue<T>(va, ref value))
+            if (!_handle.PrepareWriteValue<T>(va, in value))
                 throw new Exception("Failed to prepare write entry.");
             Interlocked.Increment(ref _count);
         }

@@ -371,6 +371,7 @@ namespace eft_dma_radar.Tarkov
         /// <summary>Obtain the PID for the Game Process.</summary>
         private void LoadProcess()
         {
+            ThrowIfVmmDisposed();
             if (!_hVMM.PidGetFromName(_processName, out uint pid))
                 throw new Exception($"Unable to find '{_processName}'");
 
@@ -469,12 +470,17 @@ namespace eft_dma_radar.Tarkov
         /// </summary>
         public void ThrowIfNotInGame()
         {
+            if (_isDisposed)
+                throw new GameNotRunning("VMM handle disposed.");
+
             FullRefresh();
 
             for (var i = 0; i < 5; i++)
             {
                 try
                 {
+                    if (_isDisposed)
+                        throw new GameNotRunning("VMM handle disposed.");
                     if (_hVMM.PidGetFromName(_processName, out _))
                         return;
                 }

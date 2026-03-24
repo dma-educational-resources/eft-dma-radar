@@ -39,6 +39,7 @@ namespace eft_dma_radar.Common.DMA
         protected static readonly ManualResetEvent _syncProcessRunning = new(false);
         protected static readonly ManualResetEvent _syncInRaid = new(false);
         protected readonly Vmm _hVMM;
+        protected volatile bool _isDisposed;
         protected bool _restartRadar;
         /// <summary>
         /// Current Process ID (PID).
@@ -69,6 +70,21 @@ namespace eft_dma_radar.Common.DMA
         /// Vmm Handle for this DMA Connection.
         /// </summary>
         public Vmm VmmHandle => _hVMM;
+
+        /// <summary>
+        /// True if the VMM handle has been disposed.
+        /// </summary>
+        public bool IsDisposed => _isDisposed;
+
+        /// <summary>
+        /// Throws <see cref="ObjectDisposedException"/> if the VMM handle has been disposed.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void ThrowIfVmmDisposed()
+        {
+            if (_isDisposed)
+                throw new ObjectDisposedException(nameof(Vmm), "VMM handle has been disposed.");
+        }
 
         private MemDMABase() { }
 
@@ -132,6 +148,8 @@ namespace eft_dma_radar.Common.DMA
         /// </summary>
         public void FullRefresh()
         {
+            if (_isDisposed)
+                return;
             _hVMM.ForceFullRefresh();
         }
 
@@ -217,6 +235,7 @@ namespace eft_dma_radar.Common.DMA
         {
             if (entries.Length == 0)
                 return;
+            ThrowIfVmmDisposed();
             var pagesToRead = new HashSet<ulong>(entries.Length); // Will contain each unique page only once to prevent reading the same page multiple times
             foreach (var entry in entries) // First loop through all entries - GET INFO
             {
@@ -269,6 +288,7 @@ namespace eft_dma_radar.Common.DMA
         /// <param name="va"></param>
         public void ReadCache(params ulong[] va)
         {
+            ThrowIfVmmDisposed();
             _hVMM.MemPrefetchPages(ProcessPID, va.AsSpan());
         }
 
@@ -282,6 +302,7 @@ namespace eft_dma_radar.Common.DMA
         public unsafe void ReadBuffer<T>(ulong addr, Span<T> buffer, bool useCache = true, bool allowPartialRead = false)
             where T : unmanaged
         {
+            ThrowIfVmmDisposed();
             uint cb = (uint)(SizeChecker<T>.Size * buffer.Length);
             try
             {
@@ -324,6 +345,7 @@ namespace eft_dma_radar.Common.DMA
         /// </summary>
         public byte[] ReadBuffer(ulong addr, int size, bool useCache = true, bool allowIncompleteRead = false)
         {
+            ThrowIfVmmDisposed();
             try
             {
                 var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
@@ -387,7 +409,9 @@ namespace eft_dma_radar.Common.DMA
             {
                 if (BaseMemoryHolder.MemoryBase == null)
                     throw new Exception("[DMA] BaseMemoryHolder.MemoryBase is not initialized!");
-        
+
+                BaseMemoryHolder.MemoryBase.ThrowIfVmmDisposed();
+
                 byte[][] buffers = new byte[ValidationCount][];
                 for (int i = 0; i < ValidationCount; i++)
                 {
@@ -444,6 +468,7 @@ namespace eft_dma_radar.Common.DMA
         }
         public unsafe T Read<T>(ulong address) where T : unmanaged
         {
+            ThrowIfVmmDisposed();
             var size = (uint)Unsafe.SizeOf<T>();
             var bytes = _hVMM.MemRead(ProcessPID, address, size, out _, VmmFlags.NOCACHE);
             if (bytes == null || bytes.Length != size)
@@ -462,6 +487,7 @@ namespace eft_dma_radar.Common.DMA
         /// </summary>
         public string ReadUtf8String(ulong addr, int cb, bool useCache = true) // read n bytes (string)
         {
+            ThrowIfVmmDisposed();
             ArgumentOutOfRangeException.ThrowIfGreaterThan(cb, 0x1000, nameof(cb));
             var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
             return _hVMM.MemReadString(ProcessPID, addr, cb, Encoding.UTF8, flags) ??
@@ -475,6 +501,7 @@ namespace eft_dma_radar.Common.DMA
         public unsafe T ReadValue<T>(ulong addr, bool useCache = true)
             where T : unmanaged, allows ref struct
         {
+            ThrowIfVmmDisposed();
             try
             {
                 var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
@@ -493,7 +520,8 @@ namespace eft_dma_radar.Common.DMA
         {
             if (targetAddress == 0)
                 return 0;
-        
+            ThrowIfVmmDisposed();
+
             ulong moduleBase = _hVMM.ProcessGetModuleBase(ProcessPID, moduleName);
             if (moduleBase == 0 || moduleBase == ulong.MaxValue)
                 return 0;
@@ -516,7 +544,10 @@ namespace eft_dma_radar.Common.DMA
             {
                 return 0;
             }
-        
+
+            if (buffer is null || buffer.Length < 8)
+                return 0;
+
             for (int i = 0; i <= buffer.Length - 8; i += 8)
             {
                 ulong value = BitConverter.ToUInt64(buffer, i);
@@ -727,7 +758,7 @@ namespace eft_dma_radar.Common.DMA
                 // Read the memory block to search within
                 byte[] buffer = _hVMM.MemRead(pid, rangeStart, (uint)(rangeEnd - rangeStart), out _, VmmFlags.NOCACHE);
 
-                if (buffer.Length == 0)
+                if (buffer is null || buffer.Length == 0)
                     return 0;
 
                 string pat = signature;
@@ -900,6 +931,7 @@ namespace eft_dma_radar.Common.DMA
         {
             if (!SharedProgram.Config?.MemWritesEnabled ?? false)
                 throw new Exception("Memory Writing is Disabled!");
+            ThrowIfVmmDisposed();
 
             try
             {
@@ -927,6 +959,7 @@ namespace eft_dma_radar.Common.DMA
         {
             if (!SharedProgram.Config?.MemWritesEnabled ?? false)
                 throw new Exception("Memory Writing is Disabled!");
+            ThrowIfVmmDisposed();
 
             try
             {
@@ -953,6 +986,7 @@ namespace eft_dma_radar.Common.DMA
         {
             if (!SharedProgram.Config?.MemWritesEnabled ?? false)
                 throw new Exception("Memory Writing is Disabled!");
+            ThrowIfVmmDisposed();
             try
             {
                 _hVMM.MemWriteSpan(ProcessPID, addr, buffer);
@@ -1048,6 +1082,7 @@ namespace eft_dma_radar.Common.DMA
         /// <returns></returns>
         public ulong GetExport(string module, string name)
         {
+            ThrowIfVmmDisposed();
             var export = _hVMM.ProcessGetProcAddress(ProcessPID, module, name);
             export.ThrowIfInvalidVirtualAddress();
             return export;
@@ -1056,7 +1091,11 @@ namespace eft_dma_radar.Common.DMA
         /// <summary>
         /// Close the FPGA Connection.
         /// </summary>
-        public void CloseFPGA() => _hVMM?.Dispose();
+        public void CloseFPGA()
+        {
+            _isDisposed = true;
+            _hVMM?.Dispose();
+        }
 
         /// <summary>
         /// Get a Vmm Scatter Handle.
@@ -1066,6 +1105,7 @@ namespace eft_dma_radar.Common.DMA
         /// <returns></returns>
         public VmmScatter GetScatter(VmmFlags flags)
         {
+            ThrowIfVmmDisposed();
             return new VmmScatter(_hVMM, ProcessPID, flags);
         }
 
