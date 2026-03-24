@@ -1095,6 +1095,12 @@ namespace eft_dma_radar.UI.Misc
         /// </summary>
         [JsonPropertyName("questPlanner")]
         public PanelPositionConfig QuestPlanner { get; set; } = new PanelPositionConfig();
+
+        /// <summary>
+        /// Hideout stash panel position
+        /// </summary>
+        [JsonPropertyName("hideoutStash")]
+        public PanelPositionConfig HideoutStash { get; set; } = new PanelPositionConfig();
     }
 
     /// <summary>
@@ -1188,10 +1194,10 @@ namespace eft_dma_radar.UI.Misc
                 Canvas.SetTop(panel, Top);
 
                 if (Width > 0)
-                    panel.Width = Width;
+                    panel.Width = Math.Max(Width, panel.MinWidth > 0 ? panel.MinWidth : Width);
 
                 if (Height > 0)
-                    panel.Height = Height;
+                    panel.Height = Math.Max(Height, panel.MinHeight > 0 ? panel.MinHeight : Height);
             }
             else
             {

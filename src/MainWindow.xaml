@@ -175,6 +175,18 @@
                             hc:IconElement.Width="18"
                             hc:IconElement.Geometry="{StaticResource MapGeometry}"
                             Click="btnQuestPlanner_Click"/>
+
+                    <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
+                    <Button x:Name="btnHideoutStash"
+                            Style="{StaticResource ButtonIcon}"
+                            ToolTip="Opens the hideout stash value panel"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Width="32" Height="32"
+                            Padding="6"
+                            hc:IconElement.Width="18"
+                            hc:IconElement.Geometry="{StaticResource BoxGeometry}"
+                            Click="btnHideoutStash_Click"/>
                 </hc:SimpleStackPanel>
             </Border>
         </Canvas>
@@ -319,6 +331,24 @@
                     Background="Transparent"
                     BorderThickness="0">
                 <local:QuestPlannerControl x:Name="QuestPlannerControl"/>
+            </Border>
+        </Canvas>
+
+        <!-- hideout stash panel -->
+        <Canvas Name="HideoutStashCanvas" Panel.ZIndex="1000">
+            <Canvas.Resources>
+                <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
+            </Canvas.Resources>
+
+            <Border x:Name="HideoutStashPanel"
+                    Width="540" Height="480"
+                    Canvas.Left="500" Canvas.Top="70"
+                    CornerRadius="8"
+                    Visibility="Collapsed"
+                    Effect="{StaticResource PanelShadow}"
+                    Background="Transparent"
+                    BorderThickness="0">
+                <local:HideoutStashControl x:Name="HideoutStashControl"/>
             </Border>
         </Canvas>
 

@@ -97,6 +97,8 @@ namespace eft_dma_radar
         private const int MIN_SEARCH_SETTINGS_PANEL_HEIGHT = 200;
         private const int MIN_QUEST_PLANNER_PANEL_WIDTH = 300;
         private const int MIN_QUEST_PLANNER_PANEL_HEIGHT = 300;
+        private const int MIN_HIDEOUT_STASH_PANEL_WIDTH = 340;
+        private const int MIN_HIDEOUT_STASH_PANEL_HEIGHT = 240;
 
         private readonly object _renderLock = new object();
         private volatile bool _isRendering = false;
@@ -1677,6 +1679,11 @@ namespace eft_dma_radar
             TogglePanelVisibility("QuestPlanner");
         }
 
+        private void btnHideoutStash_Click(object sender, RoutedEventArgs e)
+        {
+            TogglePanelVisibility("HideoutStash");
+        }
+
         private void btnFreeMode_Click(object sender, RoutedEventArgs e)
         {
             _freeMode = !_freeMode;
@@ -1902,6 +1909,7 @@ namespace eft_dma_radar
                 MapSetupControl.BringToFrontRequested += (s, args) => BringPanelToFront(MapSetupCanvas);
                 SettingsSearchControl.BringToFrontRequested += (s, e) => BringPanelToFront(SettingsSearchCanvas);
                 QuestPlannerControl.BringToFrontRequested += (s, e) => BringPanelToFront(QuestPlannerCanvas);
+                HideoutStashControl.BringToFrontRequested += (s, e) => BringPanelToFront(HideoutStashCanvas);
 
                 AttachPanelClickHandlers();
                 RestorePanelPositions();
@@ -2369,6 +2377,10 @@ namespace eft_dma_radar
             QuestPlannerControl.DragRequested += sharedDragHandler;
             QuestPlannerControl.ResizeRequested += sharedResizeHandler;
             QuestPlannerControl.CloseRequested += sharedCloseHandler;
+
+            HideoutStashControl.DragRequested += sharedDragHandler;
+            HideoutStashControl.ResizeRequested += sharedResizeHandler;
+            HideoutStashControl.CloseRequested += sharedCloseHandler;
         }
 
         private void InitializePanelsCollection()
@@ -2382,7 +2394,8 @@ namespace eft_dma_radar
                 ["LootFilter"] = new PanelInfo(LootFilterPanel, LootFilterCanvas, "LootFilter", MIN_LOOT_FILTER_PANEL_WIDTH, MIN_LOOT_FILTER_PANEL_HEIGHT),
                 ["MapSetup"] = new PanelInfo(MapSetupPanel, MapSetupCanvas, "MapSetup", 300, 300),
                 ["SettingsSearch"] = new PanelInfo(SettingsSearchPanel, SettingsSearchCanvas, "SettingsSearch", MIN_SEARCH_SETTINGS_PANEL_WIDTH, MIN_SEARCH_SETTINGS_PANEL_HEIGHT),
-                ["QuestPlanner"] = new PanelInfo(QuestPlannerPanel, QuestPlannerCanvas, "QuestPlanner", MIN_QUEST_PLANNER_PANEL_WIDTH, MIN_QUEST_PLANNER_PANEL_HEIGHT)
+                ["QuestPlanner"] = new PanelInfo(QuestPlannerPanel, QuestPlannerCanvas, "QuestPlanner", MIN_QUEST_PLANNER_PANEL_WIDTH, MIN_QUEST_PLANNER_PANEL_HEIGHT),
+                ["HideoutStash"] = new PanelInfo(HideoutStashPanel, HideoutStashCanvas, "HideoutStash", MIN_HIDEOUT_STASH_PANEL_WIDTH, MIN_HIDEOUT_STASH_PANEL_HEIGHT)
             };
         }
 
