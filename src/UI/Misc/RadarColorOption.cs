@@ -23,6 +23,7 @@ namespace eft_dma_radar.UI
         RegularLoot,
         ValuableLoot,
         WishlistLoot,
+        HideoutLoot,
         ContainerLoot,
         MedsFilterLoot,
         FoodFilterLoot,
@@ -85,6 +86,7 @@ namespace eft_dma_radar.UI
                 [RadarColorOption.RegularLoot] = SKColors.WhiteSmoke.ToString(),
                 [RadarColorOption.ValuableLoot] = SKColors.Turquoise.ToString(),
                 [RadarColorOption.WishlistLoot] = SKColors.Red.ToString(),
+                [RadarColorOption.HideoutLoot] = SKColor.Parse("00BCD4").ToString(),
                 [RadarColorOption.ContainerLoot] = SKColor.Parse("FFFFCC").ToString(),
                 [RadarColorOption.QuestLoot] = SKColors.YellowGreen.ToString(),
                 [RadarColorOption.Airdrop] = SKColors.Red.ToString(),
@@ -213,6 +215,11 @@ namespace eft_dma_radar.UI
                             SKPaints.PaintWishlistItem.Color = skColor;
                             SKPaints.PaintMiniWishlistItem.Color = skColor;
                             SKPaints.TextWishlistItem.Color = skColor;
+                            break;
+                        case RadarColorOption.HideoutLoot:
+                            SKPaints.PaintHideoutItem.Color = skColor;
+                            SKPaints.PaintMiniHideoutItem.Color = skColor;
+                            SKPaints.TextHideoutItem.Color = skColor;
                             break;
                         case RadarColorOption.QuestLoot:
                             SKPaints.PaintQuestItem.Color = skColor;

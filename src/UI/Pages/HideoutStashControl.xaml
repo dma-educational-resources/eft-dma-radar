@@ -10,6 +10,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -36,8 +37,16 @@
             </Grid>
         </Border>
 
+        <!-- GOM setup hint -->
+        <Border Grid.Row="1" Background="#08FFFFFF" BorderBrush="#18FFFFFF" BorderThickness="0,0,0,1" Padding="10,5">
+            <TextBlock FontSize="10" Opacity="0.50" TextWrapping="Wrap" LineHeight="15">
+                <Run FontWeight="Bold">ℹ</Run>
+                <Run>Visit your hideout at least once after game start and after every raid before refreshing — you can refresh while inside the hideout or from the main menu. HideoutArea / HideoutController are not present in the GOM during a raid or on first launch.</Run>
+            </TextBlock>
+        </Border>
+
         <!-- Body -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Border Background="{DynamicResource RegionBrush}" CornerRadius="0,0,8,8"/>
 
             <TabControl Margin="0" Background="Transparent" BorderThickness="0"

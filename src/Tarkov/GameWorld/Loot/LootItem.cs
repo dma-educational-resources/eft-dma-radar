@@ -780,6 +780,12 @@ public virtual void Draw(SKCanvas canvas, XMMapParams mapParams, ILocalPlayer lo
                 var itemPaint = GetItemTextPaint(lootItem);
                 lines.Add((lootItem.Name, itemPaint));
 
+                if (lootItem.IsHideoutRequired &&
+                    Program.Hideout.NeededItemCounts.TryGetValue(lootItem.ID, out var stillNeeded))
+                {
+                    lines.Add(($"Hideout: need {stillNeeded} more", SKPaints.TextHideoutItem));
+                }
+
                 Position.ToMapPos(mapParams.Map).ToZoomedPos(mapParams).DrawMouseoverText(canvas, lines);
             }
         }
@@ -1053,6 +1059,9 @@ public virtual void Draw(SKCanvas canvas, XMMapParams mapParams, ILocalPlayer lo
                     if (topItem.IsWishlisted)
                         return SKPaints.PaintWishlistItem.Color;
 
+                    if (topItem.IsHideoutRequired)
+                        return SKPaints.PaintHideoutItem.Color;
+
                     if (topItem.IsValuableLoot)
                         return SKPaints.PaintImportantLoot.Color;
                 }
@@ -1070,6 +1079,7 @@ public virtual void Draw(SKCanvas canvas, XMMapParams mapParams, ILocalPlayer lo
                                item is QuestItem ||
                                (Config.QuestHelper.Enabled && item.IsQuestCondition) ||
                                item.IsWishlisted ||
+                               item.IsHideoutRequired ||
                                (LootFilterControl.ShowBackpacks && item.IsBackpack) ||
                                (LootFilterControl.ShowMeds && item.IsMeds) ||
                                (LootFilterControl.ShowFood && item.IsFood) ||
@@ -1101,7 +1111,8 @@ public virtual void Draw(SKCanvas canvas, XMMapParams mapParams, ILocalPlayer lo
                 return new(SKPaints.PaintQuestItem, SKPaints.TextQuestItem);
             if (IsWishlisted)
                 return new(SKPaints.PaintWishlistItem, SKPaints.TextWishlistItem);
-            if (LootFilterControl.ShowBackpacks && IsBackpack)
+            if (IsHideoutRequired)
+                return new(SKPaints.PaintHideoutItem, SKPaints.TextHideoutItem);
                 return new(SKPaints.PaintBackpacks, SKPaints.TextBackpacks);
             if (LootFilterControl.ShowMeds && IsMeds)
                 return new(SKPaints.PaintMeds, SKPaints.TextMeds);
@@ -1148,7 +1159,8 @@ public virtual void Draw(SKCanvas canvas, XMMapParams mapParams, ILocalPlayer lo
                 return SKPaints.PaintMiniQuestItem;
             if (IsWishlisted)
                 return SKPaints.PaintMiniWishlistItem;
-            if (LootFilterControl.ShowBackpacks && IsBackpack)
+            if (IsHideoutRequired)
+                return SKPaints.PaintMiniHideoutItem;
                 return SKPaints.PaintMiniBackpacks;
             if (LootFilterControl.ShowMeds && IsMeds)
                 return SKPaints.PaintMiniMeds;
@@ -1195,7 +1207,8 @@ public virtual void Draw(SKCanvas canvas, XMMapParams mapParams, ILocalPlayer lo
                 return new(SKPaints.PaintQuestItemESP, SKPaints.TextQuestItemESP);
             if (IsWishlisted)
                 return new(SKPaints.PaintWishlistItemESP, SKPaints.TextWishlistItemESP);
-            if (LootFilterControl.ShowBackpacks && IsBackpack)
+            if (IsHideoutRequired)
+                return new(SKPaints.PaintHideoutItemESP, SKPaints.TextHideoutItemESP);
                 return new(SKPaints.PaintBackpackESP, SKPaints.TextBackpackESP);
             if (LootFilterControl.ShowMeds && IsMeds)
                 return new(SKPaints.PaintMedsESP, SKPaints.TextMedsESP);

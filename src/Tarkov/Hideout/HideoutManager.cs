@@ -227,6 +227,13 @@ namespace eft_dma_radar.Tarkov.Hideout
         /// </summary>
         public FrozenSet<string> NeededItemIds { get; private set; } = FrozenSet<string>.Empty;
 
+        /// <summary>
+        /// Maps each needed item template ID to the maximum <see cref="HideoutRequirement.StillNeeded"/>
+        /// count across all requirements that reference it.
+        /// Rebuilt after every <see cref="ReadAreas"/> call.
+        /// </summary>
+        public FrozenDictionary<string, int> NeededItemCounts { get; private set; } = FrozenDictionary<string, int>.Empty;
+
         /// <summary>Sum of the best sell price (trader vs flea) for every item in the stash.</summary>
         public long TotalBestValue   => Items.Sum(i => i.BestPrice);
         /// <summary>Sum of trader prices for every item in the stash.</summary>
@@ -245,6 +252,12 @@ namespace eft_dma_radar.Tarkov.Hideout
         {
             try
             {
+                if (Memory.InRaid)
+                {
+                    XMLogging.WriteLine("[HideoutManager] TryFind skipped — player is in raid.");
+                    return false;
+                }
+
                 //DumpGOM();
 
                 var unityBase = Memory.UnityBase;
@@ -307,6 +320,8 @@ namespace eft_dma_radar.Tarkov.Hideout
         /// </summary>
         public void Refresh()
         {
+            if (Memory.InRaid)
+                return;
             if (!IsValid)
                 return;
             try
@@ -331,6 +346,8 @@ namespace eft_dma_radar.Tarkov.Hideout
         /// </summary>
         public void ReadAreas()
         {
+            if (Memory.InRaid)
+                return;
             if (!IsAreasValid)
                 return;
             try
@@ -378,12 +395,24 @@ namespace eft_dma_radar.Tarkov.Hideout
                 Areas = areas;
 
                 // Rebuild the set of item template IDs still needed for upgrades
-                NeededItemIds = areas
+                var neededReqs = areas
                     .SelectMany(a => a.NextLevelRequirements)
-                    .Where(r => r.Type is ERequirementType.Item or ERequirementType.Tool && r.StillNeeded > 0)
+                    .Where(r => r.Type is ERequirementType.Item or ERequirementType.Tool
+                                && r.StillNeeded > 0
+                                && r.ItemTemplateId is not null)
+                    .ToList();
+
+                NeededItemIds = neededReqs
                     .Select(r => r.ItemTemplateId)
-                    .Where(id => id is not null)
                     .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
+                // For each template ID keep the highest StillNeeded count across all requirements
+                NeededItemCounts = neededReqs
+                    .GroupBy(r => r.ItemTemplateId, StringComparer.OrdinalIgnoreCase)
+                    .ToFrozenDictionary(
+                        g => g.Key,
+                        g => g.Max(r => r.StillNeeded),
+                        StringComparer.OrdinalIgnoreCase);
 
                 var upgradeable = areas.Where(a => !a.IsMaxLevel).ToList();
                 XMLogging.WriteLine(
@@ -589,6 +618,12 @@ namespace eft_dma_radar.Tarkov.Hideout
         {
             try
             {
+                if (Memory.InRaid)
+                {
+                    XMLogging.WriteLine("[HideoutManager] RefreshAsync skipped — player is in raid.");
+                    return "Not available in raid — return to your hideout.";
+                }
+
                 // 1. Pull fresh market data from the API
                 XMLogging.WriteLine("[HideoutManager] RefreshAsync: updating market data...");
                 bool marketUpdated = await EftDataManager.UpdateDataFileAsync();
@@ -674,6 +709,7 @@ namespace eft_dma_radar.Tarkov.Hideout
             Items               = [];
             Areas               = [];
             NeededItemIds       = FrozenSet<string>.Empty;
+            NeededItemCounts    = FrozenDictionary<string, int>.Empty;
         }
 
         /// <summary>

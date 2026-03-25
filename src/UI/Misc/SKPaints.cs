@@ -695,6 +695,44 @@ namespace eft_dma_radar.UI.Misc
             IsAntialias = true,
         };
 
+        public static SKPaint PaintHideoutItem { get; } = new()
+        {
+            Color = SKColor.Parse("00BCD4"),
+            StrokeWidth = 0.25f,
+            Style = SKPaintStyle.Fill,
+            IsAntialias = true,
+        };
+
+        public static SKPaint PaintMiniHideoutItem { get; } = new()
+        {
+            Color = SKColor.Parse("00BCD4"),
+            StrokeWidth = 0.25f,
+            Style = SKPaintStyle.Fill,
+            IsAntialias = true,
+        };
+
+        public static SKPaint TextHideoutItem { get; } = new()
+        {
+            Color = SKColor.Parse("00BCD4"),
+            IsStroke = false,
+            IsAntialias = true,
+        };
+
+        public static SKPaint PaintHideoutItemESP { get; } = new()
+        {
+            Color = SKColor.Parse("00BCD4"),
+            StrokeWidth = 0.25f,
+            Style = SKPaintStyle.Fill,
+            IsAntialias = true,
+        };
+
+        public static SKPaint TextHideoutItemESP { get; } = new()
+        {
+            Color = SKColor.Parse("00BCD4"),
+            IsStroke = false,
+            IsAntialias = true,
+        };
+
         public static readonly SKPaint TextDoorOpen = new SKPaint
         {
             Color = SKColors.Green,
