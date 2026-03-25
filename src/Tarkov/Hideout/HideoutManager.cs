@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Misc.Data;
 using eft_dma_radar.Common.Unity;
@@ -220,6 +221,12 @@ namespace eft_dma_radar.Tarkov.Hideout
         /// <summary>Area levels populated by the last <see cref="ReadAreas"/> call.</summary>
         public IReadOnlyList<HideoutAreaInfo> Areas { get; private set; } = [];
 
+        /// <summary>
+        /// Template IDs of items/tools still needed across all unfulfilled upgrade requirements.
+        /// Rebuilt after every <see cref="ReadAreas"/> call.
+        /// </summary>
+        public FrozenSet<string> NeededItemIds { get; private set; } = FrozenSet<string>.Empty;
+
         /// <summary>Sum of the best sell price (trader vs flea) for every item in the stash.</summary>
         public long TotalBestValue   => Items.Sum(i => i.BestPrice);
         /// <summary>Sum of trader prices for every item in the stash.</summary>
@@ -369,6 +376,15 @@ namespace eft_dma_radar.Tarkov.Hideout
                 }
 
                 Areas = areas;
+
+                // Rebuild the set of item template IDs still needed for upgrades
+                NeededItemIds = areas
+                    .SelectMany(a => a.NextLevelRequirements)
+                    .Where(r => r.Type is ERequirementType.Item or ERequirementType.Tool && r.StillNeeded > 0)
+                    .Select(r => r.ItemTemplateId)
+                    .Where(id => id is not null)
+                    .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
                 var upgradeable = areas.Where(a => !a.IsMaxLevel).ToList();
                 XMLogging.WriteLine(
                     $"[HideoutManager] ReadAreas: {areas.Count} area(s), " +
@@ -657,6 +673,7 @@ namespace eft_dma_radar.Tarkov.Hideout
             AreasControllerBase = 0;
             Items               = [];
             Areas               = [];
+            NeededItemIds       = FrozenSet<string>.Empty;
         }
 
         /// <summary>

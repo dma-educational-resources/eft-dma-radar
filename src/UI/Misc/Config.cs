@@ -527,6 +527,12 @@ namespace eft_dma_radar.UI.Misc
         public bool LootWishlist { get; set; } = false;
 
         /// <summary>
+        /// Highlight items in-raid that are still needed for hideout upgrades.
+        /// </summary>
+        [JsonPropertyName("lootHideoutRequired")]
+        public bool LootHideoutRequired { get; set; } = false;
+
+        /// <summary>
         /// Show corpse markers (X) on radar
         /// </summary>
         [JsonPropertyName("showCorpseMarkers")]

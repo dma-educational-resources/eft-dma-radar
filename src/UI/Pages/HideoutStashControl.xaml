@@ -155,7 +155,7 @@
                     </Grid>
                 </TabItem>
 
-                <!-- ══════════════════ UPGRADES TAB ══════════════════ -->
+                <!-- UPGRADES TAB -->
                 <TabItem Header="Upgrades">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -166,9 +166,25 @@
                         <!-- Summary bar -->
                         <Border Grid.Row="0" Background="{DynamicResource DarkPrimaryBrush}"
                                 Margin="8,6,8,0" CornerRadius="4" Padding="10,6" Opacity="0.9">
-                            <TextBlock x:Name="TxtUpgradeCount"
-                                       Text="Press Refresh to load hideout data"
-                                       FontSize="11" Opacity="0.6"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="TxtUpgradeCount"
+                                           Grid.Column="0"
+                                           Text="Press Refresh to load hideout data"
+                                           FontSize="11" Opacity="0.6"
+                                           VerticalAlignment="Center"/>
+                                <CheckBox x:Name="ChkMarkInRaid"
+                                          Grid.Column="1"
+                                          Content="Mark in raid"
+                                          FontSize="11"
+                                          VerticalAlignment="Center"
+                                          ToolTip="Highlight needed items on the radar while in raid"
+                                          Checked="ChkMarkInRaid_Changed"
+                                          Unchecked="ChkMarkInRaid_Changed"/>
+                            </Grid>
                         </Border>
 
                         <!-- Areas list -->

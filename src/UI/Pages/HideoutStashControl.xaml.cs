@@ -134,6 +134,8 @@ public sealed class RequirementView
 /// </summary>
 public partial class HideoutStashControl : UserControl
 {
+    private static Config Config => Program.Config;
+
     public event EventHandler?                       CloseRequested;
     public event EventHandler?                       BringToFrontRequested;
     public event EventHandler<PanelDragEventArgs>?   DragRequested;
@@ -153,6 +155,7 @@ public partial class HideoutStashControl : UserControl
         _view.Filter = FilterItem;
         StashGrid.ItemsSource    = _view;
         UpgradesList.ItemsSource = _areas;
+        ChkMarkInRaid.IsChecked  = Config.LootHideoutRequired;
         IsVisibleChanged += OnVisibleChanged;
     }
 
@@ -229,6 +232,12 @@ public partial class HideoutStashControl : UserControl
         var activeView = CollectionViewSource.GetDefaultView(
             _isGrouped ? (System.Collections.IEnumerable)_groupedItems : _items);
         activeView.Refresh();
+    }
+
+    private void ChkMarkInRaid_Changed(object sender, RoutedEventArgs e)
+    {
+        Config.LootHideoutRequired = ChkMarkInRaid.IsChecked == true;
+        ConfigManager.CurrentConfig.Save();
     }
 
     // ── Refresh ──────────────────────────────────────────────────────────

@@ -124,6 +124,13 @@ namespace eft_dma_radar.Tarkov.Loot
         /// </summary>
         public bool IsWishlisted => Config.LootWishlist && LocalPlayer.WishlistItems.Contains(ID);
 
+        /// <summary>
+        /// True if this item is still needed for a hideout upgrade and the option is enabled.
+        /// </summary>
+        public bool IsHideoutRequired =>
+            Config.LootHideoutRequired &&
+            Program.Hideout.NeededItemIds.Contains(ID);
+
         public GroupedLootFilterEntry MatchedFilter
         {
             get
@@ -269,6 +276,7 @@ namespace eft_dma_radar.Tarkov.Loot
                         !item.IsGroupedBlacklisted &&
                         (item.Important ||
                          item.IsWishlisted ||
+                         item.IsHideoutRequired ||
                          item is QuestItem ||
                          (Config.QuestHelper.Enabled && item.IsQuestCondition) ||
                          (LootFilterControl.ShowBackpacks && item.IsBackpack) ||
@@ -286,6 +294,7 @@ namespace eft_dma_radar.Tarkov.Loot
                         !item.IsGroupedBlacklisted &&
                         (item.Important ||
                          item.IsWishlisted ||
+                         item.IsHideoutRequired ||
                          item is QuestItem ||
                          (Config.QuestHelper.Enabled && item.IsQuestCondition) ||
                          (LootFilterControl.ShowBackpacks && item.IsBackpack) ||
@@ -302,6 +311,7 @@ namespace eft_dma_radar.Tarkov.Loot
 
                 return Important ||
                        IsWishlisted ||
+                       IsHideoutRequired ||
                        this is QuestItem ||
                        (Config.QuestHelper.Enabled && IsQuestCondition) ||
                        (LootFilterControl.ShowBackpacks && IsBackpack) ||
@@ -346,7 +356,7 @@ namespace eft_dma_radar.Tarkov.Loot
                 if (MatchedFilter != null)
                     return true;
 
-                return _item.Important || IsWishlisted;
+                return _item.Important || IsWishlisted || IsHideoutRequired;
             }
         }
 
@@ -448,6 +458,7 @@ public virtual void Draw(SKCanvas canvas, XMMapParams mapParams, ILocalPlayer lo
                 .Where(item =>
                        item.IsImportant ||
                        item is QuestItem ||
+                       item.IsHideoutRequired ||
                        (Config.QuestHelper.Enabled && item.IsQuestCondition) ||
                        item.IsWishlisted ||
                        (LootFilterControl.ShowBackpacks && item.IsBackpack) ||
