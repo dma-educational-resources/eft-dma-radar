@@ -81,10 +81,11 @@ namespace eft_dma_radar.Common.Misc
         public static string GetRandomPassword(int length)
         {
             const string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
-            string pw = "";
-            for (int i = 0; i < length; i++)
-                pw += chars[RandomNumberGenerator.GetInt32(chars.Length)];
-            return pw;
+            return string.Create(length, chars, static (span, c) =>
+            {
+                for (int i = 0; i < span.Length; i++)
+                    span[i] = c[RandomNumberGenerator.GetInt32(c.Length)];
+            });
         }
     }
     #region Debugging/Profiling

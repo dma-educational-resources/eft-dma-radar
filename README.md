@@ -1,6 +1,6 @@
 # Lone's EFT DMA Radar
 
-### As of 1/03/2026, no more features will be added & only offsets will be maintained
+### Keeegi version
 
 <img width="512" height="512" alt="image" src="https://github.com/user-attachments/assets/e2bb2567-539c-43c7-87c5-1ffe59e97d4d" />
 

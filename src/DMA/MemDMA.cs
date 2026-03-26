@@ -17,8 +17,11 @@ using eft_dma_radar.Tarkov.GameWorld.Explosives;
 using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
 using IL2CPP = eft_dma_radar.Tarkov.Unity.IL2CPP;
-using Vmmsharp;
+using VmmSharpEx;
+using VmmSharpEx.Options;
+using VmmSharpEx.Scatter;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
+using eft_dma_radar.Tarkov.Hideout;
 
 namespace eft_dma_radar.Tarkov
 {
@@ -124,6 +127,9 @@ namespace eft_dma_radar.Tarkov
         public QuestManager QuestManager => Game?.QuestManager;
         public LocalGameWorld Game       { get; private set; }
 
+        /// <summary>Hideout state manager (active while not in raid).</summary>
+        public HideoutManager Hideout { get; } = new();
+
         /// <summary>IL2CPP GameObjectManager address.</summary>
         public ulong GOM { get; private set; }
 
@@ -200,8 +206,8 @@ namespace eft_dma_radar.Tarkov
                     _starting = true;
 
                     IL2CPP.Il2CppDumper.Dump();
-                    InputManager.Initialize();
                     CameraManager.Initialize(); // IL2CPP ported - signature scan
+                    InputManager.Initialize();
                     _ready = true;
 
                     XMLogging.WriteLine("Game Startup [OK]");
@@ -354,6 +360,7 @@ namespace eft_dma_radar.Tarkov
             GCSettings.LatencyMode = GCLatencyMode.Interactive;
             _syncInRaid.Reset();
             Game = null;
+            Hideout.Reset();
         }
 
         private void MemDMA_RaidStarted(object sender, EventArgs e)
@@ -369,11 +376,11 @@ namespace eft_dma_radar.Tarkov
         /// <summary>Obtain the PID for the Game Process.</summary>
         private void LoadProcess()
         {
-            var tmpProcess = _hVMM.Process(_processName);
-            if (tmpProcess == null)
+            ThrowIfVmmDisposed();
+            if (!_hVMM.PidGetFromName(_processName, out uint pid))
                 throw new Exception($"Unable to find '{_processName}'");
 
-            Process = tmpProcess;
+            ProcessPID = pid;
         }
 
         /// <summary>
@@ -382,12 +389,12 @@ namespace eft_dma_radar.Tarkov
         private void LoadModules()
         {
             // UnityPlayer.dll base
-            var unityBase = Process.GetModuleBase("UnityPlayer.dll");
+            var unityBase = _hVMM.ProcessGetModuleBase(ProcessPID, "UnityPlayer.dll");
             ArgumentOutOfRangeException.ThrowIfZero(unityBase, nameof(unityBase));
             UnityBase = unityBase;
 
             // GameAssembly.dll base (IL2CPP)
-            var gameAssemblyBase = Process.GetModuleBase("GameAssembly.dll");
+            var gameAssemblyBase = _hVMM.ProcessGetModuleBase(ProcessPID, "GameAssembly.dll");
             if (gameAssemblyBase != 0)
             {
                 GameAssemblyBase = gameAssemblyBase;
@@ -468,17 +475,19 @@ namespace eft_dma_radar.Tarkov
         /// </summary>
         public void ThrowIfNotInGame()
         {
+            if (_isDisposed)
+                throw new GameNotRunning("VMM handle disposed.");
+
             FullRefresh();
 
             for (var i = 0; i < 5; i++)
             {
                 try
                 {
-                    var tempProcess = _hVMM.Process(_processName);
-                    if (tempProcess is null)
-                        throw new Exception();
-
-                    return;
+                    if (_isDisposed)
+                        throw new GameNotRunning("VMM handle disposed.");
+                    if (_hVMM.PidGetFromName(_processName, out _))
+                        return;
                 }
                 catch
                 {
@@ -565,8 +574,9 @@ namespace eft_dma_radar.Tarkov
         public ulong      MonoBase  => _actualMemory?.MonoBase ?? 0;
         public ulong      UnityBase => _actualMemory?.UnityBase ?? 0;
         public ulong      GOM       => _actualMemory?.GOM ?? 0;
-        public VmmProcess Process   => _actualMemory?.Process;
-        public Vmm        VmmHandle => _actualMemory?.VmmHandle;
+        public uint                         ProcessPID       => _actualMemory?.ProcessPID ?? 0;
+        public Vmm                          VmmHandle        => _actualMemory?.VmmHandle;
+        public bool                         IsDisposed       => _actualMemory?.IsDisposed ?? true;
 
         public bool RestartRadar
         {
@@ -726,7 +736,7 @@ namespace eft_dma_radar.Tarkov
         /// </summary>
         public byte[] ReadBufferEnsureE(ulong addr, int size)
         {
-            if (!HasDMA || Process == null)
+            if (!HasDMA || ProcessPID == 0)
             {
                 LogSafeOnce("[SafeMode] ReadBufferEnsureE skipped (DMA disabled)");
                 return null;
@@ -740,7 +750,7 @@ namespace eft_dma_radar.Tarkov
 
                 for (int i = 0; i < ValidationCount; i++)
                 {
-                    buffers[i] = Process.MemRead(addr, (uint)size, Vmm.FLAG_NOCACHE);
+                    buffers[i] = _actualMemory.VmmHandle.MemRead(ProcessPID, addr, (uint)size, out _, VmmFlags.NOCACHE);
 
                     if (buffers[i].Length != size)
                         throw new Exception("Incomplete memory read!");
@@ -962,7 +972,7 @@ namespace eft_dma_radar.Tarkov
             return _actualMemory.GetExport(module, name);
         }
 
-        public VmmScatterMemory GetScatter(uint flags)
+        public VmmScatter GetScatter(VmmFlags flags)
         {
             if (!HasDMA)
             {
@@ -984,7 +994,7 @@ namespace eft_dma_radar.Tarkov
             return _actualMemory.FindSignature(signature, moduleName);
         }
 
-        public ulong FindSignature(string signature, ulong rangeStart, ulong rangeEnd, VmmProcess process)
+        public ulong FindSignature(string signature, ulong rangeStart, ulong rangeEnd, uint pid)
         {
             if (!HasDMA)
             {
@@ -992,7 +1002,7 @@ namespace eft_dma_radar.Tarkov
                 return 0;
             }
 
-            return _actualMemory.FindSignature(signature, rangeStart, rangeEnd, process);
+            return _actualMemory.FindSignature(signature, rangeStart, rangeEnd, pid);
         }
 
         public void ThrowIfNotInGame()

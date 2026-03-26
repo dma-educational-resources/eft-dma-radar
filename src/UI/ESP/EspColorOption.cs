@@ -1,5 +1,4 @@
 ﻿using eft_dma_radar.UI.Misc;
-using SkiaSharp.Views.WPF;
 
 namespace eft_dma_radar.UI
 {
@@ -20,6 +19,7 @@ namespace eft_dma_radar.UI
         RegularLoot,
         ValuableLoot,
         WishlistLoot,
+        HideoutLoot,
         ContainerLoot,
         MedsFilterLoot,
         FoodFilterLoot,
@@ -91,6 +91,7 @@ namespace eft_dma_radar.UI
                 [EspColorOption.RegularLoot] = SKColors.WhiteSmoke.ToString(),
                 [EspColorOption.ValuableLoot] = SKColors.Turquoise.ToString(),
                 [EspColorOption.WishlistLoot] = SKColors.Red.ToString(),
+                [EspColorOption.HideoutLoot] = SKColor.Parse("00BCD4").ToString(),
                 [EspColorOption.ContainerLoot] = SKColor.Parse("FFFFCC").ToString(),
                 [EspColorOption.QuestLoot] = SKColors.YellowGreen.ToString(),
                 [EspColorOption.Airdrop] = SKColors.Red.ToString(),
@@ -199,6 +200,10 @@ namespace eft_dma_radar.UI
                         case EspColorOption.WishlistLoot:
                             SKPaints.PaintWishlistItemESP.Color = skColor;
                             SKPaints.TextWishlistItemESP.Color = skColor;
+                            break;
+                        case EspColorOption.HideoutLoot:
+                            SKPaints.PaintHideoutItemESP.Color = skColor;
+                            SKPaints.TextHideoutItemESP.Color = skColor;
                             break;
                         case EspColorOption.QuestLoot:
                             SKPaints.PaintQuestItemESP.Color = skColor;

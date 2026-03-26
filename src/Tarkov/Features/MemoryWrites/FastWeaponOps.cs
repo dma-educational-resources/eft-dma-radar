@@ -7,7 +7,6 @@ using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Common.Unity.Collections;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.Features;
-using eft_dma_shared.Common.Unity;
 
 namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 {
@@ -16,11 +15,15 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         private bool _lastEnabledState;
         private ulong _lastHandsController;
         private ulong _cachedAnimator;
+        private int _consecutiveErrors;
+        private DateTime _lastErrorLog = DateTime.MinValue;
 
         private const float FAST_SPEED = 4f;
         private const float NORMAL_SPEED = 1f;
         private const float FAST_AIMING_SPEED = 9999f;
         private const float SPEED_TOLERANCE = 0.1f;
+        private const int MAX_CONSECUTIVE_ERRORS_BEFORE_THROTTLE = 3;
+        private static readonly TimeSpan ErrorLogCooldown = TimeSpan.FromSeconds(5);
 
         private static readonly HashSet<string> SupportedControllers = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -62,6 +65,8 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 if (!IsSupportedController(controllerClassName))
                     return;
 
+                _consecutiveErrors = 0; // Reset on successful read
+
                 if (stateChanged || handsControllerChanged)
                 {
                     var animator = GetAnimator(localPlayer);
@@ -85,8 +90,19 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[FastWeaponOps]: {ex}");
                 _cachedAnimator = default;
+                _consecutiveErrors++;
+
+                var now = DateTime.UtcNow;
+                if (_consecutiveErrors <= MAX_CONSECUTIVE_ERRORS_BEFORE_THROTTLE ||
+                    now - _lastErrorLog >= ErrorLogCooldown)
+                {
+                    XMLogging.WriteLine($"[FastWeaponOps]: {ex.GetType().Name}: {ex.Message}" +
+                        (_consecutiveErrors > MAX_CONSECUTIVE_ERRORS_BEFORE_THROTTLE
+                            ? $" (repeated {_consecutiveErrors} times, throttling logs)"
+                            : ""));
+                    _lastErrorLog = now;
+                }
             }
         }
         private static void DumpAnimatorSpeedCandidates(ulong animator)
@@ -238,6 +254,8 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             _lastEnabledState = default;
             _lastHandsController = default;
             _cachedAnimator = default;
+            _consecutiveErrors = 0;
+            _lastErrorLog = DateTime.MinValue;
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using eft_dma_radar.Tarkov.Loot;
+﻿#nullable enable
+using eft_dma_radar.Tarkov.Loot;
 
 
 namespace eft_dma_radar.UI.LootFilters
@@ -8,10 +9,10 @@ namespace eft_dma_radar.UI.LootFilters
     /// </summary>
     internal static class LootFilter
     {
-        public static string SearchString;
-        public static bool ShowMeds;
-        public static bool ShowFood;
-        public static bool ShowBackpacks;
+        public static string? SearchString = null;
+        public static bool ShowMeds = false;
+        public static bool ShowFood = false;
+        public static bool ShowBackpacks = false;
 
         private static bool ShowQuestItems => Program.Config.QuestHelper.Enabled;
 

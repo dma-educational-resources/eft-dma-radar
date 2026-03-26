@@ -107,13 +107,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             {
                 // Health info will be unavailable but player will still work
             }
-
-            try
-            {
-            ulong id = ulong.Parse(AccountID);
-            ILocalPlayer.AccountId = id;
-            }
-            catch { }
         }
 
         /// <summary>
@@ -209,6 +202,10 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             try
             {
                 return Memory.ReadValue<bool>(this.PWA + Offsets.ProceduralWeaponAnimation._isAiming, false);
+            }
+            catch (ObjectDisposedException)
+            {
+                return false;
             }
             catch (Exception ex)
             {

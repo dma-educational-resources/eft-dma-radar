@@ -56,7 +56,7 @@ namespace eft_dma_radar.Tarkov.API
 
         private static void MemDMA_GameStarted(object sender, EventArgs e)
         {
-            uint pid = Memory.Process.PID;
+            uint pid = Memory.ProcessPID;
             if (Cache.PID != pid)
             {
                 Cache.PID = pid;

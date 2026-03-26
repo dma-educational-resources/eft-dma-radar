@@ -58,19 +58,19 @@ namespace eft_dma_radar.Common.Misc.Data
             {
                 // Telemetry disabled - no data will be sent to external servers
                 return;
-                
-                EnsureStateLoadedStrict();          // never swallow errors here silently
-                _state.Enabled = enabled;
-                TrySaveState();                     // persist opt-in change
 
-                _timer?.Dispose();
-                if (!_state.Enabled) return;
+                // EnsureStateLoadedStrict();          // never swallow errors here silently
+                // _state.Enabled = enabled;
+                // TrySaveState();                     // persist opt-in change
 
-                // First beat after 1 minute (not immediate), then every minute.
-                _timer = new System.Threading.Timer(async _ => await SendHeartbeatSafe(appVersion).ConfigureAwait(false),
-                                   null,
-                                   HeartbeatInterval,
-                                   HeartbeatInterval);
+                // _timer?.Dispose();
+                // if (!_state.Enabled) return;
+
+                // // First beat after 1 minute (not immediate), then every minute.
+                // _timer = new System.Threading.Timer(async _ => await SendHeartbeatSafe(appVersion).ConfigureAwait(false),
+                //                    null,
+                //                    HeartbeatInterval,
+                //                    HeartbeatInterval);
             }
         }
 
@@ -87,12 +87,12 @@ namespace eft_dma_radar.Common.Misc.Data
         {
             // Telemetry disabled - no data will be sent to external servers
             return;
-            
-            lock (_gate)
-            {
-                if (!(_state?.Enabled ?? false)) return;
-            }
-            _ = SendHeartbeatSafe(appVersion);
+
+            // lock (_gate)
+            // {
+            //     if (!(_state?.Enabled ?? false)) return;
+            // }
+            // _ = SendHeartbeatSafe(appVersion);
         }
 
         public static void SetEnabled(string appVersion, bool enabled)

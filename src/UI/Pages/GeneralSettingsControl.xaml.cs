@@ -181,7 +181,7 @@ namespace eft_dma_radar.UI.Pages
 
                     InitializeControlEvents();
                     LoadSettings();
-                    InitializeConfigTab();
+                    await InitializeConfigTab();
                 }
                 catch (TimeoutException ex)
                 {
@@ -604,7 +604,6 @@ namespace eft_dma_radar.UI.Pages
             ccbWidgets.SelectionChanged += widgetsCheckComboBox_SelectionChanged;
             ccbGeneralOptions.SelectionChanged += generalOptionsCheckComboBox_SelectionChanged;
 
-            btnSendStashDogTags.Click += btnSendStashDogTags_Click;
             nudFPSLimit.ValueChanged += GeneralNUD_ValueChanged;
             sldrUIScale.ValueChanged += GeneralSlider_ValueChanged;
 
@@ -854,9 +853,9 @@ namespace eft_dma_radar.UI.Pages
 
             foreach (CheckComboBoxItem item in ccbWidgets.Items)
             {
-                var content = item.Content.ToString();
+                var content = item.Content?.ToString();
 
-                if (optionsToUpdate.TryGetValue(content, out bool shouldBeSelected))
+                if (content is not null && optionsToUpdate.TryGetValue(content, out bool shouldBeSelected))
                     item.IsSelected = shouldBeSelected;
             }
         }
@@ -872,9 +871,9 @@ namespace eft_dma_radar.UI.Pages
 
             foreach (CheckComboBoxItem item in ccbGeneralOptions.Items)
             {
-                var content = item.Content.ToString();
+                var content = item.Content?.ToString();
 
-                if (optionsToUpdate.TryGetValue(content, out bool shouldBeSelected))
+                if (content is not null && optionsToUpdate.TryGetValue(content, out bool shouldBeSelected))
                     item.IsSelected = shouldBeSelected;
             }
         }
@@ -1151,47 +1150,6 @@ namespace eft_dma_radar.UI.Pages
                 });
             }
         }
-        private async void btnSendStashDogTags_Click(object sender, RoutedEventArgs e)
-        {
-            var result = MessageBox.Show(
-                "? IMPORTANT ?\n\n" +
-                "Make sure you are NOT in raid and are currently in the MAIN MENU.\n\n" +
-                "Click Continue when ready, or Cancel to abort.",
-                "Menu Stash Dogtag Dump",
-                MessageBoxButton.OKCancel,
-                MessageBoxImage.Warning
-            );
-        
-            if (result != MessageBoxResult.OK)
-                return;
-        
-            btnSendStashDogTags.IsEnabled = false;
-            btnSendStashDogTags.Content = "Sending...";
-        
-            try
-            {
-                await Task.Run(() =>
-                {
-                    MenuStashDogtagDumper.Dump();
-                });
-        
-                NotificationsShared.Success(
-                    "Menu stash dogtags successfully sent to API.\n\n" +
-                    "You may now enter a raid safely."
-                );
-            }
-            catch (Exception ex)
-            {
-                NotificationsShared.Error(
-                    $"Failed to send dogtags:\n{ex.Message}"
-                );
-            }
-            finally
-            {
-                btnSendStashDogTags.IsEnabled = true;
-                btnSendStashDogTags.Content = "Send Stashed DogTags";
-            }
-        }
         private void InitializeWebRadar()
         {
             chkWebRadarUPnP.IsChecked = Config.WebRadar.UPnP;
@@ -1222,9 +1180,9 @@ namespace eft_dma_radar.UI.Pages
         {
             var cbo = chkMapSetup;
             var value = cbo.IsChecked == true;
-            var panel = MainWindow.Window.MapSetupPanel;
+            var panel = MainWindow.Window!.MapSetupPanel;
             var config = XMMapManager.Map.Config;
-            var mapControl = MainWindow.Window.MapSetupControl;
+            var mapControl = MainWindow.Window!.MapSetupControl;
 
             if (value && Memory.InRaid && Memory.LocalPlayer != null)
                 mapControl.UpdateMapConfiguration(config.X, config.Y, config.Scale);
@@ -1245,95 +1203,57 @@ namespace eft_dma_radar.UI.Pages
             #region UpdatePaints
 
             // Outlines
-            SKPaints.TextOutline.TextSize = 12f * newScale;
             SKPaints.TextOutline.StrokeWidth = 2f * newScale;
             // Shape Outline is computed before usage due to different stroke widths
 
+            // Scale mutable radar fonts
+            SKPaints.RadarFontRegular12.Size = 12f * newScale;
+            SKPaints.RadarFontRegular48.Size = 48f * newScale;
+            SKPaints.RadarFontMedium13.Size = 13f * newScale;
+            SKPaints.RadarFontEmbolden24.Size = 24f * newScale;
+
             SKPaints.PaintConnectorGroup.StrokeWidth = 2.25f * newScale;
             SKPaints.PaintMouseoverGroup.StrokeWidth = 3 * newScale;
-            SKPaints.TextMouseoverGroup.TextSize = 12 * newScale;
             SKPaints.PaintLocalPlayer.StrokeWidth = 3 * newScale;
-            SKPaints.TextLocalPlayer.TextSize = 12 * newScale;
             SKPaints.PaintTeammate.StrokeWidth = 3 * newScale;
-            SKPaints.TextTeammate.TextSize = 12 * newScale;
             SKPaints.PaintUSEC.StrokeWidth = 3 * newScale;
-            SKPaints.TextUSEC.TextSize = 12 * newScale;
             SKPaints.PaintBEAR.StrokeWidth = 3 * newScale;
-            SKPaints.TextBEAR.TextSize = 12 * newScale;
             SKPaints.PaintSpecial.StrokeWidth = 3 * newScale;
-            SKPaints.TextSpecial.TextSize = 12 * newScale;
             SKPaints.PaintStreamer.StrokeWidth = 3 * newScale;
-            SKPaints.TextStreamer.TextSize = 12 * newScale;
             SKPaints.PaintAimbotLocked.StrokeWidth = 3 * newScale;
-            SKPaints.TextAimbotLocked.TextSize = 12 * newScale;
             SKPaints.PaintScav.StrokeWidth = 3 * newScale;
-            SKPaints.TextScav.TextSize = 12 * newScale;
             SKPaints.PaintRaider.StrokeWidth = 3 * newScale;
-            SKPaints.TextRaider.TextSize = 12 * newScale;
             SKPaints.PaintBoss.StrokeWidth = 3 * newScale;
-            SKPaints.TextBoss.TextSize = 12 * newScale;
             SKPaints.PaintFocused.StrokeWidth = 3 * newScale;
-            SKPaints.TextFocused.TextSize = 12 * newScale;
             SKPaints.PaintPScav.StrokeWidth = 3 * newScale;
-            SKPaints.TextPScav.TextSize = 12 * newScale;
-            SKPaints.TextMouseover.TextSize = 12 * newScale;
             SKPaints.PaintCorpse.StrokeWidth = 3 * newScale;
-            SKPaints.TextCorpse.TextSize = 12 * newScale;
             SKPaints.PaintMeds.StrokeWidth = 3 * newScale;
-            SKPaints.TextMeds.TextSize = 12 * newScale;
             SKPaints.PaintFood.StrokeWidth = 3 * newScale;
-            SKPaints.TextFood.TextSize = 12 * newScale;
             SKPaints.PaintWeapons.StrokeWidth = 3 * newScale;
-            SKPaints.TextWeapons.TextSize = 12 * newScale;
             SKPaints.PaintBackpacks.StrokeWidth = 3 * newScale;
-            SKPaints.TextBackpacks.TextSize = 12 * newScale;
             SKPaints.PaintQuestItem.StrokeWidth = 3 * newScale;
-            SKPaints.TextQuestItem.TextSize = 12 * newScale;
             SKPaints.PaintAirdrop.StrokeWidth = 3 * newScale;
-            SKPaints.TextAirdrop.TextSize = 12 * newScale;
             SKPaints.PaintWishlistItem.StrokeWidth = 3 * newScale;
-            SKPaints.TextWishlistItem.TextSize = 12 * newScale;
             SKPaints.QuestHelperPaint.StrokeWidth = 3 * newScale;
-            SKPaints.QuestHelperText.TextSize = 12 * newScale;
             SKPaints.QuestHelperOutline.StrokeWidth = 2.25f * newScale;
             SKPaints.PaintDeathMarker.StrokeWidth = 3 * newScale;
             SKPaints.PaintLoot.StrokeWidth = 3 * newScale;
             SKPaints.PaintImportantLoot.StrokeWidth = 3 * newScale;
             SKPaints.PaintContainerLoot.StrokeWidth = 3 * newScale;
-            SKPaints.TextContainer.TextSize = 12 * newScale;
-            SKPaints.TextLoot.TextSize = 12 * newScale;
-            SKPaints.TextImportantLoot.TextSize = 12 * newScale;
             SKPaints.PaintTransparentBacker.StrokeWidth = 1 * newScale;
-            SKPaints.TextRadarStatus.TextSize = 48 * newScale;
-            SKPaints.TextStatusSmall.TextSize = 13 * newScale;
             SKPaints.PaintExplosives.StrokeWidth = 3 * newScale;
             SKPaints.PaintExplosivesDanger.StrokeWidth = 3 * newScale;
-            SKPaints.TextExplosives.TextSize = 12 * newScale;
-            SKPaints.TextExplosivesDanger.TextSize = 12 * newScale;
             SKPaints.PaintExfilOpen.StrokeWidth = 3 * newScale;
-            SKPaints.TextExfilOpen.TextSize = 12 * newScale;
             SKPaints.PaintExfilPending.StrokeWidth = 3 * newScale;
-            SKPaints.TextExfilPending.TextSize = 12 * newScale;
             SKPaints.PaintExfilClosed.StrokeWidth = 3 * newScale;
-            SKPaints.TextExfilClosed.TextSize = 12 * newScale;
             SKPaints.PaintExfilInactive.StrokeWidth = 3 * newScale;
-            SKPaints.TextExfilInactive.TextSize = 12 * newScale;
             SKPaints.PaintExfilTransit.StrokeWidth = 3 * newScale;
-            SKPaints.TextExfilTransit.TextSize = 12 * newScale;
-            SKPaints.TextDoorOpen.TextSize = 12 * newScale;
             SKPaints.PaintDoorOpen.StrokeWidth = 3 * newScale;
-            SKPaints.TextDoorLocked.TextSize = 12 * newScale;
             SKPaints.PaintDoorLocked.StrokeWidth = 3 * newScale;
-            SKPaints.TextDoorShut.TextSize = 12 * newScale;
             SKPaints.PaintDoorShut.StrokeWidth = 3 * newScale;
-            SKPaints.TextDoorInteracting.TextSize = 12 * newScale;
             SKPaints.PaintDoorInteracting.StrokeWidth = 3 * newScale;
-            SKPaints.TextDoorBreaching.TextSize = 12 * newScale;
             SKPaints.PaintDoorBreaching.StrokeWidth = 3 * newScale;
-            SKPaints.TextPulsingAsterisk.TextSize = 24 * newScale;
-            SKPaints.TextPulsingAsteriskOutline.TextSize = 24 * newScale;
             SKPaints.PaintSwitch.StrokeWidth = 3 * newScale;
-            SKPaints.TextSwitch.TextSize = 12 * newScale;
             #endregion
         }
 
@@ -1705,7 +1625,7 @@ namespace eft_dma_radar.UI.Pages
                     case "FPSLimit":
                         Config.RadarTargetFPS = intValue;
                         Config.Save();
-                        MainWindow.Window.UpdateRenderTimerInterval(intValue);
+                        MainWindow.Window!.UpdateRenderTimerInterval(intValue);
                         break;
                 }
 
@@ -3093,7 +3013,6 @@ namespace eft_dma_radar.UI.Pages
         #endregion
 
         #region ConfigTab
-        private bool _isRefreshingConfigList = false;
         private bool _ignoreConfigSelectionChanged = false;
         private async Task InitializeConfigTab()
         {
@@ -3125,8 +3044,6 @@ namespace eft_dma_radar.UI.Pages
         }
         private void RefreshConfigList()
         {
-            _isRefreshingConfigList = true;
-        
             try
             {
                 _ignoreConfigSelectionChanged = true;
@@ -3155,7 +3072,6 @@ namespace eft_dma_radar.UI.Pages
             finally
             {
                 _ignoreConfigSelectionChanged = false;
-                _isRefreshingConfigList = false;
             }
         }
 
@@ -3323,7 +3239,7 @@ namespace eft_dma_radar.UI.Pages
                     {
                         for (int i = 0; i < cboConfigs.Items.Count; i++)
                         {
-                            if (cboConfigs.Items[i].ToString().Equals(newConfigName, StringComparison.OrdinalIgnoreCase))
+                            if (cboConfigs.Items[i].ToString()?.Equals(newConfigName, StringComparison.OrdinalIgnoreCase) == true)
                             {
                                 cboConfigs.SelectedIndex = i;
                                 break;
@@ -3355,7 +3271,7 @@ namespace eft_dma_radar.UI.Pages
             if (cboConfigs.SelectedIndex <= 0)
                 return;
 
-            var configToDelete = cboConfigs.SelectedItem.ToString();
+            var configToDelete = cboConfigs.SelectedItem?.ToString() ?? string.Empty;
 
             if (cboConfigs.SelectedIndex > 0 && !configToDelete.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
                 configToDelete += ".json";
@@ -3404,6 +3320,7 @@ namespace eft_dma_radar.UI.Pages
                 }
 
                 var configForExport = JsonSerializer.Deserialize<Config>(JsonSerializer.Serialize(Config));
+                if (configForExport is null) return;
                 configForExport.Cache = null;
                 configForExport.WebRadar = null;
 

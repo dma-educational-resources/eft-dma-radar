@@ -12,6 +12,7 @@
  * - FILE IS TOUCHED ONLY WHEN SESSION ID CHANGES
  */
 
+#nullable enable
 using System.Collections.Concurrent;
 using System.Numerics;
 using System.Text.Json;
@@ -194,14 +195,21 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             nickname = null;
             accountId = null;
 
-            if (_players.TryGetValue(profileId, out var entry))
+            if (string.IsNullOrEmpty(profileId))
+                return false;
+
+            lock (_lock)
             {
+                if (!_players.TryGetValue(profileId, out var entry))
+                    return false;
+
+                if (string.IsNullOrEmpty(entry.Nickname) && string.IsNullOrEmpty(entry.AccountId))
+                    return false;
+
                 nickname = entry.Nickname;
                 accountId = entry.AccountId;
-                return !string.IsNullOrEmpty(nickname);
+                return true;
             }
-
-            return false;
         }
 
         public static void UpdateIdentity(

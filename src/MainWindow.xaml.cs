@@ -1,4 +1,5 @@
-﻿using eft_dma_radar.Tarkov;
+﻿#nullable enable
+using eft_dma_radar.Tarkov;
 using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
@@ -10,6 +11,7 @@ using eft_dma_radar.Tarkov.GameWorld.Exits;
 using eft_dma_radar.Tarkov.GameWorld.Explosives;
 using eft_dma_radar.Tarkov.GameWorld.Interactables;
 using eft_dma_radar.Tarkov.Loot;
+using eft_dma_radar.Tarkov.Unity.IL2CPP;
 using eft_dma_radar.UI;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
@@ -53,11 +55,11 @@ namespace eft_dma_radar
     public partial class MainWindow
     {
         #region Fields / Properties
-        private DispatcherTimer _sizeChangeTimer;
+        private DispatcherTimer? _sizeChangeTimer;
         private readonly Stopwatch _fpsSw = new();
         private readonly PrecisionTimer _renderTimer;
 
-        private IMouseoverEntity _mouseOverItem;
+        private IMouseoverEntity? _mouseOverItem;
         private bool _mouseDown;
         private Point _lastMousePosition;
         private Vector2 _mapPanPosition;
@@ -72,7 +74,7 @@ namespace eft_dma_radar
 
         private const int ZOOM_STEP = 5; // How much zoom changes per scroll step (1-50 typical range)
 
-        private Dictionary<string, PanelInfo> _panels;
+        private Dictionary<string, PanelInfo>? _panels;
 
         private int _fps;
         private int _zoom = 100;
@@ -89,47 +91,49 @@ namespace eft_dma_radar
         private const int MIN_ESP_PANEL_HEIGHT = 200;
         private const int MIN_MEMORY_WRITING_PANEL_WIDTH = 200;
         private const int MIN_MEMORY_WRITING_PANEL_HEIGHT = 200;
-        private const int MIN_WATCHLIST_PANEL_WIDTH = 200;
-        private const int MIN_WATCHLIST_PANEL_HEIGHT = 200;
-        private const int MIN_PLAYERHISTORY_PANEL_WIDTH = 350;
-        private const int MIN_PLAYERHISTORY_PANEL_HEIGHT = 130;
         private const int MIN_SETTINGS_PANEL_WIDTH = 200;
         private const int MIN_SETTINGS_PANEL_HEIGHT = 200;
         private const int MIN_SEARCH_SETTINGS_PANEL_WIDTH = 200;
         private const int MIN_SEARCH_SETTINGS_PANEL_HEIGHT = 200;
         private const int MIN_QUEST_PLANNER_PANEL_WIDTH = 300;
         private const int MIN_QUEST_PLANNER_PANEL_HEIGHT = 300;
+        private const int MIN_HIDEOUT_STASH_PANEL_WIDTH = 340;
+        private const int MIN_HIDEOUT_STASH_PANEL_HEIGHT = 240;
+        private const int MIN_WATCHLIST_PANEL_WIDTH = 200;
+        private const int MIN_WATCHLIST_PANEL_HEIGHT = 200;
+        private const int MIN_PLAYERHISTORY_PANEL_WIDTH = 350;
+        private const int MIN_PLAYERHISTORY_PANEL_HEIGHT = 130;
 
         private readonly object _renderLock = new object();
         private volatile bool _isRendering = false;
         private volatile bool _uiInteractionActive = false;
-        private DispatcherTimer _uiActivityTimer;
+        private DispatcherTimer _uiActivityTimer = null!;
         private bool _lastInRaidState = false;
         private bool _wasQuestPlannerOpenBeforeRaid = false;
 
         private readonly Stopwatch _statusSw = Stopwatch.StartNew();
         private int _statusOrder = 1;
 
-        private AimviewWidget _aimview;
-        public AimviewWidget AimView { get => _aimview; private set => _aimview = value; }
+        private AimviewWidget? _aimview;
+        public AimviewWidget? AimView { get => _aimview; private set => _aimview = value; }
 
-        private PlayerInfoWidget _playerInfo;
-        public PlayerInfoWidget PlayerInfo { get => _playerInfo; private set => _playerInfo = value; }
+        private PlayerInfoWidget? _playerInfo;
+        public PlayerInfoWidget? PlayerInfo { get => _playerInfo; private set => _playerInfo = value; }
 
-        private DebugInfoWidget _debugInfo;
-        public DebugInfoWidget DebugInfo { get => _debugInfo; private set => _debugInfo = value; }
+        private DebugInfoWidget? _debugInfo;
+        public DebugInfoWidget? DebugInfo { get => _debugInfo; private set => _debugInfo = value; }
 
-        private LootInfoWidget _lootInfo;
-        public LootInfoWidget LootInfo { get => _lootInfo; private set => _lootInfo = value; }
+        private LootInfoWidget? _lootInfo;
+        public LootInfoWidget? LootInfo { get => _lootInfo; private set => _lootInfo = value; }
 
-        private QuestInfoWidget _questInfo;
-        public QuestInfoWidget QuestInfo { get => _questInfo; private set => _questInfo = value; }
+        private QuestInfoWidget? _questInfo;
+        public QuestInfoWidget? QuestInfo { get => _questInfo; private set => _questInfo = value; }
 
 
         /// <summary>
         /// Determines if MainWindow is ready or not
         /// </summary>
-        public static bool Initialized = false;
+        public static new bool Initialized = false;
 
         private static List<PingEffect> _activePings = new();
 
@@ -138,13 +142,13 @@ namespace eft_dma_radar
         /// </summary>
         public static Config Config => Program.Config;
 
-        private static EntityTypeSettings MineEntitySettings = Config?.EntityTypeSettings?.GetSettings("Mine");
+        private static EntityTypeSettings? MineEntitySettings = Config?.EntityTypeSettings?.GetSettings("Mine");
 
         /// <summary>
         /// Singleton Instance of MainWindow.
         /// </summary>
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-        internal static MainWindow Window { get; private set; }
+        internal static MainWindow? Window { get; private set; }
 
         /// <summary>
         /// Current UI Scale Value for Primary Application Window.
@@ -202,22 +206,22 @@ namespace eft_dma_radar
         /// LocalPlayer (who is running Radar) 'Player' object.
         /// Returns the player the Current Window belongs to.
         /// </summary>
-        private static LocalPlayer LocalPlayer => Memory?.LocalPlayer ?? null;
+        private static LocalPlayer? LocalPlayer => Memory?.LocalPlayer ?? null;
 
         /// <summary>
         /// All Filtered Loot on the map.
         /// </summary>
-        private static IEnumerable<LootItem> Loot => Memory.Loot?.FilteredLoot;
+        private static IEnumerable<LootItem>? Loot => Memory.Loot?.FilteredLoot;
 
         /// <summary>
         /// All Unfiltered Loot on the map.
         /// </summary>
-        private static IEnumerable<LootItem> UnfilteredLoot => Memory.Loot?.UnfilteredLoot;
+        private static IEnumerable<LootItem>? UnfilteredLoot => Memory.Loot?.UnfilteredLoot;
 
         /// <summary>
         /// All Static Containers on the map.
         /// </summary>
-        private static IEnumerable<StaticLootContainer> Containers => Memory.Loot?.StaticLootContainers;
+        private static IEnumerable<StaticLootContainer>? Containers => Memory.Loot?.StaticLootContainers;
 
         /// <summary>
         /// All Players in Local Game World (including dead/exfil'd) 'Player' collection.
@@ -239,7 +243,7 @@ namespace eft_dma_radar
         /// <summary>
         /// Contains all 'mouse-overable' items.
         /// </summary>
-        private IEnumerable<IMouseoverEntity> MouseOverItems
+        private IEnumerable<IMouseoverEntity>? MouseOverItems
         {
             get
             {
@@ -333,7 +337,7 @@ namespace eft_dma_radar
         /// <summary>
         /// Main Render Event.
         /// </summary>
-        private void SkCanvas_PaintSurface(object sender, SKPaintGLSurfaceEventArgs e)
+        private void SkCanvas_PaintSurface(object? sender, SKPaintGLSurfaceEventArgs e)
         {
             var isStarting  = Starting;
             var isReady     = Ready;
@@ -695,7 +699,6 @@ namespace eft_dma_radar
         private static int DrawPriority(PlayerType t) => t switch
         {
             PlayerType.SpecialPlayer => 7,
-            PlayerType.Streamer => 6,
             PlayerType.USEC or PlayerType.BEAR => 5,
             PlayerType.PScav => 4,
             PlayerType.AIBoss=> 3,
@@ -914,7 +917,7 @@ namespace eft_dma_radar
         private void CheckMouseoverItems(Point mousePosition)
         {
             var mousePos = new Vector2((float)mousePosition.X, (float)mousePosition.Y);
-            IMouseoverEntity closest = null;
+            IMouseoverEntity? closest = null;
             var closestDist = float.MaxValue;
             int? mouseoverGroup = null;
 
@@ -955,9 +958,9 @@ namespace eft_dma_radar
         private void GameNotRunningStatus(SKCanvas canvas)
         {
             const string notRunning = "Game Process Not Running!";
-            float textWidth = SKPaints.TextRadarStatus.MeasureText(notRunning);
+            float textWidth = SKPaints.RadarFontRegular48.MeasureText(notRunning);
             canvas.DrawText(notRunning, ((float)skCanvas.ActualWidth / 2) - textWidth / 2f, (float)skCanvas.ActualHeight / 2,
-                SKPaints.TextRadarStatus);
+                SKTextAlign.Left, SKPaints.RadarFontRegular48, SKPaints.TextRadarStatus);
             IncrementStatus();
         }
 
@@ -969,23 +972,25 @@ namespace eft_dma_radar
             string status = _statusOrder == 1 ?
                 startingUp1 : _statusOrder == 2 ?
                 startingUp2 : startingUp3;
-            float textWidth = SKPaints.TextRadarStatus.MeasureText(startingUp1);
+            float textWidth = SKPaints.RadarFontRegular48.MeasureText(startingUp1);
             canvas.DrawText(status, ((float)skCanvas.ActualWidth / 2) - textWidth / 2f, (float)skCanvas.ActualHeight / 2,
-                SKPaints.TextRadarStatus);
+                SKTextAlign.Left, SKPaints.RadarFontRegular48, SKPaints.TextRadarStatus);
             IncrementStatus();
         }
 
         private void WaitingForRaidStatus(SKCanvas canvas)
         {
-            const string waitingFor1 = "Waiting for Raid Start.";
-            const string waitingFor2 = "Waiting for Raid Start..";
-            const string waitingFor3 = "Waiting for Raid Start...";
-            string status = _statusOrder == 1 ?
-                waitingFor1 : _statusOrder == 2 ?
-                waitingFor2 : waitingFor3;
-            float textWidth = SKPaints.TextRadarStatus.MeasureText(waitingFor1);
+            string dots = _statusOrder == 1 ? "." : _statusOrder == 2 ? ".." : "...";
+            string stageText = "Waiting for Raid Start";
+
+            var stage = MatchingProgressResolver.GetCachedStage();
+            if (stage != Enums.EMatchingStage.None)
+                stageText = stage.ToDisplayString();
+
+            string status = stageText + dots;
+            float textWidth = SKPaints.RadarFontRegular48.MeasureText(stageText + "...");
             canvas.DrawText(status, ((float)skCanvas.ActualWidth / 2) - textWidth / 2f, (float)skCanvas.ActualHeight / 2,
-                SKPaints.TextRadarStatus);
+                SKTextAlign.Left, SKPaints.RadarFontRegular48, SKPaints.TextRadarStatus);
             IncrementStatus();
         }
 
@@ -1016,7 +1021,7 @@ namespace eft_dma_radar
                 var memWritesEnabled = MemWrites.Enabled;
                 var aimEnabled = Aimbot.Config.Enabled;
                 var mode = Aimbot.Config.TargetingMode;
-                string label = null;
+                string? label = null;
                 
                 if (memWritesEnabled && Config.MemWrites.RageMode)
                     label = MemWriteFeature<Aimbot>.Instance.Enabled ? $"{mode.GetDescription()}: RAGE MODE" : "RAGE MODE";
@@ -1051,10 +1056,10 @@ namespace eft_dma_radar
 
                 var width = (float)skCanvas.CanvasSize.Width;
                 var height = (float)skCanvas.CanvasSize.Height;
-                var labelWidth = SKPaints.TextStatusSmall.MeasureText(label);
+                var labelWidth = SKPaints.RadarFontMedium13.MeasureText(label);
                 var spacing = 1f * UIScale;
                 var top = spacing; // Start from top of the canvas
-                var labelHeight = SKPaints.TextStatusSmall.FontSpacing;
+                var labelHeight = SKPaints.RadarFontMedium13.Spacing;
                 var bgRect = new SKRect(
                     width / 2 - labelWidth / 2,
                     top,
@@ -1062,7 +1067,7 @@ namespace eft_dma_radar
                     top + labelHeight + spacing);
                 canvas.DrawRect(bgRect, SKPaints.PaintTransparentBacker);
                 var textLoc = new SKPoint(width / 2, top + labelHeight);
-                canvas.DrawText(label, textLoc, SKPaints.TextStatusSmall);
+                canvas.DrawText(label, textLoc, SKTextAlign.Center, SKPaints.RadarFontMedium13, SKPaints.TextStatusSmall);
             }
             catch (Exception ex)
             {
@@ -1078,7 +1083,7 @@ namespace eft_dma_radar
             });
         }
 
-        private void RenderTimer_Elapsed(object sender, EventArgs e)
+        private void RenderTimer_Elapsed(object? sender, EventArgs e)
         {
             if (_isRendering) return;
 
@@ -1385,105 +1390,7 @@ namespace eft_dma_radar
             EnsurePanelInBounds(ESPPanel, mainContentGrid, adjustSize: false);
         }
         #endregion
-        #region Watchlist
-        /// <summary>
-        /// Handles setting Watchlist panel visibility
-        /// </summary>
-        private void btnWatchlist_Click(object sender, RoutedEventArgs e)
-        {
-            NotifyUIActivity();
-            TogglePanelVisibility("Watchlist");
-        }
 
-        /// <summary>
-        /// Handle close request from Watchlist control
-        /// </summary>
-        private void WatchlistControl_CloseRequested(object sender, EventArgs e)
-        {
-            WatchlistPanel.Visibility = Visibility.Collapsed;
-        }
-
-        /// <summary>
-        /// Handle drag request from Watchlist control
-        /// </summary>
-        private void WatchlistControl_DragRequested(object sender, PanelDragEventArgs e)
-        {
-            var left = Canvas.GetLeft(WatchlistPanel) + e.OffsetX;
-            var top = Canvas.GetTop(WatchlistPanel) + e.OffsetY;
-
-            Canvas.SetLeft(WatchlistPanel, left);
-            Canvas.SetTop(WatchlistPanel, top);
-
-            EnsurePanelInBounds(WatchlistPanel, mainContentGrid, adjustSize: false);
-        }
-
-        /// <summary>
-        /// Handle resize request from Watchlist control
-        /// </summary>
-        private void WatchlistControl_ResizeRequested(object sender, PanelResizeEventArgs e)
-        {
-            var width = WatchlistPanel.Width + e.DeltaWidth;
-            var height = WatchlistPanel.Height + e.DeltaHeight;
-
-            width = Math.Max(width, MIN_WATCHLIST_PANEL_WIDTH);
-            height = Math.Max(height, MIN_WATCHLIST_PANEL_HEIGHT);
-
-            WatchlistPanel.Width = width;
-            WatchlistPanel.Height = height;
-
-            EnsurePanelInBounds(WatchlistPanel, mainContentGrid, adjustSize: false);
-        }
-        #endregion
-
-        #region Player History
-        /// <summary>
-        /// Handles setting Player History panel visibility
-        /// </summary>
-        private void btnPlayerHistory_Click(object sender, RoutedEventArgs e)
-        {
-            NotifyUIActivity();
-            TogglePanelVisibility("PlayerHistory");
-        }
-
-        /// <summary>
-        /// Handle close request from Player History control
-        /// </summary>
-        private void PlayerHistoryControl_CloseRequested(object sender, EventArgs e)
-        {
-            PlayerHistoryPanel.Visibility = Visibility.Collapsed;
-        }
-
-        /// <summary>
-        /// Handle drag request from Player History control
-        /// </summary>
-        private void PlayerHistoryControl_DragRequested(object sender, PanelDragEventArgs e)
-        {
-            var left = Canvas.GetLeft(PlayerHistoryPanel) + e.OffsetX;
-            var top = Canvas.GetTop(PlayerHistoryPanel) + e.OffsetY;
-
-            Canvas.SetLeft(PlayerHistoryPanel, left);
-            Canvas.SetTop(PlayerHistoryPanel, top);
-
-            EnsurePanelInBounds(PlayerHistoryPanel, mainContentGrid, adjustSize: false);
-        }
-
-        /// <summary>
-        /// Handle resize request from Player History control
-        /// </summary>
-        private void PlayerHistoryControl_ResizeRequested(object sender, PanelResizeEventArgs e)
-        {
-            var width = PlayerHistoryPanel.Width + e.DeltaWidth;
-            var height = PlayerHistoryPanel.Height + e.DeltaHeight;
-
-            width = Math.Max(width, MIN_PLAYERHISTORY_PANEL_WIDTH);
-            height = Math.Max(height, MIN_PLAYERHISTORY_PANEL_HEIGHT);
-
-            PlayerHistoryPanel.Width = width;
-            PlayerHistoryPanel.Height = height;
-
-            EnsurePanelInBounds(PlayerHistoryPanel, mainContentGrid, adjustSize: false);
-        }
-        #endregion
         #region Loot Filter Settings
         /// <summary>
         /// Handles setting loot filter panel visibility
@@ -1776,6 +1683,21 @@ namespace eft_dma_radar
             TogglePanelVisibility("QuestPlanner");
         }
 
+        private void btnHideoutStash_Click(object sender, RoutedEventArgs e)
+        {
+            TogglePanelVisibility("HideoutStash");
+        }
+
+        private void btnWatchlist_Click(object sender, RoutedEventArgs e)
+        {
+            TogglePanelVisibility("Watchlist");
+        }
+
+        private void btnPlayerHistory_Click(object sender, RoutedEventArgs e)
+        {
+            TogglePanelVisibility("PlayerHistory");
+        }
+
         private void btnFreeMode_Click(object sender, RoutedEventArgs e)
         {
             _freeMode = !_freeMode;
@@ -1820,7 +1742,7 @@ namespace eft_dma_radar
         #endregion
 
         #region Window Events
-        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
             try
             {
@@ -1834,16 +1756,16 @@ namespace eft_dma_radar
                 if (!Config.WindowMaximized)
                     Config.WindowSize = new Size(ActualWidth, ActualHeight);
 
-                Config.Widgets.AimviewLocation = _aimview.ClientRect;
-                Config.Widgets.AimviewMinimized = _aimview.Minimized;
-                Config.Widgets.PlayerInfoLocation = _playerInfo.ClientRect;
-                Config.Widgets.PlayerInfoMinimized = _playerInfo.Minimized;
-                Config.Widgets.DebugInfoLocation = _debugInfo.ClientRect;
-                Config.Widgets.DebugInfoMinimized = _debugInfo.Minimized;
-                Config.Widgets.LootInfoLocation = _lootInfo.ClientRect;
-                Config.Widgets.LootInfoMinimized = _lootInfo.Minimized;
-                Config.Widgets.QuestInfoLocation = _questInfo.ClientRect;
-                Config.Widgets.QuestInfoMinimized = _questInfo.Minimized;
+                Config.Widgets.AimviewLocation = _aimview!.ClientRect;
+                Config.Widgets.AimviewMinimized = _aimview!.Minimized;
+                Config.Widgets.PlayerInfoLocation = _playerInfo!.ClientRect;
+                Config.Widgets.PlayerInfoMinimized = _playerInfo!.Minimized;
+                Config.Widgets.DebugInfoLocation = _debugInfo!.ClientRect;
+                Config.Widgets.DebugInfoMinimized = _debugInfo!.Minimized;
+                Config.Widgets.LootInfoLocation = _lootInfo!.ClientRect;
+                Config.Widgets.LootInfoMinimized = _lootInfo!.Minimized;
+                Config.Widgets.QuestInfoLocation = _questInfo!.ClientRect;
+                Config.Widgets.QuestInfoMinimized = _questInfo!.Minimized;
 
                 Config.Zoom = _zoom;
 
@@ -1876,15 +1798,6 @@ namespace eft_dma_radar
 
         private void MainWindow_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (InRaid && _mouseOverItem is Player player && player.IsStreaming)
-                try
-                {
-                    Process.Start(new ProcessStartInfo(player.StreamingURL) { UseShellExecute = true });
-                }
-                catch
-                {
-                    NotificationsShared.Error("Unable to open this player's Twitch. Do you have a default browser set?");
-                }
         }
 
         private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -1992,13 +1905,13 @@ namespace eft_dma_radar
             coordinator.RegisterRequiredPanel("ESP");
             coordinator.RegisterRequiredPanel("LootFilter");
             coordinator.RegisterRequiredPanel("LootSettings");
+            coordinator.RegisterRequiredPanel("SettingsSearch");
             coordinator.RegisterRequiredPanel("Watchlist");
             coordinator.RegisterRequiredPanel("PlayerHistory");
-            coordinator.RegisterRequiredPanel("SettingsSearch");
             coordinator.AllPanelsReady += OnAllPanelsReady;
         }
 
-        private void OnAllPanelsReady(object sender, EventArgs e)
+        private void OnAllPanelsReady(object? sender, EventArgs e)
         {
             Dispatcher.Invoke(() => {
                 InitializeToolbar();
@@ -2009,11 +1922,12 @@ namespace eft_dma_radar
                 LootSettingsControl.BringToFrontRequested += (s, args) => BringPanelToFront(LootSettingsCanvas);
                 MemoryWritingControl.BringToFrontRequested += (s, args) => BringPanelToFront(MemoryWritingCanvas);
                 LootFilterControl.BringToFrontRequested += (s, args) => BringPanelToFront(LootFilterCanvas);
-                WatchlistControl.BringToFrontRequested += (s, args) => BringPanelToFront(WatchlistCanvas);
-                PlayerHistoryControl.BringToFrontRequested += (s, args) => BringPanelToFront(PlayerHistoryCanvas);
                 MapSetupControl.BringToFrontRequested += (s, args) => BringPanelToFront(MapSetupCanvas);
                 SettingsSearchControl.BringToFrontRequested += (s, e) => BringPanelToFront(SettingsSearchCanvas);
                 QuestPlannerControl.BringToFrontRequested += (s, e) => BringPanelToFront(QuestPlannerCanvas);
+                HideoutStashControl.BringToFrontRequested += (s, e) => BringPanelToFront(HideoutStashCanvas);
+                WatchlistControl.BringToFrontRequested += (s, e) => BringPanelToFront(WatchlistCanvas);
+                PlayerHistoryControl.BringToFrontRequested += (s, e) => BringPanelToFront(PlayerHistoryCanvas);
 
                 AttachPanelClickHandlers();
                 RestorePanelPositions();
@@ -2036,9 +1950,12 @@ namespace eft_dma_radar
                 if (!IsLoaded || ActualWidth <= 0 || ActualHeight <= 0)
                     return;
 
-                foreach (var panel in _panels.Values)
+                if (_panels != null)
                 {
-                    EnsurePanelInBounds(panel.Panel, mainContentGrid);
+                    foreach (var panel in _panels.Values)
+                    {
+                        EnsurePanelInBounds(panel.Panel, mainContentGrid);
+                    }
                 }
 
                 if (customToolbar != null)
@@ -2070,6 +1987,7 @@ namespace eft_dma_radar
 
                 bool needsSave = false;
 
+                if (_panels != null)
                 foreach (var panelKey in _panels.Keys)
                 {
                     var propInfo = typeof(PanelPositionsConfig).GetProperty(panelKey);
@@ -2080,8 +1998,8 @@ namespace eft_dma_radar
                         var originalWidth = posConfig.Width;
                         var originalHeight = posConfig.Height;
 
-                        var minWidth = GetMinimumPanelWidth(_panels[panelKey].Panel);
-                        var minHeight = GetMinimumPanelHeight(_panels[panelKey].Panel);
+                        var minWidth = GetMinimumPanelWidth(_panels![panelKey].Panel);
+                        var minHeight = GetMinimumPanelHeight(_panels![panelKey].Panel);
 
                         if (posConfig.Width < minWidth)
                         {
@@ -2250,11 +2168,11 @@ namespace eft_dma_radar
                 "LootSettingsPanel" => MIN_LOOT_PANEL_WIDTH,
                 "MemoryWritingPanel" => MIN_MEMORY_WRITING_PANEL_WIDTH,
                 "ESPPanel" => MIN_ESP_PANEL_WIDTH,
-                "WatchlistPanel" => MIN_WATCHLIST_PANEL_WIDTH,
-                "PlayerHistoryPanel" => MIN_PLAYERHISTORY_PANEL_WIDTH,
                 "LootFilterPanel" => MIN_LOOT_FILTER_PANEL_WIDTH,
                 "MapSetupPanel" => 300,
                 "QuestPlannerPanel" => MIN_QUEST_PLANNER_PANEL_WIDTH,
+                "WatchlistPanel" => MIN_WATCHLIST_PANEL_WIDTH,
+                "PlayerHistoryPanel" => MIN_PLAYERHISTORY_PANEL_WIDTH,
                 _ => 200
             };
         }
@@ -2267,11 +2185,11 @@ namespace eft_dma_radar
                 "LootSettingsPanel" => MIN_LOOT_PANEL_HEIGHT,
                 "MemoryWritingPanel" => MIN_MEMORY_WRITING_PANEL_HEIGHT,
                 "ESPPanel" => MIN_ESP_PANEL_HEIGHT,
-                "WatchlistPanel" => MIN_WATCHLIST_PANEL_HEIGHT,
-                "PlayerHistoryPanel" => MIN_PLAYERHISTORY_PANEL_HEIGHT,
                 "LootFilterPanel" => MIN_LOOT_FILTER_PANEL_HEIGHT,
                 "MapSetupPanel" => 300,
                 "QuestPlannerPanel" => MIN_QUEST_PLANNER_PANEL_HEIGHT,
+                "WatchlistPanel" => MIN_WATCHLIST_PANEL_HEIGHT,
+                "PlayerHistoryPanel" => MIN_PLAYERHISTORY_PANEL_HEIGHT,
                 _ => 200
             };
         }
@@ -2295,8 +2213,6 @@ namespace eft_dma_radar
                 LootSettingsCanvas,
                 MemoryWritingCanvas,
                 ESPCanvas,
-                WatchlistCanvas,
-                PlayerHistoryCanvas,
                 LootFilterCanvas,
                 MapSetupCanvas
             };
@@ -2322,8 +2238,6 @@ namespace eft_dma_radar
             AttachPreviewMouseDown(LootSettingsPanel, LootSettingsCanvas);
             AttachPreviewMouseDown(MemoryWritingPanel, MemoryWritingCanvas);
             AttachPreviewMouseDown(ESPPanel, ESPCanvas);
-            AttachPreviewMouseDown(WatchlistPanel, WatchlistCanvas);
-            AttachPreviewMouseDown(PlayerHistoryPanel, PlayerHistoryCanvas);
             AttachPreviewMouseDown(LootFilterPanel, LootFilterCanvas);
             AttachPreviewMouseDown(MapSetupPanel, MapSetupCanvas);
             AttachPreviewMouseDown(SettingsSearchPanel, SettingsSearchCanvas);
@@ -2333,8 +2247,6 @@ namespace eft_dma_radar
             GeneralSettingsCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(GeneralSettingsCanvas);
             LootSettingsCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(LootSettingsCanvas);
             MemoryWritingCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(MemoryWritingCanvas);
-            WatchlistCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(WatchlistCanvas);
-            PlayerHistoryCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(PlayerHistoryCanvas);
             LootFilterCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(LootFilterCanvas);
             MapSetupCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(MapSetupCanvas);
             SettingsSearchCanvas.PreviewMouseDown += (s, e) => BringPanelToFront(SettingsSearchCanvas);
@@ -2343,7 +2255,7 @@ namespace eft_dma_radar
 
         private void TogglePanelVisibility(string panelKey)
         {
-            if (_panels.TryGetValue(panelKey, out var panelInfo))
+            if (_panels?.TryGetValue(panelKey, out var panelInfo) == true)
             {
                 if (panelInfo.Panel.Visibility == Visibility.Visible)
                 {
@@ -2378,7 +2290,7 @@ namespace eft_dma_radar
 
         private void SetPanelVisibility(string panelKey, bool visible)
         {
-            if (_panels.TryGetValue(panelKey, out var panelInfo))
+            if (_panels?.TryGetValue(panelKey, out var panelInfo) == true)
             {
                 panelInfo.Panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
                 SaveSinglePanelPosition(panelKey);
@@ -2394,7 +2306,7 @@ namespace eft_dma_radar
                 if (controlName != null && controlName.EndsWith("Control") && controlName.Length > "Control".Length)
                 {
                     string panelKey = controlName.Substring(0, controlName.Length - "Control".Length);
-                    if (_panels.TryGetValue(panelKey, out var panelInfo))
+                    if (_panels?.TryGetValue(panelKey, out var panelInfo) == true)
                     {
                         var left = Canvas.GetLeft(panelInfo.Panel) + e.OffsetX;
                         var top = Canvas.GetTop(panelInfo.Panel) + e.OffsetY;
@@ -2415,7 +2327,7 @@ namespace eft_dma_radar
                 if (controlName != null && controlName.EndsWith("Control") && controlName.Length > "Control".Length)
                 {
                     string panelKey = controlName.Substring(0, controlName.Length - "Control".Length);
-                    if (_panels.TryGetValue(panelKey, out var panelInfo))
+                    if (_panels?.TryGetValue(panelKey, out var panelInfo) == true)
                     {
                         var width = panelInfo.Panel.Width + e.DeltaWidth;
                         var height = panelInfo.Panel.Height + e.DeltaHeight;
@@ -2449,7 +2361,7 @@ namespace eft_dma_radar
                 if (controlName != null && controlName.EndsWith("Control") && controlName.Length > "Control".Length)
                 {
                     string panelKey = controlName.Substring(0, controlName.Length - "Control".Length);
-                    if (_panels.TryGetValue(panelKey, out var panelInfo))
+                    if (_panels?.TryGetValue(panelKey, out var panelInfo) == true)
                     {
                         panelInfo.Panel.Visibility = Visibility.Collapsed;
                         SaveSinglePanelPosition(panelKey);
@@ -2464,14 +2376,6 @@ namespace eft_dma_radar
             LootSettingsControl.DragRequested += sharedDragHandler;
             LootSettingsControl.ResizeRequested += sharedResizeHandler;
             LootSettingsControl.CloseRequested += sharedCloseHandler;
-
-            WatchlistControl.DragRequested += sharedDragHandler;
-            WatchlistControl.ResizeRequested += sharedResizeHandler;
-            WatchlistControl.CloseRequested += sharedCloseHandler;
-
-            PlayerHistoryControl.DragRequested += sharedDragHandler;
-            PlayerHistoryControl.ResizeRequested += sharedResizeHandler;
-            PlayerHistoryControl.CloseRequested += sharedCloseHandler;
 
             MemoryWritingControl.DragRequested += sharedDragHandler;
             MemoryWritingControl.ResizeRequested += sharedResizeHandler;
@@ -2495,6 +2399,18 @@ namespace eft_dma_radar
             QuestPlannerControl.DragRequested += sharedDragHandler;
             QuestPlannerControl.ResizeRequested += sharedResizeHandler;
             QuestPlannerControl.CloseRequested += sharedCloseHandler;
+
+            HideoutStashControl.DragRequested += sharedDragHandler;
+            HideoutStashControl.ResizeRequested += sharedResizeHandler;
+            HideoutStashControl.CloseRequested += sharedCloseHandler;
+
+            WatchlistControl.DragRequested += sharedDragHandler;
+            WatchlistControl.ResizeRequested += sharedResizeHandler;
+            WatchlistControl.CloseRequested += sharedCloseHandler;
+
+            PlayerHistoryControl.DragRequested += sharedDragHandler;
+            PlayerHistoryControl.ResizeRequested += sharedResizeHandler;
+            PlayerHistoryControl.CloseRequested += sharedCloseHandler;
         }
 
         private void InitializePanelsCollection()
@@ -2505,12 +2421,13 @@ namespace eft_dma_radar
                 ["LootSettings"] = new PanelInfo(LootSettingsPanel, LootSettingsCanvas, "LootSettings", MIN_LOOT_PANEL_WIDTH, MIN_LOOT_PANEL_HEIGHT),
                 ["MemoryWriting"] = new PanelInfo(MemoryWritingPanel, MemoryWritingCanvas, "MemoryWriting", MIN_MEMORY_WRITING_PANEL_WIDTH, MIN_MEMORY_WRITING_PANEL_HEIGHT),
                 ["ESP"] = new PanelInfo(ESPPanel, ESPCanvas, "ESP", MIN_ESP_PANEL_WIDTH, MIN_ESP_PANEL_HEIGHT),
-                ["Watchlist"] = new PanelInfo(WatchlistPanel, WatchlistCanvas, "Watchlist", MIN_WATCHLIST_PANEL_WIDTH, MIN_WATCHLIST_PANEL_HEIGHT),
-                ["PlayerHistory"] = new PanelInfo(PlayerHistoryPanel, PlayerHistoryCanvas, "PlayerHistory", MIN_PLAYERHISTORY_PANEL_WIDTH, MIN_PLAYERHISTORY_PANEL_HEIGHT),
                 ["LootFilter"] = new PanelInfo(LootFilterPanel, LootFilterCanvas, "LootFilter", MIN_LOOT_FILTER_PANEL_WIDTH, MIN_LOOT_FILTER_PANEL_HEIGHT),
                 ["MapSetup"] = new PanelInfo(MapSetupPanel, MapSetupCanvas, "MapSetup", 300, 300),
                 ["SettingsSearch"] = new PanelInfo(SettingsSearchPanel, SettingsSearchCanvas, "SettingsSearch", MIN_SEARCH_SETTINGS_PANEL_WIDTH, MIN_SEARCH_SETTINGS_PANEL_HEIGHT),
-                ["QuestPlanner"] = new PanelInfo(QuestPlannerPanel, QuestPlannerCanvas, "QuestPlanner", MIN_QUEST_PLANNER_PANEL_WIDTH, MIN_QUEST_PLANNER_PANEL_HEIGHT)
+                ["QuestPlanner"] = new PanelInfo(QuestPlannerPanel, QuestPlannerCanvas, "QuestPlanner", MIN_QUEST_PLANNER_PANEL_WIDTH, MIN_QUEST_PLANNER_PANEL_HEIGHT),
+                ["HideoutStash"] = new PanelInfo(HideoutStashPanel, HideoutStashCanvas, "HideoutStash", MIN_HIDEOUT_STASH_PANEL_WIDTH, MIN_HIDEOUT_STASH_PANEL_HEIGHT),
+                ["Watchlist"] = new PanelInfo(WatchlistPanel, WatchlistCanvas, "Watchlist", MIN_WATCHLIST_PANEL_WIDTH, MIN_WATCHLIST_PANEL_HEIGHT),
+                ["PlayerHistory"] = new PanelInfo(PlayerHistoryPanel, PlayerHistoryCanvas, "PlayerHistory", MIN_PLAYERHISTORY_PANEL_WIDTH, MIN_PLAYERHISTORY_PANEL_HEIGHT)
             };
         }
 
@@ -2518,7 +2435,7 @@ namespace eft_dma_radar
         {
             try
             {
-                foreach (var panel in _panels)
+                foreach (var panel in _panels ?? [])
                 {
                     var propInfo = typeof(PanelPositionsConfig).GetProperty(panel.Key);
                     if (propInfo != null)
@@ -2541,7 +2458,7 @@ namespace eft_dma_radar
         {
             try
             {
-                if (_panels.TryGetValue(panelKey, out var panelInfo))
+                if (_panels?.TryGetValue(panelKey, out var panelInfo) == true)
                 {
                     var propInfo = typeof(PanelPositionsConfig).GetProperty(panelKey);
                     if (propInfo != null)
@@ -2561,7 +2478,7 @@ namespace eft_dma_radar
         {
             try
             {
-                foreach (var panel in _panels)
+                foreach (var panel in _panels ?? [])
                 {
                     var propInfo = typeof(PanelPositionsConfig).GetProperty(panel.Key);
 

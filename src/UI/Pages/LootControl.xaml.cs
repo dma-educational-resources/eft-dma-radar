@@ -252,9 +252,9 @@ namespace eft_dma_radar.UI.Pages
 
             foreach (CheckComboBoxItem item in ccbLootFilters.Items)
             {
-                var content = item.Content.ToString();
+                var content = item.Content?.ToString();
 
-                if (optionsToUpdate.TryGetValue(content, out bool shouldBeSelected))
+                if (content is not null && optionsToUpdate.TryGetValue(content, out bool shouldBeSelected))
                     if (item.IsSelected != shouldBeSelected)
                         item.IsSelected = shouldBeSelected;
             }

@@ -36,6 +36,11 @@ namespace eft_dma_radar.Common.Misc.Data
         /// Map Data for Tarkov (extracts and transits).
         /// </summary>
         public static FrozenDictionary<string, MapElement> MapData { get; private set; }
+
+        /// <summary>
+        /// Trader lookup — BSG trader id mapped to display name.
+        /// </summary>
+        public static FrozenDictionary<string, string> AllTraders { get; private set; }
         
         public static bool IsInitialized { get; set; } = false;
 
@@ -86,6 +91,12 @@ namespace eft_dma_radar.Common.Misc.Data
                     .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase) 
                     ?? new Dictionary<string, MapElement>(StringComparer.OrdinalIgnoreCase).ToFrozenDictionary();
 
+                AllTraders = (data.Traders ?? [])
+                    .Where(t => !string.IsNullOrEmpty(t.Id) && !string.IsNullOrEmpty(t.Name))
+                    .DistinctBy(t => t.Id, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(t => t.Id, t => t.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+
                 IsInitialized = true;
                 loading.UpdateStatus("Data initialization complete", loading.PercentComplete);
             }
@@ -94,10 +105,11 @@ namespace eft_dma_radar.Common.Misc.Data
                 XMLogging.WriteLine($"Error processing data: {ex}");
                 loading.UpdateStatus("Error processing data. Using empty data structures.", loading.PercentComplete);
 
-                AllItems = new Dictionary<string, TarkovMarketItem>(StringComparer.OrdinalIgnoreCase).ToFrozenDictionary();
+                AllItems      = new Dictionary<string, TarkovMarketItem>(StringComparer.OrdinalIgnoreCase).ToFrozenDictionary();
                 AllContainers = new Dictionary<string, TarkovMarketItem>(StringComparer.OrdinalIgnoreCase).ToFrozenDictionary();
-                TaskData = new Dictionary<string, TaskElement>(StringComparer.OrdinalIgnoreCase).ToFrozenDictionary();
-                MapData = new Dictionary<string, MapElement>(StringComparer.OrdinalIgnoreCase).ToFrozenDictionary();
+                TaskData      = new Dictionary<string, TaskElement>(StringComparer.OrdinalIgnoreCase).ToFrozenDictionary();
+                MapData       = new Dictionary<string, MapElement>(StringComparer.OrdinalIgnoreCase).ToFrozenDictionary();
+                AllTraders    = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).ToFrozenDictionary();
                 IsInitialized = true;
             }
         }
@@ -215,7 +227,7 @@ namespace eft_dma_radar.Common.Misc.Data
             {
                 loading.UpdateStatus("Loading embedded default data...", loading.PercentComplete);
 
-                var assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                var assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!;
                 var defaultDataPath = Path.Combine(assemblyDir, _defaultDataFileName);
 
                 if (File.Exists(defaultDataPath) && !IsDataFileOutdated(defaultDataPath, _defaultDataUpdateInterval))
@@ -288,7 +300,7 @@ namespace eft_dma_radar.Common.Misc.Data
         {
             try
             {
-                var assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                var assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!;
                 var defaultDataPath = Path.Combine(assemblyDir, _defaultDataFileName);
 
                 if (IsDataFileOutdated(defaultDataPath, _defaultDataUpdateInterval))
@@ -377,6 +389,12 @@ namespace eft_dma_radar.Common.Misc.Data
                             .ToDictionary(k => k.Id, v => v, StringComparer.OrdinalIgnoreCase)
                             .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
+                        AllTraders = (data.Traders ?? [])
+                            .Where(t => !string.IsNullOrEmpty(t.Id) && !string.IsNullOrEmpty(t.Name))
+                            .DistinctBy(t => t.Id, StringComparer.OrdinalIgnoreCase)
+                            .ToDictionary(t => t.Id, t => t.Name, StringComparer.OrdinalIgnoreCase)
+                            .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+
                         XMLogging.WriteLine("Background data update successful");
                         return true;
                     }
@@ -447,7 +465,7 @@ namespace eft_dma_radar.Common.Misc.Data
                 if (string.IsNullOrEmpty(json))
                     throw new InvalidOperationException("Failed to retrieve updated market data.");
 
-                outputPath ??= Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), _defaultDataFileName);
+                outputPath ??= Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!, _defaultDataFileName);
 
                 await File.WriteAllTextAsync(outputPath, json);
 
@@ -472,6 +490,17 @@ namespace eft_dma_radar.Common.Misc.Data
 
             [JsonPropertyName("maps")]
             public List<MapElement> Maps { get; set; } = new List<MapElement>();
+
+            [JsonPropertyName("traders")]
+            public List<TraderDataElement> Traders { get; set; } = new List<TraderDataElement>();
+        }
+
+        public sealed class TraderDataElement
+        {
+            [JsonPropertyName("id")]
+            public string Id { get; set; }
+            [JsonPropertyName("name")]
+            public string Name { get; set; }
         }
 
         /// <summary>

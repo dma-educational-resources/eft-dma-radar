@@ -1,18 +1,12 @@
-﻿using Microsoft.AspNetCore.SignalR;
+﻿#nullable enable
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Http;
 
-using eft_dma_radar.Tarkov.EFTPlayer;
-using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.Tarkov.WebRadar.Data;
 using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.MessagePack;
 
 using Open.Nat;
-using MessagePack;
 
 using System.Net;
 using System.Net.Sockets;
@@ -29,25 +23,20 @@ namespace eft_dma_radar.Tarkov.WebRadar
 {
     internal static class WebRadarServer
     {
-        private static readonly WebRadarUpdate _update = new();
         private static TimeSpan _tickRate;
-        private static IHost _webHost;
-
-        private static CancellationTokenSource _workerCts;
-        private static Thread _workerThread;
-
-        private static bool _isRunning;
         private static int _upnpPort = -1;
 
         private static string _password = Utils.GetRandomPassword(10);
         public static string Password => _password;
 
-        public static bool IsRunning => _isRunning;
+        public static bool IsRunning => _host is not null;
+
+        private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(5) };
 
         private static WebRadarUpdate _latest = new();
-        private static IHost _host;
-        private static CancellationTokenSource _cts;
-        private static Thread _worker;
+        private static WebApplication? _host;
+        private static CancellationTokenSource? _cts;
+        private static Thread? _worker;
 
         public static async Task StartAsync(
             string ip,
@@ -77,71 +66,54 @@ namespace eft_dma_radar.Tarkov.WebRadar
                     XMLogging.WriteLine($"[WebRadar] UPnP failed (router may not support it / disabled / CGNAT). Continuing without UPnP.");
             }
 
-            _host = Host.CreateDefaultBuilder()
-                .ConfigureLogging(logging =>
+            var builder = WebApplication.CreateBuilder();
+
+            builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning);
+            builder.Logging.AddFilter("Microsoft.AspNetCore.Routing.EndpointMiddleware", LogLevel.Warning);
+            builder.Logging.AddFilter("Microsoft.AspNetCore.Server.Kestrel", LogLevel.Warning);
+            builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
+            builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Information);
+
+            builder.WebHost.ConfigureKestrel(options =>
+            {
+                options.Listen(IPAddress.Any, port);
+            });
+
+            var wwwroot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+
+            _host = builder.Build();
+
+            _host.UseDefaultFiles(new DefaultFilesOptions
+            {
+                FileProvider = new PhysicalFileProvider(wwwroot)
+            });
+
+            _host.UseStaticFiles(new StaticFileOptions
+            {
+                FileProvider = new PhysicalFileProvider(wwwroot),
+                RequestPath = ""
+            });
+
+            _host.MapGet("/api/radar", () => Results.Json(_latest));
+
+            _host.MapGet("/health", () => Results.Text("OK"));
+
+            _host.MapGet("/api/default-data", async context =>
+            {
+                var path = Path.Combine(AppContext.BaseDirectory, "DEFAULT_DATA.json");
+
+                if (!File.Exists(path))
                 {
-                    logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning);
-                    logging.AddFilter("Microsoft.AspNetCore.Routing.EndpointMiddleware", LogLevel.Warning);
-                    logging.AddFilter("Microsoft.AspNetCore.Server.Kestrel", LogLevel.Warning);
-                    logging.AddFilter("Microsoft", LogLevel.Warning);
-                    logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Information);
-                })
-                .ConfigureWebHostDefaults(web =>
-                {
-                        web.UseKestrel(options =>
-                        {
-                            options.Listen(IPAddress.Any, port);
-                        })
-                       .Configure(app =>
-                       {
-                            app.UseDefaultFiles(new DefaultFilesOptions
-                            {
-                                FileProvider = new PhysicalFileProvider(
-                                    Path.Combine(AppContext.BaseDirectory, "wwwroot"))
-                            });
-                            
-                            app.UseStaticFiles(new StaticFileOptions
-                            {
-                                FileProvider = new PhysicalFileProvider(
-                                    Path.Combine(AppContext.BaseDirectory, "wwwroot")),
-                                RequestPath = ""
-                            });
-                           app.UseRouting();
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
+                    context.Response.ContentType = "text/plain";
+                    await context.Response.WriteAsync("DEFAULT_DATA.json not found.");
+                    return;
+                }
 
-                           app.UseEndpoints(endpoints =>
-                           {
-                               endpoints.MapGet("/api/radar", async context =>
-                               {
-                                   context.Response.ContentType = "application/json";
-                                   await context.Response.WriteAsJsonAsync(_latest);
-                               });
-
-                               endpoints.MapGet("/health", async context =>
-                               {
-                                   context.Response.ContentType = "text/plain";
-                                   await context.Response.WriteAsync("OK");
-                               });
-
-                               endpoints.MapGet("/api/default-data", async context =>
-                               {
-                                   var path = Path.Combine(AppContext.BaseDirectory, "DEFAULT_DATA.json");
-
-                                   if (!File.Exists(path))
-                                   {
-                                       context.Response.StatusCode = StatusCodes.Status404NotFound;
-                                       context.Response.ContentType = "text/plain";
-                                       await context.Response.WriteAsync("DEFAULT_DATA.json not found.");
-                                       return;
-                                   }
-
-                                   context.Response.ContentType = "application/json";
-                                   context.Response.Headers.CacheControl = "public, max-age=3600";
-                                   await context.Response.SendFileAsync(path);
-                               });
-                           });
-                       });
-                })
-                .Build();
+                context.Response.ContentType = "application/json";
+                context.Response.Headers.CacheControl = "public, max-age=3600";
+                await context.Response.SendFileAsync(path);
+            });
 
             await _host.StartAsync();
 
@@ -168,7 +140,7 @@ namespace eft_dma_radar.Tarkov.WebRadar
             if (_host != null)
             {
                 await _host.StopAsync();
-                _host.Dispose();
+                await _host.DisposeAsync();
                 _host = null;
             }
 
@@ -269,9 +241,9 @@ namespace eft_dma_radar.Tarkov.WebRadar
         {
             while (!ct.IsCancellationRequested)
             {
-                    bool hasLocal   = Memory.LocalPlayer is not null;
+                    bool hasLocal   = Memory?.LocalPlayer is not null;
                     bool handsValid = hasLocal &&
-                                      Memory.LocalPlayer.Firearm.HandsController.Item1.IsValidVirtualAddress();                
+                                      Memory!.LocalPlayer!.Firearm.HandsController.Item1.IsValidVirtualAddress();
                 if(!handsValid)
                 {
                     _latest = new WebRadarUpdate();
@@ -280,9 +252,9 @@ namespace eft_dma_radar.Tarkov.WebRadar
                 }
                 try
                 {
-                    _latest.InGame   = Memory.InRaid;
-                    _latest.InRaid   = Memory.InRaid;
-                    _latest.MapID    = Memory.MapID;
+                    _latest.InGame   = Memory!.InRaid;
+                    _latest.InRaid   = Memory!.InRaid;
+                    _latest.MapID    = Memory!.MapID;
                     _latest.SendTime = DateTime.UtcNow;
                     _latest.Version++;
         
@@ -298,15 +270,13 @@ namespace eft_dma_radar.Tarkov.WebRadar
                     // EXFILS (world entities)
                     // =========================
                     var exitManager = Memory?.Game?.Exits;
-                    var localPlayer = Memory?.LocalPlayer;
-                    var transitManager = exitManager;
         
                     _latest.Exfils = exitManager?
                         .OfType<eft_dma_radar.Tarkov.GameWorld.Exits.Exfil>() // 👈 important
                         .Select(WebRadarExfil.CreateFromExfil)
                         .ToArray();
         
-                    _latest.Transits = transitManager?
+                    _latest.Transits = exitManager?
                         .OfType<eft_dma_radar.Tarkov.GameWorld.Exits.TransitPoint>() // 👈 important
                         .Select(WebRadarTransit.CreateFromTransit)
                         .ToArray();
@@ -342,50 +312,9 @@ namespace eft_dma_radar.Tarkov.WebRadar
             }
         }
 
-    
-
-
-        // =========================
-        // HUB
-        // =========================
-        private sealed class RadarServerHub : Hub
-        {
-            public override async Task OnConnectedAsync()
-            {
-                var ctx = Context.GetHttpContext();
-                var remoteIp = ctx?.Connection.RemoteIpAddress;
-
-                if (!IPAddress.IsLoopback(remoteIp))
-                {
-                    var password = ctx?.Request.Query["password"].ToString();
-                    if (password != Password)
-                    {
-                        Context.Abort();
-                        return;
-                    }
-                }
-
-                await base.OnConnectedAsync();
-            }
-        }
-
         // =========================
         // NETWORK / UPNP
         // =========================
-        private static async Task<NatDevice> GetNatAsync()
-        {
-            var d = new NatDiscoverer();
-            using var cts = new CancellationTokenSource(8000);
-            return await d.DiscoverDeviceAsync(PortMapper.Upnp, cts);
-        }
-
-        private static async Task ConfigureUPnPAsync(int port)
-        {
-            var nat = await GetNatAsync();
-            await nat.CreatePortMapAsync(
-                new Mapping(Protocol.Tcp, port, port, 86400, "XM WebRadar"));
-        }
-
         private static void ThrowIfInvalidBindParameters(string ip, int port)
         {
             if (port is < 1024 or > 65535)
@@ -396,13 +325,6 @@ namespace eft_dma_radar.Tarkov.WebRadar
             s.Bind(new IPEndPoint(addr, port));
         }
 
-        private static string FormatIPForURL(string host)
-        {
-            if (IPAddress.TryParse(host, out var ip) &&
-                ip.AddressFamily == AddressFamily.InterNetworkV6)
-                return $"[{host}]";
-            return host;
-        }
         /// <summary>
         /// Get the External IP of the user running the Server.
         /// </summary>
@@ -414,7 +336,7 @@ namespace eft_dma_radar.Tarkov.WebRadar
 
             try
             {
-                string ip = null;
+                string? ip = null;
 
                 try
                 {
@@ -430,32 +352,27 @@ namespace eft_dma_radar.Tarkov.WebRadar
 
                 try
                 {
-                    using (var httpClient = new HttpClient())
+                    var ipServices = new[]
                     {
-                        httpClient.Timeout = TimeSpan.FromSeconds(5);
+                        "https://api.ipify.org",
+                        "https://icanhazip.com",
+                        "https://ifconfig.me/ip"
+                    };
 
-                        var ipServices = new[]
+                    foreach (var service in ipServices)
+                    {
+                        try
                         {
-                            "https://api.ipify.org",
-                            "https://icanhazip.com",
-                            "https://ifconfig.me/ip"
-                        };
+                            var response = await _httpClient.GetStringAsync(service);
+                            ip = response.Trim();
 
-                        foreach (var service in ipServices)
+                            if (IPAddress.TryParse(ip, out _))
+                                return ip;
+                        }
+                        catch (Exception ex)
                         {
-                            try
-                            {
-                                var response = await httpClient.GetStringAsync(service);
-                                ip = response.Trim();
-
-                                if (IPAddress.TryParse(ip, out _))
-                                    return ip;
-                            }
-                            catch (Exception ex)
-                            {
-                                errors.AppendLine($"[Service {service} Error] {ex.Message}");
-                                continue;
-                            }
+                            errors.AppendLine($"[Service {service} Error] {ex.Message}");
+                            continue;
                         }
                     }
                 }
@@ -480,7 +397,7 @@ namespace eft_dma_radar.Tarkov.WebRadar
         /// Get the local LAN IPv4 address of this machine.
         /// </summary>
         /// <returns>Local LAN IP address, or null if not found.</returns>
-        public static string GetLocalIPAddress()
+        public static string? GetLocalIPAddress()
         {
             try
             {

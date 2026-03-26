@@ -107,6 +107,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
                         _failedAllocations.TryRemove(failedAddr, out _);
                 }
             }
+            catch (ObjectDisposedException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 XMLogging.WriteLine($"CRITICAL ERROR - RegisteredPlayers Loop FAILED: {ex}");

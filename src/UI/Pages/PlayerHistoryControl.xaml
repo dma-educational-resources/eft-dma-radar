@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="eft_dma_radar.UI.Pages.PlayerHistoryControl"
+<UserControl x:Class="eft_dma_radar.UI.Pages.PlayerHistoryControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -44,8 +44,28 @@
 
                 <DataGrid x:Name="playerHistoryDataGrid" 
                           Grid.Row="0"
-                          ToolTip="Double-click on a player to add them to watchlist"
+                          ToolTip="Double-click on a player to add them to watchlist. Right-click to remove."
                           Style="{StaticResource StandardDataGrid}">
+
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem x:Name="mnuRemoveEntry" Header="Remove Selected">
+                                <MenuItem.Icon>
+                                    <Path Width="14" Height="14" Stretch="Uniform"
+                                          Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
+                                          Fill="{DynamicResource TextIconBrush}"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator Margin="-28,0,0,0"/>
+                            <MenuItem x:Name="mnuClearAll" Header="Clear All History">
+                                <MenuItem.Icon>
+                                    <Path Width="14" Height="14" Stretch="Uniform"
+                                          Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
+                                          Fill="#FF5555"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
 
                     <DataGrid.ColumnHeaderStyle>
                         <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource StandardDataGridColumnHeader}">

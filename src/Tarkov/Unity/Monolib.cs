@@ -4,7 +4,6 @@ using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity.Collections;
 
 using eft_dma_radar.Common.Unity.LowLevel.Types;
-using eft_dma_shared.Common.Unity.LowLevel.Hooks;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;

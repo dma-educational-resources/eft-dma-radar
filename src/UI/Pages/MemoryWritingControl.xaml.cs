@@ -11,7 +11,6 @@ using eft_dma_radar.Tarkov.Features.MemoryWrites.Patches;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.UI.Controls;
 using eft_dma_radar.UI.Misc;
-using eft_dma_shared.Common.Unity.LowLevel.Hooks;
 using HandyControl.Controls;
 using System;
 using System.Threading;
@@ -456,9 +455,9 @@ namespace eft_dma_radar.UI.Pages
 
             foreach (CheckComboBoxItem item in ccbAimbotOptions.Items)
             {
-                var content = item.Content.ToString();
+                var content = item.Content?.ToString();
 
-                if (optionsToUpdate.TryGetValue(content, out bool shouldBeSelected))
+                if (content is not null && optionsToUpdate.TryGetValue(content, out bool shouldBeSelected))
                     item.IsSelected = shouldBeSelected;
             }
         }
@@ -758,13 +757,11 @@ namespace eft_dma_radar.UI.Pages
         {
             var cfg = MemWrites.Config;
 
-            //MemPatchFeature<FOVChanger>.Instance.Enabled = cfg.FOV.Enabled;
             MemWriteFeature<Aimbot>.Instance.Enabled = cfg.Aimbot.Enabled;
             MemWriteFeature<NoWepMalfPatch>.Instance.Enabled = cfg.NoWeaponMalfunctions;
             MemWriteFeature<FastLoadUnload>.Instance.Enabled = cfg.FastLoadUnload;
             MemWriteFeature<FastWeaponOps>.Instance.Enabled = cfg.FastWeaponOps;
             MemWriteFeature<DisableWeaponCollision>.Instance.Enabled = cfg.DisableWeaponCollision;
-            //MemPatchFeature<RemoveableAttachments>.Instance.Enabled = cfg.RemoveableAttachments;
             MemWriteFeature<NoRecoil>.Instance.Enabled = cfg.NoRecoil;
             MemWriteFeature<InfStamina>.Instance.Enabled = cfg.InfStamina;
             MemWriteFeature<MoveSpeed>.Instance.Enabled = cfg.MoveSpeed.Enabled;
@@ -775,7 +772,6 @@ namespace eft_dma_radar.UI.Pages
             MemWriteFeature<LootThroughWalls>.Instance.Enabled = cfg.LootThroughWalls.Enabled;
             MemWriteFeature<ExtendedReach>.Instance.Enabled = cfg.ExtendedReach.Enabled;
             MemWriteFeature<FullBright>.Instance.Enabled = cfg.FullBright.Enabled;
-            //MemPatchFeature<DisableShadows>.Instance.Enabled = cfg.DisableShadows;
             MemWriteFeature<DisableGrass>.Instance.Enabled = cfg.DisableGrass;
             MemWriteFeature<ClearWeather>.Instance.Enabled = cfg.ClearWeather;
             MemWriteFeature<NoVisor>.Instance.Enabled = cfg.NoVisor;
@@ -787,15 +783,11 @@ namespace eft_dma_radar.UI.Pages
             MemWriteFeature<DisableFrostbite>.Instance.Enabled = cfg.DisableFrostbite;
             MemWriteFeature<OwlMode>.Instance.Enabled = cfg.OwlMode;
             MemWriteFeature<DisableHeadBobbing>.Instance.Enabled = cfg.DisableHeadBobbing;
-            //MemPatchFeature<StreamerMode>.Instance.Enabled = cfg.StreamerMode;
             MemWriteFeature<HideRaidCode>.Instance.Enabled = cfg.HideRaidCode;
             MemWriteFeature<InstantPlant>.Instance.Enabled = cfg.InstantPlant;
             MemWriteFeature<MedPanel>.Instance.Enabled = cfg.MedPanel;
             MemWriteFeature<DisableInventoryBlur>.Instance.Enabled = cfg.DisableInventoryBlur;
-            //MemPatchFeature<DisableScreenEffects>.Instance.Enabled = cfg.DisableScreenEffects;
             MemWriteFeature<BigHead>.Instance.Enabled = cfg.BigHead.Enabled;
-            //MemPatchFeature<SilentLoot>.Instance.Enabled = cfg.SilentLoot.Enabled;
-            //MemPatchFeature<VisibilityLinecast>.Instance.Enabled = cfg.VisCheck.Enabled;
         }
 
         private void ToggleSettingsPanel(UIElement panel)
@@ -892,9 +884,6 @@ namespace eft_dma_radar.UI.Pages
                     case "DisableWeaponCollision":
                         MemWriteFeature<DisableWeaponCollision>.Instance.Enabled = value;
                         break;
-                    //case "RemoveableAttachments":
-                    //    MemPatchFeature<RemoveableAttachments>.Instance.Enabled = value;
-                    //    break;
                     case "NoRecoil":
                         MemWriteFeature<NoRecoil>.Instance.Enabled = value;
                         ToggleNoRecoilControls();
@@ -910,9 +899,6 @@ namespace eft_dma_radar.UI.Pages
                         MemWriteFeature<TimeOfDay>.Instance.Enabled = value;
                         ToggleTimeOfDayControls();
                         break;
-                    //case "DisableShadows":
-                    //    MemPatchFeature<DisableShadows>.Instance.Enabled = value;
-                    //    break;
                     case "DisableGrass":
                         MemWriteFeature<DisableGrass>.Instance.Enabled = value;
                         break;
@@ -923,10 +909,6 @@ namespace eft_dma_radar.UI.Pages
                         MemWriteFeature<LootThroughWalls>.Instance.Enabled = value;
                         ToggleLTWControls();
                         break;
-                    //case "SilentLoot":
-                    //    MemPatchFeature<SilentLoot>.Instance.Enabled = value;
-                    //    ToggleSilentLootControls();
-                    //    break;
                     case "ExtendedReach":
                         MemWriteFeature<ExtendedReach>.Instance.Enabled = value;
                         ToggleExtendedReachControls();
@@ -957,13 +939,6 @@ namespace eft_dma_radar.UI.Pages
                     case "OwlMode":
                         MemWriteFeature<OwlMode>.Instance.Enabled = value;
                         break;
-                    //case "FOVChanger":
-                    //    MemPatchFeature<FOVChanger>.Instance.Enabled = value;
-                    //    ToggleFOVControls();
-                    //    break;
-                    //case "StreamerMode":
-                    //    MemPatchFeature<StreamerMode>.Instance.Enabled = value;
-                    //    break;
                     case "HideRaidCode":
                         MemWriteFeature<HideRaidCode>.Instance.Enabled = value;
                         break;
@@ -976,9 +951,6 @@ namespace eft_dma_radar.UI.Pages
                     case "MedPanel":
                         MemWriteFeature<MedPanel>.Instance.Enabled = value;
                         break;
-                    //case "DisableScreenEffects":
-                    //    MemPatchFeature<DisableScreenEffects>.Instance.Enabled = value;
-                    //    break;
                     case "DisableHeadBobbing":
                         MemWriteFeature<DisableHeadBobbing>.Instance.Enabled = value;
                         break;
@@ -999,13 +971,6 @@ namespace eft_dma_radar.UI.Pages
                         MemWriteFeature<BigHead>.Instance.Enabled = value;
                         ToggleBigHeadControls();
                         break;
-                    //case "VisCheck":
-                    //    MemPatchFeature<VisibilityLinecast>.Instance.Enabled = value;
-                    //    ToggleVisCheckControls();
-                    //    break;
-                    //case "IgnoreAi":
-                    //    MemWrites.Config.VisCheck.IgnoreAi = value;
-                    //    break;
                 }
 
                 Config.Save();
@@ -1263,14 +1228,6 @@ namespace eft_dma_radar.UI.Pages
 
             Config.Save();
             XMLogging.WriteLine("Saved aimbot options settings");
-        }
-
-        private struct NativeHookTestState
-        {
-            public uint HasRun;
-            public uint IsRunning;
-            public ulong UserData;
-            public ulong ReturnAddr;
         }
 
         private async void btnAntiAFK_Click(object sender, RoutedEventArgs e)

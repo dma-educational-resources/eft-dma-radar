@@ -131,8 +131,6 @@
                                         </Grid>
                                     </hc:SimpleStackPanel>
 
-                                    <Button x:Name="btnSendStashDogTags" Content="Send Stashed DogTags" 
-                                            Style="{StaticResource ButtonPrimary}" HorizontalAlignment="Left" ToolTip="Sends Dogtags from your stash to our API to gather player names and stats. Thank you!" Width="145"/>
                                     <!-- Widgets -->
                                     <hc:CheckComboBox x:Name="ccbWidgets" Grid.Column="1" Margin="0,5,0,8"
                                                           Style="{StaticResource CheckComboBoxExtend}"
@@ -1347,7 +1345,6 @@
 
                                             <!-- Bindable Hotkey List -->
                                             <ListView Grid.Row="1" x:Name="hotkeyListView"
-                                                      ItemsSource="{Binding Hotkeys}"
                                                       BorderThickness="0" Background="Transparent"
                                                       Height="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
 

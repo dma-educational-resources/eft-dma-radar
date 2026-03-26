@@ -1,3 +1,4 @@
+#nullable enable
 using eft_dma_radar.Common.Maps;
 using eft_dma_radar.Tarkov.GameWorld.Interactables;
 using eft_dma_radar.UI.Misc;
@@ -8,7 +9,7 @@ namespace eft_dma_radar.Tarkov.WebRadar.Data
     public sealed class WebRadarDoor
     {
         public EDoorState DoorState { get; init; }
-        public string Id { get; init; }
+        public string Id { get; init; } = string.Empty;
         public string? KeyId { get; init; }
 
         //ned position (JSON safe)

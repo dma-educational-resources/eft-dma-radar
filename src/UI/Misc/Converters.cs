@@ -43,6 +43,7 @@ namespace eft_dma_radar.Converters
     public class ItemIconConverter : IValueConverter
     {
         private static readonly string IconPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar", "Assets", "Icons", "Items");
+        private static readonly HttpClient SharedHttpClient = new HttpClient() { Timeout = TimeSpan.FromSeconds(15) };
 
         public static async Task SaveItemIconAsPng(string itemId, string saveDir)
         {
@@ -59,8 +60,7 @@ namespace eft_dma_radar.Converters
 
             try
             {
-                using var httpClient = new HttpClient();
-                var imageBytes = await httpClient.GetByteArrayAsync(webpUrl);
+                var imageBytes = await SharedHttpClient.GetByteArrayAsync(webpUrl);
 
                 using var memoryStream = new MemoryStream(imageBytes);
                 using var codec = SKCodec.Create(memoryStream);
@@ -74,6 +74,10 @@ namespace eft_dma_radar.Converters
                 using var data = image.Encode(SKEncodedImageFormat.Png, 100);
                 using var outputStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
                 data.SaveTo(outputStream);
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                // Icon not available on CDN — skip silently
             }
             catch (Exception ex)
             {

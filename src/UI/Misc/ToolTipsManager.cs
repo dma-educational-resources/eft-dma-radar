@@ -61,32 +61,7 @@ namespace eft_dma_radar.UI.Misc
             if (context.FindName("chkContainersHideSearched") is CheckBox chkContainersHideSearched)
                 chkContainersHideSearched.ToolTip = "Hides containers that have already been searched by a networked entity (usually ONLY yourself).";
         }
-        public static void AssignPlayerHistoryTooltips(UserControl context)
-        {
-            if (context.FindName("playerHistoryDataGrid") is DataGrid playerHistoryDataGrid)
-                playerHistoryDataGrid.ToolTip = "Double click to add a recent player into the watchlist.";
-        }
 
-        public static void AssignWatchlistTooltips(UserControl context)
-        {
-            if (context.FindName("txtAccountID") is HandyControl.Controls.TextBox txtAccountID)
-                txtAccountID.ToolTip = "The Account ID of the player.";
-
-            if (context.FindName("txtReason") is HandyControl.Controls.TextBox txtReason)
-                txtReason.ToolTip = "The reason why they are being watched.";
-
-            if (context.FindName("btnClearForm") is Button btnClearForm)
-                btnClearForm.ToolTip = "Clears the selected entry/form.";
-
-            if (context.FindName("btnAddEntry") is Button btnAddEntry)
-                btnAddEntry.ToolTip = "Add a new entry or update an existing one.";
-
-            if (context.FindName("btnRemoveEntry") is Button btnRemoveEntry)
-                btnRemoveEntry.ToolTip = "Remove the selected watchlist entry.";
-
-            if (context.FindName("watchlistListView") is ListView watchlistListView)
-                watchlistListView.ToolTip = "Click to select & edit an existing watchlist entry.";
-        }
         public static void AssignLootFilterTooltips(UserControl context)
         {
             if (context.FindName("cboLootFilters") is HandyControl.Controls.ComboBox cboLootFilters)
@@ -565,6 +540,33 @@ namespace eft_dma_radar.UI.Misc
 
             if (context.FindName("rdbToggle") is RadioButton rdbToggle)
                 rdbToggle.ToolTip = "Toggle the action on and off with the key.";
+        }
+
+        public static void AssignPlayerHistoryTooltips(UserControl context)
+        {
+            if (context.FindName("playerHistoryDataGrid") is DataGrid playerHistoryDataGrid)
+                playerHistoryDataGrid.ToolTip = "Double click to add a recent player into the watchlist.";
+        }
+
+        public static void AssignWatchlistTooltips(UserControl context)
+        {
+            if (context.FindName("txtAccountID") is HandyControl.Controls.TextBox txtAccountID)
+                txtAccountID.ToolTip = "The Account ID of the player.";
+
+            if (context.FindName("txtReason") is HandyControl.Controls.TextBox txtReason)
+                txtReason.ToolTip = "The reason why they are being watched.";
+
+            if (context.FindName("btnClearForm") is Button btnClearForm)
+                btnClearForm.ToolTip = "Clears the selected entry/form.";
+
+            if (context.FindName("btnAddEntry") is Button btnAddEntry)
+                btnAddEntry.ToolTip = "Add a new entry or update an existing one.";
+
+            if (context.FindName("btnRemoveEntry") is Button btnRemoveEntry)
+                btnRemoveEntry.ToolTip = "Remove the selected watchlist entry.";
+
+            if (context.FindName("watchlistListView") is ListView watchlistListView)
+                watchlistListView.ToolTip = "Click to select & edit an existing watchlist entry.";
         }
     }
 }

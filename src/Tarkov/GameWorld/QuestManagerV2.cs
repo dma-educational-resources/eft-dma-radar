@@ -1,3 +1,4 @@
+#pragma warning disable CS0162 // Unreachable code detected (DEBUG_ENABLED const)
 using eft_dma_radar;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.ESP;

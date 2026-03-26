@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using eft_dma_radar.Tarkov.Features;
-using eft_dma_shared.Common.Unity;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Common.Misc;

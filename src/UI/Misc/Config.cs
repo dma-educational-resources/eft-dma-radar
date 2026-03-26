@@ -11,7 +11,6 @@ using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Misc.Config;
 using eft_dma_radar.Common.Misc.Data;
 using eft_dma_radar.Common.Misc.Data.EFT;
-using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Common.Unity.LowLevel;
 using System.IO;
@@ -246,7 +245,10 @@ public static class ConfigManager
             var options = new JsonSerializerOptions { WriteIndented = true };
             var json = JsonSerializer.Serialize(CurrentConfig, options);
             var configToSave = JsonSerializer.Deserialize<Config>(json, options);
-            
+
+            if (configToSave is null)
+                return false;
+
             configToSave.Filename = configName;
             configToSave.ConfigName = Path.GetFileNameWithoutExtension(configName);
     
@@ -525,6 +527,12 @@ namespace eft_dma_radar.UI.Misc
         public bool LootWishlist { get; set; } = false;
 
         /// <summary>
+        /// Highlight items in-raid that are still needed for hideout upgrades.
+        /// </summary>
+        [JsonPropertyName("lootHideoutRequired")]
+        public bool LootHideoutRequired { get; set; } = false;
+
+        /// <summary>
         /// Show corpse markers (X) on radar
         /// </summary>
         [JsonPropertyName("showCorpseMarkers")]
@@ -726,6 +734,8 @@ namespace eft_dma_radar.UI.Misc
                                 };
 
                                 config = JsonSerializer.Deserialize<Config>(json, options);
+                                if (config is null)
+                                    throw new JsonException("Deserialized config was null.");
                                 config.Filename = filename;
                                 config.ConfigName = Path.GetFileNameWithoutExtension(filename);
 
@@ -849,12 +859,6 @@ namespace eft_dma_radar.UI.Misc
 
                 if (config.PanelPositions.MemoryWriting == null)
                     config.PanelPositions.MemoryWriting = new PanelPositionConfig();
-
-                if (config.PanelPositions.Watchlist == null)
-                    config.PanelPositions.Watchlist = new PanelPositionConfig();
-
-                if (config.PanelPositions.PlayerHistory == null)
-                    config.PanelPositions.PlayerHistory = new PanelPositionConfig();
 
                 if (config.PanelPositions.ESP == null)
                     config.PanelPositions.ESP = new PanelPositionConfig();
@@ -1067,17 +1071,7 @@ namespace eft_dma_radar.UI.Misc
         /// </summary>
         [JsonPropertyName("esp")]
         public PanelPositionConfig ESP { get; set; } = new PanelPositionConfig();
-        /// <summary>
-        /// Watchlist panel position
-        /// </summary>
-        [JsonPropertyName("watchlist")]
-        public PanelPositionConfig Watchlist { get; set; } = new PanelPositionConfig();
 
-        /// <summary>
-        /// Player history panel position
-        /// </summary>
-        [JsonPropertyName("playerHistory")]
-        public PanelPositionConfig PlayerHistory { get; set; } = new PanelPositionConfig();
         /// <summary>
         /// Loot filter panel position
         /// </summary>
@@ -1107,6 +1101,24 @@ namespace eft_dma_radar.UI.Misc
         /// </summary>
         [JsonPropertyName("questPlanner")]
         public PanelPositionConfig QuestPlanner { get; set; } = new PanelPositionConfig();
+
+        /// <summary>
+        /// Hideout stash panel position
+        /// </summary>
+        [JsonPropertyName("hideoutStash")]
+        public PanelPositionConfig HideoutStash { get; set; } = new PanelPositionConfig();
+
+        /// <summary>
+        /// Watchlist panel position
+        /// </summary>
+        [JsonPropertyName("watchlist")]
+        public PanelPositionConfig Watchlist { get; set; } = new PanelPositionConfig();
+
+        /// <summary>
+        /// Player history panel position
+        /// </summary>
+        [JsonPropertyName("playerHistory")]
+        public PanelPositionConfig PlayerHistory { get; set; } = new PanelPositionConfig();
     }
 
     /// <summary>
@@ -1200,10 +1212,10 @@ namespace eft_dma_radar.UI.Misc
                 Canvas.SetTop(panel, Top);
 
                 if (Width > 0)
-                    panel.Width = Width;
+                    panel.Width = Math.Max(Width, panel.MinWidth > 0 ? panel.MinWidth : Width);
 
                 if (Height > 0)
-                    panel.Height = Height;
+                    panel.Height = Math.Max(Height, panel.MinHeight > 0 ? panel.MinHeight : Height);
             }
             else
             {

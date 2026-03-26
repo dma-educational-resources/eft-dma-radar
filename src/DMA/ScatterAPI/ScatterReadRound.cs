@@ -46,7 +46,19 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
         /// </summary>
         internal void Run()
         {
-            Memory.ReadScatter(_indexes.Values.SelectMany(x => x.Entries.Values).ToArray(), UseCache);
+            int totalEntries = 0;
+            foreach (var idx in _indexes.Values)
+                totalEntries += idx.Entries.Count;
+
+            var entries = new IScatterEntry[totalEntries];
+            int pos = 0;
+            foreach (var idx in _indexes.Values)
+            {
+                foreach (var entry in idx.Entries.Values)
+                    entries[pos++] = entry;
+            }
+
+            Memory.ReadScatter(entries, UseCache);
             foreach (var index in _indexes)
                 index.Value.ExecuteCallback();
         }

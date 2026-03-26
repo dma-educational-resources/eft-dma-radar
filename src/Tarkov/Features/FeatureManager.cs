@@ -1,4 +1,5 @@
-﻿using eft_dma_radar.Common.Misc;
+﻿#pragma warning disable CS0162 // Unreachable code detected (HARD_DISABLE_ALL_MEMWRITES const)
+using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.Tarkov.GameWorld;
 
@@ -66,7 +67,7 @@ namespace eft_dma_radar.Tarkov.Features
                     bool inRaid     = Memory.InRaid;
                     bool hasLocal   = Memory.LocalPlayer is not null;
                     bool handsValid = hasLocal &&
-                                      Memory.LocalPlayer.Firearm.HandsController.Item1.IsValidVirtualAddress();
+                                      Memory.LocalPlayer!.Firearm.HandsController.Item1.IsValidVirtualAddress();
 
                     if (!enabled || !ready || !inRaid || !hasLocal || !handsValid)
                     {
@@ -173,25 +174,6 @@ namespace eft_dma_radar.Tarkov.Features
             catch (Exception ex)
             {
                 XMLogging.WriteLine($"MemWrites [FAIL] {ex}");
-            }
-        }
-
-        /// <summary>
-        /// Executes MemPatch Features.
-        /// </summary>
-        private static void ExecuteMemPatches(IEnumerable<IMemPatchFeature> patches)
-        {
-            try
-            {
-                foreach (var feature in patches)
-                {
-                    feature.TryApply();
-                    feature.OnApply();
-                }
-            }
-            catch (Exception ex)
-            {
-                XMLogging.WriteLine($"MemPatches [FAIL] {ex}");
             }
         }
 

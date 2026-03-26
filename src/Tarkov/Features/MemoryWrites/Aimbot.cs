@@ -1,4 +1,5 @@
-﻿using eft_dma_radar.Tarkov.EFTPlayer;
+﻿#pragma warning disable CS0162 // Unreachable code detected (SILENT_AIM_DRY_RUN const)
+using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.UI.Misc;
@@ -6,7 +7,6 @@ using eft_dma_radar.Common.DMA;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.Features.Ballistics;
 using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Common.Unity.Collections;
@@ -44,10 +44,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         private sbyte _lastShotIndex = -1;
         private Bones _lastRandomBone = Config.Bone;
         private static bool _ballisticsDiagnosticLogged = false;
+        private int _ballisticsErrorCount;
+        private DateTime _lastBallisticsErrorLog = DateTime.MinValue;
+        private static readonly TimeSpan BallisticsErrorLogCooldown = TimeSpan.FromSeconds(5);
         /// <summary>
         /// Aimbot Info.
         /// </summary>
-        public AimbotCache Cache { get; private set; }
+        public AimbotCache Cache { get; private set; } = null!;
 
         public Aimbot()
         {
@@ -60,7 +63,6 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 
         public override void OnGameStop()
         {
-            _weaponDirectionGetter = null;
         }
 
         public override bool Enabled
@@ -463,7 +465,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 
                 // DATA-BASED SILENT AIM: Write directly to _shotDirection field instead of patching code
                 // This is safer because it writes to heap memory, not executable code
-                WriteShotDirection(localPlayer.PWA, newWeaponDirection, Cache.FireportTransform);
+                WriteShotDirection(localPlayer.PWA, newWeaponDirection, Cache!.FireportTransform);
                 
                 Cache.LastFireportPos = fireportPosition;
 
@@ -479,7 +481,6 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         #endregion
 
         #region Helper Methods
-        private static ScatterWriteHandle writes;
         private static Player GetBestAimbotTarget(LocalGameWorld game, Player localPlayer)
         {
             var players = game.Players?
@@ -786,13 +787,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 int weaponVersion = Memory.ReadValue<int>(Cache.ItemBase + Offsets.LootItem.Version);
                 if (Cache.LastWeaponVersion != weaponVersion) // New round in chamber
                 {
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            LootFilterControl.CreateWeaponAmmoGroup();
-                        });
+                    Application.Current.Dispatcher.BeginInvoke(() =>
+                    {
+                        LootFilterControl.CreateWeaponAmmoGroup();
+                    });
                     var ammoTemplate = FirearmManager.MagazineManager.GetAmmoTemplateFromWeapon(Cache.ItemBase);
                     if (Cache.LoadedAmmo != ammoTemplate)
-                    {                        
+                    {
                         XMLogging.WriteLine("[Aimbot] Ammo changed!");
                         Cache.Ballistics.BulletMassGrams = Memory.ReadValue<float>(ammoTemplate + Offsets.AmmoTemplate.BulletMassGram);
                         Cache.Ballistics.BulletDiameterMillimeters =
@@ -818,10 +819,18 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     }
                     Cache.LastWeaponVersion = weaponVersion;
                 }
+                _ballisticsErrorCount = 0;
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Aimbot [WARNING] - Unable to set/update Ballistics: {ex}");
+                _ballisticsErrorCount++;
+                var now = DateTime.UtcNow;
+                if (_ballisticsErrorCount <= 3 || now - _lastBallisticsErrorLog >= BallisticsErrorLogCooldown)
+                {
+                    XMLogging.WriteLine($"Aimbot [WARNING] - Unable to set/update Ballistics: {ex.GetType().Name}: {ex.Message}" +
+                        (_ballisticsErrorCount > 3 ? $" (repeated {_ballisticsErrorCount} times)" : ""));
+                    _lastBallisticsErrorLog = now;
+                }
             }
             /// Target Velocity - Read from appropriate source based on player type
             Vector3 targetVelocity = Vector3.Zero;
@@ -979,7 +988,6 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 
         #region Silent Aim Internal
 
-        private static ulong? _weaponDirectionGetter;       
         private static long _lastPatchTicks = 0;
         private static Vector3 _lastPatchedDirection = Vector3.Zero;
         
@@ -996,7 +1004,6 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         
         private static bool _shotDirectionDiagLogged = false;
         private static long _lastDryRunLogTicks = 0;
-        private static bool _shotDirectionNeutral = true; // Track if we're writing (false) or letting game handle it (true)     
   
         /// <summary>
         /// DATA-BASED SILENT AIM: Write directly to _shotDirection field on PWA.
@@ -1080,7 +1087,6 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             
             _lastPatchTicks = now;
             _lastPatchedDirection = localDirection;
-            _shotDirectionNeutral = false; // Mark as non-neutral (aimbot is active)
         }
         
         /// <summary>
@@ -1128,7 +1134,6 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         {
             _shotDirectionDiagLogged = false; // Reset diagnostic flag for next engagement
             _lastDryRunLogTicks = 0; // Reset dry run log timer
-            _shotDirectionNeutral = true; // Mark as neutral (we're not writing anymore)
         }
 
         #endregion

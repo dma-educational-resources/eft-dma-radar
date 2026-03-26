@@ -1,0 +1,449 @@
+using System;
+using System.Diagnostics;
+using System.Threading;
+using eft_dma_radar.Common.DMA;
+using eft_dma_radar.Common.Misc;
+using eft_dma_radar.Common.Unity;
+using SDK;
+
+namespace eft_dma_radar.Tarkov.Unity.IL2CPP
+{
+    /// <summary>
+    /// Resolves the live <c>MatchingProgress</c> instance.
+    ///
+    /// Strategy: <c>GameObjectManager.FindBehaviourByClassName("MatchingProgressView")</c>
+    /// returns the <c>objectClass</c> ptr of the first matching component, identical to the
+    /// pattern used by <c>AntiAfk</c> for <c>TarkovApplication</c>.
+    /// From there: <c>objectClass + Offsets.MatchingProgressView._matchingProgress</c>
+    /// → <c>MatchingProgress</c> instance pointer.
+    ///
+    /// <c>MatchingProgressView</c> is a pre-raid matchmaking UI MonoBehaviour — it only
+    /// exists in the GOM while the queue / matching screen is active.
+    /// </summary>
+    internal static class MatchingProgressResolver
+    {
+        private const string Tag = "[MatchingProgressResolver]";
+
+        private static ulong _cachedMatchingProgress;
+        private static ulong _cachedViewObjectClass;
+        private static Enums.EMatchingStage _cachedStage;
+        private static readonly object _lock = new();
+        private static volatile bool _resolvingAsync;
+
+        // ── Transition-tracking state ────────────────────────────────────────────
+        private static Enums.EMatchingStage _prevStage = Enums.EMatchingStage.None;
+        private static Enums.EMatchingStage _highWaterStage = Enums.EMatchingStage.None;
+        private static readonly Stopwatch _totalSw = new();
+        private static readonly Stopwatch _stageSw = new();
+
+        // ── Background stage poller (runs independently of the main loop) ────────
+        private static System.Threading.Timer _stagePoller;
+        private static volatile bool _pollerActive;
+
+        // ── View-disappearance detection ─────────────────────────────────────────
+        private const int ViewGoneThreshold = 5;
+        private static int _consecutiveReadFailures;
+
+        // ── GOM search skip (handles launched-mid-raid) ──────────────────────────
+        private const int MaxGomFailures = 3;
+        private static int _consecutiveGomFailures;
+
+        // ── Tracks whether NotifyRaidStarted() already printed the session summary ──
+        private static bool _sessionSummaryLogged;
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // Public API
+        // ─────────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Called once when a <c>LocalGameWorld</c> is found — the matching phase is over.
+        /// Stops the stage poller and freezes the elapsed timer so the session-end
+        /// summary reports accurate matching duration rather than in-raid time.
+        /// Safe to call multiple times (idempotent).
+        /// </summary>
+        public static void NotifyRaidStarted()
+        {
+            _totalSw.Stop();
+            StopStagePoller();
+
+            if (_highWaterStage != Enums.EMatchingStage.None)
+            {
+                XMLogging.WriteLine(
+                    $"{Tag} ──── Matching session ended ────\n" +
+                    $"{Tag}   Furthest stage reached : {_highWaterStage} ({(int)_highWaterStage}/17)\n" +
+                    $"{Tag}   Total matching elapsed  : {_totalSw.Elapsed.TotalSeconds:F1}s");
+                _sessionSummaryLogged = true;
+            }
+        }
+
+        /// <summary>
+        /// Clear cached pointer (call on raid start / raid stop).
+        /// </summary>
+        public static void Reset()
+        {
+            // Log summary only if matching was aborted before NotifyRaidStarted() fired
+            if (!_sessionSummaryLogged && (_totalSw.IsRunning || _highWaterStage != Enums.EMatchingStage.None))
+            {
+                XMLogging.WriteLine(
+                    $"{Tag} ──── Matching session ended (aborted) ────\n" +
+                    $"{Tag}   Furthest stage reached : {_highWaterStage} ({(int)_highWaterStage}/17)\n" +
+                    $"{Tag}   Total matching elapsed  : {_totalSw.Elapsed.TotalSeconds:F1}s");
+            }
+
+            StopStagePoller();
+
+            lock (_lock)
+            {
+                _cachedMatchingProgress = 0;
+                _cachedViewObjectClass  = 0;
+                _cachedStage            = Enums.EMatchingStage.None;
+            }
+            _prevStage      = Enums.EMatchingStage.None;
+            _highWaterStage = Enums.EMatchingStage.None;
+            _consecutiveReadFailures = 0;
+            _consecutiveGomFailures = 0;
+            _totalSw.Reset();
+            _stageSw.Reset();
+            _resolvingAsync = false;
+            _sessionSummaryLogged = false;
+            XMLogging.WriteLine($"{Tag} Cache invalidated via Reset().");
+        }
+
+        /// <summary>
+        /// Non-blocking cache read.
+        /// Returns <c>true</c> (and a non-zero <paramref name="matchingProgress"/>) if a
+        /// valid pointer is cached.
+        /// </summary>
+        public static bool TryGetCached(out ulong matchingProgress)
+        {
+            lock (_lock)
+            {
+                matchingProgress = _cachedMatchingProgress;
+                return matchingProgress.IsValidVirtualAddress();
+            }
+        }
+
+        /// <summary>
+        /// Fire-and-forget background resolve.
+        /// Safe to call from any thread; does not block caller.
+        /// </summary>
+        public static void ResolveAsync()
+        {
+            if (_resolvingAsync)
+                return;
+
+            _resolvingAsync = true;
+
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    var mp = GetMatchingProgress();
+                    if (mp.IsValidVirtualAddress())
+                        XMLogging.WriteLine($"{Tag} Resolved MatchingProgress @ 0x{mp:X}");
+                }
+                catch (Exception ex)
+                {
+                    XMLogging.WriteLine($"{Tag} ResolveAsync error: {ex}");
+                }
+                finally
+                {
+                    _resolvingAsync = false;
+                }
+            });
+        }
+
+        private static void HandleGomFailure()
+        {
+            _consecutiveGomFailures++;
+            if (_consecutiveGomFailures == MaxGomFailures)
+                XMLogging.WriteLine($"{Tag} MatchingProgressView not found in GOM after {_consecutiveGomFailures} attempts.");
+        }
+
+        /// <summary>
+        /// Synchronous resolver. Returns the cached value on subsequent calls.
+        /// Walks the GOM by class name — same pattern as <c>AntiAfk.TarkovApplication</c>.
+        /// </summary>
+        public static ulong GetMatchingProgress()
+        {
+            if (TryGetCached(out var cached))
+                return cached;
+
+            try
+            {
+                var unityBase = Memory.UnityBase;
+                if (unityBase == 0)
+                    return 0;
+
+                var gomAddr = GameObjectManager.GetAddr(unityBase);
+                var gom     = GameObjectManager.Get(gomAddr);
+
+                // FindBehaviourByClassName returns the objectClass ptr of the first
+                // component whose IL2CPP class name matches — exactly like AntiAfk does
+                // for "TarkovApplication".
+                ulong viewObjectClass;
+                try
+                {
+                    viewObjectClass = gom.FindBehaviourByClassName("MatchingProgressView");
+                }
+                catch
+                {
+                    // Memory unreadable during GOM scan — treat same as "not found"
+                    HandleGomFailure();
+                    return 0;
+                }
+
+                if (!viewObjectClass.IsValidVirtualAddress())
+                {
+                    HandleGomFailure();
+                    return 0;
+                }
+
+                _consecutiveGomFailures = 0; // successful find — reset counter
+
+                XMLogging.WriteLine($"{Tag} MatchingProgressView objectClass @ 0x{viewObjectClass:X}");
+
+                var mpPtr = Memory.ReadPtr(viewObjectClass + Offsets.MatchingProgressView._matchingProgress);
+                if (!mpPtr.IsValidVirtualAddress())
+                {
+                    XMLogging.WriteLine($"{Tag} _matchingProgress ptr invalid @ objectClass+0x{Offsets.MatchingProgressView._matchingProgress:X}");
+                    return 0;
+                }
+
+                lock (_lock)
+                {
+                    _cachedViewObjectClass  = viewObjectClass;
+                    _cachedMatchingProgress = mpPtr;
+                }
+
+                XMLogging.WriteLine($"{Tag} MatchingProgress resolved and cached @ 0x{mpPtr:X}");
+                LogViewSnapshot(viewObjectClass);
+                LogSnapshot(mpPtr);
+                _totalSw.Restart();
+                _stageSw.Restart();
+                TryUpdateStage();
+                StartStagePoller();
+                return mpPtr;
+            }
+            catch (Exception ex)
+            {
+                XMLogging.WriteLine($"{Tag} GetMatchingProgress error: {ex}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Reads the live <c>CurrentStage</c> from the cached <c>MatchingProgress</c> pointer,
+        /// updates <see cref="_cachedStage"/>, and logs it. Call on every pre-raid loop tick.
+        /// Returns <c>true</c> when the pointer is valid and the read succeeded.
+        /// </summary>
+        public static bool TryUpdateStage()
+        {
+            ulong mp;
+            lock (_lock)
+                mp = _cachedMatchingProgress;
+
+            if (!mp.IsValidVirtualAddress())
+                return false;
+
+            try
+            {
+                var stage = (Enums.EMatchingStage)Memory.ReadValue<int>(mp + Offsets.MatchingProgress.CurrentStage, useCache: false);
+
+                lock (_lock)
+                    _cachedStage = stage;
+
+                _consecutiveReadFailures = 0;
+
+                // ── Transition logging: only log when stage actually changes ──
+                if (stage != _prevStage)
+                {
+                    var stageElapsed = _stageSw.Elapsed.TotalSeconds;
+                    var totalElapsed = _totalSw.Elapsed.TotalSeconds;
+
+                    XMLogging.WriteLine(
+                        $"{Tag} Stage TRANSITION: {_prevStage}({(int)_prevStage}) → {stage}({(int)stage}) | " +
+                        $"prev held {stageElapsed:F1}s | total {totalElapsed:F1}s");
+
+                    // Update high-water mark
+                    if ((int)stage > (int)_highWaterStage)
+                        _highWaterStage = stage;
+
+                    // Full snapshot at important late stages close to spawn
+                    if (stage >= Enums.EMatchingStage.LocalGameStarting)
+                        LogSnapshot(mp);
+
+                    _prevStage = stage;
+                    _stageSw.Restart();
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _consecutiveReadFailures++;
+                XMLogging.WriteLine($"{Tag} TryUpdateStage read failure #{_consecutiveReadFailures}: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Returns the last successfully read <c>CurrentStage</c> without a memory read.
+        /// Safe to call from the render thread.
+        /// </summary>
+        public static Enums.EMatchingStage GetCachedStage()
+        {
+            lock (_lock)
+                return _cachedStage;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // Background stage poller
+        // ─────────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Starts a background <see cref="Timer"/> that calls <see cref="TryUpdateStage"/>
+        /// every 100 ms, independent of the main game-instance loop. This ensures stage
+        /// transitions are captured even while <c>GetLocalGameWorld</c> blocks.
+        /// </summary>
+        private static void StartStagePoller()
+        {
+            if (_pollerActive)
+                return;
+
+            _pollerActive = true;
+            _stagePoller = new System.Threading.Timer(_ =>
+            {
+                try
+                {
+                    TryUpdateStage();
+
+                    if (_consecutiveReadFailures >= ViewGoneThreshold)
+                    {
+                        var lastStage = _prevStage;
+                        var totalElapsed = _totalSw.Elapsed.TotalSeconds;
+                        XMLogging.WriteLine(
+                            $"{Tag} ██ MatchingProgressView DISAPPEARED from GOM ██\n" +
+                            $"{Tag}   Last known stage     : {lastStage} ({(int)lastStage}/17)\n" +
+                            $"{Tag}   Furthest stage       : {_highWaterStage} ({(int)_highWaterStage}/17)\n" +
+                            $"{Tag}   Total elapsed        : {totalElapsed:F1}s\n" +
+                            $"{Tag}   Consecutive failures : {_consecutiveReadFailures}");
+                        StopStagePoller();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    XMLogging.WriteLine($"{Tag} StagePoller tick error: {ex.Message}");
+                }
+            }, null, 0, 100);
+
+            XMLogging.WriteLine($"{Tag} Background stage poller started (100 ms interval).");
+        }
+
+        /// <summary>
+        /// Stops and disposes the background stage poller.
+        /// </summary>
+        private static void StopStagePoller()
+        {
+            _pollerActive = false;
+            var t = Interlocked.Exchange(ref _stagePoller, null);
+            if (t != null)
+            {
+                t.Dispose();
+                XMLogging.WriteLine($"{Tag} Background stage poller stopped.");
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // Diagnostic snapshots
+        // ─────────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Reads the <c>MatchingProgressView</c> component-level fields and writes them to
+        /// <c>XMLogging</c>. Uses the cached <c>viewObjectClass</c> when <paramref name="view"/> is 0.
+        /// </summary>
+        public static void LogViewSnapshot(ulong view = 0)
+        {
+            if (view == 0)
+            {
+                lock (_lock)
+                    view = _cachedViewObjectClass;
+            }
+
+            if (!view.IsValidVirtualAddress())
+            {
+                XMLogging.WriteLine($"{Tag} LogViewSnapshot — no valid MatchingProgressView objectClass pointer.");
+                return;
+            }
+
+            try
+            {
+                var serversLimited         = Memory.ReadValue<bool>(view + Offsets.MatchingProgressView._serversLimited,           useCache: false);
+                var canUpdateStatus        = Memory.ReadValue<bool>(view + Offsets.MatchingProgressView._canUpdateStatus,          useCache: false);
+                var maxMatchingTime        = Memory.ReadValue<int> (view + Offsets.MatchingProgressView._maxMatchingTimeInSeconds, useCache: false);
+                var warningHasValue        = Memory.ReadValue<bool>(view + Offsets.MatchingProgressView._matchingWarningType_hasValue, useCache: false);
+                var warningRaw             = warningHasValue
+                    ? Memory.ReadValue<int>(view + Offsets.MatchingProgressView._matchingWarningType, useCache: false)
+                    : (int?)null;
+
+                XMLogging.WriteLine(
+                    $"{Tag} ViewSnapshot @ 0x{view:X} | " +
+                    $"ServersLimited={serversLimited} CanUpdateStatus={canUpdateStatus} " +
+                    $"MaxMatchingTime={maxMatchingTime}s " +
+                    $"MatchingWarning={(warningRaw.HasValue ? warningRaw.Value.ToString() : "null")} ");
+            }
+            catch (Exception ex)
+            {
+                XMLogging.WriteLine($"{Tag} LogViewSnapshot error: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// Reads all known <c>MatchingProgress</c> fields from <paramref name="mp"/> and
+        /// writes a snapshot to <c>XMLogging</c>. Uses the cached pointer when
+        /// <paramref name="mp"/> is 0.
+        /// </summary>
+        public static void LogSnapshot(ulong mp = 0)
+        {
+            if (mp == 0)
+            {
+                lock (_lock)
+                    mp = _cachedMatchingProgress;
+            }
+
+            if (!mp.IsValidVirtualAddress())
+            {
+                XMLogging.WriteLine($"{Tag} LogSnapshot — no valid MatchingProgress pointer.");
+                return;
+            }
+
+            try
+            {
+                var currentStage        = (Enums.EMatchingStage)     Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.CurrentStage,        useCache: false);
+                var currentStageGroup   = (Enums.EMatchingStageGroup) Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.CurrentStageGroup,   useCache: false);
+                var stageProgress       = Memory.ReadValue<float>(mp + Offsets.MatchingProgress.CurrentStageProgress,                            useCache: false);
+                var estimateTime        = Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.EstimateTime,                                    useCache: false);
+                var isAbortAvailable    = Memory.ReadValue<bool> (mp + Offsets.MatchingProgress.IsAbortAvailable,                                useCache: false);
+                var blockAbortDuration  = Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.BlockAbortAbilityDurationSeconds,                useCache: false);
+                var showAbortPopup      = Memory.ReadValue<bool> (mp + Offsets.MatchingProgress.ShowAbortConfirmationPopup,                      useCache: false);
+                var abortRequested      = Memory.ReadValue<bool> (mp + Offsets.MatchingProgress.IsMatchingAbortRequested,                        useCache: false);
+                var canProcessStages    = Memory.ReadValue<bool> (mp + Offsets.MatchingProgress.CanProcessServerStages,                          useCache: false);
+                var lastDelayedStage    = (Enums.EMatchingStage)      Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.LastMemorizedDelayedStage,         useCache: false);
+                var lastDelayedProgress = Memory.ReadValue<float>(mp + Offsets.MatchingProgress.LastMemorizedDelayedStageProgress,               useCache: false);
+
+                XMLogging.WriteLine(
+                    $"{Tag} Snapshot @ 0x{mp:X} | " +
+                    $"Stage={currentStage}({(int)currentStage}) Group={currentStageGroup}({(int)currentStageGroup}) " +
+                    $"Progress={stageProgress:F3} EstimateTime={estimateTime}s | " +
+                    $"LastDelayedStage={lastDelayedStage}({(int)lastDelayedStage}) LastDelayedProgress={lastDelayedProgress:F3} | " +
+                    $"IsAbortAvailable={isAbortAvailable} BlockAbortDuration={blockAbortDuration}s " +
+                    $"ShowAbortPopup={showAbortPopup} AbortRequested={abortRequested} " +
+                    $"CanProcessStages={canProcessStages}");
+            }
+            catch (Exception ex)
+            {
+                XMLogging.WriteLine($"{Tag} LogSnapshot error: {ex}");
+            }
+        }
+    }
+}

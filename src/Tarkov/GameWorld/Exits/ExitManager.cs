@@ -7,19 +7,13 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
     /// <summary>
     /// List of PMC/Scav 'Exits' in Local Game World and their position/status.
     /// </summary>
-    public sealed class ExitManager : IReadOnlyCollection<IExitPoint>
+    public sealed class ExitManager(ulong localGameWorld, bool isPMC) : IReadOnlyCollection<IExitPoint>
     {
-        private readonly ulong _localGameWorld;
-        private readonly bool _isPMC;
+        private readonly ulong _localGameWorld = localGameWorld;
+        private readonly bool _isPMC = isPMC;
         private IReadOnlyList<IExitPoint> _exits;
         private int _initAttempts = 0;
         private const int MAX_INIT_ATTEMPTS = 20; // Try for ~10 seconds (500ms between refreshes)
-
-        public ExitManager(ulong localGameWorld, bool isPMC)
-        {
-            _localGameWorld = localGameWorld;
-            _isPMC = isPMC;
-        }
 
         /// <summary>
         /// Initialize ExfilManager.
@@ -214,6 +208,10 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                     }
                 }
                 map.Execute();
+            }
+            catch (ObjectDisposedException)
+            {
+                throw;
             }
             catch (Exception ex)
             {

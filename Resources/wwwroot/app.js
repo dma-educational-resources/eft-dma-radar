@@ -237,6 +237,15 @@ const defaults = {
   aimviewFov: 90,
   aimviewSize: 260,
 
+  aimviewMaxDist: 0,
+  aimviewShowPmc: true,
+  aimviewShowScav: true,
+  aimviewShowPScav: true,
+  aimviewShowBoss: true,
+  aimviewShowRaider: true,
+  aimviewShowTeammate: true,
+  aimviewZoomWithPlayer: true,
+
   lootWidgetSearch: "",
   playersWidgetOnlyPMCs: false,
 
@@ -299,6 +308,7 @@ function mergeState(parsed){
 
   out.aimviewFov  = Math.max(20, Math.min(160, Number(out.aimviewFov)  || 90));
   out.aimviewSize = Math.max(160, Math.min(480, Number(out.aimviewSize) || 260));
+  out.aimviewMaxDist = Math.max(0, Math.min(1000, Number(out.aimviewMaxDist) || 0));
 
   if(!Array.isArray(out.lootGroups)) out.lootGroups = [];
   for(const g of out.lootGroups){
@@ -418,6 +428,16 @@ const inputs = {
   aimviewFov:        $("aimviewFov"),
   aimviewFovText:    $("aimviewFovText"),
   aimviewSize:       $("aimviewSize"),
+
+  aimviewShowPmc:        $("aimviewShowPmc"),
+  aimviewShowScav:       $("aimviewShowScav"),
+  aimviewShowPScav:      $("aimviewShowPScav"),
+  aimviewShowBoss:       $("aimviewShowBoss"),
+  aimviewShowRaider:     $("aimviewShowRaider"),
+  aimviewShowTeammate:   $("aimviewShowTeammate"),
+  aimviewZoomWithPlayer: $("aimviewZoomWithPlayer"),
+  aimviewMaxDist:        $("aimviewMaxDist"),
+  aimviewMaxDistText:    $("aimviewMaxDistText"),
 
   showGroups: $("showGroups"),
   groupAlpha: $("groupAlpha"),
@@ -564,6 +584,20 @@ function bindAllInputs(){
     updateAimviewCanvasSize();
     saveSettings();
   };
+
+  const aimviewFilterKeys = ["aimviewShowPmc","aimviewShowScav","aimviewShowPScav","aimviewShowBoss","aimviewShowRaider","aimviewShowTeammate","aimviewZoomWithPlayer"];
+  for(const k of aimviewFilterKeys){
+    if(inputs[k]){ inputs[k].checked = !!state[k]; onBool(k, inputs[k]); }
+  }
+  if(inputs.aimviewMaxDist){
+    inputs.aimviewMaxDist.value = String(state.aimviewMaxDist);
+    if(inputs.aimviewMaxDistText) inputs.aimviewMaxDistText.textContent = state.aimviewMaxDist > 0 ? state.aimviewMaxDist + "m" : "\u221e";
+    inputs.aimviewMaxDist.oninput = () => {
+      state.aimviewMaxDist = Math.max(0, Math.min(1000, Number(inputs.aimviewMaxDist.value) || 0));
+      if(inputs.aimviewMaxDistText) inputs.aimviewMaxDistText.textContent = state.aimviewMaxDist > 0 ? state.aimviewMaxDist + "m" : "\u221e";
+      saveSettings();
+    };
+  }
 
   onBool("showGroups", inputs.showGroups);
   onNum("groupAlpha", inputs.groupAlpha, (v)=>Math.min(1, Math.max(0, Number(v))));
@@ -1272,6 +1306,14 @@ function updateCenterTargetSelect(){
   }
 
   const current = (typeof state.centerTarget === "string" && state.centerTarget) ? state.centerTarget : "local";
+  const exists = final.some(o => o.v === current);
+
+  // If the selected player is temporarily missing (e.g. player list rebuilding),
+  // keep a placeholder option so the selection is preserved across transient gaps.
+  if(!exists && current !== "local"){
+    final.push({ v: current, t: current + " (pending\u2026)" });
+  }
+
   const html = final.map(o => `<option value="${escapeHtml(o.v)}">${escapeHtml(o.t)}</option>`).join("");
 
   if(sel._lastHtml !== html){
@@ -1279,12 +1321,7 @@ function updateCenterTargetSelect(){
     sel._lastHtml = html;
   }
 
-  const exists = final.some(o => o.v === current);
-  sel.value = exists ? current : "local";
-  if(!exists && state.centerTarget !== "local"){
-    state.centerTarget = "local";
-    saveSettings();
-  }
+  sel.value = current;
 }
 
 /* =========================
@@ -1659,22 +1696,28 @@ function getBaseLayer(map){
   return base || layers[0];
 }
 
-function getHeightLayer(map, localWorldY){
+// Returns all in-range non-base floor layers sorted lowest→highest minHeight.
+// Mirrors the desktop Draw pass-1 logic (draws every layer in range, not just the topmost).
+function getHeightLayers(map, localWorldY){
   const layers = getMapLayers(map);
-  if(!layers.length) return null;
-  if(localWorldY == null) return null;
+  if(!layers.length) return [];
+  if(localWorldY == null) return [];
 
   const candidates = layers.filter(l => {
     if(!l) return false;
-    if(hmin(l) == null && hmax(l) == null) return false;
+    if(hmin(l) == null && hmax(l) == null) return false; // skip base layer
     const minOk = (hmin(l) == null) || (localWorldY >= hmin(l));
     const maxOk = (hmax(l) == null) || (localWorldY <  hmax(l));
     return minOk && maxOk;
   });
 
-  if(!candidates.length) return null;
   candidates.sort((a,b) => (hmin(a) ?? -999999) - (hmin(b) ?? -999999));
-  return candidates[candidates.length - 1];
+  return candidates;
+}
+
+function getHeightLayer(map, localWorldY){
+  const all = getHeightLayers(map, localWorldY);
+  return all.length ? all[all.length - 1] : null;
 }
 
 function toRadMaybe(v){
@@ -1804,12 +1847,16 @@ function drawMap(map, localWorldY, cx, cy, zoom, rotateRad, anchorMap){
   if(!base) return false;
 
   const disableDimming = !!(map.disableDimming ?? map.DisableDimming);
-  const overlay = (!disableDimming) ? getHeightLayer(map, localWorldY) : null;
 
+  // Collect ALL in-range floor overlays (lowest→highest), matching desktop pass-1/pass-2 logic.
+  const overlays = (!disableDimming) ? getHeightLayers(map, localWorldY) : [];
+  const topOverlay = overlays.length ? overlays[overlays.length - 1] : null;
+
+  // Dim the base layer when the topmost overlay requests it (matches desktop PaintBitmapAlpha on base).
   let baseAlpha = 1;
-  if(!disableDimming && overlay){
-    if(overlay.dimBaseLayer === true || overlay.DimBaseLayer === true){
-      baseAlpha = 0.55;
+  if(!disableDimming && topOverlay){
+    if(topOverlay.dimBaseLayer === true || topOverlay.DimBaseLayer === true){
+      baseAlpha = 0.5; // ~127/255, matches desktop SharedPaints.PaintBitmapAlpha
     }
   }
 
@@ -1817,9 +1864,13 @@ function drawMap(map, localWorldY, cx, cy, zoom, rotateRad, anchorMap){
   const ok = drawSvgLayerAnchored(bFile, map, cx, cy, zoom, rotateRad, anchorMap, baseAlpha);
   if(!ok) return false;
 
-  if(overlay){
+  // Draw each floor overlay in order: intermediate layers at 0.5 alpha, topmost at full opacity.
+  for(let i = 0; i < overlays.length; i++){
+    const overlay = overlays[i];
     const oFile = overlay.filename || overlay.Filename;
-    if(oFile && oFile !== bFile) drawSvgLayerAnchored(oFile, map, cx, cy, zoom, rotateRad, anchorMap, 1);
+    if(!oFile || oFile === bFile) continue;
+    const alpha = (i === overlays.length - 1) ? 1 : 0.5;
+    drawSvgLayerAnchored(oFile, map, cx, cy, zoom, rotateRad, anchorMap, alpha);
   }
   return true;
 }
@@ -1994,12 +2045,26 @@ function buildAimviewMatrix(px, py, pz, yawDeg, pitchDeg){
 
 // Projects a single world point through a synthetic view matrix.
 // Returns null if behind the camera.
-function w2sSynth(wx, wy, wz, vm, halfW, halfH){
+function w2sSynth(wx, wy, wz, vm, halfW, halfH, focalLen){
   const w = vm.fwdX*wx + vm.fwdY*wy + vm.fwdZ*wz + vm.m44;
   if(w < 0.098) return null;
   const x = vm.rgtX*wx + vm.rgtY*wy + vm.rgtZ*wz + vm.m14;
   const y = vm.upX*wx  + vm.upY*wy  + vm.upZ*wz  + vm.m24;
-  return { px: halfW*(1 + x/w), py: halfH*(1 - y/w) };
+  return { px: halfW + focalLen*(x/w), py: halfH - focalLen*(y/w) };
+}
+
+function aimviewPlayerPassesTypeFilter(p){
+  const tn = String(p?.typeName ?? p?.TypeName ?? "").toLowerCase();
+  const isFriendly = !!(p?.isFriendly || p?.IsFriendly);
+  if(isFriendly) return !!state.aimviewShowTeammate;
+  switch(tn){
+    case "player":     return !!state.aimviewShowPmc;
+    case "playerscav": return !!state.aimviewShowPScav;
+    case "bot":        return !!state.aimviewShowScav;
+    case "raider":     return !!state.aimviewShowRaider;
+    case "boss":       return !!state.aimviewShowBoss;
+    default:           return true;
+  }
 }
 
 function drawAimview(players){
@@ -2035,10 +2100,21 @@ function drawAimview(players){
 
   const cx = cpx, cy = cpy, cz = cpz;
 
+  // Compute focal length from configured FOV, then apply player zoom if enabled
+  const fovRad = (state.aimviewFov || 90) * Math.PI / 180;
+  let focalLen = halfW / Math.tan(fovRad / 2);
+  if(state.aimviewZoomWithPlayer && !centeredIsLocal){
+    const zl = Number(centered.zoomLevel ?? centered.ZoomLevel ?? 1) || 1;
+    if(zl > 1) focalLen *= zl;  // zoom synthetic projection via focal length
+  }
+
+  const maxDist = Number(state.aimviewMaxDist) || 0;
+
   for(const p of players){
     if(!p || p === centered) continue;
     if(p?.isAlive === false || p?.IsAlive === false) continue;
     if(isExtracted(p)) continue;
+    if(!aimviewPlayerPassesTypeFilter(p)) continue;
 
     const tx = Number(p.worldX ?? p.WorldX ?? NaN);
     const ty = Number(p.worldY ?? p.WorldY ?? NaN);
@@ -2046,6 +2122,8 @@ function drawAimview(players){
     if(!Number.isFinite(tx) || !Number.isFinite(ty) || !Number.isFinite(tz)) continue;
 
     const fullDist = Math.sqrt((tx-cx)**2 + (ty-cy)**2 + (tz-cz)**2);
+    if(maxDist > 0 && fullDist > maxDist) continue;
+
     const col = playerColor(p);
 
     if(centeredIsLocal){
@@ -2059,13 +2137,13 @@ function drawAimview(players){
       if(!Array.isArray(world) || world.length !== 48) continue;
 
       // Project all 16 bones; anchor = MidTorso (index 3)
-      const anchorPt = w2sSynth(world[9], world[10], world[11], synthVm, halfW, halfH);
+      const anchorPt = w2sSynth(world[9], world[10], world[11], synthVm, halfW, halfH, focalLen);
       if(!anchorPt) continue; // MidTorso behind camera — skip
 
       const pts = [];
       for(let i = 0; i < 16; i++){
         const bx = world[i*3], by = world[i*3+1], bz = world[i*3+2];
-        pts.push(w2sSynth(bx, by, bz, synthVm, halfW, halfH) ?? anchorPt);
+        pts.push(w2sSynth(bx, by, bz, synthVm, halfW, halfH, focalLen) ?? anchorPt);
       }
 
       aimviewCtx.strokeStyle = col;
@@ -2101,13 +2179,18 @@ function drawAimview(players){
   drawAimviewCrosshair(halfW, halfH);
 }
 
-function drawAimviewSkel52(skel, W, H, col, fullDist, p){
+function drawAimviewSkel52(skel, W, H, col, fullDist, p, zoom=1){
+  const halfW = W / 2, halfH = H / 2;
+  // sx/sy: apply zoom around canvas center for skeleton screen coords (0-1 normalized)
+  const sx = (v) => halfW + (v * W - halfW) * zoom;
+  const sy = (v) => halfH + (v * H - halfH) * zoom;
+
   aimviewCtx.strokeStyle = col;
   aimviewCtx.lineWidth = 1.5;
   aimviewCtx.beginPath();
   for(let i = 0; i < 52; i += 4){
-    aimviewCtx.moveTo(skel[i]   * W, skel[i+1] * H);
-    aimviewCtx.lineTo(skel[i+2] * W, skel[i+3] * H);
+    aimviewCtx.moveTo(sx(skel[i]),   sy(skel[i+1]));
+    aimviewCtx.lineTo(sx(skel[i+2]), sy(skel[i+3]));
   }
   aimviewCtx.stroke();
 
@@ -2118,12 +2201,12 @@ function drawAimviewSkel52(skel, W, H, col, fullDist, p){
       aimviewCtx.font = "10px monospace";
       aimviewCtx.textAlign = "center";
       aimviewCtx.textBaseline = "bottom";
-      aimviewCtx.fillText(nm, skel[0] * W, skel[1] * H - 3);
+      aimviewCtx.fillText(nm, sx(skel[0]), sy(skel[1]) - 3);
     }
   }
 
-  const fx = (skel[26] + skel[30]) / 2 * W;
-  const fy = Math.max(skel[27], skel[31]) * H;
+  const fx = (sx(skel[26]) + sx(skel[30])) / 2;
+  const fy = Math.max(sy(skel[27]), sy(skel[31]));
   aimviewCtx.fillStyle = "rgba(229,231,235,0.85)";
   aimviewCtx.font = "10px monospace";
   aimviewCtx.textAlign = "center";
@@ -2189,6 +2272,8 @@ function buildPlayerTooltip(p){
   const dist = lastCenteredPlayer ? distanceMeters(p, lastCenteredPlayer) : null;
 
   const gearValue = pick(p, ["gearValue","GearValue","value","Value","gearPrice","GearPrice","totalValue","TotalValue"]);
+  const currentWeapon = pick(p, ["currentWeapon","CurrentWeapon"]);
+  const currentAmmo   = pick(p, ["currentAmmo","CurrentAmmo"]);
   const weapon = pick(p, ["weapon","Weapon","weaponName","WeaponName","primary","Primary"]);
   const armor  = pick(p, ["armor","Armor","armorName","ArmorName","armorClass","ArmorClass"]);
   const helmet = pick(p, ["helmet","Helmet","helmetName","HelmetName"]);
@@ -2207,6 +2292,7 @@ function buildPlayerTooltip(p){
       ${kvRow("HP", hp, true)}
       ${kvRow("Distance", dist != null ? `${dist.toFixed(1)} m` : null, true)}
       ${kvRow("Gear", gearValue != null ? `$${fmtMoney(gearValue)}` : null, true)}
+      ${(()=>{ const cw = currentWeapon && currentWeapon !== "--" ? currentWeapon : null; const ca = currentAmmo || null; return kvRow("In Hands", cw ? (ca ? `${cw} / ${ca}` : cw) : null); })()}
       ${kvRow("Weapon", weapon)}
       ${kvRow("Armor", armor)}
       ${kvRow("Helmet", helmet)}
@@ -2428,16 +2514,15 @@ function drawGroupConnectors(players, map, cx, cy, rotRad, mapRect){
   for(const g of groups.values()){
     if(g.length < 2) continue;
 
-    const leader = g[0];
-    const lm = readPlayerMapXY(leader, map);
-    const ls = mapXYToScreen(lm.x, lm.y, mapRect, cx, cy, rotRad);
+    const positions = g.map(p => {
+      const pm = readPlayerMapXY(p, map);
+      return mapXYToScreen(pm.x, pm.y, mapRect, cx, cy, rotRad);
+    });
 
-    for(let i=1;i<g.length;i++){
-      const pm = readPlayerMapXY(g[i], map);
-      const ps = mapXYToScreen(pm.x, pm.y, mapRect, cx, cy, rotRad);
+    for(let i=0;i<positions.length-1;i++){
       ctx.beginPath();
-      ctx.moveTo(ls.px, ls.py);
-      ctx.lineTo(ps.px, ps.py);
+      ctx.moveTo(positions[i].px, positions[i].py);
+      ctx.lineTo(positions[i+1].px, positions[i+1].py);
       ctx.stroke();
     }
   }
@@ -3012,6 +3097,9 @@ function refreshPlayersWidget(){
   if(playersWidgetSub) playersWidgetSub.textContent = out.length ? `${out.length} shown` : "empty";
 
   const html = out.map(it => {
+    const cw = normStr(it.p?.currentWeapon ?? it.p?.CurrentWeapon);
+    const ca = normStr(it.p?.currentAmmo ?? it.p?.CurrentAmmo);
+    const weaponStr = cw && cw !== "--" ? (ca ? `${cw} / ${ca}` : cw) : null;
     return `
       <div class="w-row"
            data-kind="player"
@@ -3022,7 +3110,7 @@ function refreshPlayersWidget(){
         <div class="w-dot" style="background:${escapeHtml(it.col)}"></div>
         <div class="w-main">
           <div class="w-name">${escapeHtml(it.name)}</div>
-          <div class="w-sub mono">${escapeHtml(isPMC(it.p) ? "PMC" : "AI")}</div>
+          <div class="w-sub mono">${escapeHtml(isPMC(it.p) ? "PMC" : "AI")}${weaponStr ? ` | ${escapeHtml(weaponStr)}` : ""}</div>
         </div>
       </div>
     `;

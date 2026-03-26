@@ -140,11 +140,10 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                     return result;
                 }
 
-                Debug.WriteLine("[LevelSettingsResolver] LevelSettings GameObject not found (forward/backward).");
+
             }
-            catch (Exception ex)
+            catch
             {
-                Debug.WriteLine($"[LevelSettingsResolver] Exception while searching: {ex.Message}");
                 result = 0;
             }
 
@@ -164,10 +163,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             while (true)
             {
                 if (++iterations > maxDepth)
-                {
-                    Debug.WriteLine("[LevelSettingsResolver] Forward scan hit maxDepth; aborting.");
                     break;
-                }
 
                 if (!current.ThisObject.IsValidVirtualAddress())
                     break;
@@ -200,10 +196,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             while (true)
             {
                 if (++iterations > maxDepth)
-                {
-                    Debug.WriteLine("[LevelSettingsResolver] Backward scan hit maxDepth; aborting.");
                     break;
-                }
 
                 if (!current.ThisObject.IsValidVirtualAddress())
                     break;
@@ -278,7 +271,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[LevelSettingsResolver] TryMatchLevelSettings hard fail: {ex}");
+                Debug.WriteLine($"[LevelSettingsResolver] TryMatchLevelSettings: {ex.Message}");
                 return false;
             }
         }

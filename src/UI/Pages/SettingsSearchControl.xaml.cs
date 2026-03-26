@@ -1,4 +1,5 @@
-﻿using eft_dma_radar.Common.Misc.Data;
+﻿#nullable enable
+using eft_dma_radar.Common.Misc.Data;
 using eft_dma_radar.UI.Misc;
 using System;
 using System.Collections.Generic;
@@ -28,10 +29,10 @@ namespace eft_dma_radar.UI.Pages
         #region Fields and Properties
         private const int INTERVAL = 100; // 0.1 second
         private Point _dragStartPoint;
-        public event EventHandler CloseRequested;
-        public event EventHandler BringToFrontRequested;
-        public event EventHandler<PanelDragEventArgs> DragRequested;
-        public event EventHandler<PanelResizeEventArgs> ResizeRequested;
+        public event EventHandler? CloseRequested;
+        public event EventHandler? BringToFrontRequested;
+        public event EventHandler<PanelDragEventArgs>? DragRequested;
+        public event EventHandler<PanelResizeEventArgs>? ResizeRequested;
 
         private static Config Config => Program.Config;
 
@@ -68,7 +69,7 @@ namespace eft_dma_radar.UI.Pages
                 InitializeControlEvents();
                 LoadSettings(); // your existing binding/indexing
 
-                Dispatcher.BeginInvoke(new Action(() =>
+                _ = Dispatcher.BeginInvoke(new Action(() =>
                 {
                     SetVerticalOffset(ResultsList, resultsOffset);
                 }), DispatcherPriority.Loaded);

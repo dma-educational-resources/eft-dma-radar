@@ -26,6 +26,9 @@ namespace eft_dma_radar.Common.Misc.Data.TarkovMarket
 
             [JsonPropertyName("items")]
             public List<ItemElement> Items { get; set; }
+
+            [JsonPropertyName("traders")]
+            public List<TaskElement.TraderElement> Traders { get; set; }
         }
 
         public partial class ApiMapElement
@@ -242,6 +245,9 @@ namespace eft_dma_radar.Common.Misc.Data.TarkovMarket
 
         public partial class TraderElement
         {
+            [JsonPropertyName("id")]
+            public string Id { get; set; }
+
             [JsonPropertyName("name")]
             public string Name { get; set; }
         }

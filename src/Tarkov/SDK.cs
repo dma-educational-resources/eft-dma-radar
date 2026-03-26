@@ -1,3 +1,5 @@
+#pragma warning disable CA2211 // Non-constant fields should not be visible
+
 namespace SDK
 {
 	public readonly partial struct Offsets
@@ -45,7 +47,7 @@ namespace SDK
             public static uint ClientShellingController = 0xA8; //_ClientShellingController_k__BackingField
             public static uint LocationId = 0xD0; //_LocationId_k__BackingField
             public static uint LootList = 0x198;
-            public static uint RegisteredPlayers = 0x1B0;
+            public static uint RegisteredPlayers = 0x1B8;
             public static uint BorderZones = 0x1F0;
             public static uint MainPlayer = 0x210;
             public static uint World = 0x218; //_world
@@ -263,7 +265,7 @@ namespace SDK
 			public static uint InventoryController = 0x10; //_InventoryController_k__BackingField
 			public static uint Player = 0x18; //_PlayerView_k__BackingField
 			public static uint InfoContainer = 0xD0; //_InfoContainer_k__BackingField
-			public static readonly uint[] MovementController = new uint[] { 0xD8, 0x98 }; //_MovementController_k__BackingField
+			public static readonly uint[] MovementController = [0xD8, 0x98]; //_MovementController_k__BackingField
 			public static uint HealthController = 0xE8; //_HealthController_k__BackingField
 			public static uint HandsController = 0x120; //_HandsController_k__BackingField
 		}
@@ -793,9 +795,8 @@ namespace SDK
 		public readonly partial struct EFTCameraManager
 		{
 			public static uint OpticCameraManager = 0x10; //_OpticCameraManager_k__BackingField
-            public static uint Camera = 0x60; //_Camera_k__BackingField
-            public static uint GetInstance_RVA = 0x2CF8AB0; //get_Instance_RVA
-            public static uint CameraDerefOffset = 0x10;
+			public static uint Camera = 0x60; //_Camera_k__BackingField
+			public static uint GetInstance_RVA = 0x2CF8AB0; //get_Instance_RVA
 		}
 		//public static class SightComponent
 		public readonly partial struct SightComponent
@@ -829,11 +830,42 @@ namespace SDK
 		//
 		public readonly partial struct Special
 		{
-			public static ulong TypeInfoTableRva = 0x00000;
+			public static ulong TypeInfoTableRva = 0x5AA9118;
 			public static uint EFTHardSettings_TypeIndex = 225;
 			public static uint GPUInstancerManager_TypeIndex = 4917;
 			public static uint WeatherController_TypeIndex = 10104;
 			public static uint GlobalConfiguration_TypeIndex = 6406;
+			public static uint MatchingProgress_TypeIndex = 15331;
+			public static uint MatchingProgressView_TypeIndex = 15334;
+		}
+		// MatchingProgress — pure data model, instance fields
+		public readonly partial struct MatchingProgress
+		{
+			public const uint StatusUpdateEvent                  = 0x10;
+			public const uint MatchingProgressChangedEvent       = 0x18;
+			public const uint CurrentStage                       = 0x20; // int / enum
+			public const uint CurrentStageGroup                  = 0x24; // int / enum
+			public const uint CurrentStageProgress               = 0x28; // float
+			public const uint EstimateTime                       = 0x30; // int
+			public const uint StartTime                          = 0x38; // DateTime (8 bytes)
+			public const uint IsAbortAvailable                   = 0x40; // bool
+			public const uint BlockAbortAbilityDurationSeconds   = 0x44; // int
+			public const uint ShowAbortConfirmationPopup         = 0x48; // bool
+			public const uint IsMatchingAbortRequested           = 0x49; // bool
+			public const uint LastMemorizedDelayedStage          = 0x4C;
+			public const uint LastMemorizedDelayedStageProgress  = 0x54;
+			public const uint CanProcessServerStages             = 0x5C; // bool
+		}
+		// MatchingProgressView — MonoBehaviour that owns the MatchingProgress instance
+		public readonly partial struct MatchingProgressView
+		{
+			public const uint _matchingProgress             = 0x130;
+			public const uint _lastUpdateTime               = 0x138; // DateTime (8-byte ticks)
+			public const uint _matchingWarningType          = 0x148; // EMatchingWarning? (nullable int at +0x148, hasValue bool at +0x14C)
+			public const uint _matchingWarningType_hasValue = 0x14C; // bool — nullable backing hasValue
+			public const uint _serversLimited               = 0x160; // bool
+			public const uint _canUpdateStatus              = 0x161; // bool
+			public const uint _maxMatchingTimeInSeconds     = 0x164; // int
 		}
 		public readonly partial struct Il2CppClass
 		{
@@ -887,6 +919,48 @@ namespace SDK
 			StartMoveZombieState = 33,
 			EndMoveZombieState = 34,
 			DoorInteractionZombieState = 35,
+		}
+
+		// TODO: dump EMatchingWarning enum values from IL2CPP — field offsets are 0x0 in static region, int values unknown
+		public enum EMatchingWarning
+		{
+			// values need confirming from IL2CPP dump / dnSpy
+		}
+
+		public enum EMatchingStage
+		{
+			None                          = 0,
+			GameWorldCreating             = 1,
+			BundlesLoading                = 2,
+			PoolsCreating                 = 3,
+			MapLoading                    = 4,
+			DataCaching                   = 5,
+			PlayersSearching              = 6,
+			ServerSearching               = 7,
+			ServerStartAwaiting           = 8,
+			GamePreparing                 = 9,
+			ServerConnecting              = 10,
+			ServerResponseAwaiting        = 11,
+			LootBundlesLoading            = 12,
+			LootPoolsCreating             = 13,
+			SessionStartAwaiting          = 14,
+			LocalGameStarting             = 15,
+			PlayersAwaiting               = 16,
+			SynchronizationWithOtherPlayers = 17,
+			GameLeaving                   = 18,
+		}
+
+		public enum EMatchingStageGroup
+		{
+			GameWorldCreating   = 0,
+			MapLoading          = 1,
+			PlayersSearching    = 2,
+			ServerSearching     = 3,
+			ServerStartAwaiting = 4,
+			ServerConnecting    = 5,
+			LootLoading         = 6,
+			SessionStartAwaiting = 7,
+			PlayersAwaiting     = 8,
 		}
 
 		[Flags]
@@ -1015,5 +1089,31 @@ namespace SDK
 			Inert = 5,
 		}
 
+	}
+
+	public static class EMatchingStageExtensions
+	{
+		public static string ToDisplayString(this Enums.EMatchingStage stage) => stage switch
+		{
+			Enums.EMatchingStage.GameWorldCreating              => "Creating Game World",
+			Enums.EMatchingStage.BundlesLoading                 => "Loading Bundles",
+			Enums.EMatchingStage.PoolsCreating                  => "Creating Pools",
+			Enums.EMatchingStage.MapLoading                     => "Loading Map",
+			Enums.EMatchingStage.DataCaching                    => "Caching Data",
+			Enums.EMatchingStage.PlayersSearching               => "Searching for Players",
+			Enums.EMatchingStage.ServerSearching                => "Searching for Server",
+			Enums.EMatchingStage.ServerStartAwaiting            => "Awaiting Server Start",
+			Enums.EMatchingStage.GamePreparing                  => "Preparing Game",
+			Enums.EMatchingStage.ServerConnecting               => "Connecting to Server",
+			Enums.EMatchingStage.ServerResponseAwaiting         => "Awaiting Server Response",
+			Enums.EMatchingStage.LootBundlesLoading             => "Loading Loot Bundles",
+			Enums.EMatchingStage.LootPoolsCreating              => "Creating Loot Pools",
+			Enums.EMatchingStage.SessionStartAwaiting           => "Awaiting Session Start",
+			Enums.EMatchingStage.LocalGameStarting              => "Starting Game",
+			Enums.EMatchingStage.PlayersAwaiting                => "Awaiting Players",
+			Enums.EMatchingStage.SynchronizationWithOtherPlayers => "Synchronizing Players",
+			Enums.EMatchingStage.GameLeaving                    => "Leaving Game",
+			_                                                   => "Waiting for Raid Start",
+		};
 	}
 }

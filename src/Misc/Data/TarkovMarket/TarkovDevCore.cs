@@ -256,6 +256,10 @@ namespace eft_dma_radar.Common.Misc.Data.TarkovMarket
                       status
                     }
                   }
+                  traders {
+                    id
+                    name
+                  }
                 }
                 """
                 }

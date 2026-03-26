@@ -1,7 +1,9 @@
-﻿using eft_dma_radar.Tarkov.API;
+﻿#nullable enable
+using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Common.Misc.Data;
 using HandyControl.Tools.Extension;
 using System.Threading;
+using eft_dma_radar.Web.ProfileApi;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 {
@@ -14,9 +16,23 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         }
 
         /// <summary>
+        /// Resolves the account ID from the API cache (via ProfileID → API lookup).
+        /// </summary>
+        private string? ResolvedAccountID
+        {
+            get
+            {
+                var profileId = _player.ProfileID;
+                if (string.IsNullOrEmpty(profileId))
+                    return null;
+                return PlayerLookupApiClient.TryGetCached(profileId)?.AccountId;
+            }
+        }
+
+        /// <summary>
         /// Player's Nickname (via Profile Data).
         /// </summary>
-        public string Nickname => this.Profile?.Info?.Nickname;
+        public string? Nickname => this.Profile?.Info?.Nickname;
 
         public int Prestige => this.Profile?.Info?.Prestige ?? -1;
         /// <summary> Is the player flagged as streamer (from eft-api.tech top-level). </summary>
@@ -48,11 +64,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             }
         }
 
-        private EFTProfileService.ProfileResponseContainer Meta
+        private EFTProfileService.ProfileResponseContainer? Meta
         {
             get
             {
-                var acctID = _player.AccountID;
+                var acctID = ResolvedAccountID;
                 if (string.IsNullOrEmpty(acctID)) return null;
                 return EFTProfileService.TryGetEftApiMeta(acctID, out var m) ? m : null;
             }
@@ -61,11 +77,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         /// Player's current profile (if Profile Lookups are enabled).
         /// Returns NULL if profile cannot be retrieved.
         /// </summary>
-        private EFTProfileService.ProfileData Profile
+        private EFTProfileService.ProfileData? Profile
         {
             get
             {
-                string acctID = _player.AccountID;
+                string? acctID = ResolvedAccountID;
                 if (string.IsNullOrEmpty(acctID))
                     return null;
                 else if (EFTProfileService.Profiles.TryGetValue(acctID, out var profile))
@@ -219,7 +235,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 {
                     try
                     {
-                        var fixUnix = profile.ToString().Substring(0, profile.ToString().Length - 3);
+                        var profileStr = profile.ToString() ?? string.Empty;
+                        var fixUnix = profileStr.Substring(0, profileStr.Length - 3);
                         var time = (DateTime.Now - DateTimeOffset.FromUnixTimeSeconds(Convert.ToInt64(fixUnix)).LocalDateTime);
 
                         if (time.Days > 0)

@@ -65,14 +65,14 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
         /// </summary>
         /// <param name="hScatter">Scatter read handle.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetResult(Vmmsharp.LeechCore.SCATTER_HANDLE hScatter)
+        public void SetResult(Dictionary<ulong, byte[]> scatterResults)
         {
             try
             {
                 if (_isValueType)
-                    SetValueResult(hScatter);
+                    SetValueResult(scatterResults);
                 else
-                    SetClassResult(hScatter);
+                    SetClassResult(scatterResults);
             }
             catch
             {
@@ -87,14 +87,14 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
         /// Set the Result from a Value Type.
         /// </summary>
         /// <param name="hScatter">Scatter read handle.</param>
-        private unsafe void SetValueResult(Vmmsharp.LeechCore.SCATTER_HANDLE hScatter)
+        private unsafe void SetValueResult(Dictionary<ulong, byte[]> scatterResults)
         {
             int cb = SizeChecker<T>.Size; // Also enforces type safety
 #pragma warning disable CS8500
             fixed (void* pb = &_result)
             {
                 var buffer = new Span<byte>(pb, cb);
-                if (!ProcessBytes(hScatter, buffer))
+                if (!ProcessBytes(scatterResults, buffer))
                 {
                     IsFailed = true;
                     return;
@@ -111,7 +111,7 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
         /// Set the Result from a Class Type.
         /// </summary>
         /// <param name="hScatter">Scatter read handle.</param>
-        private void SetClassResult(Vmmsharp.LeechCore.SCATTER_HANDLE hScatter)
+        private void SetClassResult(Dictionary<ulong, byte[]> scatterResults)
         {
             if (this is ScatterReadEntry<SharedArray<TrsX>> r1) // vertices
             {
@@ -119,7 +119,7 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
                 ArgumentOutOfRangeException.ThrowIfNotEqual(CB % size, 0, nameof(CB));
                 int count = CB / size;
                 var vert = SharedArray<TrsX>.Get(count);
-                if (!ProcessBytes(hScatter, vert.Span))
+                if (!ProcessBytes(scatterResults, vert.Span))
                 {
                     vert.Dispose();
                     IsFailed = true;
@@ -135,7 +135,7 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
                 ArgumentOutOfRangeException.ThrowIfNotEqual(CB % size, 0, nameof(CB));
                 int count = CB / size;
                 var ctr = SharedArray<MemPointer>.Get(count);
-                if (!ProcessBytes(hScatter, ctr.Span))
+                if (!ProcessBytes(scatterResults, ctr.Span))
                 {
                     ctr.Dispose();
                     IsFailed = true;
@@ -149,7 +149,7 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
             {
                 Span<byte> buffer = CB > 0x1000 ? new byte[CB] : stackalloc byte[CB];
                 buffer.Clear();
-                if (!ProcessBytes(hScatter, buffer))
+                if (!ProcessBytes(scatterResults, buffer))
                 {
                     IsFailed = true;
                     return;
@@ -163,7 +163,7 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
             {
                 Span<byte> buffer = CB > 0x1000 ? new byte[CB] : stackalloc byte[CB];
                 buffer.Clear();
-                if (!ProcessBytes(hScatter, buffer))
+                if (!ProcessBytes(scatterResults, buffer))
                 {
                     IsFailed = true;
                     return;
@@ -185,7 +185,7 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
         /// <param name="hScatter">Scatter read handle.</param>
         /// <param name="bufferIn">Result buffer</param>
         /// <exception cref="Exception"></exception>
-        private bool ProcessBytes<TBuf>(Vmmsharp.LeechCore.SCATTER_HANDLE hScatter, Span<TBuf> bufferIn)
+        private bool ProcessBytes<TBuf>(Dictionary<ulong, byte[]> scatterResults, Span<TBuf> bufferIn)
             where TBuf : unmanaged
         {
             var buffer = MemoryMarshal.Cast<TBuf, byte>(bufferIn);
@@ -202,9 +202,9 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
             for (int p = 0; p < numPages; p++)
             {
                 ulong pageAddr = basePageAddr + 0x1000 * (uint)p; // get current page addr
-                if (hScatter.Results.TryGetValue(pageAddr, out var scatter)) // retrieve page of mem needed
+                if (scatterResults.TryGetValue(pageAddr, out var pageData)) // retrieve page of mem needed
                 {
-                    scatter.Page
+                    pageData.AsSpan()
                         .Slice((int)pageOffset, (int)cb)
                         .CopyTo(buffer.Slice(bytesCopied, (int)cb)); // Copy bytes to buffer
                     bytesCopied += (int)cb;

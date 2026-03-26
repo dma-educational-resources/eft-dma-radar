@@ -1,7 +1,6 @@
-﻿using eft_dma_radar.Tarkov.EFTPlayer;
+using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
-using eft_dma_radar.UI.ESP;
 using eft_dma_radar.Common.Maps;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Common.Unity;
@@ -61,20 +60,20 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             if (Settings.ShowName)
             {
                 var namePoint = new SKPoint(point.X + nameXOffset, point.Y + nameYOffset);
-                canvas.DrawText("Mortar", namePoint, SKPaints.TextOutline);
-                canvas.DrawText("Mortar", namePoint, SKPaints.TextExplosives);
+                canvas.DrawText("Mortar", namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText("Mortar", namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextExplosives);
             }
 
             if (Settings.ShowDistance)
             {
                 var distText = $"{(int)dist}m";
-                var distWidth = SKPaints.TextExplosives.MeasureText(distText);
+                var distWidth = SKPaints.RadarFontRegular12.MeasureText(distText, SKPaints.TextExplosives);
                 var distPoint = new SKPoint(
                     point.X - (distWidth / 2),
                     point.Y + distanceYOffset
                 );
-                canvas.DrawText(distText, distPoint, SKPaints.TextOutline);
-                canvas.DrawText(distText, distPoint, SKPaints.TextExplosives);
+                canvas.DrawText(distText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(distText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextExplosives);
             }
         }
 
@@ -185,17 +184,17 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
                 );
             }
         }
-        // ─────────────────────────────────────────────────────
-        // FAST PATH (scatter) — queue reads
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
+        // FAST PATH (scatter) � queue reads
+        // -----------------------------------------------------
         public void QueueScatterReads(ScatterReadIndex idx)
         {
 
         }
 
-        // ─────────────────────────────────────────────────────
-        // FAST PATH (scatter) — apply results
-        // ─────────────────────────────────────────────────────
+        // -----------------------------------------------------
+        // FAST PATH (scatter) � apply results
+        // -----------------------------------------------------
         public void OnRefresh(ScatterReadIndex idx)
         {
 

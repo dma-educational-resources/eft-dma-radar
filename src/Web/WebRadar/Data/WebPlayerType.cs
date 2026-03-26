@@ -24,6 +24,14 @@
         /// <summary>
         /// Human-Controlled Scav.
         /// </summary>
-        PlayerScav = 4
+        PlayerScav = 4,
+        /// <summary>
+        /// AI Raider / Guard.
+        /// </summary>
+        Raider = 5,
+        /// <summary>
+        /// AI Boss.
+        /// </summary>
+        Boss = 6
     }
 }

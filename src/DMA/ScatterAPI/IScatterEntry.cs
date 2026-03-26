@@ -20,7 +20,7 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
         /// <summary>
         /// Parse the memory buffer and set the result value.
         /// </summary>
-        /// <param name="hScatter">Scatter read handle.</param>
-        void SetResult(Vmmsharp.LeechCore.SCATTER_HANDLE hScatter);
+        /// <param name="scatterResults">Scatter results keyed by page-aligned address.</param>
+        void SetResult(Dictionary<ulong, byte[]> scatterResults);
     }
 }

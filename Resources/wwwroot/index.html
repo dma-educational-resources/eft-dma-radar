@@ -84,6 +84,22 @@
         Aimview Size
         <input type="range" id="aimviewSize" min="160" max="480" step="20">
       </label>
+      <label>
+        Zoom w/ Player
+        <input type="checkbox" id="aimviewZoomWithPlayer">
+      </label>
+      <label>
+        Max Dist <span class="mono" id="aimviewMaxDistText">&#8734;</span>
+        <input type="range" id="aimviewMaxDist" min="0" max="1000" step="1">
+      </label>
+      <div class="aimview-type-filters">
+        <label class="atf"><input type="checkbox" id="aimviewShowPmc"> PMC</label>
+        <label class="atf"><input type="checkbox" id="aimviewShowScav"> Scav</label>
+        <label class="atf"><input type="checkbox" id="aimviewShowPScav"> PScav</label>
+        <label class="atf"><input type="checkbox" id="aimviewShowBoss"> Boss</label>
+        <label class="atf"><input type="checkbox" id="aimviewShowRaider"> Raider</label>
+        <label class="atf"><input type="checkbox" id="aimviewShowTeammate"> Team</label>
+      </div>
     </div>
 
     <div class="section">

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -18,7 +19,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         public static ulong GetGameWorld(
             ulong gomAddress,
             CancellationToken ct,
-            out string map)
+            out string? map)
         {
             map = null;
 
@@ -31,7 +32,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
                 if (TryTypeIndexScan(gomAddress, ct, out var result))
                 {
-                    map = result.Map;
+                    map = result!.Map;
                     XMLogging.WriteLine("[IL2CPP] GameWorld found (TypeIndex)");
                     return result.GameWorld;
                 }
@@ -46,7 +47,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
                 if (TryShallowScan(gomAddress, ct, out var result))
                 {
-                    map = result.Map;
+                    map = result!.Map;
                     XMLogging.WriteLine("[IL2CPP] GameWorld found (shallow)");
                     return result.GameWorld;
                 }
@@ -65,7 +66,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         private static bool TryTypeIndexScan(
             ulong gomAddress,
             CancellationToken ct,
-            out GameWorldResult result)
+            out GameWorldResult? result)
         {
             result = null;
 
@@ -150,7 +151,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         private static bool TryShallowScan(
             ulong gomAddress,
             CancellationToken ct,
-            out GameWorldResult result)
+            out GameWorldResult? result)
         {
             result = null;
 
@@ -187,7 +188,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         private static ulong FullScan(
             ulong gomAddress,
             CancellationToken ct,
-            out string map)
+            out string? map)
         {
             map = null;
 
@@ -257,7 +258,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         // SHARED HELPERS
         // ?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่
 
-        private static bool TryResolveMap(ulong gameWorld, out string map)
+        private static bool TryResolveMap(ulong gameWorld, out string? map)
         {
             map = null;
 
@@ -288,7 +289,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         private sealed class GameWorldResult
         {
             public ulong GameWorld { get; init; }
-            public string Map { get; init; }
+            public string? Map { get; init; }
         }
     }
 }

@@ -36,7 +36,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             {
                 try
                 {
-                    const string sig = "48 89 05 ?? ?? ?? ?? 48 83 C4 ?? C3 33 C9";
+                    const string sig = "48 89 05 ? ? ? ? 48 83 C4 ? C3 33 C9";
                     ulong addr = Memory.FindSignature(sig, "UnityPlayer.dll");
 
                     if (addr.IsValidVirtualAddress())

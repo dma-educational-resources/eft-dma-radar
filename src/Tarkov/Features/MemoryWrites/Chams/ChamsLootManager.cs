@@ -284,7 +284,7 @@ namespace eft_dma_radar.Tarkov.Features
 
         private static bool IsValidLootItem(LootItem item)
         {
-            return item?.InteractiveClass != 0 && !string.IsNullOrEmpty(item.ID);
+            return item is not null && item.InteractiveClass != 0 && !string.IsNullOrEmpty(item.ID);
         }
 
         private static bool IsModeAvailable(ChamsMode mode, ChamsEntityType lootType)

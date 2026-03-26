@@ -1,4 +1,4 @@
-﻿using eft_dma_radar.Tarkov.EFTPlayer;
+﻿﻿using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity.LowLevel;
@@ -175,6 +175,8 @@ namespace eft_dma_radar.UI.Pages
         private void RegisterSettingsEvents()
         {
             playerHistoryDataGrid.MouseDoubleClick += PlayerHistoryDataGrid_MouseDoubleClick;
+            mnuRemoveEntry.Click += MnuRemoveEntry_Click;
+            mnuClearAll.Click += MnuClearAll_Click;
 
             RegisterDeselectionEvents();
         }
@@ -258,6 +260,12 @@ namespace eft_dma_radar.UI.Pages
             {
                 try
                 {
+                    if (string.IsNullOrEmpty(selectedEntry.ID))
+                    {
+                        NotificationsShared.Warning($"Cannot add '{selectedEntry.Name}' — Account ID not yet resolved. Try again after a dogtag has been read.");
+                        return;
+                    }
+
                     if (MessageBox.Show(
                         $"Add player '{selectedEntry.Name}' to the watchlist?",
                         "Confirm",
@@ -394,6 +402,42 @@ namespace eft_dma_radar.UI.Pages
             else
             {
                 AddToWatchlist();
+            }
+        }
+
+        private void MnuRemoveEntry_Click(object sender, RoutedEventArgs e)
+        {
+            if (playerHistoryDataGrid.SelectedItem is PlayerHistoryEntry selectedEntry)
+            {
+                try
+                {
+                    _playerHistory?.Remove(selectedEntry);
+                }
+                catch (Exception ex)
+                {
+                    NotificationsShared.Error($"Error removing entry: {ex.Message}");
+                    XMLogging.WriteLine($"[PlayerHistory] Error removing entry: {ex}");
+                }
+            }
+        }
+
+        private void MnuClearAll_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (MessageBox.Show(
+                    "Clear all player history? This cannot be undone.",
+                    "Confirm",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                {
+                    _playerHistory?.Clear();
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationsShared.Error($"Error clearing history: {ex.Message}");
+                XMLogging.WriteLine($"[PlayerHistory] Error clearing history: {ex}");
             }
         }
         #endregion

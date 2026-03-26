@@ -1,7 +1,6 @@
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity.IL2CPP;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.GameWorld;
@@ -15,7 +14,6 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         private bool _lastEnabledState;
         private ulong _cachedHardSettings;
         private ulong _cachedInertiaSettings;
-        private ulong _cachedglobalConfig;
 
         public override bool Enabled
         {

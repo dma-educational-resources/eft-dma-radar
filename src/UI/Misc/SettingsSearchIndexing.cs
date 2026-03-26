@@ -68,8 +68,8 @@ namespace eft_dma_radar.UI.Misc
                         if (cc.Content is TextBlock tbc && !string.IsNullOrWhiteSpace(tbc.Text)) return tbc.Text;
                         return cc.Content?.ToString();
                     }
-                    tb = fe as TextBlock;
-                    if (tb != null && !string.IsNullOrWhiteSpace(tb.Text)) return tb.Text;
+                    var tbFe = fe as TextBlock;
+                    if (tbFe != null && !string.IsNullOrWhiteSpace(tbFe.Text)) return tbFe.Text;
                     return fe.DataContext?.ToString() ?? fe.ToString();
                 default:
                     return item.ToString();
@@ -403,14 +403,14 @@ namespace eft_dma_radar.UI.Misc
                         if (cc.Content is TextBlock tbc && !string.IsNullOrWhiteSpace(tbc.Text)) return tbc.Text;
                         return cc.Content?.ToString();
                     }
-                    tb = fe as TextBlock;
-                    if (tb != null && !string.IsNullOrWhiteSpace(tb.Text)) return tb.Text;
+                    var tbFe = fe as TextBlock;
+                    if (tbFe != null && !string.IsNullOrWhiteSpace(tbFe.Text)) return tbFe.Text;
                     return fe.DataContext?.ToString() ?? fe.ToString();
                 default:
                     return item.ToString();
             }
         }
-            
+
         private static bool IsVisual(DependencyObject d) => d is Visual || d is Visual3D;
         private static DependencyObject GetParentSafe(DependencyObject d)
         {

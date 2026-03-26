@@ -1,9 +1,10 @@
-﻿using eft_dma_radar;
+#nullable enable
+#pragma warning disable CS0162 // Unreachable code detected (DEBUG_QUEST_CONDITIONS const)
+using eft_dma_radar;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;
-using eft_dma_radar.UI.ESP;
 using eft_dma_radar.Common.Maps;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Misc.Data;
@@ -38,8 +39,8 @@ namespace eft_dma_radar.Tarkov.GameWorld
             { "Sandbox_high", "65b8d6f5cdde2479cb2a3125" }
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
-        private static FrozenDictionary<string, FrozenDictionary<string, Vector3>> _questZones;
-        private static FrozenDictionary<string, FrozenDictionary<string, List<Vector3>>> _questOutlines;
+        private static FrozenDictionary<string, FrozenDictionary<string, Vector3>>? _questZones;
+        private static FrozenDictionary<string, FrozenDictionary<string, List<Vector3>>>? _questOutlines;
         private static bool _lastKappaFilterState;
         private static bool _lastOptionalFilterState;
 
@@ -337,7 +338,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             _rateLimit.Restart();
         }
 
-        private Quest CreateQuestFromGameData(string questId, ulong qDataEntry, HashSet<string> completedConditions, uint templateOffset)
+        private Quest? CreateQuestFromGameData(string questId, ulong qDataEntry, HashSet<string> completedConditions, uint templateOffset)
         {
             try
             {
@@ -512,7 +513,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                             allConditions.Add(conditionId);
                             foundCount++;
                             if (DEBUG_QUEST_CONDITIONS)
-                                XMLogging.WriteLine($"[QuestDebug]     ✓ {conditionId}");
+                                XMLogging.WriteLine($"[QuestDebug]     ? {conditionId}");
                         }
                     }
                     catch
@@ -667,10 +668,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     sb.AppendLine();
                     sb.AppendLine($"    -- API DATA CHECK --");
                     
-                    var hasApiData = EftDataManager.TaskData.TryGetValue(qID, out var taskData);
+                    TaskElement? taskData = null;
+                    var hasApiData = EftDataManager.TaskData is { } td && td.TryGetValue(qID, out taskData);
                     sb.AppendLine($"    In API TaskData: {(hasApiData ? "YES" : "NO")}");
-                    
-                    if (hasApiData && taskData != null)
+
+                    if (hasApiData && taskData is not null)
                     {
                         sb.AppendLine($"    API Name: {taskData.Name ?? "(null)"}");
                         sb.AppendLine($"    KappaRequired: {taskData.KappaRequired} Objectives: {taskData.Objectives?.Count ?? 0}");
@@ -736,7 +738,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             };
         }
 
-        private QuestLocation CreateQuestLocation(string questId, string locationId, bool optional = false, string objectiveId = null)
+        private QuestLocation? CreateQuestLocation(string questId, string locationId, bool optional = false, string? objectiveId = null)
         {
             // Debug: Log zone lookup issues
             if (!_mapToId.TryGetValue(MapID, out var id))
@@ -746,7 +748,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 return null;
             }
             
-            if (!_questZones.TryGetValue(id, out var zones))
+            if (!_questZones!.TryGetValue(id, out var zones))
             {
                 if (DEBUG_QUEST_CONDITIONS)
                     XMLogging.WriteLine($"[QuestZone] BSG ID '{id}' not found in _questZones (count: {_questZones?.Count ?? 0})");
@@ -763,12 +765,12 @@ namespace eft_dma_radar.Tarkov.GameWorld
             return new QuestLocation(questId, locationId, location, optional, objectiveId ?? locationId);
         }
 
-        private QuestLocation CreateQuestLocationWithOutline(string questId, string locationId, bool optional = false, string objectiveId = null)
+        private QuestLocation? CreateQuestLocationWithOutline(string questId, string locationId, bool optional = false, string? objectiveId = null)
         {
             if (_mapToId.TryGetValue(MapID, out var mapId) &&
-                _questOutlines.TryGetValue(mapId, out var outlines) &&
+                _questOutlines!.TryGetValue(mapId, out var outlines) &&
                 outlines.TryGetValue(locationId, out var outline) &&
-                _questZones.TryGetValue(mapId, out var zones) &&
+                _questZones!.TryGetValue(mapId, out var zones) &&
                 zones.TryGetValue(locationId, out var location))
             {
                 return new QuestLocation(questId, locationId, location, outline, optional, objectiveId ?? locationId);
@@ -926,7 +928,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
         private static Config Config => Program.Config;
 
         private Vector3 _position;
-        private List<Vector3> _outline;
+        private List<Vector3>? _outline;
 
         /// <summary>
         /// Original location name.
@@ -961,9 +963,9 @@ namespace eft_dma_radar.Tarkov.GameWorld
         /// <summary>
         /// Quest location outlines (if any).
         /// </summary>
-        public List<Vector3> Outline => _outline;
+        public List<Vector3>? Outline => _outline;
 
-        public QuestLocation(string questId, string locationName, Vector3 position, bool optional = false, string objectiveId = null)
+        public QuestLocation(string questId, string locationName, Vector3 position, bool optional = false, string? objectiveId = null)
         {
             QuestID = questId;
             LocationName = locationName;
@@ -978,7 +980,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 QuestName = locationName;
         }
 
-        public QuestLocation(string questId, string locationName, Vector3 position, List<Vector3> outline, bool optional = false, string objectiveId = null)
+        public QuestLocation(string questId, string locationName, Vector3 position, List<Vector3> outline, bool optional = false, string? objectiveId = null)
         {
             QuestID = questId;
             LocationName = locationName;
@@ -1072,21 +1074,21 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 point.Offset(nameXOffset, nameYOffset);
                 if (!string.IsNullOrEmpty(QuestName))
                 {
-                    canvas.DrawText(QuestName, point, SKPaints.TextOutline);
-                    canvas.DrawText(QuestName, point, SKPaints.QuestHelperText);
+                    canvas.DrawText(QuestName, point, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                    canvas.DrawText(QuestName, point, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.QuestHelperText);
                 }
             }
 
             if (QuestManager.Settings.ShowDistance)
             {
                 var distText = $"{(int)dist}m";
-                var distWidth = SKPaints.QuestHelperText.MeasureText($"{(int)dist}");
+                var distWidth = SKPaints.RadarFontRegular12.MeasureText($"{(int)dist}", SKPaints.QuestHelperText);
                 var distPoint = new SKPoint(
                     point.X - (distWidth / 2) - nameXOffset,
                     point.Y + distanceYOffset - nameYOffset
                 );
-                canvas.DrawText(distText, distPoint, SKPaints.TextOutline);
-                canvas.DrawText(distText, distPoint, SKPaints.QuestHelperText);
+                canvas.DrawText(distText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(distText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.QuestHelperText);
             }
         }
 
@@ -1253,7 +1255,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                         foreach (var cond in quest.CompletedConditions.Take(10)) // Limit to 10
                         {
                             var match = (cond == ObjectiveId || cond == LocationName) ? " <-- THIS" : "";
-                            lines.Add($"  ✓ {cond}{match}");
+                            lines.Add($"  ? {cond}{match}");
                         }
                         if (quest.CompletedConditions.Count > 10)
                             lines.Add($"  ... and {quest.CompletedConditions.Count - 10} more");

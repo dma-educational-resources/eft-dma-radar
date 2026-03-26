@@ -1,4 +1,5 @@
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
+using eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections;
 using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.Tarkov.Features.MemoryWrites.Patches;
@@ -19,10 +20,6 @@ using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Common.Unity.Collections;
 using eft_dma_radar.Common.Unity.LowLevel;
 using System;
-using System.Linq;
-using System.Windows.Shapes;
-using static System.Windows.Forms.LinkLabel;
-using eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer
 {
@@ -87,14 +84,22 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// </summary>
         public static PlayerWatchlist PlayerWatchlist { get; } = new();
         /// <summary>
+        /// Tracks which player (Base address) owns each VerticesAddr.
+        /// Prevents two players sharing the same transform hierarchy.
+        /// Key = VerticesAddr, Value = Player.Base that claimed it.
+        /// </summary>
+        private static readonly ConcurrentDictionary<ulong, ulong> _verticesOwner = new();
+
+        /// <summary>
         /// Resets/Updates 'static' assets in preparation for a new game/raid instance.
         /// </summary>
         public static void Reset()
         {
             _groups.Clear();
             _rateLimit.Clear();
-            PlayerHistory.Reset();             
+            PlayerHistory.Reset();
             _playerScavNumber = 0;
+            _verticesOwner.Clear();
         }
 
         #endregion
@@ -123,7 +128,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"ERROR during Player Allocation for player @ 0x{playerBase:X}: {ex}");
+                XMLogging.WriteLine($"ERROR during Player Allocation for player @ 0x{playerBase:X}: {ex.Message}");
                 return false;
             }
             finally
@@ -182,7 +187,9 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             // Skeleton
             try
             {
+                ReleaseSkeletonClaim();
                 Skeleton?.ResetESPCacheAndTransforms();
+                Skeleton = null;
             }
             catch (Exception ex)
             {
@@ -248,16 +255,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         public PlayerType Type { get; protected set; }
 
         /// <summary>
-        /// Streaming platform username.
-        /// </summary>
-        public string StreamingUsername { get; set; }
-
-        /// <summary>
-        /// The streaming platform URL they're streaming
-        /// </summary>
-        public string StreamingURL { get; set; }
-
-        /// <summary>
         /// Player's Rotation in Local Game World.
         /// </summary>
         public Vector2 Rotation { get; private set; }
@@ -310,11 +307,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         protected int _verticesCount;
         
         /// <summary>
-        /// Flag to prevent skeleton error log spam.
-        /// </summary>
-        private bool _skeletonErrorLogged;
-
-        /// <summary>
         /// Player's Gear/Loadout Information and contained items.
         /// </summary>
         public GearManager Gear { get; private set; }
@@ -343,6 +335,16 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// True if player is being focused via Right-Click (UI).
         /// </summary>
         public bool IsFocused { get; set; }
+
+        /// <summary>
+        /// Streaming platform username.
+        /// </summary>
+        public string StreamingUsername { get; set; }
+
+        /// <summary>
+        /// The streaming platform URL they're streaming
+        /// </summary>
+        public string StreamingURL { get; set; }
 
         /// <summary>
         /// Dead Player's associated loot container object.
@@ -426,7 +428,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// Player Rotation Field Address (view angles).
         /// </summary>
         public virtual ulong RotationAddress { get; }
-        public virtual float ZoomLevel { get; set; }
+        public virtual float ZoomLevel { get; set; } = 1f;
         public virtual ulong PWA { get; set; }
 
         public virtual ref Vector3 Position
@@ -665,7 +667,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             LootObject = null;
             IsActive = true;
         }
-        private ulong _lastMovementPlayer;
         internal int BtrStickTicks;
         /// <summary>
         /// Executed on each Realtime Loop.
@@ -770,14 +771,44 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 if (Body == 0 || !Body.IsValidVirtualAddress())
                     return false;
 
-                Skeleton = new Skeleton(this, GetTransformInternalChain);
+                var skeleton = new Skeleton(this, GetTransformInternalChain);
+
+                // Guard against two players sharing the same transform hierarchy.
+                // This happens when EFT reuses a pooled PlayerBody whose pointer
+                // hasn't been fully updated yet, causing the new player's skeleton
+                // to point at an already-alive player's vertices array.
+                var rootVerts = skeleton.Root.VerticesAddr;
+                if (!_verticesOwner.TryAdd(rootVerts, this))
+                {
+                    // Already owned by someone else — stale Body pointer, retry later.
+                    if (_verticesOwner.TryGetValue(rootVerts, out var owner) && owner != this)
+                        throw new InvalidOperationException(
+                            $"VerticesAddr 0x{rootVerts:X} already owned by player 0x{owner:X}");
+                }
+
+                Skeleton = skeleton;
                 return true;
             }
             catch
             {
+                // Release any claim we might have registered before failing.
+                if (Skeleton == null && Body != 0)
+                {
+                    // Nothing was assigned yet — no claim to release.
+                }
                 Skeleton = null;
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Releases this player's VerticesAddr ownership claim so another player can claim it.
+        /// Call whenever the skeleton is being discarded (re-alloc, soft-reset, dispose).
+        /// </summary>
+        protected void ReleaseSkeletonClaim()
+        {
+            if (Skeleton?.Root is UnityTransform root)
+                _verticesOwner.TryRemove(new KeyValuePair<ulong, ulong>(root.VerticesAddr, this));
         }
         /// <summary>
         /// Executed on each Transform Validation Loop.
@@ -1486,7 +1517,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         {
             try
             {
-                if (!Skeleton.HasValidPosition)
+                if (Skeleton is null || !Skeleton.HasValidPosition)
                     return;
 
                 // PERF: cache once
@@ -1531,7 +1562,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     Type != PlayerType.Teammate &&
                     (gearLoot != null &&
                      (gearLoot.Any(i => i.IsImportant) ||
-                      (Config.QuestHelper.Enabled && Gear.HasQuestItems)));
+                      (Config.QuestHelper.Enabled && Gear!.HasQuestItems)));
 
                 if (typeSettings.ShowName)
                 {
@@ -1679,16 +1710,16 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
 
             if (!string.IsNullOrEmpty(nameText))
             {
-                var nameWidth = paints.Item2.MeasureText(nameText);
+                var nameWidth = SKPaints.RadarFontRegular12.MeasureText(nameText, paints.Item2);
                 var namePoint = new SKPoint(point.X - (nameWidth / 2), baseYPosition - 0);
 
-                canvas.DrawText(nameText, namePoint, SKPaints.TextOutline);
-                canvas.DrawText(nameText, namePoint, paints.Item2);
+                canvas.DrawText(nameText, namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(nameText, namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, paints.Item2);
 
                 if (showImportantIndicator)
                 {
-                    var asteriskWidth = SKPaints.TextPulsingAsterisk.MeasureText("*");
-                    var verticalOffset = (SKPaints.TextPulsingAsterisk.TextSize - paints.Item2.TextSize) / 2;
+                    var asteriskWidth = SKPaints.RadarFontEmbolden24.MeasureText("*", SKPaints.TextPulsingAsterisk);
+                    var verticalOffset = (SKPaints.RadarFontEmbolden24.Size - SKPaints.RadarFontRegular12.Size) / 2;
                     verticalOffset += 1.5f * MainWindow.UIScale;
 
                     var asteriskPoint = new SKPoint(
@@ -1696,28 +1727,28 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                         namePoint.Y + verticalOffset
                     );
 
-                    canvas.DrawText("*", asteriskPoint, SKPaints.TextPulsingAsteriskOutline);
-                    canvas.DrawText("*", asteriskPoint, SKPaints.TextPulsingAsterisk);
+                    canvas.DrawText("*", asteriskPoint, SKTextAlign.Left, SKPaints.RadarFontEmbolden24, SKPaints.TextPulsingAsteriskOutline);
+                    canvas.DrawText("*", asteriskPoint, SKTextAlign.Left, SKPaints.RadarFontEmbolden24, SKPaints.TextPulsingAsterisk);
                 }
             }
             else if (showImportantIndicator)
             {
-                var asteriskWidth = SKPaints.TextPulsingAsterisk.MeasureText("*");
+                var asteriskWidth = SKPaints.RadarFontEmbolden24.MeasureText("*", SKPaints.TextPulsingAsterisk);
                 var yPos = point.Y - 2 * MainWindow.UIScale;
                 var asteriskPoint = new SKPoint(point.X - (asteriskWidth / 2), yPos);
 
-                canvas.DrawText("*", asteriskPoint, SKPaints.TextPulsingAsteriskOutline);
-                canvas.DrawText("*", asteriskPoint, SKPaints.TextPulsingAsterisk);
+                canvas.DrawText("*", asteriskPoint, SKTextAlign.Left, SKPaints.RadarFontEmbolden24, SKPaints.TextPulsingAsteriskOutline);
+                canvas.DrawText("*", asteriskPoint, SKTextAlign.Left, SKPaints.RadarFontEmbolden24, SKPaints.TextPulsingAsterisk);
             }
 
             var currentBottomY = point.Y + 20 * MainWindow.UIScale;
             if (!string.IsNullOrEmpty(distanceText))
             {
-                var distWidth = paints.Item2.MeasureText(distanceText);
+                var distWidth = SKPaints.RadarFontRegular12.MeasureText(distanceText, paints.Item2);
                 var distPoint = new SKPoint(point.X - (distWidth / 2), currentBottomY);
 
-                canvas.DrawText(distanceText, distPoint, SKPaints.TextOutline);
-                canvas.DrawText(distanceText, distPoint, paints.Item2);
+                canvas.DrawText(distanceText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(distanceText, distPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, paints.Item2);
             }
 
             if (importantLootItems?.Any() == true)
@@ -1728,11 +1759,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 {
                     var itemText = item.ShortName;
                     var itemPaint = GetPlayerLootItemTextPaint(item);
-                    var itemWidth = itemPaint.MeasureText(itemText);
+                    var itemWidth = SKPaints.RadarFontRegular12.MeasureText(itemText, itemPaint);
                     var itemPoint = new SKPoint(point.X - (itemWidth / 2), currentBottomY);
 
-                    canvas.DrawText(itemText, itemPoint, SKPaints.TextOutline);
-                    canvas.DrawText(itemText, itemPoint, itemPaint);
+                    canvas.DrawText(itemText, itemPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                    canvas.DrawText(itemText, itemPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, itemPaint);
 
                     currentBottomY += textSize + spacing;
                 }
@@ -1740,11 +1771,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
 
             if (!string.IsNullOrEmpty(heightText))
             {
-                var heightWidth = paints.Item2.MeasureText(heightText);
+                var heightWidth = SKPaints.RadarFontRegular12.MeasureText(heightText, paints.Item2);
                 var heightPoint = new SKPoint(point.X - heightWidth - 15 * MainWindow.UIScale, point.Y + 5 * MainWindow.UIScale);
 
-                canvas.DrawText(heightText, heightPoint, SKPaints.TextOutline);
-                canvas.DrawText(heightText, heightPoint, paints.Item2);
+                canvas.DrawText(heightText, heightPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                canvas.DrawText(heightText, heightPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, paints.Item2);
             }
 
             if (rightSideInfo.Count > 0)
@@ -1759,8 +1790,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     if (string.IsNullOrEmpty(line?.Trim()))
                         continue;
 
-                    canvas.DrawText(line, rightPoint, SKPaints.TextOutline);
-                    canvas.DrawText(line, rightPoint, paints.Item2);
+                    canvas.DrawText(line, rightPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
+                    canvas.DrawText(line, rightPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, paints.Item2);
                     rightPoint.Offset(0, textSize);
                 }
             }
@@ -1942,13 +1973,13 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     kd = kdResult.ToString("n2");
             }
 
-            if (IsStreaming) // Streamer Notice
-                lines.Add(($"[LIVE - Double Click]", SKPaints.TextMouseover));
-
             var alert = this.Alerts?.Trim();
 
             if (!string.IsNullOrEmpty(alert))
                 lines.Add((alert, SKPaints.TextMouseover));
+
+            if (IsStreaming)
+                lines.Add(("[LIVE - Double Click]", SKPaints.TextMouseover));
 
             if (IsHostileActive)
             {
@@ -2130,11 +2161,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             // ---------------- TEXT ----------------
             var observed = this as ObservedPlayer;
             float textY = headPoint.Y - 5f * ESP.Config.FontScale;
-            float lineHeight = textPaint.TextSize * 1.2f * ESP.Config.FontScale;
+            float lineHeight = SKPaints.ESPFontMedium12.Size * 1.2f * ESP.Config.FontScale;
 
             if (espSettings.ShowADS && IsAiming && observed != null)
             {
-                canvas.DrawText("ADS", new SKPoint(headPoint.X, textY), textPaint);
+                canvas.DrawText("ADS", new SKPoint(headPoint.X, textY), SKTextAlign.Center, SKPaints.ESPFontMedium12, textPaint);
                 textY -= lineHeight;
             }
 
@@ -2144,7 +2175,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 if (IsHostilePmc)
                     name = (PlayerSide == Enums.EPlayerSide.Usec ? "U:" : "B:") + name;
 
-                canvas.DrawText(name, new SKPoint(headPoint.X, textY), textPaint);
+                canvas.DrawText(name, new SKPoint(headPoint.X, textY), SKTextAlign.Center, SKPaints.ESPFontMedium12, textPaint);
             }
         
             if (espSettings.ShowHealth && observed != null)
@@ -2187,7 +2218,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             if (count > 0)
             {
                 var label = string.Join("\n", lines[..count]);
-                var metrics = textPaint.FontMetrics;
+                var metrics = SKPaints.ESPFontMedium12.Metrics;
 
                 // Ascent is negative in Skia
                 float ascent = -metrics.Ascent * ESP.Config.FontScale;

@@ -1,4 +1,5 @@
-﻿using eft_dma_radar.Common.Maps;
+﻿#nullable enable
+using eft_dma_radar.Common.Maps;
 using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
@@ -35,7 +36,7 @@ namespace eft_dma_radar.Tarkov.WebRadar.Data
         [Key(13)] public bool IsAiming { get; init; }
         [Key(14)] public float ZoomLevel { get; init; }
 
-        [Key(15)] public IEnumerable<WebRadarLoot> Loot { get; init; }
+        [Key(15)] public IEnumerable<WebRadarLoot>? Loot { get; init; }
         [Key(16)] public int GroupId { get; init; }
 
         // ============================================================
@@ -62,6 +63,8 @@ namespace eft_dma_radar.Tarkov.WebRadar.Data
         [Key(28)] public float[]? SkeletonScreen { get; init; }
         [Key(29)] public float[]? SkeletonWorld  { get; init; }
         [Key(30)] public float    Pitch          { get; init; }
+        [Key(32)] public string? CurrentWeapon  { get; init; }
+        [Key(33)] public string? CurrentAmmo    { get; init; }
 
         // ============================================================
         // FACTORY
@@ -90,7 +93,12 @@ namespace eft_dma_radar.Tarkov.WebRadar.Data
                 isFriendly ? WebPlayerType.Teammate :
                 isHuman ?
                     (player.IsScav ? WebPlayerType.PlayerScav : WebPlayerType.Player)
-                    : WebPlayerType.Bot;
+                    : player.Type switch
+                    {
+                        Player.PlayerType.AIBoss => WebPlayerType.Boss,
+                        Player.PlayerType.AIRaider => WebPlayerType.Raider,
+                        _ => WebPlayerType.Bot
+                    };
 
             float kd = 0f;
             float hours = 0f;
@@ -141,14 +149,17 @@ namespace eft_dma_radar.Tarkov.WebRadar.Data
                 IsAiming = isAiming,
                 ZoomLevel = player.ZoomLevel,
                 Loot = player.Gear?.Loot?.Select(WebRadarLoot.CreateFromLoot),
-                GroupId = player.NetworkGroupID,
+                GroupId = player.SpawnGroupID,
 
                 PrimaryWeapon = player.Gear?.Equipment?.TryGetValue("FirstPrimaryWeapon", out var p) == true ? p.Long : "None",
                 SecondaryWeapon = player.Gear?.Equipment?.TryGetValue("SecondPrimaryWeapon", out var s) == true ? s.Long : "None",
                 Armor = player.Gear?.Equipment?.TryGetValue("ArmorVest", out var a) == true ? a.Long : "None",
                 Helmet = player.Gear?.Equipment?.TryGetValue("Headwear", out var h) == true ? h.Long : "None",
                 Backpack = player.Gear?.Equipment?.TryGetValue("Backpack", out var b) == true ? b.Long : "None",
-                Rig = player.Gear?.Equipment?.TryGetValue("TacticalVest", out var r) == true ? r.Long : "None"
+                Rig = player.Gear?.Equipment?.TryGetValue("TacticalVest", out var r) == true ? r.Long : "None",
+
+                CurrentWeapon = player.Hands?.CurrentItem,
+                CurrentAmmo   = player.Hands?.CurrentAmmo
             };
         }
             // Bone order matches GetWebRadarScreenBuffer segment layout:

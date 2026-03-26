@@ -28,7 +28,6 @@ namespace eft_dma_radar.UI.ESP
         private SKPath _resizeTriangle;
         private float _relativeX;
         private float _relativeY;
-        private bool _isDragging = false;
         private int _zIndex;
         #endregion
 
@@ -272,7 +271,6 @@ namespace eft_dma_radar.UI.ESP
                 {
                     _capturedWidget._titleDrag = false;
                     _capturedWidget._resizeDrag = false;
-                    _capturedWidget._isDragging = false;
                     _capturedWidget = null;
                     return;
                 }
@@ -298,7 +296,6 @@ namespace eft_dma_radar.UI.ESP
             {
                 case WidgetClickEvent.ClickedTitleBar:
                     _titleDrag = true;
-                    _isDragging = true;
                     _capturedWidget = this;
                     break;
 
@@ -306,7 +303,6 @@ namespace eft_dma_radar.UI.ESP
                     if (CanResize)
                     {
                         _resizeDrag = true;
-                        _isDragging = true;
                         _capturedWidget = this;
                     }
                     break;
@@ -317,7 +313,6 @@ namespace eft_dma_radar.UI.ESP
         {
             _titleDrag = false;
             _resizeDrag = false;
-            _isDragging = false;
         }
 
         private void HandleMouseMove(SKPoint position, MouseEventArgs e)
@@ -406,21 +401,21 @@ namespace eft_dma_radar.UI.ESP
 
             canvas.DrawRect(TitleBar, TitleBarPaint);
             var titleCenterY = TitleBar.Top + (TitleBar.Height / 2);
-            var titleYOffset = (TitleBarText.FontMetrics.Ascent + TitleBarText.FontMetrics.Descent) / 2;
+            var titleYOffset = (_espWidgetFont.Metrics.Ascent + _espWidgetFont.Metrics.Descent) / 2;
 
             canvas.DrawText(Title,
                 new(TitleBar.Left + 2.5f * ScaleFactor,
                 titleCenterY - titleYOffset),
-                TitleBarText);
+                SKTextAlign.Left, _espWidgetFont, TitleBarText);
 
             if (!string.IsNullOrEmpty(RightTitleInfo))
             {
-                var rightInfoWidth = RightTitleInfoText.MeasureText(RightTitleInfo);
+                var rightInfoWidth = _espWidgetFont.MeasureText(RightTitleInfo);
                 var rightX = TitleBar.Right - rightInfoWidth - 2.5f * ScaleFactor - TitleBarHeight;
 
                 canvas.DrawText(RightTitleInfo,
                     new(rightX, titleCenterY - titleYOffset),
-                    RightTitleInfoText);
+                    SKTextAlign.Left, _espWidgetFont, RightTitleInfoText);
             }
 
             canvas.DrawRect(MinimizeButton, ButtonBackgroundPaint);
@@ -436,8 +431,7 @@ namespace eft_dma_radar.UI.ESP
             ScaleFactor = newScale;
             InitializeResizeTriangle();
 
-            TitleBarText.TextSize = 12F * newScale;
-            RightTitleInfoText.TextSize = 12F * newScale;
+            _espWidgetFont.Size = 12F * newScale;
             SymbolPaint.StrokeWidth = 2f * newScale;
         }
         #endregion
@@ -540,27 +534,19 @@ namespace eft_dma_radar.UI.ESP
 
         private static readonly SKPaint TitleBarText = new SKPaint()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Left,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.High
         };
 
         private static readonly SKPaint RightTitleInfoText = new SKPaint()
         {
-            SubpixelText = true,
             Color = SKColors.White,
             IsStroke = false,
-            TextSize = 12f,
-            TextAlign = SKTextAlign.Left,
-            TextEncoding = SKTextEncoding.Utf8,
             IsAntialias = true,
-            FilterQuality = SKFilterQuality.High
         };
+
+        private static readonly SKFont _espWidgetFont = new(SKTypeface.FromFamilyName("Consolas"), 12) { Subpixel = true };
         #endregion
 
         #region IDisposable

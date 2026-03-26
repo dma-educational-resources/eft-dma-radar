@@ -51,6 +51,9 @@ namespace eft_dma_radar.Tarkov.QuestPlanner
     /// </summary>
     public static class QuestMemoryReader
     {
+        private static int _lastStarted = -1;
+        private static int _lastAvailableForStart = -1;
+        private static int _lastAvailableForFinish = -1;
         /// <summary>
         /// Reads all quests from the player's profile grouped by status.
         /// Returns quests with Status=1 (AvailableForStart), 2 (Started), or 3 (AvailableForFinish).
@@ -146,7 +149,15 @@ namespace eft_dma_radar.Tarkov.QuestPlanner
 
                 if (started.Count > 0 || availableForStart.Count > 0 || availableForFinish.Count > 0)
                 {
-                    XMLogging.WriteLine($"[QuestMemoryReader] Found {started.Count} Started, {availableForStart.Count} AvailableForStart, {availableForFinish.Count} AvailableForFinish quests");
+                    if (started.Count != _lastStarted ||
+                        availableForStart.Count != _lastAvailableForStart ||
+                        availableForFinish.Count != _lastAvailableForFinish)
+                    {
+                        _lastStarted = started.Count;
+                        _lastAvailableForStart = availableForStart.Count;
+                        _lastAvailableForFinish = availableForFinish.Count;
+                        XMLogging.WriteLine($"[QuestMemoryReader] Found {started.Count} Started, {availableForStart.Count} AvailableForStart, {availableForFinish.Count} AvailableForFinish quests");
+                    }
                 }
             }
             catch (Exception ex)

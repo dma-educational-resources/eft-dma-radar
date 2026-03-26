@@ -115,11 +115,11 @@ namespace eft_dma_radar.Common.Unity
         }
         public readonly struct Camera
         {
-            // IL2CPP offsets (updated Dec 2025)
-            public const uint ViewMatrix = 0x128;      // IL2CPP: 0x128 (was 0x100 in Mono)
-            public const uint FOV = 0x1A8;             // IL2CPP: 0x1A8 (was 0x180 in Mono)
+            // IL2CPP offsets (updated Dec 2025) — resolved dynamically via sig scan, hardcoded as fallback
+            public static uint ViewMatrix = 0x128;      // IL2CPP: 0x128 (was 0x100 in Mono)
+            public static uint FOV = 0x1A8;             // IL2CPP: 0x1A8 (was 0x180 in Mono)
             public const uint LastPosition = 0x454;    // TODO: Verify for IL2CPP
-            public const uint AspectRatio = 0x518;     // IL2CPP: 0x518 (was 0x4F0 in Mono)
+            public static uint AspectRatio = 0x518;     // IL2CPP: 0x518 (was 0x4F0 in Mono)
             public const uint ZoomLevel = 0xE8;        // IL2CPP: Zoom level (used for scope detection)
             public const uint DerefIsAddedOffset = 0x35; // IL2CPP: IsAdded offset after +0x10 dereference (DEC 2025 from Camera-PWA)
             public const uint OcclusionCulling = 0x524; // bool, Camera::CopiableState -> m_OcclusionCulling

@@ -193,6 +193,17 @@ input[type="color"]{
   padding: 0;
   cursor:pointer;
 }
+select{
+  background: rgba(0,0,0,.32);
+  border: 1px solid rgba(255,255,255,.12);
+  color: #e5e7eb;
+  border-radius: 8px;
+  padding: 3px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+select:hover{ border-color: rgba(255,255,255,.22); }
 button.small{
   padding: 6px 8px;
   border-radius: 10px;
@@ -280,6 +291,22 @@ button.small:hover{ background: rgba(255,255,255,.10); }
 }
 .widget.minimized .w-body{ display:none; }
 .widget .w-aimview-body{ padding:0; overflow:hidden; gap:0; max-height:none; }
+
+.aimview-type-filters{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 4px 0 2px;
+}
+.atf{
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
+}
 
 .widget .w-toprow{
   display:flex;

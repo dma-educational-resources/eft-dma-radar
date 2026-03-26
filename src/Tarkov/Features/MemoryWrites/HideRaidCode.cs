@@ -1,5 +1,4 @@
 using System;
-using eft_dma_shared.Common.Unity;
 using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
