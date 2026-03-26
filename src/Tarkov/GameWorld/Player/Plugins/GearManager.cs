@@ -249,12 +249,20 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 
                 // ✅ SET PROFILE ID ONCE
                 player.ProfileID = profileId;
-        
+
                 XMLogging.WriteLine(
                     $"[GearManager] Resolved ProfileID for {player}: {profileId}");
-        
-                // ✅ FIRE API INGESTION HERE (ONCE)
-                PlayerLookupApiClient.TryResolve(player);
+
+                // Register this profileId in the local database. AccountId is not
+                // available from the player's own dogtag — it will be filled in if
+                // they appear as a killer on a corpse dogtag in this or a future raid.
+                DogtagDatabase.TryAddOrUpdate(profileId, null, null);
+
+                // If accountId was already seeded (e.g. they killed someone previously),
+                // trigger stats fetch now.
+                var cached = PlayerLookupApiClient.TryGetCached(profileId);
+                if (cached?.AccountId is string acctId)
+                    EFTProfileService.RegisterProfile(acctId);
             }
             catch { }
         }

@@ -1,105 +1,73 @@
-using System;
-using System.Collections.Concurrent;
-using System.Net.Http;
-using System.Text.Json;
-using System.Threading.Tasks;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Tarkov.EFTPlayer;
-using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
+ï»¿using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
+using eft_dma_radar.Common.Misc;
+
 namespace eft_dma_radar.Tarkov.API
 {
+    /// <summary>
+    /// Local-only registry that maps profileId to (accountId, nickname).
+    /// Populated exclusively from in-game dogtag reads - no external HTTP calls.
+    /// </summary>
     internal static class PlayerLookupApiClient
     {
-        private const string ApiKey = "eft_7f8d2c4b9a1e3d6a1";
-        private const string BaseUrl = "http://45.61.50.254:8000/player";
+        // profileId -> result (hot cache, pre-seeded from DogtagDatabase on startup)
+        private static readonly ConcurrentDictionary<string, PlayerLookupResult> _cache;
 
-        private static readonly HttpClient _http = CreateClient();
-
-        // profileId -> result (ONLY successful results cached)
-        private static readonly ConcurrentDictionary<string, PlayerLookupResult> _cache = new();
-
-        private static HttpClient CreateClient()
+        static PlayerLookupApiClient()
         {
-            var client = new HttpClient
+            _cache = new ConcurrentDictionary<string, PlayerLookupResult>(StringComparer.OrdinalIgnoreCase);
+
+            // Pre-populate from persisted database so previous raids are immediately available.
+            foreach (var kv in DogtagDatabase.Entries)
             {
-                Timeout = TimeSpan.FromSeconds(2)
-            };
-            client.DefaultRequestHeaders.Add("X-API-Key", ApiKey);
-            return client;
+                _cache[kv.Key] = new PlayerLookupResult
+                {
+                    AccountId = kv.Value.AccountId,
+                    Nickname  = kv.Value.Nickname
+                };
+
+                if (!string.IsNullOrEmpty(kv.Value.AccountId))
+                    EFTProfileService.RegisterProfile(kv.Value.AccountId);
+            }
         }
 
-        // ? called every refresh until resolved
-        public static void TryResolve(Player player)
+        /// <summary>
+        /// Seeds the registry from a corpse dogtag where both profileId and accountId
+        /// are embedded (the killer's data). Persists to DogtagDb.json and triggers
+        /// EFT stats fetch. Handles the case where the profileId was already known
+        /// (e.g. previously seen as a victim) but had no accountId until now.
+        /// </summary>
+        public static void SeedFromDogtag(string profileId, string accountId, string? nickname)
         {
-            if (player == null)
+            if (string.IsNullOrEmpty(profileId) || string.IsNullOrEmpty(accountId))
                 return;
 
-            var profileId = player.ProfileID;
-            if (string.IsNullOrEmpty(profileId))
-                return;
-
-            // already cached ¡ú nothing to do
-            if (_cache.ContainsKey(profileId))
-                return;
-
-            // fire async lookup
-            _ = LookupAsync(profileId, player);
+            // TryAddOrUpdate returns true when accountId is resolved for the first time.
+            if (DogtagDatabase.TryAddOrUpdate(profileId, accountId, nickname))
+            {
+                _cache[profileId] = new PlayerLookupResult { AccountId = accountId, Nickname = nickname };
+                EFTProfileService.RegisterProfile(accountId);
+                XMLogging.WriteLine(
+                    $"[PlayerLookup] Seeded from dogtag: {profileId} => {nickname} ({accountId})");
+            }
         }
 
-        // ? ObservedPlayer pulls from here
-        public static PlayerLookupResult TryGetCached(string profileId)
+        /// <summary>
+        /// Returns cached data for a given profile ID, or null if not yet seeded.
+        /// </summary>
+        public static PlayerLookupResult? TryGetCached(string profileId)
         {
             _cache.TryGetValue(profileId, out var result);
             return result;
         }
 
-        private static async Task LookupAsync(string profileId, Player player)
-        {
-            try
-            {
-                var url = $"{BaseUrl}?q={profileId}";
-                using var resp = await _http.GetAsync(url).ConfigureAwait(false);
-
-                if (!resp.IsSuccessStatusCode)
-                    return;
-
-                var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-                var result = JsonSerializer.Deserialize<PlayerLookupResult>(json);
-
-                if (result?.Found == true)
-                {
-                    _cache.TryAdd(profileId, result);
-
-                    // propagate to PlayerList.json
-                    if (player.VoipId != 0)
-                    {
-                        PlayerListWorker.UpdateIdentity(
-                            player.ProfileID,
-                            result.Nickname,
-                            result.AccountId);
-                    }
-
-                    XMLogging.WriteLine(
-                        $"[PlayerLookup] RESOLVED {profileId} => {result.Nickname} ({result.AccountId})");
-                }
-            }
-            catch
-            {
-                // swallow, retry later
-            }
-        }
-
         internal sealed class PlayerLookupResult
         {
-            [JsonPropertyName("found")]
-            public bool Found { get; set; }
-
             [JsonPropertyName("accountId")]
-            public string AccountId { get; set; }
+            public string? AccountId { get; set; }
 
             [JsonPropertyName("nickname")]
-            public string Nickname { get; set; }
+            public string? Nickname { get; set; }
         }
     }
 }

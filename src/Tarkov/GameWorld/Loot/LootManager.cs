@@ -13,6 +13,7 @@ using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.GameWorld;
 using System.IO;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
+using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.UI.ESP.eft_dma_radar.UI.ESP;
 using HandyControl.Controls;
 using System.Drawing.Imaging.Effects;
@@ -481,11 +482,16 @@ namespace eft_dma_radar.Tarkov.Loot
                     if (!dogtagComp.IsValidVirtualAddress())
                         continue;
 
-                    string victimName = ReadStringPtr(dogtagComp + Offsets.DogtagComponent.Nickname);
+                    string victimName      = ReadStringPtr(dogtagComp + Offsets.DogtagComponent.Nickname);
                     string victimProfileId = ReadStringPtr(dogtagComp + Offsets.DogtagComponent.ProfileId);
+                    string victimAccountId = ReadStringPtr(dogtagComp + Offsets.DogtagComponent.AccountId);
 
                     if (string.IsNullOrEmpty(victimProfileId) || string.IsNullOrEmpty(victimName))
                         continue;
+
+                    // Victim's own AccountId is embedded in the dogtag at 0x20.
+                    // Seed both victim and killer so stats can be fetched for either side.
+                    PlayerLookupApiClient.SeedFromDogtag(victimProfileId, victimAccountId, victimName);
 
                     lock (_sync)
                     {
@@ -505,6 +511,10 @@ namespace eft_dma_radar.Tarkov.Loot
                             profileId: killerProfileId,
                             nickname: killerName,
                             accountId: killerAccountId);
+
+                        // Killer's profileId + accountId are both present in the dogtag.
+                        // Seed the local registry so PlayerProfile can resolve stats.
+                        PlayerLookupApiClient.SeedFromDogtag(killerProfileId, killerAccountId, killerName);
 
                         string weapon = "UNKNOWN";
                         PlayerType side = PlayerType.Default;

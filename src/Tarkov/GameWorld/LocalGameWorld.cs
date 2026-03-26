@@ -662,9 +662,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
                                 continue;
                             try
                             {
-                                
-                                PlayerLookupApiClient.TryResolve(player);
-                                XMLogging.WriteLine($"[Raid] PlayerLookupApiClient resolved player {player.ProfileID}");
+                                // Trigger stats fetch if this player's accountId was already
+                                // seeded from a previous corpse dogtag read.
+                                var cached = PlayerLookupApiClient.TryGetCached(player.ProfileID);
+                                if (cached?.AccountId is string acctId)
+                                    EFTProfileService.RegisterProfile(acctId);
                             }
                             catch (Exception ex)
                             {
