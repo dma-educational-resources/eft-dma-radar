@@ -594,9 +594,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         protected static ulong ValidateRotationAddr(ulong rotationAddr)
         {
             var rotation = Memory.ReadValue<Vector2>(rotationAddr, false);
-            if (!rotation.IsNormalOrZero() ||
-                Math.Abs(rotation.X) > 360f ||
-                Math.Abs(rotation.Y) > 90f)
+            if (!rotation.IsNormalOrZero())
                 throw new ArgumentOutOfRangeException(nameof(rotationAddr));
 
             return rotationAddr;
