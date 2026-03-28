@@ -99,6 +99,11 @@
 
                                         <CheckBox x:Name="chkMapSetup" Content="Show Map Setup" Tag="ShowMapSetup"
                                                   Style="{StaticResource DynamicCheckBoxStyle}" Grid.Row="0" Grid.Column="0" Margin="0,0,5,8"/>
+                                        <Button x:Name="btnForceOffsetsUpdate" Content="Force Offsets Update"
+                                                Tag="ForceOffsetsUpdate"
+                                                Style="{StaticResource ButtonPrimary}"
+                                                Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                                Height="28" HorizontalAlignment="Left" Margin="0,0,0,8"/>
                                     </Grid>
 
                                     <Grid Margin="0,2,0,2">

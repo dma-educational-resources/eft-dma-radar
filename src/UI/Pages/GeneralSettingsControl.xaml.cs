@@ -2,6 +2,8 @@ using eft_dma_radar.Tarkov;
 using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.Features;
+using eft_dma_radar.Tarkov.Unity.IL2CPP;
+using eft_dma_radar.Misc;
 using System.Net.Http;
 using System.Windows.Media.Imaging;
 using SkiaSharp;
@@ -576,6 +578,12 @@ namespace eft_dma_radar.UI.Pages
             }
         }
 
+        private void btnForceOffsetsUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            NotificationsShared.Info("IL2CPP offsets update started...");
+            Task.Run(Il2CppDumper.ForceRedump);
+        }
+
         private void GeneralMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (sender is MenuItem mnu && mnu.Tag is string tag)
@@ -601,6 +609,7 @@ namespace eft_dma_radar.UI.Pages
             // General Options
             chkMapSetup.Checked += GeneralCheckbox_Checked;
             chkMapSetup.Unchecked += GeneralCheckbox_Checked;
+            btnForceOffsetsUpdate.Click += btnForceOffsetsUpdate_Click;
             ccbWidgets.SelectionChanged += widgetsCheckComboBox_SelectionChanged;
             ccbGeneralOptions.SelectionChanged += generalOptionsCheckComboBox_SelectionChanged;
 

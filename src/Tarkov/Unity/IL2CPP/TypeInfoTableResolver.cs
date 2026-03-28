@@ -1,6 +1,5 @@
 #nullable enable
 
-using System.Diagnostics;
 using System.Reflection;
 using eft_dma_radar.Common.Misc;
 using SDK;
@@ -9,241 +8,27 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 {
     public static partial class Il2CppDumper
     {
-        // ── IL2CPP bootstrap resolution ─────────────────────────────────────────
+        // ── Constants ────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Candidate signatures for locating the TypeInfoTable global.
-        /// Each entry: (signature, rel32 offset from match start, instruction length for RIP calc, description).
-        /// Both patterns reference the same <c>qword</c> global that holds
-        /// <c>s_Il2CppMetadataRegistration→typeInfoTable</c>.
-        /// Confirmed via IDA: only 2 xrefs to this global exist in GameAssembly.dll.
-        /// </summary>
+        private const int MaxTableEntries = 64;
+        private const int EarlyProbeCount = 16;
+        private const int EarlyProbeRequired = 8;
+        private const int MidProbeOffset = 5_000;
+        private const int MidProbeCount = 8;
+        private const int MidProbeRequired = 3;
+        private const string GameAssemblyName = "GameAssembly.dll";
+        private const string LogTag = "[Il2CppDumper]";
+
+        // ── Signatures & TypeIndex map ───────────────────────────────────────
+
+        // (Sig, RelOffset, InstrLen, Desc) — RelOffset/InstrLen used for RIP-relative decode
         private static readonly (string Sig, int RelOffset, int InstrLen, string Desc)[] TypeInfoTableSigs =
         [
-            // Read-side (lookup function): mov rax, [rip+rel32]; lea r14,[rax+rsi*8]; ...; nop; test rdi,rdi; jnz
             ("48 8B 05 ? ? ? ? ? ? ? ? ? ? ? 90 48 85 DB 75 ? 48 8D 2D ? ? ? ? 48 89 6C 24 ? 48 8B CD E8 ? ? ? ? 90 ? ? ? 48 85 DB 75 ? 8B CF", 3, 7, "read: mov rax,[rip+rel32] (table lookup)"),
-
-            // Write-side (initialization): mov [rip+rel32], rax; mov rax, [rip+rel32]; mov edx, [rax+...]
             ("48 89 05 ? ? ? ? 48 8B 05 ? ? ? ? 8B 48", 3, 7, "write: mov [rip+rel32],rax (init store)"),
-
-            // Minimal write-side anchor: mov [rip+rel32], rax; mov rax, [rip+rel32]
             ("48 89 05 ? ? ? ? 48 8B 05", 3, 7, "write: mov [rip+rel32],rax; mov rax,[rip+rel32] (minimal)"),
         ];
 
-        /// <summary>
-        /// Signature-scans GameAssembly.dll for the TypeInfoTable global and
-        /// updates <see cref="Offsets.Special.TypeInfoTableRva"/> at runtime.
-        /// Tries multiple signature patterns and validates the result by probing
-        /// the resolved table for plausible class pointers.
-        /// Falls back to the hardcoded value in SDK.cs if all strategies fail.
-        /// </summary>
-        private static bool ResolveTypeInfoTableRva(ulong gaBase)
-        {
-            DebugTestAllSignatures(gaBase);
-
-            const int maxMatchesPerSignature = 64;
-            var testedRvas = new HashSet<ulong>();
-
-            ulong selectedRva = 0;
-            ulong selectedSigAddr = 0;
-            string? selectedSig = null;
-
-            int totalValidMatches = 0;
-
-            foreach (var (sig, relOff, instrLen, _) in TypeInfoTableSigs)
-            {
-                ulong[] sigAddrs;
-                try
-                {
-                    sigAddrs = Memory.FindSignatures(sig, "GameAssembly.dll", maxMatchesPerSignature);
-                }
-                catch (Exception ex)
-                {
-                    XMLogging.WriteLine($"[Il2CppDumper] TypeInfoTable sig scan error ({sig}): {ex.Message}");
-                    continue;
-                }
-
-                int validMatches = 0;
-                var sigUniqueRvas = new HashSet<ulong>();
-                ulong sigFirstValidRva = 0;
-                ulong sigFirstValidAddr = 0;
-
-                foreach (var sigAddr in sigAddrs)
-                {
-                    var rva = ResolveRipRelativeRva(sigAddr, relOff, instrLen, gaBase);
-                    if (rva == 0)
-                        continue;
-
-                    if (!ValidateTypeInfoTable(gaBase, rva))
-                        continue;
-
-                    validMatches++;
-                    totalValidMatches++;
-                    sigUniqueRvas.Add(rva);
-
-                    if (sigFirstValidRva == 0)
-                    {
-                        sigFirstValidRva = rva;
-                        sigFirstValidAddr = sigAddr;
-                    }
-
-                    bool isNewGlobalValid = testedRvas.Add(rva);
-                    if (!isNewGlobalValid)
-                        continue;
-
-                    if (selectedRva == 0)
-                    {
-                        selectedRva = rva;
-                        selectedSigAddr = sigAddr;
-                        selectedSig = sig;
-                    }
-                }
-
-                if (sigFirstValidRva != 0)
-                {
-                    XMLogging.WriteLine($"[Il2CppDumper] TypeInfoTable sig '{sig}': found={sigAddrs.Length}, valid={validMatches}, unique={sigUniqueRvas.Count}, anyValid=yes, firstValid=GA+0x{sigFirstValidAddr - gaBase:X}, rva=0x{sigFirstValidRva:X}");
-                }
-                else
-                {
-                    XMLogging.WriteLine($"[Il2CppDumper] TypeInfoTable sig '{sig}': found={sigAddrs.Length}, valid=0, unique=0, anyValid=no");
-                }
-            }
-
-            if (selectedRva != 0)
-            {
-                var previous = Offsets.Special.TypeInfoTableRva;
-                Offsets.Special.TypeInfoTableRva = selectedRva;
-
-                if (selectedSig is not null)
-                    XMLogging.WriteLine($"[Il2CppDumper] TypeInfoTable selected: sig={selectedSig}, GA+0x{selectedSigAddr - gaBase:X}, rva=0x{selectedRva:X}");
-
-                XMLogging.WriteLine($"[Il2CppDumper] TypeInfoTable validation totals: valid={totalValidMatches}, unique={testedRvas.Count}");
-
-                if (previous != selectedRva)
-                    XMLogging.WriteLine($"[Il2CppDumper] TypeInfoTableRva UPDATED: 0x{previous:X} → 0x{selectedRva:X}");
-
-                return true;
-            }
-
-            // All signatures failed — validate the hardcoded fallback.
-            if (Offsets.Special.TypeInfoTableRva != 0 && ValidateTypeInfoTable(gaBase, Offsets.Special.TypeInfoTableRva))
-                return true;
-
-            XMLogging.WriteLine($"[Il2CppDumper] TypeInfoTable validation totals: valid={totalValidMatches}, unique={testedRvas.Count}");
-            XMLogging.WriteLine("[Il2CppDumper] WARNING: All TypeInfoTable resolution strategies failed — offsets may be stale!");
-            return false;
-        }
-
-        /// <summary>
-        /// Reads a RIP-relative <c>int32</c> displacement from a matched signature
-        /// and computes the target RVA relative to <paramref name="gaBase"/>.
-        /// </summary>
-        private static ulong ResolveRipRelativeRva(ulong sigAddr, int relOffset, int instrLen, ulong gaBase)
-        {
-            int rel;
-            try { rel = Memory.ReadValue<int>(sigAddr + (ulong)relOffset, false); }
-            catch { return 0; }
-
-            ulong globalVa = sigAddr + (ulong)instrLen + (ulong)(long)rel;
-
-            // Basic sanity: the resolved VA must be inside GameAssembly's address space.
-            if (globalVa <= gaBase)
-                return 0;
-
-            return globalVa - gaBase;
-        }
-
-        /// <summary>
-        /// Validates a candidate TypeInfoTable RVA by probing entries at multiple positions.
-        /// A valid table has non-null class pointers whose <c>Il2CppClass::name</c>
-        /// fields point to readable ASCII strings.
-        /// Probes early, mid, and late sections to catch partially-corrupt tables.
-        /// </summary>
-        private static bool ValidateTypeInfoTable(ulong gaBase, ulong rva)
-        {
-            ulong tablePtr;
-            try { tablePtr = Memory.ReadPtr(gaBase + rva, false); }
-            catch { return false; }
-
-            if (!tablePtr.IsValidVirtualAddress())
-                return false;
-
-            // Probe early entries — these are almost always populated.
-            const int earlyProbeCount = 16;
-            const int earlyRequired = 8;
-
-            if (!ProbeTableEntries(tablePtr, 0, earlyProbeCount, earlyRequired))
-                return false;
-
-            // Probe a mid-range slice — catches tables that are valid at the start but corrupt later.
-            // Offset 5000 is well within any healthy IL2CPP binary (typically 30k+ classes).
-            const int midOffset = 5_000;
-            const int midProbeCount = 8;
-            const int midRequired = 3;
-
-            if (!ProbeTableEntries(tablePtr, midOffset, midProbeCount, midRequired))
-                return false;
-
-            return true;
-        }
-
-        /// <summary>
-        /// Probes <paramref name="count"/> consecutive table entries starting at <paramref name="startIndex"/>
-        /// and returns <c>true</c> if at least <paramref name="required"/> contain a valid Il2CppClass
-        /// with a plausible name string.
-        /// </summary>
-        private static bool ProbeTableEntries(ulong tablePtr, int startIndex, int count, int required)
-        {
-            ulong[] ptrs;
-            try { ptrs = Memory.ReadArray<ulong>(tablePtr + (ulong)startIndex * 8, count, false); }
-            catch { return false; }
-
-            int valid = 0;
-            for (int i = 0; i < ptrs.Length; i++)
-            {
-                if (!ptrs[i].IsValidVirtualAddress())
-                    continue;
-
-                ulong namePtr;
-                try { namePtr = Memory.ReadValue<ulong>(ptrs[i] + K_Name, false); }
-                catch { continue; }
-
-                if (!namePtr.IsValidVirtualAddress())
-                    continue;
-
-                var name = ReadStr(namePtr);
-                if (!string.IsNullOrEmpty(name) && name.Length < MaxNameLen && IsPlausibleClassName(name))
-                    valid++;
-
-                if (valid >= required)
-                    return true;
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// Checks whether a string looks like a plausible IL2CPP class name
-        /// (printable ASCII or common Unicode escape, no control chars).
-        /// </summary>
-        private static bool IsPlausibleClassName(string name)
-        {
-            for (int i = 0; i < name.Length; i++)
-            {
-                char c = name[i];
-                // Allow printable ASCII, common C# identifier chars, and IL2CPP unicode escapes
-                if (c < 0x20 || (c > 0x7E && c < 0xA0))
-                    return false;
-            }
-            return true;
-        }
-
-        // ── TypeIndex resolution ─────────────────────────────────────────────────
-
-        /// <summary>
-        /// Maps IL2CPP class names → <see cref="Offsets.Special"/> TypeIndex field names.
-        /// Add entries here when new singleton classes need TypeIndex resolution.
-        /// </summary>
         private static readonly (string Il2CppName, string FieldName)[] TypeIndexMap =
         [
             ("EFTHardSettings",       nameof(Offsets.Special.EFTHardSettings_TypeIndex)),
@@ -254,243 +39,256 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             ("MatchingProgressView",  nameof(Offsets.Special.MatchingProgressView_TypeIndex)),
         ];
 
-        /// <summary>
-        /// Looks up known singleton class names in the scanned type table and
-        /// updates <see cref="Offsets.Special"/> TypeIndex fields dynamically.
-        /// Falls back to hardcoded values for any class not found.
-        /// </summary>
-        private static void ResolveTypeIndices(Dictionary<string, int> nameToIndex)
-        {
-            var specialType = typeof(Offsets.Special);
-            const BindingFlags bf = BindingFlags.Public | BindingFlags.Static;
+        // ── State ────────────────────────────────────────────────────────────
 
-            foreach (var (il2cppName, fieldName) in TypeIndexMap)
+        private static readonly FieldInfo[] CachedTypeIndexFields =
+            typeof(Offsets.Special).GetFields(BindingFlags.Public | BindingFlags.Static);
+
+        private record struct SigScanResult(int Index, string Desc, string State, int Matches, int ValidMatches, ulong Rva);
+
+        private static SigScanResult[] _lastSigResults = [];
+        private static string _lastResolutionMode = "not run";
+
+        // ── Resolution pipeline ──────────────────────────────────────────────
+
+        private static bool ResolveTypeInfoTableRva(ulong gaBase)
+        {
+            var testedRvas = new HashSet<ulong>();
+            var sigResults = new List<SigScanResult>(TypeInfoTableSigs.Length);
+            (ulong rva, ulong sigAddr, string sig)? first = null;
+
+            for (int i = 0; i < TypeInfoTableSigs.Length; i++)
             {
-                var fi = specialType.GetField(fieldName, bf);
-                if (fi is null)
+                var (sig, relOff, instrLen, desc) = TypeInfoTableSigs[i];
+                var (result, scanResult) = TryResolveFromSignature(i, sig, relOff, instrLen, desc, gaBase, testedRvas);
+                sigResults.Add(scanResult);
+                if (result.HasValue && first is null)
+                    first = result;
+            }
+
+            bool success;
+            if (first.HasValue)
+            {
+                var prev = Offsets.Special.TypeInfoTableRva;
+                Offsets.Special.TypeInfoTableRva = first.Value.rva;
+                XMLogging.WriteLine($"{LogTag} TypeInfoTable resolved: rva=0x{first.Value.rva:X}, unique={testedRvas.Count}");
+                if (prev != first.Value.rva)
+                    XMLogging.WriteLine($"{LogTag} TypeInfoTableRva UPDATED: 0x{prev:X} → 0x{first.Value.rva:X}");
+                _lastResolutionMode = "signature";
+                success = true;
+            }
+            else if (Offsets.Special.TypeInfoTableRva != 0 && ValidateTypeInfoTable(gaBase, Offsets.Special.TypeInfoTableRva))
+            {
+                XMLogging.WriteLine($"{LogTag} TypeInfoTable using fallback RVA: 0x{Offsets.Special.TypeInfoTableRva:X}");
+                _lastResolutionMode = "fallback (hardcoded)";
+                success = true;
+            }
+            else
+            {
+                XMLogging.WriteLine($"{LogTag} WARNING: All TypeInfoTable resolution strategies failed — offsets may be stale!");
+                _lastResolutionMode = "FAILED";
+                success = false;
+            }
+
+            _lastSigResults = [.. sigResults];
+            return success;
+        }
+
+        private static ((ulong rva, ulong sigAddr, string sig)?, SigScanResult) TryResolveFromSignature(
+            int index, string sig, int relOff, int instrLen, string desc, ulong gaBase, HashSet<ulong> testedRvas)
+        {
+            ulong[] sigAddrs;
+            try
+            {
+                sigAddrs = Memory.FindSignatures(sig, GameAssemblyName, MaxTableEntries);
+            }
+            catch (Exception ex)
+            {
+                XMLogging.WriteLine($"{LogTag} TypeInfoTable sig[{index}] scan error: {ex.Message}");
+                return (null, new SigScanResult(index, desc, "ERROR", 0, 0, 0));
+            }
+
+            if (sigAddrs.Length == 0)
+                return (null, new SigScanResult(index, desc, "MISS", 0, 0, 0));
+
+            ulong duplicateRva = 0;
+            int validCount = 0;
+            foreach (var sigAddr in sigAddrs)
+            {
+                var rva = ResolveRipRelativeRva(sigAddr, relOff, instrLen, gaBase);
+                if (rva == 0 || !ValidateTypeInfoTable(gaBase, rva))
                     continue;
 
-                if (nameToIndex.TryGetValue(il2cppName, out var index))
-                {
-                    var previous = (uint)(fi.GetValue(null) ?? 0u);
-                    fi.SetValue(null, (uint)index);
+                validCount++;
+                if (testedRvas.Add(rva))
+                    return ((rva, sigAddr, sig), new SigScanResult(index, desc, "OK", sigAddrs.Length, validCount, rva));
 
-                    if (previous != (uint)index)
-                        XMLogging.WriteLine($"[Il2CppDumper] {fieldName} UPDATED: {previous} → {index}");
-                }
-                else
-                {
-                    XMLogging.WriteLine($"[Il2CppDumper] WARN: '{il2cppName}' not found in type table — {fieldName} using fallback ({fi.GetValue(null) ?? 0u}).");
-                }
+                duplicateRva = rva; // valid RVA but already found by a prior signature
             }
+
+            if (duplicateRva != 0)
+                return (null, new SigScanResult(index, desc, "DUPLICATE", sigAddrs.Length, validCount, duplicateRva));
+
+            return (null, new SigScanResult(index, desc, "INVALID", sigAddrs.Length, validCount, 0));
         }
 
-        // ── Debug diagnostics ─────────────────────────────────────────────────────────────
+        // ── User Diagnostic Report ───────────────────────────────────────────
 
-#if DEBUG
-        /// <summary>
-        /// Sig audit lines collected by <see cref="DebugTestAllSignatures"/> for
-        /// deferred output inside <see cref="DebugDumpResolverState"/>.
-        /// </summary>
-        private static List<string>? _sigAuditLines;
-#endif
-
-        /// <summary>
-        /// DEBUG: Tests all TypeInfoTable signatures and stores results for
-        /// deferred output inside <see cref="DebugDumpResolverState"/>.
-        /// Automatically runs in Debug builds; fully stripped in Release.
-        /// </summary>
-        [Conditional("DEBUG")]
-        private static void DebugTestAllSignatures(ulong gaBase)
+        private static List<string> BuildUserReportBox(int classCount, int updated, int fallback, int skipped)
         {
-            const string tag = "[Il2CppDumper]";
-            var bodyLines = new List<string>();
-
-            for (int idx = 0; idx < TypeInfoTableSigs.Length; idx++)
-            {
-                var (sig, relOff, instrLen, _) = TypeInfoTableSigs[idx];
-                try
-                {
-                    var sigAddrs = Memory.FindSignatures(sig, "GameAssembly.dll", 64);
-                    if (sigAddrs.Length == 0)
-                    {
-                        bodyLines.Add($"[{idx}] MISS — sig={sig}");
-                        continue;
-                    }
-
-                    int badRip = 0;
-                    int invalid = 0;
-                    ulong firstValidRva = 0;
-                    ulong firstValidSigAddr = 0;
-
-                    foreach (var sigAddr in sigAddrs)
-                    {
-                        var rva = ResolveRipRelativeRva(sigAddr, relOff, instrLen, gaBase);
-                        if (rva == 0)
-                        {
-                            badRip++;
-                            continue;
-                        }
-
-                        if (!ValidateTypeInfoTable(gaBase, rva))
-                        {
-                            invalid++;
-                            continue;
-                        }
-
-                        firstValidRva = rva;
-                        firstValidSigAddr = sigAddr;
-                        break;
-                    }
-
-                    if (firstValidRva != 0)
-                    {
-                        bodyLines.Add($"[{idx}] OK RVA=0x{firstValidRva:X} — sig={sig} (matches={sigAddrs.Length}, GA+0x{firstValidSigAddr - gaBase:X})");
-                    }
-                    else if (badRip == sigAddrs.Length)
-                    {
-                        bodyLines.Add($"[{idx}] BAD RIP — sig={sig} (matches={sigAddrs.Length})");
-                    }
-                    else
-                    {
-                        bodyLines.Add($"[{idx}] INVALID — sig={sig} (matches={sigAddrs.Length}, badRip={badRip}, invalid={invalid})");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    bodyLines.Add($"[{idx}] ERROR {ex.Message} — sig={sig}");
-                }
-            }
-
-            // Auto-size: W = inner width between │ and │ (or ┌ and ┐)
-            const string title = "TypeInfoTable Signature Audit";
-            int W = title.Length + 4; // "─ title ─" minimum
-            foreach (var line in bodyLines)
-                if (line.Length + 2 > W) // " content " padding
-                    W = line.Length + 2;
-
-            var lines = new List<string>(bodyLines.Count + 2);
-            {
-                int dashTotal = W - title.Length - 2; // 2 spaces around title
-                int dashLeft = dashTotal / 2;
-                int dashRight = dashTotal - dashLeft;
-                lines.Add($"{tag} ┌{new string('─', dashLeft)} {title} {new string('─', dashRight)}┐");
-            }
-            foreach (var body in bodyLines)
-            {
-                if (body.StartsWith('['))
-                {
-                    lines.Add($"{tag} │ {body.PadRight(W - 1)}│");
-                }
-                else
-                {
-                    int pad = W - body.Length;
-                    int left = pad / 2;
-                    int right = pad - left;
-                    lines.Add($"{tag} │{new string(' ', left)}{body}{new string(' ', right)}│");
-                }
-            }
-            lines.Add($"{tag} └{new string('─', W)}┘");
-
-#if DEBUG
-            _sigAuditLines = lines;
-#endif
-        }
-
-        /// <summary>
-        /// DEBUG: Dumps a comprehensive summary of TypeInfoTable resolution and TypeIndex state.
-        /// Includes the deferred sig audit box from <see cref="DebugTestAllSignatures"/>.
-        /// Called after <see cref="Il2CppDumper.Dump"/> completes.
-        /// </summary>
-        [Conditional("DEBUG")]
-        internal static void DebugDumpResolverState(int classCount, int updated, int fallback, int skipped)
-        {
-            const int W = 54;
-            const string tag = "[Il2CppDumper]";
             var gaBase = Memory.GameAssemblyBase;
+            string gaText = gaBase.IsValidVirtualAddress() ? $"0x{gaBase:X}" : "(not resolved)";
 
-            string Row(string text) => $"║  {text,-(W - 2)}║";
+            int W = 56;
+            const int SigTruncLen = 48;
+            foreach (var r in _lastSigResults)
+            {
+                string rawSig = TypeInfoTableSigs[r.Index].Sig;
+                int sigLen = Math.Min(rawSig.Length, SigTruncLen) + (rawSig.Length > SigTruncLen ? 3 : 0);
+                int sigNeeded = 9 + sigLen;
+                int statusNeeded = 4 + 7 + $"matches={r.Matches,-4} valid={r.ValidMatches,-4} rva=0x{r.Rva:X}".Length;
+                if (sigNeeded > W) W = sigNeeded;
+                if (statusNeeded > W) W = statusNeeded;
+            }
+
+            string Row(string text)  => $"║  {text.PadRight(W - 2)}║";
+            string Sep(string label) => $"╠── {label} {new string('─', W - 4 - label.Length)}╣";
             string Header(string text)
             {
                 int pad = W - text.Length;
                 int left = pad / 2;
-                int right = pad - left;
-                return $"║{new string(' ', left)}{text}{new string(' ', right)}║";
+                return $"║{new string(' ', left)}{text}{new string(' ', pad - left)}║";
             }
-            string Sep(string label) => $"╠── {label} {"".PadRight(W - 4 - label.Length, '─')}╣";
 
             var lines = new List<string>();
+            lines.Add($"{LogTag} ╔{new string('═', W)}╗");
+            lines.Add($"{LogTag} {Header("IL2CPP DIAGNOSTIC REPORT")}");
+            lines.Add($"{LogTag} ╠{new string('═', W)}╣");
+            lines.Add($"{LogTag} {Row("If you have issues, copy this entire block (╔ to ╚)")}");
+            lines.Add($"{LogTag} {Row("and paste it when reporting to developers.")}");
+            lines.Add($"{LogTag} ╠{new string('═', W)}╣");
+            lines.Add($"{LogTag} {Row($"GameAssembly  : {gaText}")}");
+            lines.Add($"{LogTag} {Row($"Resolution    : {_lastResolutionMode}")}");
+            lines.Add($"{LogTag} {Row($"Table RVA     : 0x{Offsets.Special.TypeInfoTableRva:X}")}");
+            lines.Add($"{LogTag} {Row($"Classes Found : {classCount}")}");
 
-#if DEBUG
-            // Prepend the deferred sig audit box so both appear together.
-            if (_sigAuditLines is not null)
+            int okCount = _lastSigResults.Count(r => r.State is "OK" or "DUPLICATE");
+            lines.Add($"{LogTag} {Sep($"Signature Scan ({okCount}/{_lastSigResults.Length} OK)")}");
+            foreach (var r in _lastSigResults)
             {
-                lines.AddRange(_sigAuditLines);
-                _sigAuditLines = null;
+                string state = r.State is "OK" or "DUPLICATE" ? "OK" : r.State;
+                string status = r.Rva != 0
+                    ? $"  [{r.Index}] {state,-7} matches={r.Matches,-4} valid={r.ValidMatches,-4} rva=0x{r.Rva:X}"
+                    : $"  [{r.Index}] {state,-7} matches={r.Matches,-4} valid={r.ValidMatches}";
+                lines.Add($"{LogTag} {Row(status)}");
+                string rawSig = TypeInfoTableSigs[r.Index].Sig;
+                string sigLine = rawSig.Length > SigTruncLen ? rawSig[..SigTruncLen] + "..." : rawSig;
+                lines.Add($"{LogTag} {Row($"       {sigLine}")}");
             }
-#endif
 
-            lines.Add($"{tag} ╔{new string('═', W)}╗");
-            lines.Add($"{tag} {Header("IL2CPP Dumper — Debug State")}");
-            lines.Add($"{tag} ╠{new string('═', W)}╣");
-            lines.Add($"{tag} {Row($"GameAssembly Base:  {FormatPtr(gaBase)}")}");
-            lines.Add($"{tag} {Sep("TypeInfoTable")}");
-            lines.Add($"{tag} {Row($"RVA:                0x{Offsets.Special.TypeInfoTableRva:X}")}");
-            lines.Add($"{tag} {Row($"Classes Found:      {classCount}")}");
-            lines.Add($"{tag} {Sep("Dump Results")}");
-            lines.Add($"{tag} {Row($"Offsets Updated:    {updated}")}");
-            lines.Add($"{tag} {Row($"Using Fallback:     {fallback}")}");
-            lines.Add($"{tag} {Row($"Classes Skipped:    {skipped}")}");
-            lines.Add($"{tag} {Sep("TypeIndex Resolution")}");
-
-            var specialType = typeof(Offsets.Special);
-            const BindingFlags bf = BindingFlags.Public | BindingFlags.Static;
+            lines.Add($"{LogTag} {Sep("Offset Dump")}");
+            lines.Add($"{LogTag} {Row($"Updated  : {updated}")}");
+            lines.Add($"{LogTag} {Row($"Fallback : {fallback}")}");
+            lines.Add($"{LogTag} {Row($"Skipped  : {skipped}")}");
+            lines.Add($"{LogTag} {Sep("TypeIndex Values")}");
             foreach (var (il2cppName, fieldName) in TypeIndexMap)
             {
-                var fi = specialType.GetField(fieldName, bf);
+                var fi = GetTypeIndexField(fieldName);
                 string val = fi is not null ? $"{fi.GetValue(null)}" : "(missing)";
-                lines.Add($"{tag} {Row($"{il2cppName + ":",-24}{val}")}");
+                lines.Add($"{LogTag} {Row($"  {il2cppName + ":",-24} {val}")}");
             }
 
-            int validSigs = CountValidSigs(gaBase);
-            lines.Add($"{tag} {Sep("Signature Health")}");
-            lines.Add($"{tag} {Row($"TypeInfoTable:      {validSigs}/{TypeInfoTableSigs.Length} sigs valid")}");
-            lines.Add($"{tag} ╚{new string('═', W)}╝");
-
-            XMLogging.WriteBlock(lines);
+            lines.Add($"{LogTag} ╚{new string('═', W)}╝");
+            return lines;
         }
 
-        private static string FormatPtr(ulong ptr) =>
-            ptr.IsValidVirtualAddress() ? $"0x{ptr:X}" : "(not resolved)";
+        // ── RIP-relative decode ──────────────────────────────────────────────
 
-        private static int CountValidSigs(ulong gaBase)
+        private static ulong ResolveRipRelativeRva(ulong sigAddr, int relOffset, int instrLen, ulong gaBase)
         {
-            int count = 0;
-            foreach (var (sig, relOff, instrLen, _) in TypeInfoTableSigs)
-            {
-                try
-                {
-                    var sigAddrs = Memory.FindSignatures(sig, "GameAssembly.dll", 64);
-                    if (sigAddrs.Length == 0)
-                        continue;
+            int rel;
+            try { rel = Memory.ReadValue<int>(sigAddr + (ulong)relOffset, false); }
+            catch { return 0; }
 
-                    bool hasValid = false;
-                    foreach (var sigAddr in sigAddrs)
-                    {
-                        var rva = ResolveRipRelativeRva(sigAddr, relOff, instrLen, gaBase);
-                        if (rva != 0 && ValidateTypeInfoTable(gaBase, rva))
-                        {
-                            hasValid = true;
-                            break;
-                        }
-                    }
-
-                    if (hasValid)
-                        count++;
-                }
-                catch { /* skip */ }
-            }
-            return count;
+            ulong globalVa = sigAddr + (ulong)instrLen + (ulong)(long)rel;
+            return globalVa > gaBase ? globalVa - gaBase : 0;
         }
+
+        // ── TypeInfoTable validation ─────────────────────────────────────────
+
+        private static bool ValidateTypeInfoTable(ulong gaBase, ulong rva)
+        {
+            ulong tablePtr;
+            try { tablePtr = Memory.ReadPtr(gaBase + rva, false); }
+            catch { return false; }
+
+            return tablePtr.IsValidVirtualAddress()
+                && ProbeTableEntries(tablePtr, 0, EarlyProbeCount, EarlyProbeRequired)
+                && ProbeTableEntries(tablePtr, MidProbeOffset, MidProbeCount, MidProbeRequired);
+        }
+
+        private static bool ProbeTableEntries(ulong tablePtr, int startIndex, int count, int required)
+        {
+            ulong[] ptrs;
+            try { ptrs = Memory.ReadArray<ulong>(tablePtr + (ulong)startIndex * 8, count, false); }
+            catch { return false; }
+
+            int valid = 0;
+            foreach (var ptr in ptrs)
+                if (IsValidClassPtr(ptr) && ++valid >= required)
+                    return true;
+
+            return false;
+        }
+
+        private static bool IsValidClassPtr(ulong ptr)
+        {
+            if (!ptr.IsValidVirtualAddress()) return false;
+            try
+            {
+                var namePtr = Memory.ReadValue<ulong>(ptr + K_Name, false);
+                if (!namePtr.IsValidVirtualAddress()) return false;
+                var name = ReadStr(namePtr);
+                return !string.IsNullOrEmpty(name) && name.Length < MaxNameLen && IsPlausibleClassName(name);
+            }
+            catch { return false; }
+        }
+
+        private static bool IsPlausibleClassName(string name)
+        {
+            foreach (char c in name)
+                if (c < 0x20 || (c > 0x7E && c < 0xA0)) return false;
+            return true;
+        }
+
+        // ── TypeIndex resolution ─────────────────────────────────────────────
+
+        private static void ResolveTypeIndices(Dictionary<string, int> nameToIndex)
+        {
+            foreach (var (il2cppName, fieldName) in TypeIndexMap)
+            {
+                var fi = GetTypeIndexField(fieldName);
+                if (fi is null) continue;
+
+                if (nameToIndex.TryGetValue(il2cppName, out var index))
+                    UpdateTypeIndexField(fi, (uint)index);
+                else
+                    XMLogging.WriteLine($"{LogTag} WARN: '{il2cppName}' not found in type table — {fieldName} using fallback ({fi.GetValue(null) ?? 0u}).");
+            }
+        }
+
+        private static FieldInfo? GetTypeIndexField(string fieldName) =>
+            CachedTypeIndexFields.FirstOrDefault(f => f.Name == fieldName);
+
+        private static void UpdateTypeIndexField(FieldInfo fi, uint newValue)
+        {
+            var previous = (uint)(fi.GetValue(null) ?? 0u);
+            fi.SetValue(null, newValue);
+            if (previous != newValue)
+                XMLogging.WriteLine($"{LogTag} {fi.Name} UPDATED: {previous} → {newValue}");
+        }
+
+        internal static void DebugDumpResolverState(int classCount, int updated, int fallback, int skipped) =>
+            XMLogging.WriteBlock(BuildUserReportBox(classCount, updated, fallback, skipped));
     }
 }

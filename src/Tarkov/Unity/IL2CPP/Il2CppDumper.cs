@@ -1,8 +1,10 @@
+using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.Misc;
+using eft_dma_radar.Misc;
 using SDK;
 
 namespace eft_dma_radar.Tarkov.Unity.IL2CPP
@@ -75,6 +77,19 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         /// loaded instead of re-reading the TypeInfoTable, which may no longer
         /// be accessible after the first ~10 minutes in-game.
         /// </summary>
+        /// <summary>
+        /// Forces a full live re-dump, bypassing the run-once guard and cache.
+        /// Deletes the existing cache file so offsets are read fresh from memory.
+        /// </summary>
+        public static void ForceRedump()
+        {
+            _dumped = false;
+            if (File.Exists(CacheFilePath))
+                File.Delete(CacheFilePath);
+            XMLogging.WriteLine("[Il2CppDumper] Force re-dump requested — cache cleared.");
+            Dump();
+        }
+
         public static void Dump()
         {
             if (_dumped)
@@ -89,6 +104,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             if (gaBase == 0)
             {
                 XMLogging.WriteLine("[Il2CppDumper] ERROR: GameAssemblyBase is 0 — game not ready.");
+                NotificationsShared.Error("IL2CPP dump failed: GameAssembly not found.");
                 return;
             }
 
@@ -98,6 +114,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             if (!ResolveTypeInfoTableRva(gaBase))
             {
                 XMLogging.WriteLine("[Il2CppDumper] ABORT: TypeInfoTable resolution failed — cannot dump offsets.");
+                NotificationsShared.Error("IL2CPP dump failed: TypeInfoTable not found. Offsets may be stale.");
                 return;
             }
 
@@ -293,6 +310,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
             DebugDumpResolverState(classes.Count, updated, fallback, classesSkipped);
             XMLogging.WriteLine($"[Il2CppDumper] Done. {updated} offsets updated, {fallback} fallback, {classesSkipped} skipped.");
+
+            if (fallback > 0 || classesSkipped > 0)
+                NotificationsShared.Warning($"IL2CPP dump partial: {fallback} fallback offset(s), {classesSkipped} class(es) skipped. Check logs.");
 
             // Persist to cache so future game restarts (where the TypeInfoTable may
             // no longer be readable) can skip the live dump entirely.
