@@ -285,7 +285,6 @@ namespace eft_dma_radar
             else
                 ConfigureSafeMode();
 
-            mainWindow.InitializeComponent();
             mainWindow.Show();
             mainWindow.Activate();
 

@@ -28,7 +28,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         private static ulong _cachedViewObjectClass;
         private static Enums.EMatchingStage _cachedStage;
         private static readonly object _lock = new();
-        private static volatile bool _resolvingAsync;
+        private static volatile int _resolvingAsync; // 0 = idle, 1 = running
 
         // ── Transition-tracking state ────────────────────────────────────────────
         private static Enums.EMatchingStage _prevStage = Enums.EMatchingStage.None;
@@ -42,14 +42,14 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
         // ── View-disappearance detection ─────────────────────────────────────────
         private const int ViewGoneThreshold = 5;
-        private static int _consecutiveReadFailures;
+        private static volatile int _consecutiveReadFailures;
 
         // ── GOM search skip (handles launched-mid-raid) ──────────────────────────
         private const int MaxGomFailures = 3;
         private static int _consecutiveGomFailures;
 
         // ── Tracks whether NotifyRaidStarted() already printed the session summary ──
-        private static bool _sessionSummaryLogged;
+        private static volatile bool _sessionSummaryLogged;
 
         // ─────────────────────────────────────────────────────────────────────────
         // Public API
@@ -66,12 +66,20 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             _totalSw.Stop();
             StopStagePoller();
 
-            if (_highWaterStage != Enums.EMatchingStage.None)
+            Enums.EMatchingStage highWater;
+            double elapsed;
+            lock (_lock)
+            {
+                highWater = _highWaterStage;
+                elapsed   = _totalSw.Elapsed.TotalSeconds;
+            }
+
+            if (highWater != Enums.EMatchingStage.None)
             {
                 XMLogging.WriteLine(
                     $"{Tag} ──── Matching session ended ────\n" +
-                    $"{Tag}   Furthest stage reached : {_highWaterStage} ({(int)_highWaterStage}/17)\n" +
-                    $"{Tag}   Total matching elapsed  : {_totalSw.Elapsed.TotalSeconds:F1}s");
+                    $"{Tag}   Furthest stage reached : {highWater} ({(int)highWater}/17)\n" +
+                    $"{Tag}   Total matching elapsed  : {elapsed:F1}s");
                 _sessionSummaryLogged = true;
             }
         }
@@ -81,13 +89,24 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         /// </summary>
         public static void Reset()
         {
+            // Snapshot state under lock before stopping the poller
+            Enums.EMatchingStage highWater;
+            double elapsed;
+            bool wasRunning;
+            lock (_lock)
+            {
+                highWater  = _highWaterStage;
+                elapsed    = _totalSw.Elapsed.TotalSeconds;
+                wasRunning = _totalSw.IsRunning;
+            }
+
             // Log summary only if matching was aborted before NotifyRaidStarted() fired
-            if (!_sessionSummaryLogged && (_totalSw.IsRunning || _highWaterStage != Enums.EMatchingStage.None))
+            if (!_sessionSummaryLogged && (wasRunning || highWater != Enums.EMatchingStage.None))
             {
                 XMLogging.WriteLine(
                     $"{Tag} ──── Matching session ended (aborted) ────\n" +
-                    $"{Tag}   Furthest stage reached : {_highWaterStage} ({(int)_highWaterStage}/17)\n" +
-                    $"{Tag}   Total matching elapsed  : {_totalSw.Elapsed.TotalSeconds:F1}s");
+                    $"{Tag}   Furthest stage reached : {highWater} ({(int)highWater}/17)\n" +
+                    $"{Tag}   Total matching elapsed  : {elapsed:F1}s");
             }
 
             StopStagePoller();
@@ -97,15 +116,15 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 _cachedMatchingProgress = 0;
                 _cachedViewObjectClass  = 0;
                 _cachedStage            = Enums.EMatchingStage.None;
+                _prevStage              = Enums.EMatchingStage.None;
+                _highWaterStage         = Enums.EMatchingStage.None;
+                _totalSw.Reset();
+                _stageSw.Reset();
             }
-            _prevStage      = Enums.EMatchingStage.None;
-            _highWaterStage = Enums.EMatchingStage.None;
-            _consecutiveReadFailures = 0;
+            Interlocked.Exchange(ref _consecutiveReadFailures, 0);
             _consecutiveGomFailures = 0;
-            _totalSw.Reset();
-            _stageSw.Reset();
-            _resolvingAsync = false;
-            _sessionSummaryLogged = false;
+            _resolvingAsync         = 0;
+            _sessionSummaryLogged   = false;
             XMLogging.WriteLine($"{Tag} Cache invalidated via Reset().");
         }
 
@@ -129,10 +148,8 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         /// </summary>
         public static void ResolveAsync()
         {
-            if (_resolvingAsync)
+            if (Interlocked.CompareExchange(ref _resolvingAsync, 1, 0) != 0)
                 return;
-
-            _resolvingAsync = true;
 
             ThreadPool.QueueUserWorkItem(_ =>
             {
@@ -148,7 +165,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 }
                 finally
                 {
-                    _resolvingAsync = false;
+                    _resolvingAsync = 0;
                 }
             });
         }
@@ -248,40 +265,59 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
             try
             {
+                // Memory read outside the lock — this is the slow path.
                 var stage = (Enums.EMatchingStage)Memory.ReadValue<int>(mp + Offsets.MatchingProgress.CurrentStage, useCache: false);
 
+                // All state mutation under a single lock acquisition to prevent the
+                // poller thread and the main memory thread from double-logging transitions.
+                bool didTransition;
+                Enums.EMatchingStage prevForLog;
+                double stageElapsed, totalElapsed;
+                bool needsSnapshot;
+
                 lock (_lock)
-                    _cachedStage = stage;
-
-                _consecutiveReadFailures = 0;
-
-                // ── Transition logging: only log when stage actually changes ──
-                if (stage != _prevStage)
                 {
-                    var stageElapsed = _stageSw.Elapsed.TotalSeconds;
-                    var totalElapsed = _totalSw.Elapsed.TotalSeconds;
+                    _cachedStage = stage;
+                    Interlocked.Exchange(ref _consecutiveReadFailures, 0);
 
+                    if (stage != _prevStage)
+                    {
+                        prevForLog    = _prevStage;
+                        stageElapsed  = _stageSw.Elapsed.TotalSeconds;
+                        totalElapsed  = _totalSw.Elapsed.TotalSeconds;
+                        needsSnapshot = stage >= Enums.EMatchingStage.LocalGameStarting;
+                        didTransition = true;
+
+                        if ((int)stage > (int)_highWaterStage)
+                            _highWaterStage = stage;
+
+                        _prevStage = stage;
+                        _stageSw.Restart();
+                    }
+                    else
+                    {
+                        didTransition = false;
+                        prevForLog    = default;
+                        stageElapsed  = totalElapsed = 0;
+                        needsSnapshot = false;
+                    }
+                }
+
+                if (didTransition)
+                {
                     XMLogging.WriteLine(
-                        $"{Tag} Stage TRANSITION: {_prevStage}({(int)_prevStage}) → {stage}({(int)stage}) | " +
+                        $"{Tag} Stage TRANSITION: {prevForLog}({(int)prevForLog}) → {stage}({(int)stage}) | " +
                         $"prev held {stageElapsed:F1}s | total {totalElapsed:F1}s");
 
-                    // Update high-water mark
-                    if ((int)stage > (int)_highWaterStage)
-                        _highWaterStage = stage;
-
-                    // Full snapshot at important late stages close to spawn
-                    if (stage >= Enums.EMatchingStage.LocalGameStarting)
+                    if (needsSnapshot)
                         LogSnapshot(mp);
-
-                    _prevStage = stage;
-                    _stageSw.Restart();
                 }
 
                 return true;
             }
             catch (Exception ex)
             {
-                _consecutiveReadFailures++;
+                Interlocked.Increment(ref _consecutiveReadFailures);
                 XMLogging.WriteLine($"{Tag} TryUpdateStage read failure #{_consecutiveReadFailures}: {ex.Message}");
                 return false;
             }
@@ -320,14 +356,27 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
                     if (_consecutiveReadFailures >= ViewGoneThreshold)
                     {
-                        var lastStage = _prevStage;
-                        var totalElapsed = _totalSw.Elapsed.TotalSeconds;
+                        Enums.EMatchingStage lastStage, highWater;
+                        double totalElapsed;
+                        int failures;
+
+                        lock (_lock)
+                        {
+                            lastStage    = _prevStage;
+                            highWater    = _highWaterStage;
+                            totalElapsed = _totalSw.Elapsed.TotalSeconds;
+                            failures     = _consecutiveReadFailures;
+                            // Clear the stale pointer so the next re-queue can re-resolve.
+                            _cachedMatchingProgress = 0;
+                            _cachedViewObjectClass  = 0;
+                        }
+
                         XMLogging.WriteLine(
                             $"{Tag} ██ MatchingProgressView DISAPPEARED from GOM ██\n" +
                             $"{Tag}   Last known stage     : {lastStage} ({(int)lastStage}/17)\n" +
-                            $"{Tag}   Furthest stage       : {_highWaterStage} ({(int)_highWaterStage}/17)\n" +
+                            $"{Tag}   Furthest stage       : {highWater} ({(int)highWater}/17)\n" +
                             $"{Tag}   Total elapsed        : {totalElapsed:F1}s\n" +
-                            $"{Tag}   Consecutive failures : {_consecutiveReadFailures}");
+                            $"{Tag}   Consecutive failures : {failures}");
                         StopStagePoller();
                     }
                 }

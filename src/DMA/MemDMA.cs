@@ -154,12 +154,14 @@ namespace eft_dma_radar.Tarkov
         /// </summary>
         private void MemoryPrimaryWorker()
         {
-            XMLogging.WriteLine("Memory thread starting...");
+            LoggingEnhancements.Log(AppLogLevel.Info, "Memory thread starting...");
 
-            while (!MainWindow.Initialized)
+            if (!MainWindow.Initialized)
             {
-                XMLogging.WriteLine("[Waiting] Main window not ready...");
-                Thread.Sleep(100);
+                LoggingEnhancements.Log(AppLogLevel.Info, "Main window not ready, waiting...", "Waiting");
+                while (!MainWindow.Initialized)
+                    Thread.Sleep(100);
+                LoggingEnhancements.Log(AppLogLevel.Info, "Main window ready.", "Waiting");
             }
 
             while (true)
@@ -173,7 +175,7 @@ namespace eft_dma_radar.Tarkov
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"FATAL ERROR on Memory Thread: {ex}");
+                    LoggingEnhancements.Log(AppLogLevel.Error, $"FATAL ERROR on Memory Thread: {ex}");
                     if (MainWindow.Window != null)
                         NotificationsShared.Warning("FATAL ERROR on Memory Thread");
                     OnGameStopped();

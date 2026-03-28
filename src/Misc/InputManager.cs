@@ -29,6 +29,11 @@ namespace eft_dma_radar.Common.Misc
 
         public static bool IsReady => _initialized;
 
+        /// <summary>
+        /// Raised once when InputManager transitions to the ready state.
+        /// </summary>
+        public static event EventHandler? ReadyChanged;
+
         private static readonly Dictionary<int, List<KeyActionHandler>> _keyActionHandlers = new();
         private static readonly object _eventLock = new();
         private static int _nextActionId = 1;
@@ -92,6 +97,7 @@ namespace eft_dma_radar.Common.Misc
             {
                 _vmmInput = new DmaInputManager(_hVMM);
                 _initialized = true;
+                ReadyChanged?.Invoke(null, EventArgs.Empty);
                 return true;
             }
             catch (Exception ex)

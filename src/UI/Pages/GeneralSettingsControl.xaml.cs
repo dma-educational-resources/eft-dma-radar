@@ -2367,16 +2367,9 @@ namespace eft_dma_radar.UI.Pages
         {
             if (!InputManager.IsReady)
             {
-                XMLogging.WriteLine("[Hotkeys] InputManager not ready, retrying hotkey registration");
+                LoggingEnhancements.Log(AppLogLevel.Info, "InputManager not ready — will register hotkeys once it initializes.", "Hotkeys");
 
-                Task.Delay(3000).ContinueWith(_ =>
-                {
-                    Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        RegisterHotkeyHandlers();
-                    }), DispatcherPriority.Background);
-                });
-
+                InputManager.ReadyChanged += OnInputManagerReady;
                 return;
             }
 
@@ -2417,7 +2410,13 @@ namespace eft_dma_radar.UI.Pages
                 }
             }
 
-            XMLogging.WriteLine($"[Hotkeys] Registered {registeredCount} hotkey handlers");
+            LoggingEnhancements.Log(AppLogLevel.Info, $"Registered {registeredCount} hotkey handlers", "Hotkeys");
+        }
+
+        private void OnInputManagerReady(object? sender, EventArgs e)
+        {
+            InputManager.ReadyChanged -= OnInputManagerReady;
+            Dispatcher.BeginInvoke(new Action(RegisterHotkeyHandlers), DispatcherPriority.Background);
         }
 
         private void UnregisterAllHotkeyHandlers()

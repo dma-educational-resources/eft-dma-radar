@@ -133,7 +133,7 @@ namespace eft_dma_radar
         /// <summary>
         /// Determines if MainWindow is ready or not
         /// </summary>
-        public static new bool Initialized = false;
+        public static volatile bool Initialized = false;
 
         private static List<PingEffect> _activePings = new();
 
@@ -315,7 +315,6 @@ namespace eft_dma_radar
                 InitializeCanvas();
             };
 
-            Initialized = true;
             InitializePanels();
             InitializeUIActivityMonitoring();
             InitilizeTelemetry();
@@ -1941,6 +1940,7 @@ namespace eft_dma_radar
             });
 
             XMLogging.WriteLine("[PANELS] All panels are ready!");
+            Initialized = true;
         }
 
         public void EnsureAllPanelsInBounds()
