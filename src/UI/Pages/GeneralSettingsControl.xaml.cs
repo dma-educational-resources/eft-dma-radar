@@ -2437,8 +2437,12 @@ namespace eft_dma_radar.UI.Pages
         private void HandleHotkeyEvent(string actionKey, HotkeyEntry entry, InputManager.KeyEventArgs e)
         {
             XMLogging.WriteLine($"[Hotkeys] HandleHotkeyEvent: {actionKey} IsPressed={e.IsPressed} Mode={entry.Mode}");
-            
-            if (_lastExecutionTime.TryGetValue(actionKey, out var lastTime))
+
+            // For OnKey mode, key-release must always be processed to properly reset state.
+            // Only apply cooldown to press events (or Toggle mode).
+            bool skipCooldown = entry.Mode == HotkeyMode.OnKey && !e.IsPressed;
+
+            if (!skipCooldown && _lastExecutionTime.TryGetValue(actionKey, out var lastTime))
             {
                 var elapsed = (DateTime.UtcNow - lastTime).TotalMilliseconds;
                 if (elapsed < HOTKEY_COOLDOWN_MS)

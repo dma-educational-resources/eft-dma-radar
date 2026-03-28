@@ -117,10 +117,22 @@ namespace eft_dma_radar.Common.Misc
             {
                 var isDown = _vmmInput.IsKeyDown((uint)vk);
 
+                // Keep _currentStateBitmap in sync with the live key state so that
+                // _previousStateBitmap correctly reflects "was held last frame" next iteration.
+                // Without this, _previousStateBitmap stays all-zeros permanently, which means
+                // wasDown is always false: key-down events fire every frame while held, and
+                // key-up events never fire.
+                int byteIdx = vk * 2 / 8;
+                int bitMask = 1 << (vk % 4 * 2);
+                if (isDown)
+                    _currentStateBitmap[byteIdx] |= (byte)bitMask;
+                else
+                    _currentStateBitmap[byteIdx] &= (byte)~bitMask;
+
                 if (isDown)
                     _pressedKeys.Add(vk);
 
-                var wasDown = (_previousStateBitmap[(vk * 2 / 8)] & (1 << (vk % 4 * 2))) != 0;
+                var wasDown = (_previousStateBitmap[byteIdx] & bitMask) != 0;
 
                 if (wasDown != isDown)
                 {
