@@ -3,7 +3,6 @@ using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov;
 using VmmSharpEx;
-using VmmSharpEx.Extensions.Input;
 
 namespace eft_dma_radar.Common.Misc
 {
@@ -17,7 +16,7 @@ namespace eft_dma_radar.Common.Misc
         private static readonly HashSet<int> _pressedKeys = new();
 
         private static Vmm _hVMM;
-        private static VmmInputManager _vmmInput;
+        private static DmaInputManager _vmmInput;
 
         private static int _initAttempts = 0;
         private const int MAX_ATTEMPTS = 3;
@@ -91,7 +90,7 @@ namespace eft_dma_radar.Common.Misc
 
             try
             {
-                _vmmInput = new VmmInputManager(_hVMM);
+                _vmmInput = new DmaInputManager(_hVMM);
                 _initialized = true;
                 return true;
             }
