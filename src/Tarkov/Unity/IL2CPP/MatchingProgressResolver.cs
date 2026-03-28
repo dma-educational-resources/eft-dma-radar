@@ -125,7 +125,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             _consecutiveGomFailures = 0;
             _resolvingAsync         = 0;
             _sessionSummaryLogged   = false;
-            XMLogging.WriteLine($"{Tag} Cache invalidated via Reset().");
+            LoggingEnhancements.Log(AppLogLevel.Debug, "Cache invalidated.", "MatchingProgressResolver");
         }
 
         /// <summary>
@@ -157,7 +157,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 {
                     var mp = GetMatchingProgress();
                     if (mp.IsValidVirtualAddress())
-                        XMLogging.WriteLine($"{Tag} Resolved MatchingProgress @ 0x{mp:X}");
+                        LoggingEnhancements.Log(AppLogLevel.Debug, $"ResolveAsync: MatchingProgress @ 0x{mp:X}", "MatchingProgressResolver");
                 }
                 catch (Exception ex)
                 {
@@ -218,12 +218,12 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
                 _consecutiveGomFailures = 0; // successful find — reset counter
 
-                XMLogging.WriteLine($"{Tag} MatchingProgressView objectClass @ 0x{viewObjectClass:X}");
+                LoggingEnhancements.Log(AppLogLevel.Debug, $"MatchingProgressView objectClass @ 0x{viewObjectClass:X}", "MatchingProgressResolver");
 
                 var mpPtr = Memory.ReadPtr(viewObjectClass + Offsets.MatchingProgressView._matchingProgress);
                 if (!mpPtr.IsValidVirtualAddress())
                 {
-                    XMLogging.WriteLine($"{Tag} _matchingProgress ptr invalid @ objectClass+0x{Offsets.MatchingProgressView._matchingProgress:X}");
+                    LoggingEnhancements.Log(AppLogLevel.Debug, $"_matchingProgress ptr invalid @ objectClass+0x{Offsets.MatchingProgressView._matchingProgress:X}", "MatchingProgressResolver");
                     return 0;
                 }
 
@@ -233,9 +233,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                     _cachedMatchingProgress = mpPtr;
                 }
 
-                XMLogging.WriteLine($"{Tag} MatchingProgress resolved and cached @ 0x{mpPtr:X}");
-                LogViewSnapshot(viewObjectClass);
-                LogSnapshot(mpPtr);
+                LoggingEnhancements.Log(AppLogLevel.Info, $"MatchingProgress resolved @ 0x{mpPtr:X}", "MatchingProgressResolver");
                 _totalSw.Restart();
                 _stageSw.Restart();
                 TryUpdateStage();
@@ -318,7 +316,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             catch (Exception ex)
             {
                 Interlocked.Increment(ref _consecutiveReadFailures);
-                XMLogging.WriteLine($"{Tag} TryUpdateStage read failure #{_consecutiveReadFailures}: {ex.Message}");
+                LoggingEnhancements.Log(AppLogLevel.Debug, $"TryUpdateStage read failure #{_consecutiveReadFailures}: {ex.Message}", "MatchingProgressResolver");
                 return false;
             }
         }
@@ -386,7 +384,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 }
             }, null, 0, 100);
 
-            XMLogging.WriteLine($"{Tag} Background stage poller started (100 ms interval).");
+            LoggingEnhancements.Log(AppLogLevel.Debug, "Stage poller started.", "MatchingProgressResolver");
         }
 
         /// <summary>
@@ -399,7 +397,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             if (t != null)
             {
                 t.Dispose();
-                XMLogging.WriteLine($"{Tag} Background stage poller stopped.");
+                LoggingEnhancements.Log(AppLogLevel.Debug, "Stage poller stopped.", "MatchingProgressResolver");
             }
         }
 
@@ -413,6 +411,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         /// </summary>
         public static void LogViewSnapshot(ulong view = 0)
         {
+            if (!LoggingEnhancements.EnableDebugLogging)
+                return;
+
             if (view == 0)
             {
                 lock (_lock)
@@ -420,30 +421,28 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             }
 
             if (!view.IsValidVirtualAddress())
-            {
-                XMLogging.WriteLine($"{Tag} LogViewSnapshot — no valid MatchingProgressView objectClass pointer.");
                 return;
-            }
 
             try
             {
-                var serversLimited         = Memory.ReadValue<bool>(view + Offsets.MatchingProgressView._serversLimited,           useCache: false);
-                var canUpdateStatus        = Memory.ReadValue<bool>(view + Offsets.MatchingProgressView._canUpdateStatus,          useCache: false);
-                var maxMatchingTime        = Memory.ReadValue<int> (view + Offsets.MatchingProgressView._maxMatchingTimeInSeconds, useCache: false);
-                var warningHasValue        = Memory.ReadValue<bool>(view + Offsets.MatchingProgressView._matchingWarningType_hasValue, useCache: false);
-                var warningRaw             = warningHasValue
+                var serversLimited  = Memory.ReadValue<bool>(view + Offsets.MatchingProgressView._serversLimited,              useCache: false);
+                var canUpdateStatus = Memory.ReadValue<bool>(view + Offsets.MatchingProgressView._canUpdateStatus,             useCache: false);
+                var maxMatchingTime = Memory.ReadValue<int> (view + Offsets.MatchingProgressView._maxMatchingTimeInSeconds,    useCache: false);
+                var warningHasValue = Memory.ReadValue<bool>(view + Offsets.MatchingProgressView._matchingWarningType_hasValue,useCache: false);
+                var warningRaw      = warningHasValue
                     ? Memory.ReadValue<int>(view + Offsets.MatchingProgressView._matchingWarningType, useCache: false)
                     : (int?)null;
 
-                XMLogging.WriteLine(
-                    $"{Tag} ViewSnapshot @ 0x{view:X} | " +
+                LoggingEnhancements.Log(AppLogLevel.Debug,
+                    $"ViewSnapshot @ 0x{view:X} | " +
                     $"ServersLimited={serversLimited} CanUpdateStatus={canUpdateStatus} " +
                     $"MaxMatchingTime={maxMatchingTime}s " +
-                    $"MatchingWarning={(warningRaw.HasValue ? warningRaw.Value.ToString() : "null")} ");
+                    $"MatchingWarning={(warningRaw.HasValue ? warningRaw.Value.ToString() : "null")}",
+                    "MatchingProgressResolver");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"{Tag} LogViewSnapshot error: {ex}");
+                LoggingEnhancements.Log(AppLogLevel.Debug, $"LogViewSnapshot error: {ex}", "MatchingProgressResolver");
             }
         }
 
@@ -454,6 +453,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         /// </summary>
         public static void LogSnapshot(ulong mp = 0)
         {
+            if (!LoggingEnhancements.EnableDebugLogging)
+                return;
+
             if (mp == 0)
             {
                 lock (_lock)
@@ -461,37 +463,35 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             }
 
             if (!mp.IsValidVirtualAddress())
-            {
-                XMLogging.WriteLine($"{Tag} LogSnapshot — no valid MatchingProgress pointer.");
                 return;
-            }
 
             try
             {
-                var currentStage        = (Enums.EMatchingStage)     Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.CurrentStage,        useCache: false);
-                var currentStageGroup   = (Enums.EMatchingStageGroup) Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.CurrentStageGroup,   useCache: false);
-                var stageProgress       = Memory.ReadValue<float>(mp + Offsets.MatchingProgress.CurrentStageProgress,                            useCache: false);
-                var estimateTime        = Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.EstimateTime,                                    useCache: false);
-                var isAbortAvailable    = Memory.ReadValue<bool> (mp + Offsets.MatchingProgress.IsAbortAvailable,                                useCache: false);
-                var blockAbortDuration  = Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.BlockAbortAbilityDurationSeconds,                useCache: false);
-                var showAbortPopup      = Memory.ReadValue<bool> (mp + Offsets.MatchingProgress.ShowAbortConfirmationPopup,                      useCache: false);
-                var abortRequested      = Memory.ReadValue<bool> (mp + Offsets.MatchingProgress.IsMatchingAbortRequested,                        useCache: false);
-                var canProcessStages    = Memory.ReadValue<bool> (mp + Offsets.MatchingProgress.CanProcessServerStages,                          useCache: false);
-                var lastDelayedStage    = (Enums.EMatchingStage)      Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.LastMemorizedDelayedStage,         useCache: false);
-                var lastDelayedProgress = Memory.ReadValue<float>(mp + Offsets.MatchingProgress.LastMemorizedDelayedStageProgress,               useCache: false);
+                var currentStage        = (Enums.EMatchingStage)      Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.CurrentStage,                      useCache: false);
+                var currentStageGroup   = (Enums.EMatchingStageGroup)  Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.CurrentStageGroup,                 useCache: false);
+                var stageProgress       = Memory.ReadValue<float>(mp + Offsets.MatchingProgress.CurrentStageProgress,                                           useCache: false);
+                var estimateTime        = Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.EstimateTime,                                                   useCache: false);
+                var isAbortAvailable    = Memory.ReadValue<bool> (mp + Offsets.MatchingProgress.IsAbortAvailable,                                               useCache: false);
+                var blockAbortDuration  = Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.BlockAbortAbilityDurationSeconds,                               useCache: false);
+                var showAbortPopup      = Memory.ReadValue<bool> (mp + Offsets.MatchingProgress.ShowAbortConfirmationPopup,                                     useCache: false);
+                var abortRequested      = Memory.ReadValue<bool> (mp + Offsets.MatchingProgress.IsMatchingAbortRequested,                                       useCache: false);
+                var canProcessStages    = Memory.ReadValue<bool> (mp + Offsets.MatchingProgress.CanProcessServerStages,                                         useCache: false);
+                var lastDelayedStage    = (Enums.EMatchingStage)       Memory.ReadValue<int>  (mp + Offsets.MatchingProgress.LastMemorizedDelayedStage,         useCache: false);
+                var lastDelayedProgress = Memory.ReadValue<float>(mp + Offsets.MatchingProgress.LastMemorizedDelayedStageProgress,                              useCache: false);
 
-                XMLogging.WriteLine(
-                    $"{Tag} Snapshot @ 0x{mp:X} | " +
+                LoggingEnhancements.Log(AppLogLevel.Debug,
+                    $"Snapshot @ 0x{mp:X} | " +
                     $"Stage={currentStage}({(int)currentStage}) Group={currentStageGroup}({(int)currentStageGroup}) " +
                     $"Progress={stageProgress:F3} EstimateTime={estimateTime}s | " +
                     $"LastDelayedStage={lastDelayedStage}({(int)lastDelayedStage}) LastDelayedProgress={lastDelayedProgress:F3} | " +
                     $"IsAbortAvailable={isAbortAvailable} BlockAbortDuration={blockAbortDuration}s " +
                     $"ShowAbortPopup={showAbortPopup} AbortRequested={abortRequested} " +
-                    $"CanProcessStages={canProcessStages}");
+                    $"CanProcessStages={canProcessStages}",
+                    "MatchingProgressResolver");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"{Tag} LogSnapshot error: {ex}");
+                LoggingEnhancements.Log(AppLogLevel.Debug, $"LogSnapshot error: {ex}", "MatchingProgressResolver");
             }
         }
     }
