@@ -1,4 +1,4 @@
-﻿﻿global using eft_dma_radar;
+﻿global using eft_dma_radar;
 global using eft_dma_radar.Common;
 global using eft_dma_radar.Misc;
 global using SDK;
@@ -559,7 +559,8 @@ namespace eft_dma_radar
             {
                 try
                 {
-                    XMLogging.WriteLine($"[IconCache] Caching item icon: {itemId}");
+                    // Use debug level for icon caching - only visible when debug logging is enabled
+                    LoggingEnhancements.Log(AppLogLevel.Debug, $"Caching item icon: {itemId}", "IconCache");
                     await Converters.ItemIconConverter.SaveItemIconAsPng(itemId, iconCachePath);
                 }
                 catch (Exception ex)

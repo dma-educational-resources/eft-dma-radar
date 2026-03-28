@@ -152,7 +152,8 @@ namespace eft_dma_radar.Web.ProfileApi
                     File.WriteAllText(tmp, json);
                     File.Move(tmp, _dbPath, overwrite: true);
                     _dirty = false;
-                    XMLogging.WriteLine($"[DogtagDB] Flushed {_entries.Count} entries to disk.");
+                    // Use debug level - only logged when debug logging is enabled
+                    LoggingEnhancements.Log(AppLogLevel.Debug, $"Flushed {_entries.Count} entries to disk.", "DogtagDB");
                 }
                 catch (Exception ex)
                 {

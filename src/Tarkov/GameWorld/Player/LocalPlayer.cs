@@ -119,7 +119,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 _healthController = Memory.ReadPtr(Base + Offsets.Player._healthController, false);
                 if (!_healthController.IsValidVirtualAddress())
                 {
-                    XMLogging.WriteLine("[LocalPlayer] HealthController address invalid");
+                    LoggingEnhancements.Log(AppLogLevel.Warning, "HealthController address invalid", "LocalPlayer");
                     return;
                 }
 
@@ -128,16 +128,16 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 
                 if (_energyPtr.IsValidVirtualAddress() && _hydrationPtr.IsValidVirtualAddress())
                 {
-                    XMLogging.WriteLine($"[LocalPlayer] Health pointers initialized: Energy=0x{_energyPtr:X}, Hydration=0x{_hydrationPtr:X}");
+                    LoggingEnhancements.Log(AppLogLevel.Debug, $"Health pointers initialized: Energy=0x{_energyPtr:X}, Hydration=0x{_hydrationPtr:X}", "LocalPlayer");
                 }
                 else
                 {
-                    XMLogging.WriteLine("[LocalPlayer] Energy/Hydration pointers invalid");
+                    LoggingEnhancements.Log(AppLogLevel.Warning, "Energy/Hydration pointers invalid", "LocalPlayer");
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[LocalPlayer] Failed to initialize health pointers: {ex.Message}");
+                LoggingEnhancements.Log(AppLogLevel.Error, $"Failed to initialize health pointers: {ex.Message}", "LocalPlayer");
             }
         }
 
@@ -285,7 +285,13 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[LocalPlayer] UpdateEnergyHydrationCache failed: {ex.Message}");
+                // Rate limit this error message
+                LoggingEnhancements.LogRateLimited(
+                    AppLogLevel.Error,
+                    "update_energy_hydration",
+                    TimeSpan.FromSeconds(30),
+                    $"UpdateEnergyHydrationCache failed: {ex.Message}",
+                    "LocalPlayer");
             }
         }
     }

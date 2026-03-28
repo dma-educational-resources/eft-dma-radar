@@ -79,7 +79,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                         if (Player.Allocate(_players, playerBase))
                         {
                             _failedAllocations.TryRemove(playerBase, out _); // Clear fail count on success
-                            XMLogging.WriteLine($"New Player Allocated: {i} - {playerBase:X}");
+                            LoggingEnhancements.Log(AppLogLevel.Info, $"New Player Allocated: {i} - {playerBase:X}", "Players");
                             foreach(var player in _players.Values)
                             {
                                 if (player.ListIndex == i) // Ensure ListIndex is set correctly
@@ -190,8 +190,12 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 {
                     if (isLocal)
                     {
-                        XMLogging.WriteLine(
-                            "[BTR FIX] LocalPlayer stuck to BTR with rotating view → soft reset");
+                        LoggingEnhancements.LogRateLimited(
+                            AppLogLevel.Warning,
+                            "btr_fix_local",
+                            TimeSpan.FromSeconds(5),
+                            "LocalPlayer stuck to BTR with rotating view → soft reset",
+                            "BTR FIX");
         
                         player.BtrStickTicks = 0;
                         player.BtrStaticRotationTicks = 0;
@@ -199,8 +203,12 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     }
                     else
                     {
-                        XMLogging.WriteLine(
-                            $"[BTR FIX] Stuck player {player.Name} rotating at BTR → soft reset");
+                        LoggingEnhancements.LogRateLimited(
+                            AppLogLevel.Warning,
+                            $"btr_fix_{player.Base:X}",
+                            TimeSpan.FromSeconds(5),
+                            $"Stuck player {player.Name} rotating at BTR → soft reset",
+                            "BTR FIX");
         
                         player.BtrStickTicks = 0;
                         player.BtrStaticRotationTicks = 0;

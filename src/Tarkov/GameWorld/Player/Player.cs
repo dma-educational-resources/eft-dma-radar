@@ -123,12 +123,18 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             {
                 var player = AllocateInternal(playerBase);
                 playerDict[player] = player; // Insert or swap
-                XMLogging.WriteLine($"Player '{player.Name}' allocated.");
+                LoggingEnhancements.Log(AppLogLevel.Info, $"Player '{player.Name}' allocated.", "Player");
                 return true;
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"ERROR during Player Allocation for player @ 0x{playerBase:X}: {ex.Message}");
+                // Rate limit error messages - log each unique player base error only once per 5 seconds
+                LoggingEnhancements.LogRateLimited(
+                    AppLogLevel.Error,
+                    $"player_alloc_{playerBase:X}",
+                    TimeSpan.FromSeconds(5),
+                    $"Player Allocation failed for 0x{playerBase:X}: {ex.Message}",
+                    "Player");
                 return false;
             }
             finally
@@ -747,8 +753,13 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 if (Skeleton.IsLikelyStuck &&
                     ErrorTimer.ElapsedMilliseconds > 800)
                 {
-                    XMLogging.WriteLine(
-                        $"[SKELETON FIX] {Name} skeleton frozen ¡ú soft reset");
+                    // Rate limit skeleton fix messages to prevent spam (max once per 10 seconds per player)
+                    LoggingEnhancements.LogRateLimited(
+                        AppLogLevel.Warning,
+                        $"skeleton_fix_{Base:X}",
+                        TimeSpan.FromSeconds(10),
+                        $"{Name} skeleton frozen → soft reset",
+                        "SKELETON FIX");
 
                     SoftResetRuntimeState();
                     Skeleton.ResetESPCacheAndTransforms();
@@ -1372,12 +1383,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                         Type = PlayerType.AIScav
                     };
                 case Enums.WildSpawnType.followerBoarClose1:
-                    return new AIRole()
-                    {
-                        Name = "Guard",
-                        Type = PlayerType.AIRaider
-                    };
-                case Enums.WildSpawnType.followerBoarClose2:
                     return new AIRole()
                     {
                         Name = "Guard",
@@ -2225,7 +2230,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 float totalHeight = (count - 1) * lineAdvance + ascent;
                 float padding = 1f * ESP.Config.FontScale;
 
-                // Baseline placed so TOP of first line starts just under box
+                // Baseline placed so TOP of the first line starts just under box
                 float textBaseY = playerBox.Bottom + padding + ascent;
 
                 new SKPoint(playerBox.MidX, textBaseY)
