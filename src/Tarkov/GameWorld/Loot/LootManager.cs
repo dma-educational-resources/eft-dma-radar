@@ -393,38 +393,31 @@ namespace eft_dma_radar.Tarkov.Loot
         /// </summary>
         private static void GetItemsInSlots(ulong slotsPtr, List<LootItem> loot, bool isPMC)
         {
-            var slotDict = new Dictionary<string, ulong>(StringComparer.OrdinalIgnoreCase);
             using var slots = MemArray<ulong>.Get(slotsPtr);
 
             foreach (var slot in slots)
             {
-                var namePtr = Memory.ReadPtr(slot + Offsets.Slot.ID);
-                var name = Memory.ReadUnityString(namePtr);
-                if (!_skipSlots.Contains(name))
-                    slotDict.TryAdd(name, slot);
-            }
-
-            foreach (var slot in slotDict)
-            {
                 try
                 {
-                    if (isPMC && slot.Key == "Scabbard")
+                    var namePtr = Memory.ReadPtr(slot + Offsets.Slot.ID);
+                    var name = Memory.ReadUnityString(namePtr);
+                    if (_skipSlots.Contains(name))
                         continue;
-                    var containedItem = Memory.ReadPtr(slot.Value + Offsets.Slot.ContainedItem);
+                    if (isPMC && name == "Scabbard")
+                        continue;
+                    var containedItem = Memory.ReadPtr(slot + Offsets.Slot.ContainedItem);
                     var inventorytemplate = Memory.ReadPtr(containedItem + Offsets.LootItem.Template);
                     var idPtr = Memory.ReadValue<Types.MongoID>(inventorytemplate + Offsets.ItemTemplate._id);
                     var id = Memory.ReadUnityString(idPtr.StringID);
                     if (EftDataManager.AllItems.TryGetValue(id, out var entry))
                         loot.Add(new LootItem(entry)
                         {
-                            InteractiveClass = containedItem // <-- THIS IS THE ITEM
+                            InteractiveClass = containedItem
                         });
                     var childGrids = Memory.ReadPtr(containedItem + Offsets.LootItemMod.Grids);
-                    GetItemsInGrid(childGrids, loot); // Recurse the grids (if possible)
+                    GetItemsInGrid(childGrids, loot);
                 }
-                catch
-                {
-                }
+                catch { }
             }
         }
 

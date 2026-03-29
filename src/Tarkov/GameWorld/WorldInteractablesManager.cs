@@ -36,12 +36,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     return;
 
                 using var array = MemArray<ulong>.Get(interactableArrayPtr, true);
-                var set = array.Where(x => x != 0x0).ToHashSet();
-        
-                foreach (var item in set)
+                foreach (var item in array)
                 {
+                    if (item == 0x0)
+                        continue;
                     var itemName = ObjectClass.ReadName(item);
-        
                     if (itemName == "Door")
                         _Doors.Add(new Door(item));
                 }

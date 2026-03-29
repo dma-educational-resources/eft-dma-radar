@@ -1583,24 +1583,29 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     gearLoot != null &&
                     Type != PlayerType.Teammate)
                 {
-                    var snapshot = gearLoot.ToList();
-                    importantLootItems = snapshot
-                        .Where(item =>
-                               item.IsImportant ||
-                               item is QuestItem ||
-                               (Config.QuestHelper.Enabled && item.IsQuestCondition) ||
-                               item.IsWishlisted ||
-                               (LootFilterControl.ShowBackpacks && item.IsBackpack) ||
-                               (LootFilterControl.ShowMeds && item.IsMeds) ||
-                               (LootFilterControl.ShowFood && item.IsFood) ||
-                               (LootFilterControl.ShowWeapons && item.IsWeapon) ||
-                               item.IsValuableLoot ||
-                               (!item.IsGroupedBlacklisted &&
-                                item.MatchedFilter?.Color != null &&
-                                !string.IsNullOrEmpty(item.MatchedFilter.Color)))
-                        .OrderLoot()
-                        .Take(5)
-                        .ToList();
+                    bool qe = Config.QuestHelper.Enabled;
+                    bool showBp = LootFilterControl.ShowBackpacks;
+                    bool showMeds = LootFilterControl.ShowMeds;
+                    bool showFood = LootFilterControl.ShowFood;
+                    bool showWep = LootFilterControl.ShowWeapons;
+                    var temp = new List<LootItem>(gearLoot.Count);
+                    foreach (var item in gearLoot)
+                    {
+                        if (item.IsImportant ||
+                            item is QuestItem ||
+                            (qe && item.IsQuestCondition) ||
+                            item.IsWishlisted ||
+                            (showBp && item.IsBackpack) ||
+                            (showMeds && item.IsMeds) ||
+                            (showFood && item.IsFood) ||
+                            (showWep && item.IsWeapon) ||
+                            item.IsValuableLoot ||
+                            (!item.IsGroupedBlacklisted &&
+                             item.MatchedFilter?.Color != null &&
+                             !string.IsNullOrEmpty(item.MatchedFilter.Color)))
+                            temp.Add(item);
+                    }
+                    importantLootItems = temp.OrderLoot().Take(5).ToList();
                 }
 
                 if (typeSettings.ShowHeight && !typeSettings.HeightIndicator)

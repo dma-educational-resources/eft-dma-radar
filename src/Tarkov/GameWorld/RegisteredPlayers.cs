@@ -133,10 +133,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 return;
 
             // Collect BTR positions (rare path — only when a BTR is present)
-            var btrs = _players.Values
-                .OfType<BtrOperator>()
-                .Select(b => b.Position)
-                .ToList();
+            var btrs = new List<Vector3>(4);
+            foreach (var p in _players.Values)
+                if (p is BtrOperator btr)
+                    btrs.Add(btr.Position);
         
             foreach (var player in _players.Values)
             {
