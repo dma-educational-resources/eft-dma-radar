@@ -18,6 +18,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
         /// Tracks failed player allocations to prevent spam. Key=playerBase, Value=(failCount, lastAttemptTime)
         /// </summary>
         private readonly ConcurrentDictionary<ulong, (int Count, DateTime LastAttempt)> _failedAllocations = new();
+        private readonly HashSet<ulong> _registeredScratch = new(64);
         private const int MAX_FAIL_COUNT = 5;
         private static readonly TimeSpan FAIL_RETRY_COOLDOWN = TimeSpan.FromSeconds(2);
 
@@ -48,7 +49,12 @@ namespace eft_dma_radar.Tarkov.GameWorld
             try
             {
                 using var playersList = MemList<ulong>.Get(this, false); // Realtime Read
-                var registered = playersList.Where(x => x != 0x0).ToHashSet();
+                // Reuse the pre-allocated scratch set to avoid a per-tick HashSet allocation.
+                _registeredScratch.Clear();
+                foreach (var addr in playersList)
+                    if (addr != 0x0)
+                        _registeredScratch.Add(addr);
+                var registered = _registeredScratch;
                 int i = -1;
                 // Allocate New Players
                 foreach (var playerBase in registered)
@@ -101,10 +107,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 UpdateExistingPlayers(registered);
                 HandleBtrStickiness();
                 // Clean up failed allocation tracking for addresses no longer in the game
-                foreach (var failedAddr in _failedAllocations.Keys.ToArray())
+                foreach (var kvp in _failedAllocations)
                 {
-                    if (!registered.Contains(failedAddr))
-                        _failedAllocations.TryRemove(failedAddr, out _);
+                    if (!registered.Contains(kvp.Key))
+                        _failedAllocations.TryRemove(kvp.Key, out _);
                 }
             }
             catch (ObjectDisposedException)

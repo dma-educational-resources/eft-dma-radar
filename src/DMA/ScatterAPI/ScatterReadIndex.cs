@@ -35,17 +35,11 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
             var cbs = Callbacks;
             if (cbs is not null)
             {
-                foreach (var del in cbs.GetInvocationList())
+                try
                 {
-                    try
-                    {
-                        if (del is Action<ScatterReadIndex> cb)
-                        {
-                            cb.Invoke(this);
-                        }
-                    }
-                    catch { }
+                    cbs.Invoke(this);
                 }
+                catch { }
             }
         }
 

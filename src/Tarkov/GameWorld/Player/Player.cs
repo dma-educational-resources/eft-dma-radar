@@ -272,11 +272,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         {
             get
             {
-                float mapRotation = Rotation.X; // Cache value
-                mapRotation -= 90f;
-                while (mapRotation < 0f)
-                    mapRotation += 360f;
-
+                float mapRotation = ((Rotation.X - 90f) % 360f + 360f) % 360f;
                 return mapRotation;
             }
         }

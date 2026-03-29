@@ -53,18 +53,19 @@ namespace eft_dma_radar.Common.Misc.Pools
 
         private static class ObjectPool
         {
-            private static readonly ConcurrentBag<T> _objectPool = new();
+            // ConcurrentStack has simpler atomic push/pop (no thread-local affinity overhead
+            // that ConcurrentBag carries), making cross-thread rent/return cheaper.
+            private static readonly ConcurrentStack<T> _objectPool = new();
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             internal static T Rent()
             {
-                if (_objectPool.TryTake(out var obj))
+                if (_objectPool.TryPop(out var obj))
                 {
                     return obj;
                 }
                 else
                 {
-                    //XMLogging.WriteLine($"{DateTime.UtcNow.Ticks}: New Pool Obj {typeof(T)}");
                     return Activator.CreateInstance<T>();
                 }
             }
@@ -72,7 +73,7 @@ namespace eft_dma_radar.Common.Misc.Pools
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             internal static void Return(T obj)
             {
-                _objectPool.Add(obj);
+                _objectPool.Push(obj);
             }
         }
         #endregion

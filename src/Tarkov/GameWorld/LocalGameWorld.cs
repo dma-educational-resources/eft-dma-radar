@@ -76,6 +76,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
         private bool _disposed;
         private bool _raidStarted;
         private int _mapCheckTick;
+        private readonly List<Player> _activeScratch = new(128);
 
         public bool InRaid => !_disposed;
         public IReadOnlyCollection<Player> Players => _rgtPlayers;
@@ -754,16 +755,16 @@ namespace eft_dma_radar.Tarkov.GameWorld
             try
             {
                 var localPlayer = LocalPlayer;
-                int playerCount = 0;
 
-                // Count active+alive players first (single pass)
+                // Single pass: collect active+alive players into pre-allocated scratch list
+                _activeScratch.Clear();
                 foreach (var p in _rgtPlayers)
                 {
                     if (p.IsActive && p.IsAlive)
-                        playerCount++;
+                        _activeScratch.Add(p);
                 }
 
-                if (playerCount == 0)
+                if (_activeScratch.Count == 0)
                 {
                     Thread.Sleep(1);
                     return;
@@ -776,12 +777,8 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     cm.OnRealtimeLoop(round1[-1], localPlayer);
                 }
 
-                int i = 0;
-                foreach (var player in _rgtPlayers)
-                {
-                    if (player.IsActive && player.IsAlive)
-                        player.OnRealtimeLoop(round1[i++]);
-                }
+                for (int i = 0; i < _activeScratch.Count; i++)
+                    _activeScratch[i].OnRealtimeLoop(round1[i]);
 
                 scatterMap.Execute(); // Execute scatter read
             }
@@ -905,27 +902,21 @@ namespace eft_dma_radar.Tarkov.GameWorld
         {
             try
             {
-                int playerCount = 0;
+                // Single pass: collect eligible players into pre-allocated scratch list
+                _activeScratch.Clear();
                 foreach (var p in _rgtPlayers)
                 {
                     if (p.IsActive && p.IsAlive && p is not BtrOperator)
-                        playerCount++;
+                        _activeScratch.Add(p);
                 }
 
-                if (playerCount > 0)
+                if (_activeScratch.Count > 0)
                 {
                     using var scatterMap = ScatterReadMap.Get();
                     var round1 = scatterMap.AddRound();
                     var round2 = scatterMap.AddRound();
-                    int i = 0;
-                    foreach (var player in _rgtPlayers)
-                    {
-                        if (player.IsActive && player.IsAlive && player is not BtrOperator)
-                        {
-                            player.OnValidateTransforms(round1[i], round2[i]);
-                            i++;
-                        }
-                    }
+                    for (int i = 0; i < _activeScratch.Count; i++)
+                        _activeScratch[i].OnValidateTransforms(round1[i], round2[i]);
                     scatterMap.Execute(); // execute scatter read
                 }
             }

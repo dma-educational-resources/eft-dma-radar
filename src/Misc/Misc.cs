@@ -138,33 +138,46 @@ namespace eft_dma_radar.Common.Misc
         /// </summary>
         private readonly struct DebugSwAverages
         {
-            private readonly ConcurrentBag<long> _values;
             private readonly Stopwatch _timer;
+            // Running sum and count — updated via Interlocked, no ConcurrentBag/LINQ needed.
+            private readonly StatsBox _box;
+
+            private sealed class StatsBox
+            {
+                public long Sum;
+                public long Count;
+            }
 
             public DebugSwAverages()
             {
-                _values = new();
+                _box = new();
                 _timer = new();
                 _timer.Start();
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public readonly void Add(long avg) => _values.Add(avg);
+            public readonly void Add(long ticks)
+            {
+                Interlocked.Add(ref _box.Sum, ticks);
+                Interlocked.Increment(ref _box.Count);
+            }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public readonly bool TryGetAverage(out double avg)
             {
-                if (_timer.Elapsed.TotalMilliseconds >= 1000 && _values.Any())
+                if (_timer.Elapsed.TotalMilliseconds >= 1000)
                 {
-                    avg = _values.Average();
+                    var count = Interlocked.Exchange(ref _box.Count, 0);
+                    var sum   = Interlocked.Exchange(ref _box.Sum,   0);
                     _timer.Restart();
-                    return true;
+                    if (count > 0)
+                    {
+                        avg = (double)sum / count;
+                        return true;
+                    }
                 }
-                else
-                {
-                    avg = default;
-                    return false;
-                }
+                avg = default;
+                return false;
             }
         }
     }
