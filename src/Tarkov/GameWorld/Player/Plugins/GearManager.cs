@@ -105,8 +105,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 return false;
 
             _equipmentSlotsPtr = Memory.ReadPtr(equipment + Offsets.Equipment.Slots);
-
-            ulong slotsPtr = Memory.ReadPtr(equipment + Offsets.Equipment.Slots);
+            ulong slotsPtr = _equipmentSlotsPtr;
             if (!slotsPtr.IsValidVirtualAddress())
                 return false;
 
@@ -187,10 +186,20 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             Loot = loot.OrderLoot().ToList();
             Equipment = gear;
 
-            Value = Loot.Sum(x => x.Price);
-            HasNVG = Loot.Any(x => NVG_IDS.Contains(x.ID));
-            HasThermal = Loot.Any(x => THERMAL_IDS.Contains(x.ID));
-            HasUBGL = Loot.Any(x => UBGL_IDS.Contains(x.ID));
+            int value = 0;
+            bool hasNvg = false, hasThermal = false, hasUBGL = false;
+            foreach (var item in Loot)
+            {
+                value += item.Price;
+                var id = item.ID;
+                if (!hasNvg && NVG_IDS.Contains(id)) hasNvg = true;
+                if (!hasThermal && THERMAL_IDS.Contains(id)) hasThermal = true;
+                if (!hasUBGL && UBGL_IDS.Contains(id)) hasUBGL = true;
+            }
+            Value = value;
+            HasNVG = hasNvg;
+            HasThermal = hasThermal;
+            HasUBGL = hasUBGL;
         }
         // ============================================================
         // ALIVE DOGTAG → PROFILE ID RESOLUTION

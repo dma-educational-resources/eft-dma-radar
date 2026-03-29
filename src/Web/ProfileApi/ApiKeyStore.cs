@@ -17,7 +17,7 @@ namespace eft_dma_radar.Tarkov.API
         }
 
         public static string StoreDir =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar");
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar-public");
 
         public static string StorePath => Path.Combine(StoreDir, "api.json");
 

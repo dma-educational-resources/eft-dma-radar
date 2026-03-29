@@ -77,7 +77,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         private static readonly object _lock = new();
 
         private static readonly string _filePath =
-            Path.Combine(AppContext.BaseDirectory, "PlayerList.json");
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar-public", "PlayerList.json");
 
         /* ==============================
          * STARTUP

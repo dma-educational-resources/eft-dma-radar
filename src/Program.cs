@@ -74,8 +74,8 @@ namespace eft_dma_radar
         /// <summary>
         /// Path to the Configuration Folder in %AppData%
         /// </summary>
-        public static DirectoryInfo ConfigPath { get; } = new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar"));
-        public static DirectoryInfo CustomConfigPath { get; } = new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar", "Configs"));
+        public static DirectoryInfo ConfigPath { get; } = new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar-public"));
+        public static DirectoryInfo CustomConfigPath { get; } = new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar-public", "Configs"));
 
         /// <summary>
         /// Update the global configuration reference (used for config imports)
@@ -412,7 +412,7 @@ namespace eft_dma_radar
 
         private static void CacheAllItemIcons()
         {
-            string iconCachePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar", "Assets", "Icons", "Items");
+            string iconCachePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar-public", "Assets", "Icons", "Items");
 
             Directory.CreateDirectory(iconCachePath);
 

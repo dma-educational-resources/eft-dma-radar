@@ -22,7 +22,7 @@ namespace eft_dma_radar.UI.LootFilters
     {
         public static GroupedLootFilterConfig CurrentGroups { get; private set; } = new();
 
-        public static string GroupedLootFilterFilePath { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar", "lootfilters.json");
+        public static string GroupedLootFilterFilePath { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar-public", "lootfilters.json");
 
         public static void Load()
         {

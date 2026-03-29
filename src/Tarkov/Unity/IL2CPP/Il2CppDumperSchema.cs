@@ -590,7 +590,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             C("CameraManager", [
                 F("<OpticCameraManager>k__BackingField", "OpticCameraManager"),
                 F("<Camera>k__BackingField", "Camera"),
-                M("get_Instance_RVA", "GetInstance_RVA"),
+                M("get_Instance", "GetInstance_RVA"),
             ], cs: "EFTCameraManager"),
 
             // SightComponent

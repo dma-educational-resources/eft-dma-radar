@@ -12,7 +12,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         // ── Cache file path ──────────────────────────────────────────────────────
 
         private static readonly string CacheFilePath =
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "il2cpp_offsets.json");
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar-public", "il2cpp_offsets.json");
 
         // ── Serialization model ──────────────────────────────────────────────────
 
@@ -65,6 +65,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 };
 
                 var json = JsonSerializer.Serialize(cache, _jsonOpts);
+                Directory.CreateDirectory(Path.GetDirectoryName(CacheFilePath)!);
                 File.WriteAllText(CacheFilePath, json);
                 XMLogging.WriteLine($"[Il2CppDumper] Cache saved → {CacheFilePath}");
             }

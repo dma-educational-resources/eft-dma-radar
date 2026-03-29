@@ -15,7 +15,7 @@ namespace eft_dma_radar.Web.ProfileApi
     internal static class DogtagDatabase
     {
         private static readonly string _dbPath =
-            Path.Combine(AppContext.BaseDirectory, "DogtagDb.json");
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar-public", "DogtagDb.json");
 
         private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
 
@@ -146,6 +146,7 @@ namespace eft_dma_radar.Web.ProfileApi
             {
                 try
                 {
+                    Directory.CreateDirectory(Path.GetDirectoryName(_dbPath)!);
                     var db = new DbFile { Entries = _entries };
                     var json = JsonSerializer.Serialize(db, _jsonOptions);
                     var tmp = _dbPath + ".tmp";

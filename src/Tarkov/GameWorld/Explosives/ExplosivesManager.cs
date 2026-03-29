@@ -15,6 +15,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
         private static readonly uint[] _toSyncObjects = [Offsets.GameWorld.SynchronizableObjectLogicProcessor, Offsets.SynchronizableObjectLogicProcessor._activeSynchronizableObjects];
         private readonly ulong _localGameWorld = localGameWorld;
         private readonly ConcurrentDictionary<ulong, IExplosiveItem> _explosives = new();
+        private readonly List<ulong> _expiredKeys = new();
         private ulong _grenadesBase;
 
         private void Init()
@@ -92,11 +93,12 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
                     }
 
                     // Cleanup inactive / expired explosives
-                    foreach (var kv in _explosives.ToArray())
-                    {
+                    _expiredKeys.Clear();
+                    foreach (var kv in _explosives)
                         if (!kv.Value.IsActive)
-                            _explosives.TryRemove(kv.Key, out _);
-                    }
+                            _expiredKeys.Add(kv.Key);
+                    foreach (var key in _expiredKeys)
+                        _explosives.TryRemove(key, out _);
                 }
 
                 // ─────────────────────────────────────────────────────

@@ -44,7 +44,7 @@ namespace eft_dma_radar.UI.Pages
 
         private const int INTERVAL = 100; // 0.1 second
 
-        private static string WatchlistFilePath { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar", "watchlist.json");
+        private static string WatchlistFilePath { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar-public", "watchlist.json");
         #endregion
 
         public WatchlistControl()

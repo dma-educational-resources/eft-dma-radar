@@ -42,7 +42,7 @@ namespace eft_dma_radar.Converters
 
     public class ItemIconConverter : IValueConverter
     {
-        private static readonly string IconPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar", "Assets", "Icons", "Items");
+        private static readonly string IconPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar-public", "Assets", "Icons", "Items");
         private static readonly HttpClient SharedHttpClient = new HttpClient() { Timeout = TimeSpan.FromSeconds(15) };
 
         public static async Task SaveItemIconAsPng(string itemId, string saveDir)

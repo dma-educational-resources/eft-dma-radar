@@ -86,14 +86,24 @@ namespace eft_dma_radar.Tarkov.Loot
                 try
                 {
                     var filter = LootFilterControl.Create();
-                    FilteredLoot = UnfilteredLoot?
-                        .Where(x => filter(x))
-                        .OrderByDescending(x => x.Important)
-                        .ThenByDescending(x => (Program.Config.QuestHelper.Enabled && x.IsQuestCondition))
-                        .ThenByDescending(x => x.IsWishlisted)
-                        .ThenByDescending(x => x.IsValuableLoot)
-                        .ThenByDescending(x => x?.Price ?? 0)
-                        .ToList();
+                    bool questEnabled = Program.Config.QuestHelper.Enabled;
+                    var filtered = new List<LootItem>();
+                    var unfiltered = UnfilteredLoot;
+                    if (unfiltered is not null)
+                    {
+                        foreach (var x in unfiltered)
+                            if (filter(x))
+                                filtered.Add(x);
+                        filtered.Sort((a, b) =>
+                        {
+                            int c = b.Important.CompareTo(a.Important); if (c != 0) return c;
+                            c = (questEnabled && b.IsQuestCondition ? 1 : 0).CompareTo(questEnabled && a.IsQuestCondition ? 1 : 0); if (c != 0) return c;
+                            c = (b.IsWishlisted ? 1 : 0).CompareTo(a.IsWishlisted ? 1 : 0); if (c != 0) return c;
+                            c = (b.IsValuableLoot ? 1 : 0).CompareTo(a.IsValuableLoot ? 1 : 0); if (c != 0) return c;
+                            return (b?.Price ?? 0).CompareTo(a?.Price ?? 0);
+                        });
+                    }
+                    FilteredLoot = filtered;
                 }
                 catch { }
                 finally
