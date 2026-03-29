@@ -2,8 +2,8 @@
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Misc.Pools;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
+using VmmSharpEx.Scatter;
 using static eft_dma_radar.Common.Unity.UnityTransform;
 
 namespace eft_dma_radar.Common.DMA.ScatterAPI
@@ -60,19 +60,18 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
         }
 
         /// <summary>
-        /// Parse the memory buffer and set the result value.
+        /// Extracts the result for this entry from the executed native scatter handle.
         /// Only called internally via API.
         /// </summary>
-        /// <param name="hScatter">Scatter read handle.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetResult(Dictionary<ulong, byte[]> scatterResults)
+        public void ReadResult(VmmScatter scatter)
         {
             try
             {
                 if (_isValueType)
-                    SetValueResult(scatterResults);
+                    SetValueResult(scatter);
                 else
-                    SetClassResult(scatterResults);
+                    SetClassResult(scatter);
             }
             catch
             {
@@ -84,17 +83,16 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
         }
 
         /// <summary>
-        /// Set the Result from a Value Type.
+        /// Read a value type result directly from the native scatter handle.
         /// </summary>
-        /// <param name="hScatter">Scatter read handle.</param>
-        private unsafe void SetValueResult(Dictionary<ulong, byte[]> scatterResults)
+        private unsafe void SetValueResult(VmmScatter scatter)
         {
-            int cb = SizeChecker<T>.Size; // Also enforces type safety
+            int cb = SizeChecker<T>.Size;
 #pragma warning disable CS8500
             fixed (void* pb = &_result)
             {
                 var buffer = new Span<byte>(pb, cb);
-                if (!ProcessBytes(scatterResults, buffer))
+                if (!scatter.ReadSpan<byte>(Address, buffer))
                 {
                     IsFailed = true;
                     return;
@@ -102,16 +100,13 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
             }
 #pragma warning restore CS8500
             if (_result is MemPointer memPtrResult && !Utils.IsValidVirtualAddress(memPtrResult))
-            {
                 IsFailed = true;
-            }
         }
 
         /// <summary>
-        /// Set the Result from a Class Type.
+        /// Read a class/reference type result directly from the native scatter handle.
         /// </summary>
-        /// <param name="hScatter">Scatter read handle.</param>
-        private void SetClassResult(Dictionary<ulong, byte[]> scatterResults)
+        private void SetClassResult(VmmScatter scatter)
         {
             if (this is ScatterReadEntry<SharedArray<TrsX>> r1) // vertices
             {
@@ -119,15 +114,13 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
                 ArgumentOutOfRangeException.ThrowIfNotEqual(CB % size, 0, nameof(CB));
                 int count = CB / size;
                 var vert = SharedArray<TrsX>.Get(count);
-                if (!ProcessBytes(scatterResults, vert.Span))
+                if (!scatter.ReadSpan(Address, vert.Span))
                 {
                     vert.Dispose();
                     IsFailed = true;
                 }
                 else
-                {
                     r1._result = vert;
-                }
             }
             else if (this is ScatterReadEntry<SharedArray<MemPointer>> r2) // Pointers
             {
@@ -135,93 +128,42 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
                 ArgumentOutOfRangeException.ThrowIfNotEqual(CB % size, 0, nameof(CB));
                 int count = CB / size;
                 var ctr = SharedArray<MemPointer>.Get(count);
-                if (!ProcessBytes(scatterResults, ctr.Span))
+                if (!scatter.ReadSpan(Address, ctr.Span))
                 {
                     ctr.Dispose();
                     IsFailed = true;
                 }
                 else
-                {
                     r2._result = ctr;
-                }
             }
             else if (this is ScatterReadEntry<UnicodeString> r3) // UTF-16
             {
                 Span<byte> buffer = CB > 0x1000 ? new byte[CB] : stackalloc byte[CB];
                 buffer.Clear();
-                if (!ProcessBytes(scatterResults, buffer))
+                if (!scatter.ReadSpan(Address, buffer))
                 {
                     IsFailed = true;
                     return;
                 }
                 var nullIndex = buffer.FindUtf16NullTerminatorIndex();
-                UnicodeString value = nullIndex >= 0 ?
+                r3._result = nullIndex >= 0 ?
                     Encoding.Unicode.GetString(buffer.Slice(0, nullIndex)) : Encoding.Unicode.GetString(buffer);
-                r3._result = value;
             }
             else if (this is ScatterReadEntry<UTF8String> r4) // UTF-8
             {
                 Span<byte> buffer = CB > 0x1000 ? new byte[CB] : stackalloc byte[CB];
                 buffer.Clear();
-                if (!ProcessBytes(scatterResults, buffer))
+                if (!scatter.ReadSpan(Address, buffer))
                 {
                     IsFailed = true;
                     return;
                 }
                 var nullIndex = buffer.IndexOf((byte)0);
-                UTF8String value = nullIndex >= 0 ?
+                r4._result = nullIndex >= 0 ?
                     Encoding.UTF8.GetString(buffer.Slice(0, nullIndex)) : Encoding.UTF8.GetString(buffer);
-                r4._result = value;
             }
             else
                 throw new NotImplementedException($"Type {typeof(T)} not supported!");
-        }
-
-        /// <summary>
-        /// Process the Scatter Read bytes into the result buffer.
-        /// *Callers should verify buffer size*
-        /// </summary>
-        /// <typeparam name="TBuf">Buffer type</typeparam>
-        /// <param name="hScatter">Scatter read handle.</param>
-        /// <param name="bufferIn">Result buffer</param>
-        /// <exception cref="Exception"></exception>
-        private bool ProcessBytes<TBuf>(Dictionary<ulong, byte[]> scatterResults, Span<TBuf> bufferIn)
-            where TBuf : unmanaged
-        {
-            var buffer = MemoryMarshal.Cast<TBuf, byte>(bufferIn);
-            uint pageOffset = MemDMABase.BYTE_OFFSET(Address); // Get object offset from the page start address
-
-            var bytesCopied = 0; // track number of bytes copied to ensure nothing is missed
-            uint cb = Math.Min((uint)CB, (uint)0x1000 - pageOffset); // bytes to read this page
-
-            uint numPages =
-                MemDMABase.ADDRESS_AND_SIZE_TO_SPAN_PAGES(Address,
-                    (uint)CB); // number of pages to read from (in case result spans multiple pages)
-            ulong basePageAddr = MemDMABase.PAGE_ALIGN(Address);
-
-            for (int p = 0; p < numPages; p++)
-            {
-                ulong pageAddr = basePageAddr + 0x1000 * (uint)p; // get current page addr
-                if (scatterResults.TryGetValue(pageAddr, out var pageData)) // retrieve page of mem needed
-                {
-                    pageData.AsSpan()
-                        .Slice((int)pageOffset, (int)cb)
-                        .CopyTo(buffer.Slice(bytesCopied, (int)cb)); // Copy bytes to buffer
-                    bytesCopied += (int)cb;
-                }
-                else // read failed -> break
-                    return false;
-
-                cb = 0x1000; // set bytes to read next page
-                if (bytesCopied + cb > CB) // partial chunk last page
-                    cb = (uint)CB - (uint)bytesCopied;
-
-                pageOffset = 0x0; // Next page (if any) should start at 0x0
-            }
-
-            if (bytesCopied != CB)
-                return false;
-            return true;
         }
 
         public void Dispose()

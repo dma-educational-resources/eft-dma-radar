@@ -1,5 +1,6 @@
 ﻿using eft_dma_radar.Common.DMA;
 using eft_dma_radar.Common.Misc.Pools;
+using System.Buffers;
 
 namespace eft_dma_radar.Common.DMA.ScatterAPI
 {
@@ -50,17 +51,28 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
             foreach (var idx in _indexes.Values)
                 totalEntries += idx.Entries.Count;
 
-            var entries = new IScatterEntry[totalEntries];
-            int pos = 0;
-            foreach (var idx in _indexes.Values)
-            {
-                foreach (var entry in idx.Entries.Values)
-                    entries[pos++] = entry;
-            }
+            if (totalEntries == 0)
+                return;
 
-            Memory.ReadScatter(entries, UseCache);
-            foreach (var index in _indexes)
-                index.Value.ExecuteCallback();
+            var entries = ArrayPool<IScatterEntry>.Shared.Rent(totalEntries);
+            try
+            {
+                int pos = 0;
+                foreach (var idx in _indexes.Values)
+                {
+                    foreach (var entry in idx.Entries.Values)
+                        entries[pos++] = entry;
+                }
+
+                Memory.ReadScatter(entries, totalEntries, UseCache);
+                foreach (var index in _indexes)
+                    index.Value.ExecuteCallback();
+            }
+            finally
+            {
+                Array.Clear(entries, 0, totalEntries);
+                ArrayPool<IScatterEntry>.Shared.Return(entries, false);
+            }
         }
 
         public void Dispose()

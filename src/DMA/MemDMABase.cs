@@ -225,56 +225,48 @@ namespace eft_dma_radar.Common.DMA
         #region ScatterRead
 
         /// <summary>
-        /// Performs multiple reads in one sequence, significantly faster than single reads.
-        /// Designed to run without throwing unhandled exceptions, which will ensure the maximum amount of
-        /// reads are completed OK even if a couple fail.
+        /// Performs multiple reads in one sequence using the native VmmScatter API.
+        /// Page deduplication and result extraction are handled at the native layer —
+        /// no managed HashSet, page array, or results dictionary is allocated.
         /// </summary>
         public void ReadScatter(IScatterEntry[] entries, bool useCache = true)
+            => ReadScatter(entries, entries.Length, useCache);
+
+        /// <summary>
+        /// Overload that accepts an explicit count, enabling callers to pass ArrayPool-rented
+        /// arrays larger than the actual entry count without extra allocation.
+        /// </summary>
+        public void ReadScatter(IScatterEntry[] entries, int count, bool useCache = true)
         {
-            if (entries.Length == 0)
+            if (count == 0)
                 return;
             ThrowIfVmmDisposed();
-            var pagesToRead = new HashSet<ulong>(entries.Length); // Will contain each unique page only once to prevent reading the same page multiple times
-            foreach (var entry in entries) // First loop through all entries - GET INFO
+
+            var vmmFlags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
+            using var scatter = new VmmScatter(_hVMM, ProcessPID, vmmFlags);
+
+            // First pass: register each address with the native scatter handle.
+            for (int i = 0; i < count; i++)
             {
-                // INTEGRITY CHECK - Make sure the read is valid and within range
+                var entry = entries[i];
                 if (entry.Address == 0x0 || entry.CB == 0 || (uint)entry.CB > MAX_READ_SIZE)
                 {
-                    //XMLogging.WriteLine($"[Scatter Read] Out of bounds read @ 0x{entry.Address.ToString("X")} ({entry.CB})");
                     entry.IsFailed = true;
                     continue;
                 }
-
-                // get the number of pages
-                uint numPages = ADDRESS_AND_SIZE_TO_SPAN_PAGES(entry.Address, (uint)entry.CB);
-                ulong basePage = PAGE_ALIGN(entry.Address);
-
-                //loop all the pages we would need
-                for (int p = 0; p < numPages; p++)
-                {
-                    ulong page = basePage + 0x1000 * (uint)p;
-                    pagesToRead.Add(page);
-                }
-            }
-            if (pagesToRead.Count == 0)
-                return;
-
-            var vmmFlags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
-            var pageArray = new ulong[pagesToRead.Count];
-            pagesToRead.CopyTo(pageArray);
-            var scatterRaw = _hVMM.MemReadScatter(ProcessPID, vmmFlags, pageArray.AsSpan());
-            var scatterResults = new Dictionary<ulong, byte[]>(scatterRaw.Length);
-            foreach (var s in scatterRaw)
-            {
-                if (s.f && s.pb != null)
-                    scatterResults[s.qwA] = s.pb;
+                if (!scatter.PrepareRead(entry.Address, (uint)entry.CB))
+                    entry.IsFailed = true;
             }
 
-            foreach (var entry in entries) // Second loop through all entries - PARSE RESULTS
+            // Execute all prepared reads in one native call.
+            scatter.Execute();
+
+            // Second pass: extract results via native ReadSpan (no page-boundary logic needed).
+            for (int i = 0; i < count; i++)
             {
-                if (entry.IsFailed)
-                    continue;
-                entry.SetResult(scatterResults);
+                var entry = entries[i];
+                if (!entry.IsFailed)
+                    entry.ReadResult(scatter);
             }
         }
 

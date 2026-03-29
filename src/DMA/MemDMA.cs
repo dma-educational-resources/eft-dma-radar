@@ -949,6 +949,22 @@ namespace eft_dma_radar.Tarkov
             _actualMemory.ReadScatter(entries, useCache);
         }
 
+        public void ReadScatter(IScatterEntry[] entries, int count, bool useCache = true)
+        {
+            if (!HasDMA)
+            {
+                LogSafeOnce("[SafeMode] ReadScatter skipped (DMA disabled)");
+                if (entries != null)
+                {
+                    for (int i = 0; i < count; i++)
+                        entries[i].IsFailed = true;
+                }
+                return;
+            }
+
+            _actualMemory.ReadScatter(entries, count, useCache);
+        }
+
         public void ReadCache(params ulong[] va)
         {
             if (!HasDMA)
