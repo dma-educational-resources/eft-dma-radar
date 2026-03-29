@@ -822,6 +822,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         public void OnValidateTransforms(ScatterReadIndex round1, ScatterReadIndex round2)
         {
             var skeleton = Skeleton;
+            if (skeleton is null)
+                return;
 
             // Root bone: check root transform hierarchy access ptr
             round1.AddEntry<MemPointer>(-1, skeleton.Root.TransformInternal +

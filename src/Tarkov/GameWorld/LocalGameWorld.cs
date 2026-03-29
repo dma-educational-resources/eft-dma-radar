@@ -96,6 +96,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
         public QuestManager QuestManager { get; private set; }
 
         public CameraManager CameraManager { get; private set; }
+        private long _cameraRetryAfter;
 
         /// <summary>
         /// True if raid instance is still active, and safe to Write Memory.
@@ -155,6 +156,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
             // Reset static assets for a new raid/game.
             Player.Reset();
+
+            // Delay camera resolution by 20s from raid start.
+            // EFT's CameraManager.Instance is not available until well after raid begins.
+            _cameraRetryAfter = Environment.TickCount64 + 20_000;
         }
 
         /// <summary>
@@ -1064,18 +1069,19 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         private void RefreshCameraManager()
         {
+            if (CameraManager is not null)
+                return;
+            if (Environment.TickCount64 < _cameraRetryAfter)
+                return;
             try
             {
-                if (CameraManager is null)
-                {
-                    CameraManager.Initialize();
-                    CameraManager = new CameraManager();
-                    XMLogging.WriteLine("[CameraManager] Camera resolved!");
-                }
+                CameraManager = new CameraManager();
+                XMLogging.WriteLine("[CameraManager] Camera resolved!");
             }
             catch
             {
-                // Camera can fail transiently during loading/transitions — retry next tick
+                // Back off 3s before next attempt — Instance takes time to become available after raid start
+                _cameraRetryAfter = Environment.TickCount64 + 3_000;
             }
         }
 
