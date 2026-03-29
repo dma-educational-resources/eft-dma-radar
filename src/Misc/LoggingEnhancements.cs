@@ -33,12 +33,13 @@ namespace eft_dma_radar.Common.Misc
             // Filter based on minimum log level
             if (level < MinimumLogLevel)
                 return;
-                
+
             // Skip debug logs unless explicitly enabled
             if (level == AppLogLevel.Debug && !EnableDebugLogging)
                 return;
 
-            var prefix = string.IsNullOrEmpty(category) ? "" : $"[{category}] ";
+            // Build the final string only once, avoiding intermediate allocations
+            // when prefix/levelPrefix are empty strings (the common case).
             var levelPrefix = level switch
             {
                 AppLogLevel.Error => "ERROR ",
@@ -47,7 +48,20 @@ namespace eft_dma_radar.Common.Misc
                 _ => ""
             };
 
-            XMLogging.WriteLine($"{levelPrefix}{prefix}{message}");
+            if (string.IsNullOrEmpty(category))
+            {
+                if (levelPrefix.Length == 0)
+                    XMLogging.WriteLine(message);
+                else
+                    XMLogging.WriteLine($"{levelPrefix}{message}");
+            }
+            else
+            {
+                if (levelPrefix.Length == 0)
+                    XMLogging.WriteLine($"[{category}] {message}");
+                else
+                    XMLogging.WriteLine($"{levelPrefix}[{category}] {message}");
+            }
         }
 
         /// <summary>

@@ -100,6 +100,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             PlayerHistory.Reset();
             _playerScavNumber = 0;
             _verticesOwner.Clear();
+            LoggingEnhancements.ClearCaches();
         }
 
         #endregion
@@ -114,9 +115,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// <returns>True if allocation succeeded, false otherwise.</returns>
         public static bool Allocate(ConcurrentDictionary<ulong, Player> playerDict, ulong playerBase)
         {
-            var sw = _rateLimit.AddOrUpdate(playerBase,
-                key => new Stopwatch(),
-                (key, oldValue) => oldValue);
+            var sw = _rateLimit.GetOrAdd(playerBase, static _ => new Stopwatch());
             if (sw.IsRunning && sw.Elapsed.TotalMilliseconds < 500f)
                 return false; // Rate limited, not a real failure
             try
@@ -822,70 +821,71 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// <param name="round2">Index (round 2)</param>
         public void OnValidateTransforms(ScatterReadIndex round1, ScatterReadIndex round2)
         {
-            // Check skeleton root transform first (most critical - if this changes, rebuild everything)
-            round1.AddEntry<MemPointer>(-1, Skeleton.Root.TransformInternal +
-                UnityOffsets.TransformInternal.TransformAccess); // Root Hierarchy
-            round1.Callbacks += x1 =>
-            {
-                if (x1.TryGetResult<MemPointer>(-1, out var tra))
-                {
-                    round2.AddEntry<MemPointer>(-1, tra + UnityOffsets.TransformAccess.Vertices); // Root Vertices Ptr
-                    round2.Callbacks += x2 =>
-                    {
-                        if (x2.TryGetResult<MemPointer>(-1, out var verticesPtr))
-                        {
-                            if (Skeleton.Root.VerticesAddr != verticesPtr) // Root vertices address changed
-                            {
-                                // Rebuild root transform
-                                var transform = new UnityTransform(Skeleton.Root.TransformInternal);
-                                // Note: We can't directly set Skeleton.Root, but we can reset all bones
-                                // The root will be updated when we reset the HumanBase bone
-                                _verticesCount = 0; // Force fresh vertex count on next read
+            var skeleton = Skeleton;
 
-                                // IMPORTANT: Rebuild all bone transforms when root changes
-                                try
-                                {
-                                    foreach (var bone in Skeleton.Bones.Keys.ToList())
-                                    {
-                                        Skeleton.ResetTransform(bone);
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    XMLogging.WriteLine($"ERROR rebuilding skeleton for '{Name}': {ex}");
-                                }
-                            }
-                        }
-                    };
-                }
-            };
+            // Root bone: check root transform hierarchy access ptr
+            round1.AddEntry<MemPointer>(-1, skeleton.Root.TransformInternal +
+                UnityOffsets.TransformInternal.TransformAccess);
 
-            // Also check individual bone transforms (for non-root changes)
-            foreach (var tr in Skeleton.Bones)
+            // Non-root bones: one AddEntry per bone, all registered before the single callback fires
+            foreach (var tr in skeleton.Bones)
             {
-                // Skip root bone (already checked above)
                 if (tr.Key == eft_dma_radar.Common.Unity.Bones.HumanBase)
                     continue;
-
                 round1.AddEntry<MemPointer>((int)(uint)tr.Key,
                     tr.Value.TransformInternal +
-                    UnityOffsets.TransformInternal.TransformAccess); // Bone Hierarchy
-                round1.Callbacks += x1 =>
-                {
-                    if (x1.TryGetResult<MemPointer>((int)(uint)tr.Key, out var tra))
-                        round2.AddEntry<MemPointer>((int)(uint)tr.Key, tra + UnityOffsets.TransformAccess.Vertices); // Vertices Ptr
-                    round2.Callbacks += x2 =>
-                    {
-                        if (x2.TryGetResult<MemPointer>((int)(uint)tr.Key, out var verticesPtr))
-                        {
-                            if (tr.Value.VerticesAddr != verticesPtr) // check if any addr changed
-                            {
-                                this.Skeleton.ResetTransform(tr.Key); // alloc new transform
-                            }
-                        }
-                    };
-                };
+                    UnityOffsets.TransformInternal.TransformAccess);
             }
+
+            // Single round1 callback handles root + all non-root bones at once
+            round1.Callbacks = x1 =>
+            {
+                // Root
+                if (x1.TryGetResult<MemPointer>(-1, out var rootTra))
+                    round2.AddEntry<MemPointer>(-1, rootTra + UnityOffsets.TransformAccess.Vertices);
+
+                // Non-root bones
+                foreach (var tr in skeleton.Bones)
+                {
+                    if (tr.Key == eft_dma_radar.Common.Unity.Bones.HumanBase)
+                        continue;
+                    if (x1.TryGetResult<MemPointer>((int)(uint)tr.Key, out var tra))
+                        round2.AddEntry<MemPointer>((int)(uint)tr.Key, tra + UnityOffsets.TransformAccess.Vertices);
+                }
+
+                // Single round2 callback handles root + all non-root bones at once
+                round2.Callbacks = x2 =>
+                {
+                    // Root
+                    if (x2.TryGetResult<MemPointer>(-1, out var rootVerticesPtr) &&
+                        skeleton.Root.VerticesAddr != rootVerticesPtr)
+                    {
+                        _verticesCount = 0;
+                        try
+                        {
+                            foreach (var bone in skeleton.Bones.Keys)
+                                skeleton.ResetTransform(bone);
+                        }
+                        catch (Exception ex)
+                        {
+                            XMLogging.WriteLine($"ERROR rebuilding skeleton for '{Name}': {ex}");
+                        }
+                        return; // Root changed → all bones already reset, skip per-bone check
+                    }
+
+                    // Non-root bones
+                    foreach (var tr in skeleton.Bones)
+                    {
+                        if (tr.Key == eft_dma_radar.Common.Unity.Bones.HumanBase)
+                            continue;
+                        if (x2.TryGetResult<MemPointer>((int)(uint)tr.Key, out var verticesPtr) &&
+                            tr.Value.VerticesAddr != verticesPtr)
+                        {
+                            skeleton.ResetTransform(tr.Key);
+                        }
+                    }
+                };
+            };
         }
 
         /// <summary>

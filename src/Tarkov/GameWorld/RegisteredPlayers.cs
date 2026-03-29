@@ -124,14 +124,19 @@ namespace eft_dma_radar.Tarkov.GameWorld
         }
         private void HandleBtrStickiness()
         {
-            // Collect BTR positions
+            // Fast-path: no BTR operators on this map (the common case)
+            // Avoid LINQ + ToList() allocation when there are no BTRs at all
+            bool hasBtr = false;
+            foreach (var p in _players.Values)
+                if (p is BtrOperator) { hasBtr = true; break; }
+            if (!hasBtr)
+                return;
+
+            // Collect BTR positions (rare path — only when a BTR is present)
             var btrs = _players.Values
                 .OfType<BtrOperator>()
                 .Select(b => b.Position)
                 .ToList();
-        
-            if (btrs.Count == 0)
-                return;
         
             foreach (var player in _players.Values)
             {

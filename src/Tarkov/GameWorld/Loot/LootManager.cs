@@ -228,24 +228,14 @@ namespace eft_dma_radar.Tarkov.Loot
                                                         {
                                                             if (x6.TryGetResult<MemPointer>(11, out var transformInternal))
                                                             {
-                                                                // Defer processing until all scatter reads complete
-                                                                map.CompletionCallbacks += () =>
-                                                {
-                                                    _ct.ThrowIfCancellationRequested();
-                                                    try
-                                                    {
-                                                                        var classNameStr = (string)className;
-                                                                        var objectNameStr = (string)objectName;
-                                                                        
-                                                        ProcessLootIndex(loot, containers, deadPlayers,
-                                                                            interactiveClass, objectNameStr,
-                                                                            transformInternal, classNameStr, gameObject);
-                                                    }
-                                                    catch
-                                                    {
-                                                                        // Silently ignore processing errors
-                                                                    }
-                                                                };
+                                                                _ct.ThrowIfCancellationRequested();
+                                                                try
+                                                                {
+                                                                    ProcessLootIndex(loot, containers, deadPlayers,
+                                                                        interactiveClass, (string)objectName,
+                                                                        transformInternal, (string)className, gameObject);
+                                                                }
+                                                                catch { }
                                                             }
                                                         };
                                                     }
