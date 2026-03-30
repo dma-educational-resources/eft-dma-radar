@@ -1,4 +1,4 @@
-﻿using eft_dma_radar;
+using eft_dma_radar;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.UI;
