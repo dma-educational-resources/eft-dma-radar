@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.ScatterAPI;
+﻿using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
@@ -55,7 +55,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                         if (!_set)
                         {
                             _set = true;
-                            XMLogging.WriteLine("Time of Day enabled!");
+                            Log.WriteLine("Time of Day enabled!");
                         }
                         _lastHour = currentHour;
                     };
@@ -68,13 +68,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     writes.Callbacks += () =>
                     {
                         _set = false;
-                        XMLogging.WriteLine("Time of Day disabled!");
+                        Log.WriteLine("Time of Day disabled!");
                     };
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[TimeOfDay]: {ex}");
+                Log.WriteLine($"[TimeOfDay]: {ex}");
             }
         }
 
@@ -98,7 +98,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 
             //if (ObjectClass.ReadName(todTime) != "TOD_Time")
             //{
-            //    XMLogging.WriteLine($"Tod_Time name = {ObjectClass.ReadName(todTime)}");
+            //    Log.WriteLine($"Tod_Time name = {ObjectClass.ReadName(todTime)}");
             //    throw new ArgumentOutOfRangeException(nameof(todTime), "Invalid TOD_Time object");
             //}
 

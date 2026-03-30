@@ -1,4 +1,4 @@
-using eft_dma_radar.UI.ESP;
+﻿using eft_dma_radar.UI.ESP;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
@@ -147,7 +147,7 @@ namespace eft_dma_radar.UI.Pages
                 }
                 catch (TimeoutException ex)
                 {
-                    XMLogging.WriteLine($"[PANELS] {ex.Message}");
+                    Log.WriteLine($"[PANELS] {ex.Message}");
                 }
             };
         }
@@ -192,7 +192,7 @@ namespace eft_dma_radar.UI.Pages
                     }
                     catch (Exception ex)
                     {
-                        XMLogging.WriteLine($"[ESP Control] Error applying chams colors in background: {ex.Message}");
+                        Log.WriteLine($"[ESP Control] Error applying chams colors in background: {ex.Message}");
                     }
                 });
             }
@@ -362,7 +362,7 @@ namespace eft_dma_radar.UI.Pages
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[ERROR] UpdateEntityChamsSettings failed for {entityType}: {ex}");
+                Log.WriteLine($"[ERROR] UpdateEntityChamsSettings failed for {entityType}: {ex}");
             }
         }
 
@@ -639,7 +639,7 @@ namespace eft_dma_radar.UI.Pages
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[ESP Control] Error applying color to materials: {ex.Message}");
+                    Log.WriteLine($"[ESP Control] Error applying color to materials: {ex.Message}");
                 }
             });
         }
@@ -671,7 +671,7 @@ namespace eft_dma_radar.UI.Pages
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[CHAMS] Failed to apply color to materials: {ex.Message}");
+                Log.WriteLine($"[CHAMS] Failed to apply color to materials: {ex.Message}");
             }
         }
 
@@ -682,7 +682,7 @@ namespace eft_dma_radar.UI.Pages
                 if (!Config.ChamsConfig.Enabled || !MemWrites.Enabled)
                     return;
 
-                XMLogging.WriteLine("[ESP Control] Applying all configured material colors...");
+                Log.WriteLine("[ESP Control] Applying all configured material colors...");
 
                 using var colorMem = new RemoteBytes(SizeChecker<UnityColor>.Size);
 
@@ -716,20 +716,20 @@ namespace eft_dma_radar.UI.Pages
                                 //NativeMethods.SetMaterialColor(colorMem, material.Address, material.ColorInvisible, invisibleUnityColor);
                             }
 
-                            XMLogging.WriteLine($"[CHAMS] Applied configured colors to {materialMode}/{entityType}");
+                            Log.WriteLine($"[CHAMS] Applied configured colors to {materialMode}/{entityType}");
                         }
                         catch (Exception ex)
                         {
-                            XMLogging.WriteLine($"[CHAMS] Failed to apply configured colors to {materialMode}/{entityType}: {ex.Message}");
+                            Log.WriteLine($"[CHAMS] Failed to apply configured colors to {materialMode}/{entityType}: {ex.Message}");
                         }
                     }
                 }
 
-                XMLogging.WriteLine("[ESP Control] Finished applying all configured material colors");
+                Log.WriteLine("[ESP Control] Finished applying all configured material colors");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[ESP Control] Error applying configured material colors: {ex.Message}");
+                Log.WriteLine($"[ESP Control] Error applying configured material colors: {ex.Message}");
             }
         }
 
@@ -739,7 +739,7 @@ namespace eft_dma_radar.UI.Pages
             {
                 if (_isApplyingChamsColors)
                 {
-                    XMLogging.WriteLine("[ESP Control] Chams colors already being applied, skipping duplicate call");
+                    Log.WriteLine("[ESP Control] Chams colors already being applied, skipping duplicate call");
                     return;
                 }
                 _isApplyingChamsColors = true;
@@ -753,21 +753,21 @@ namespace eft_dma_radar.UI.Pages
                     {
                         if (!Config.ChamsConfig.Enabled || !MemWrites.Enabled || ChamsManager.Materials.Count == 0)
                         {
-                            XMLogging.WriteLine("[ESP Control] Skipping color application - chams disabled or no materials loaded");
+                            Log.WriteLine("[ESP Control] Skipping color application - chams disabled or no materials loaded");
                             return;
                         }
 
-                        XMLogging.WriteLine("[ESP Control] Applying all chams colors in background...");
+                        Log.WriteLine("[ESP Control] Applying all chams colors in background...");
 
                         ApplyAllConfiguredMaterialColors();
                         PlayerChamsManager.ApplyConfiguredColors();
                         LootChamsManager.ApplyConfiguredColors();
 
-                        XMLogging.WriteLine("[ESP Control] Finished applying all chams colors");
+                        Log.WriteLine("[ESP Control] Finished applying all chams colors");
                     }
                     catch (Exception ex)
                     {
-                        XMLogging.WriteLine($"[ESP Control] Error applying chams colors: {ex.Message}");
+                        Log.WriteLine($"[ESP Control] Error applying chams colors: {ex.Message}");
                         throw;
                     }
                 });
@@ -808,7 +808,7 @@ namespace eft_dma_radar.UI.Pages
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[CHAMS STATUS] Error updating status: {ex.Message}");
+                Log.WriteLine($"[CHAMS STATUS] Error updating status: {ex.Message}");
                 ShowFallbackMaterialStatus();
             }
         }
@@ -878,7 +878,7 @@ namespace eft_dma_radar.UI.Pages
                     txtChamsMaterialStatus.Foreground = new SolidColorBrush(Colors.Orange);
                 });
 
-                XMLogging.WriteLine("[CHAMS REFRESH] Starting smart materials refresh...");
+                Log.WriteLine("[CHAMS REFRESH] Starting smart materials refresh...");
 
                 var success = await Task.Run(async () =>
                 {
@@ -888,7 +888,7 @@ namespace eft_dma_radar.UI.Pages
 
                         if (status.IsComplete)
                         {
-                            XMLogging.WriteLine("[CHAMS REFRESH] All materials already loaded");
+                            Log.WriteLine("[CHAMS REFRESH] All materials already loaded");
 
                             await Dispatcher.InvokeAsync(() =>
                             {
@@ -898,12 +898,12 @@ namespace eft_dma_radar.UI.Pages
                             return true;
                         }
 
-                        XMLogging.WriteLine($"[CHAMS REFRESH] Status: {status.LoadedCount}/{status.ExpectedCount} loaded, {status.WorkingCount} working, {status.FailedCount} failed");
+                        Log.WriteLine($"[CHAMS REFRESH] Status: {status.LoadedCount}/{status.ExpectedCount} loaded, {status.WorkingCount} working, {status.FailedCount} failed");
 
                         if (status.MissingCombos.Any())
                         {
                             var missingList = string.Join(", ", status.MissingCombos.Select(x => $"{x.Item1}-{x.Item2}"));
-                            XMLogging.WriteLine($"[CHAMS REFRESH] Missing materials: {missingList}");
+                            Log.WriteLine($"[CHAMS REFRESH] Missing materials: {missingList}");
                         }
 
                         await Dispatcher.InvokeAsync(() =>
@@ -917,7 +917,7 @@ namespace eft_dma_radar.UI.Pages
                     }
                     catch (Exception ex)
                     {
-                        XMLogging.WriteLine($"[CHAMS REFRESH] SmartRefresh error: {ex.Message}");
+                        Log.WriteLine($"[CHAMS REFRESH] SmartRefresh error: {ex.Message}");
                         return false;
                     }
                 });
@@ -932,24 +932,24 @@ namespace eft_dma_radar.UI.Pages
 
                 if (finalStatus.IsComplete)
                 {
-                    XMLogging.WriteLine("[CHAMS REFRESH] All materials successfully loaded!");
+                    Log.WriteLine("[CHAMS REFRESH] All materials successfully loaded!");
                     NotificationsShared.Success("[CHAMS] All materials successfully loaded!");
                 }
                 else if (finalStatus.LoadedCount > 0)
                 {
                     var recovered = Math.Max(0, finalStatus.LoadedCount);
-                    XMLogging.WriteLine($"[CHAMS REFRESH] Partially successful: {recovered} materials loaded");
+                    Log.WriteLine($"[CHAMS REFRESH] Partially successful: {recovered} materials loaded");
                     NotificationsShared.Info($"[CHAMS] {finalStatus.LoadedCount}/{finalStatus.ExpectedCount} total loaded.");
 
                     if (finalStatus.MissingCombos.Any())
                     {
                         var stillMissing = string.Join(", ", finalStatus.MissingCombos.Take(5).Select(x => $"{x.Item1}-{x.Item2}"));
-                        XMLogging.WriteLine($"[CHAMS REFRESH] Still missing: {stillMissing}{(finalStatus.MissingCombos.Count > 5 ? "..." : "")}");
+                        Log.WriteLine($"[CHAMS REFRESH] Still missing: {stillMissing}{(finalStatus.MissingCombos.Count > 5 ? "..." : "")}");
                     }
                 }
                 else
                 {
-                    XMLogging.WriteLine("[CHAMS REFRESH] Refresh failed - no materials recovered");
+                    Log.WriteLine("[CHAMS REFRESH] Refresh failed - no materials recovered");
                     NotificationsShared.Error("[CHAMS] Refresh failed. Check logs for details.");
                 }
 
@@ -961,18 +961,18 @@ namespace eft_dma_radar.UI.Pages
                         {
                             await Task.Delay(500);
                             await ApplyAllChamsColorsAsync();
-                            XMLogging.WriteLine("[ESP Control] Applied colors after material refresh");
+                            Log.WriteLine("[ESP Control] Applied colors after material refresh");
                         }
                         catch (Exception ex)
                         {
-                            XMLogging.WriteLine($"[ESP Control] Error applying colors after material refresh: {ex.Message}");
+                            Log.WriteLine($"[ESP Control] Error applying colors after material refresh: {ex.Message}");
                         }
                     });
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[CHAMS REFRESH] Unexpected error: {ex.Message}");
+                Log.WriteLine($"[CHAMS REFRESH] Unexpected error: {ex.Message}");
                 NotificationsShared.Error($"[CHAMS] Refresh error: {ex.Message}");
             }
             finally
@@ -1009,12 +1009,12 @@ namespace eft_dma_radar.UI.Pages
                         try
                         {
                             await cache.SaveAsync();
-                            XMLogging.WriteLine("[CHAMS CACHE] Material cache cleared successfully");
+                            Log.WriteLine("[CHAMS CACHE] Material cache cleared successfully");
                             NotificationsShared.Info("[CHAMS] Material cache cleared. Use 'Refresh Materials' to reload.");
                         }
                         catch (Exception ex)
                         {
-                            XMLogging.WriteLine($"[CHAMS CACHE] Error saving cleared cache: {ex.Message}");
+                            Log.WriteLine($"[CHAMS CACHE] Error saving cleared cache: {ex.Message}");
                             NotificationsShared.Warning($"[CHAMS] Cache cleared but save failed: {ex.Message}");
                         }
                     });
@@ -1025,7 +1025,7 @@ namespace eft_dma_radar.UI.Pages
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[CHAMS CACHE] Error clearing cache: {ex.Message}");
+                Log.WriteLine($"[CHAMS CACHE] Error clearing cache: {ex.Message}");
                 NotificationsShared.Error($"[CHAMS] Error clearing cache: {ex.Message}");
             }
         }
@@ -1049,7 +1049,7 @@ namespace eft_dma_radar.UI.Pages
         {
             try
             {
-                XMLogging.WriteLine("[CHAMS IMPORT] Loading imported chams settings...");
+                Log.WriteLine("[CHAMS IMPORT] Loading imported chams settings...");
                 _isImporting = true;
 
                 await Dispatcher.InvokeAsync(() =>
@@ -1068,7 +1068,7 @@ namespace eft_dma_radar.UI.Pages
                         }
                         catch (Exception ex)
                         {
-                            XMLogging.WriteLine($"[CHAMS IMPORT] Error applying imported chams colors: {ex.Message}");
+                            Log.WriteLine($"[CHAMS IMPORT] Error applying imported chams colors: {ex.Message}");
                         }
                         finally
                         {
@@ -1084,12 +1084,12 @@ namespace eft_dma_radar.UI.Pages
                     _isImporting = false;
                 }
 
-                XMLogging.WriteLine("[CHAMS IMPORT] Imported chams settings loaded successfully");
+                Log.WriteLine("[CHAMS IMPORT] Imported chams settings loaded successfully");
             }
             catch (Exception ex)
             {
                 _isImporting = false;
-                XMLogging.WriteLine($"[CHAMS IMPORT] Error loading imported chams settings: {ex.Message}");
+                Log.WriteLine($"[CHAMS IMPORT] Error loading imported chams settings: {ex.Message}");
             }
         }
 
@@ -1138,7 +1138,7 @@ namespace eft_dma_radar.UI.Pages
             }
 
             Config.Save();
-            XMLogging.WriteLine($"[CHAMS] {tag} for {_selectedEntityType} changed to {value}");
+            Log.WriteLine($"[CHAMS] {tag} for {_selectedEntityType} changed to {value}");
         }
 
         private void cboChamsEntityType_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1414,7 +1414,7 @@ namespace eft_dma_radar.UI.Pages
             settings.RenderMode = (ESPPlayerRenderMode)cboPlayerRenderMode.SelectedIndex;
 
             Config.Save();
-            XMLogging.WriteLine($"Saved ESP player type settings for {playerType}");
+            Log.WriteLine($"Saved ESP player type settings for {playerType}");
             //PlayerPreviewControl.RefreshESPPreview();
         }
 
@@ -1587,7 +1587,7 @@ namespace eft_dma_radar.UI.Pages
             }
 
             Config.Save();
-            XMLogging.WriteLine($"Saved ESP entity type settings for {entityType}");
+            Log.WriteLine($"Saved ESP entity type settings for {entityType}");
             //PlayerPreviewControl.RefreshESPPreview();
         }
 
@@ -1679,7 +1679,7 @@ namespace eft_dma_radar.UI.Pages
             }
 
             Config.Save();
-            XMLogging.WriteLine($"Updated widget option: {widgetName} = {isSelected}");
+            Log.WriteLine($"Updated widget option: {widgetName} = {isSelected}");
         }
 
         /// <summary>
@@ -1844,7 +1844,7 @@ namespace eft_dma_radar.UI.Pages
             if (sender is CheckBox cb && cb.Tag is string tag)
             {
                 var value = cb.IsChecked == true;
-                XMLogging.WriteLine($"[Checkbox] {cb.Name} changed to {value}");
+                Log.WriteLine($"[Checkbox] {cb.Name} changed to {value}");
                 switch (tag)
                 {
                     case "AutoFullscreen":
@@ -1875,7 +1875,7 @@ namespace eft_dma_radar.UI.Pages
                 }
 
                 Config.Save();
-                XMLogging.WriteLine("Saved Config");
+                Log.WriteLine("Saved Config");
             }
         }
 
@@ -1938,7 +1938,7 @@ namespace eft_dma_radar.UI.Pages
                 }
 
                 Config.Save();
-                XMLogging.WriteLine("[ComboBox] Selection changed and config saved.");
+                Log.WriteLine("[ComboBox] Selection changed and config saved.");
             }
         }
 
@@ -1952,7 +1952,7 @@ namespace eft_dma_radar.UI.Pages
 
                 ESPForm.Window?.UpdateRenderTimerInterval(fpsValue);
 
-                XMLogging.WriteLine($"[FPS Cap] Changed to {fpsValue}");
+                Log.WriteLine($"[FPS Cap] Changed to {fpsValue}");
             }
         }
 
@@ -2040,7 +2040,7 @@ namespace eft_dma_radar.UI.Pages
             Config.ESP.ShowTopLoot = IsOptionSelected("Top Loot");
 
             Config.Save();
-            XMLogging.WriteLine("Saved ESP option settings");
+            Log.WriteLine("Saved ESP option settings");
         }
 
         private void widgetsCheckComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2065,7 +2065,7 @@ namespace eft_dma_radar.UI.Pages
             }
 
             Config.Save();
-            XMLogging.WriteLine("Saved widget settings");
+            Log.WriteLine("Saved widget settings");
         }
         /// <summary>
         /// Load available monitors into the ComboBox
@@ -2086,11 +2086,11 @@ namespace eft_dma_radar.UI.Pages
                 else
                     cmbTargetMonitor.SelectedIndex = monitors.Count > 1 ? 1 : 0; // Default to second monitor if available
 
-                XMLogging.WriteLine($"[ESP] Loaded {monitors.Count} monitor(s), selected monitor {cmbTargetMonitor.SelectedIndex}");
+                Log.WriteLine($"[ESP] Loaded {monitors.Count} monitor(s), selected monitor {cmbTargetMonitor.SelectedIndex}");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[ESP] Error loading monitors: {ex.Message}");
+                Log.WriteLine($"[ESP] Error loading monitors: {ex.Message}");
             }
         }
 
@@ -2103,10 +2103,10 @@ namespace eft_dma_radar.UI.Pages
             {
                 Config.ESP.EspTargetScreen = monitor.Index;
                 Config.Save();
-                XMLogging.WriteLine($"[ESP] Target monitor changed to {monitor.DisplayName}");
+                Log.WriteLine($"[ESP] Target monitor changed to {monitor.DisplayName}");
 
                 // Log for debugging
-                XMLogging.WriteLine($"[ESP] Monitor resolution: {monitor.Width}x{monitor.Height} @ ({monitor.Left}, {monitor.Top})");
+                Log.WriteLine($"[ESP] Monitor resolution: {monitor.Width}x{monitor.Height} @ ({monitor.Left}, {monitor.Top})");
             }
         }
         #endregion

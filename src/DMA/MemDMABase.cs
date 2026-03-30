@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.ScatterAPI;
+﻿using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
 using System.Diagnostics;
@@ -88,7 +88,7 @@ namespace eft_dma_radar.Common.DMA
 
         protected MemDMABase(FpgaAlgo fpgaAlgo, bool useMemMap)
         {
-            XMLogging.WriteLine("Initializing DMA...");
+            Log.WriteLine("Initializing DMA...");
             /// Check MemProcFS Versions...
             var vmmVersion = FileVersionInfo.GetVersionInfo("vmm.dll").FileVersion;
             var lcVersion = FileVersionInfo.GetVersionInfo("leechcore.dll").FileVersion;
@@ -105,7 +105,7 @@ namespace eft_dma_radar.Common.DMA
                 /// Begin Init...
                 if (useMemMap && !File.Exists(_memoryMapFile))
                 {
-                    XMLogging.WriteLine("[DMA] No MemMap, attempting to generate...");
+                    Log.WriteLine("[DMA] No MemMap, attempting to generate...");
                     _hVMM = new Vmm(initArgs);
                     _ = _hVMM.GetMemoryMap(applyMap: true, outputFile: _memoryMapFile);
                 }
@@ -121,7 +121,7 @@ namespace eft_dma_radar.Common.DMA
                 _hVMM.RegisterAutoRefresh(RefreshOption.MemoryPartial, TimeSpan.FromMilliseconds(300));
                 _hVMM.RegisterAutoRefresh(RefreshOption.TlbPartial, TimeSpan.FromSeconds(2));
                 BaseMemoryHolder.MemoryBase = this;
-                XMLogging.WriteLine("DMA Initialized!");
+                Log.WriteLine("DMA Initialized!");
             }
             catch (Exception ex)
             {
@@ -226,7 +226,7 @@ namespace eft_dma_radar.Common.DMA
 
         /// <summary>
         /// Performs multiple reads in one sequence using the native VmmScatter API.
-        /// Page deduplication and result extraction are handled at the native layer —
+        /// Page deduplication and result extraction are handled at the native layer â€”
         /// no managed HashSet, page array, or results dictionary is allocated.
         /// </summary>
         public void ReadScatter(IScatterEntry[] entries, bool useCache = true)
@@ -413,7 +413,7 @@ namespace eft_dma_radar.Common.DMA
                 {
                     if (!buffers[i].SequenceEqual(buffers[0]))
                     {
-                        XMLogging.WriteLine($"[WARN] ReadBufferEnsure() -> 0x{addr:X} failed memory consistency check.");
+                        Log.WriteLine($"[WARN] ReadBufferEnsure() -> 0x{addr:X} failed memory consistency check.");
                         return null;
                     }
                 }
@@ -686,7 +686,7 @@ namespace eft_dma_radar.Common.DMA
                 var moduleBase = _hVMM.ProcessGetModuleBase(ProcessPID, moduleName);
                 if (moduleBase == 0 || moduleBase == ulong.MaxValue)
                 {
-                    XMLogging.WriteLine($"[Signature] Module {moduleName} not found");
+                    Log.WriteLine($"[Signature] Module {moduleName} not found");
                     return Array.Empty<ulong>();
                 }
 
@@ -721,7 +721,7 @@ namespace eft_dma_radar.Common.DMA
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Signature] Error searching module {moduleName}: {ex.Message}");
+                Log.WriteLine($"[Signature] Error searching module {moduleName}: {ex.Message}");
                 return Array.Empty<ulong>();
             }
         }
@@ -799,7 +799,7 @@ namespace eft_dma_radar.Common.DMA
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[DMA] Error in FindSignatures: {ex.Message}");
+                Log.WriteLine($"[DMA] Error in FindSignatures: {ex.Message}");
                 return Array.Empty<ulong>();
             }
         }
@@ -1066,7 +1066,7 @@ namespace eft_dma_radar.Common.DMA
 
                     if (validateBytes is null || !validateBytes.SequenceEqual(buffer))
                     {
-                        XMLogging.WriteLine($"[WARN] WriteBufferEnsure() -> 0x{addr:X} did not pass validation on try {i + 1}!");
+                        Log.WriteLine($"[WARN] WriteBufferEnsure() -> 0x{addr:X} did not pass validation on try {i + 1}!");
                         success = false;
                         continue;
                     }

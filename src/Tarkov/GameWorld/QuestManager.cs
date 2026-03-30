@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 #pragma warning disable CS0162 // Unreachable code detected (DEBUG_QUEST_CONDITIONS const)
 using eft_dma_radar;
 using eft_dma_radar.Tarkov.EFTPlayer;
@@ -64,7 +64,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 {
                     var totalZones = _questZones?.Values.Sum(x => x.Count) ?? 0;
                     var totalOutlines = _questOutlines?.Values.Sum(x => x.Count) ?? 0;
-                    XMLogging.WriteLine($"[QuestManager] Cache updated: {totalZones} quest zones, {totalOutlines} zone outlines");
+                    Log.WriteLine($"[QuestManager] Cache updated: {totalZones} quest zones, {totalOutlines} zone outlines");
                 }
             }
 
@@ -78,7 +78,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 {
                     var totalZones = _questZones?.Values.Sum(x => x.Count) ?? 0;
                     var totalOutlines = _questOutlines?.Values.Sum(x => x.Count) ?? 0;
-                    XMLogging.WriteLine($"[QuestManager] Cache retry: {totalZones} quest zones, {totalOutlines} zone outlines");
+                    Log.WriteLine($"[QuestManager] Cache retry: {totalZones} quest zones, {totalOutlines} zone outlines");
                 }
             }
         }
@@ -278,18 +278,18 @@ namespace eft_dma_radar.Tarkov.GameWorld
                         try
                         {
                             if (DEBUG_QUEST_CONDITIONS)
-                                XMLogging.WriteLine($"[QuestDebug] Quest {qID}: HashSet @ 0x{completedHashSetPtr:X}");
+                                Log.WriteLine($"[QuestDebug] Quest {qID}: HashSet @ 0x{completedHashSetPtr:X}");
 
                             // Read directly from the HashSet<MongoID>
                             ReadHashSetMongoIds(completedHashSetPtr, questCompletedConditions, allCompletedConditions, qID, "completed");
 
                             if (DEBUG_QUEST_CONDITIONS && questCompletedConditions.Count > 0)
-                                XMLogging.WriteLine($"[QuestDebug] Quest {qID}: Found {questCompletedConditions.Count} completed conditions");
+                                Log.WriteLine($"[QuestDebug] Quest {qID}: Found {questCompletedConditions.Count} completed conditions");
                         }
                         catch (Exception ex)
                         {
                             if (DEBUG_QUEST_CONDITIONS)
-                                XMLogging.WriteLine($"[QuestDebug] Error reading completed conditions for {qID}: {ex.Message}");
+                                Log.WriteLine($"[QuestDebug] Error reading completed conditions for {qID}: {ex.Message}");
                         }
                     }
                     // Note: completedHashSetPtr == 0 is normal for quests with no completed conditions yet
@@ -327,9 +327,9 @@ namespace eft_dma_radar.Tarkov.GameWorld
             if (DEBUG_QUEST_CONDITIONS)
             {
                 if (allLocationConditions.Count > 0)
-                    XMLogging.WriteLine($"[QuestManager] {allLocationConditions.Count} location objectives for current map ({MapID})");
+                    Log.WriteLine($"[QuestManager] {allLocationConditions.Count} location objectives for current map ({MapID})");
                 else
-                    XMLogging.WriteLine($"[QuestManager] No location objectives for current map ({MapID}). Active quests: {activeQuests.Count}");
+                    Log.WriteLine($"[QuestManager] No location objectives for current map ({MapID}). Active quests: {activeQuests.Count}");
             }
 
             if (MainWindow.Window?.GeneralSettingsControl?.QuestItems?.Count != AllStartedQuestIds.Count)
@@ -513,7 +513,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                             allConditions.Add(conditionId);
                             foundCount++;
                             if (DEBUG_QUEST_CONDITIONS)
-                                XMLogging.WriteLine($"[QuestDebug]     ? {conditionId}");
+                                Log.WriteLine($"[QuestDebug]     ? {conditionId}");
                         }
                     }
                     catch
@@ -523,12 +523,12 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 }
 
                 if (DEBUG_QUEST_CONDITIONS && foundCount > 0)
-                    XMLogging.WriteLine($"[QuestDebug]   {source}: Found {foundCount} conditions");
+                    Log.WriteLine($"[QuestDebug]   {source}: Found {foundCount} conditions");
             }
             catch (Exception ex)
             {
                 if (DEBUG_QUEST_CONDITIONS)
-                    XMLogging.WriteLine($"[QuestDebug]   {source} read error: {ex.Message}");
+                    Log.WriteLine($"[QuestDebug]   {source} read error: {ex.Message}");
             }
         }
 
@@ -717,7 +717,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             sb.AppendLine("================================================================");
 
             if (DEBUG_QUEST_CONDITIONS)
-                XMLogging.WriteLine(sb.ToString());
+                Log.WriteLine(sb.ToString());
         }
 
         private static string GetStatusName(int status)
@@ -744,21 +744,21 @@ namespace eft_dma_radar.Tarkov.GameWorld
             if (!_mapToId.TryGetValue(MapID, out var id))
             {
                 if (DEBUG_QUEST_CONDITIONS)
-                    XMLogging.WriteLine($"[QuestZone] MapID '{MapID}' not found in _mapToId");
+                    Log.WriteLine($"[QuestZone] MapID '{MapID}' not found in _mapToId");
                 return null;
             }
 
             if (!_questZones!.TryGetValue(id, out var zones))
             {
                 if (DEBUG_QUEST_CONDITIONS)
-                    XMLogging.WriteLine($"[QuestZone] BSG ID '{id}' not found in _questZones (count: {_questZones?.Count ?? 0})");
+                    Log.WriteLine($"[QuestZone] BSG ID '{id}' not found in _questZones (count: {_questZones?.Count ?? 0})");
                 return null;
             }
 
             if (!zones.TryGetValue(locationId, out var location))
             {
                 if (DEBUG_QUEST_CONDITIONS)
-                    XMLogging.WriteLine($"[QuestZone] Zone '{locationId}' not found for map '{id}' (zones: {zones.Count})");
+                    Log.WriteLine($"[QuestZone] Zone '{locationId}' not found for map '{id}' (zones: {zones.Count})");
                 return null;
             }
 

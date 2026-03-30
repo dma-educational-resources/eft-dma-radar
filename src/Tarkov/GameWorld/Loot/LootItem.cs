@@ -1,4 +1,4 @@
-using eft_dma_radar.Tarkov.EFTPlayer;
+﻿using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Common.Maps;
@@ -796,28 +796,28 @@ namespace eft_dma_radar.Tarkov.Loot
             {
                 if (interactiveClass == 0)
                 {
-                    XMLogging.WriteLine("[ApplyItemChams] Skipped: interactiveClass is 0");
+                    Log.WriteLine("[ApplyItemChams] Skipped: interactiveClass is 0");
                     return;
                 }
 
                 var rendererList = Memory.ReadPtr(interactiveClass + 0x90);
                 if (rendererList == 0)
                 {
-                    XMLogging.WriteLine($"[ApplyItemChams] Skipped: rendererList is 0 for {interactiveClass:X}");
+                    Log.WriteLine($"[ApplyItemChams] Skipped: rendererList is 0 for {interactiveClass:X}");
                     return;
                 }
 
                 int rendererCount = Memory.ReadValue<int>(rendererList + 0x18);
                 if (rendererCount <= 0 || rendererCount > 1000)
                 {
-                    XMLogging.WriteLine($"[ApplyItemChams] Skipped: invalid rendererCount ({rendererCount}) for {interactiveClass:X}");
+                    Log.WriteLine($"[ApplyItemChams] Skipped: invalid rendererCount ({rendererCount}) for {interactiveClass:X}");
                     return;
                 }
 
                 var rendererBase = Memory.ReadPtr(rendererList + 0x10);
                 if (rendererBase == 0)
                 {
-                    XMLogging.WriteLine($"[ApplyItemChams] Skipped: rendererBase is 0 for {interactiveClass:X}");
+                    Log.WriteLine($"[ApplyItemChams] Skipped: rendererBase is 0 for {interactiveClass:X}");
                     return;
                 }
 
@@ -832,14 +832,14 @@ namespace eft_dma_radar.Tarkov.Loot
                     int matCount = Memory.ReadValue<int>(materialDict + 0x158);
                     if (matCount <= 0 || matCount > 100)
                     {
-                        XMLogging.WriteLine($"[ApplyItemChams] Skipped: invalid matCount ({matCount}) at {materialDict:X}");
+                        Log.WriteLine($"[ApplyItemChams] Skipped: invalid matCount ({matCount}) at {materialDict:X}");
                         continue;
                     }
 
                     var matArray = Memory.ReadPtr(materialDict + 0x148);
                     if (matArray == 0)
                     {
-                        XMLogging.WriteLine($"[ApplyItemChams] Skipped: matArray is 0 at {materialDict:X}");
+                        Log.WriteLine($"[ApplyItemChams] Skipped: matArray is 0 at {materialDict:X}");
                         continue;
                     }
 
@@ -851,7 +851,7 @@ namespace eft_dma_radar.Tarkov.Loot
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[ApplyItemChams] Failed for {interactiveClass:X}: {ex.Message}");
+                Log.WriteLine($"[ApplyItemChams] Failed for {interactiveClass:X}: {ex.Message}");
             }
         }
 
@@ -1296,7 +1296,7 @@ namespace eft_dma_radar.Tarkov.Loot
 
             if (keysToRemove.Count > 0)
             {
-                XMLogging.WriteLine($"[Notifications] Cleaned up {keysToRemove.Count} old notification entries");
+                Log.WriteLine($"[Notifications] Cleaned up {keysToRemove.Count} old notification entries");
             }
         }
 
@@ -1306,7 +1306,7 @@ namespace eft_dma_radar.Tarkov.Loot
         public static void ClearNotificationHistory()
         {
             _lastNotifyTimes.Clear();
-            XMLogging.WriteLine("[Notifications] Cleared all notification history");
+            Log.WriteLine("[Notifications] Cleared all notification history");
         }
 
         #region Custom Loot Paints

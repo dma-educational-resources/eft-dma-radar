@@ -49,7 +49,7 @@ namespace eft_dma_radar.Web.ProfileApi
             {
                 _cache[profileId] = new PlayerLookupResult { AccountId = accountId, Nickname = nickname };
                 EFTProfileService.RegisterProfile(accountId);
-                XMLogging.WriteLine(
+                Log.WriteLine(
                     $"[PlayerLookup] Seeded from dogtag: {profileId} => {nickname} ({accountId})");
             }
         }

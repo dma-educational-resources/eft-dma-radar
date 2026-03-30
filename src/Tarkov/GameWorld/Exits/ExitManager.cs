@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.Misc;
+﻿using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.Unity.Collections;
 
@@ -26,7 +26,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                 var exfilController = Memory.ReadPtr(_localGameWorld + Offsets.ClientLocalGameWorld.ExfilController, false);
                 if (exfilController == 0)
                 {
-                    XMLogging.WriteLine($"[ExitManager] ExfilController is null");
+                    Log.WriteLine($"[ExitManager] ExfilController is null");
                     _exits = list;
                     return;
                 }
@@ -41,7 +41,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                     if (exfilPoints != 0)
                     {
                         using var exfils = MemArray<ulong>.Get(exfilPoints, false);
-                        XMLogging.WriteLine($"[ExitManager] {(_isPMC ? "PMC" : "Scav")} exfil array @ 0x{exfilPoints:X}, count: {exfils.Count}");
+                        Log.WriteLine($"[ExitManager] {(_isPMC ? "PMC" : "Scav")} exfil array @ 0x{exfilPoints:X}, count: {exfils.Count}");
 
                         foreach (var exfilAddr in exfils)
                         {
@@ -52,18 +52,18 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                             }
                             catch (Exception ex)
                             {
-                                XMLogging.WriteLine($"[ExitManager] Failed to read exfil @ 0x{exfilAddr:X}: {ex.Message}");
+                                Log.WriteLine($"[ExitManager] Failed to read exfil @ 0x{exfilAddr:X}: {ex.Message}");
                             }
                         }
                     }
                     else
                     {
-                        XMLogging.WriteLine($"[ExitManager] {(_isPMC ? "PMC" : "Scav")} exfil array is null");
+                        Log.WriteLine($"[ExitManager] {(_isPMC ? "PMC" : "Scav")} exfil array is null");
                     }
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[ExitManager] Exfil array read failed: {ex.Message}");
+                    Log.WriteLine($"[ExitManager] Exfil array read failed: {ex.Message}");
                 }
 
                 // Secret Extracts
@@ -73,7 +73,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                     if (secretExfilPtr != 0)
                     {
                         using var secrets = MemArray<ulong>.Get(secretExfilPtr, false);
-                        XMLogging.WriteLine($"[ExitManager] Secret exfil array @ 0x{secretExfilPtr:X}, count: {secrets.Count}");
+                        Log.WriteLine($"[ExitManager] Secret exfil array @ 0x{secretExfilPtr:X}, count: {secrets.Count}");
 
                         foreach (var secretAddr in secrets)
                         {
@@ -81,22 +81,22 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                             {
                                 var exfil = new Exfil(secretAddr, true);
                                 list.Add(exfil);
-                                XMLogging.WriteLine($"[ExitManager] Secret exfil loaded: {exfil.Name}");
+                                Log.WriteLine($"[ExitManager] Secret exfil loaded: {exfil.Name}");
                             }
                             catch (Exception ex)
                             {
-                                XMLogging.WriteLine($"[ExitManager] Failed to read secret exfil @ 0x{secretAddr:X}: {ex.Message}");
+                                Log.WriteLine($"[ExitManager] Failed to read secret exfil @ 0x{secretAddr:X}: {ex.Message}");
                             }
                         }
                     }
                     else
                     {
-                        XMLogging.WriteLine($"[ExitManager] SecretExfiltrationPointArray is null (offset 0x{Offsets.ExfilController.SecretExfiltrationPointArray:X})");
+                        Log.WriteLine($"[ExitManager] SecretExfiltrationPointArray is null (offset 0x{Offsets.ExfilController.SecretExfiltrationPointArray:X})");
                     }
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[ExitManager] Secret exfil array read failed: {ex.Message}");
+                    Log.WriteLine($"[ExitManager] Secret exfil array read failed: {ex.Message}");
                 }
 
                 // Transits - Using hardcoded IL2CPP dictionary offsets (different from Mono)
@@ -144,7 +144,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                                         }
                                         catch (Exception ex)
                                         {
-                                            XMLogging.WriteLine($"[ExitManager] Failed to read transit[{i}]: {ex.Message}");
+                                            Log.WriteLine($"[ExitManager] Failed to read transit[{i}]: {ex.Message}");
                                         }
                                     }
 
@@ -155,14 +155,14 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[ExitManager] Transit read error: {ex.Message}");
+                    Log.WriteLine($"[ExitManager] Transit read error: {ex.Message}");
                 }
 
                 _exits = list;
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[ExitManager] Init failed: {ex.Message}");
+                Log.WriteLine($"[ExitManager] Init failed: {ex.Message}");
                 _exits = list;
             }
         }
@@ -181,9 +181,9 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                     Init();
 
                     if (_exits?.Count > 0)
-                        XMLogging.WriteLine($"[ExitManager] Successfully initialized {_exits.Count} exits on attempt {_initAttempts}");
+                        Log.WriteLine($"[ExitManager] Successfully initialized {_exits.Count} exits on attempt {_initAttempts}");
                     else if (_initAttempts % 5 == 0)
-                        XMLogging.WriteLine($"[ExitManager] Still waiting for exits... attempt {_initAttempts}/{MAX_INIT_ATTEMPTS}");
+                        Log.WriteLine($"[ExitManager] Still waiting for exits... attempt {_initAttempts}/{MAX_INIT_ATTEMPTS}");
                 }
 
                 ArgumentNullException.ThrowIfNull(_exits, nameof(_exits));
@@ -215,7 +215,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[ExitManager] Refresh Error: {ex}");
+                Log.WriteLine($"[ExitManager] Refresh Error: {ex}");
             }
         }
 

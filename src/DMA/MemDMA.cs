@@ -1,4 +1,4 @@
-global using static eft_dma_radar.Tarkov.MemoryInterface;
+ï»¿global using static eft_dma_radar.Tarkov.MemoryInterface;
 
 using System;
 using System.Collections.Generic;
@@ -40,7 +40,7 @@ namespace eft_dma_radar.Tarkov
                 // Safety net: if Memory is accessed before ModuleInit, create a safe proxy
                 if (_safeMemory == null)
                 {
-                    XMLogging.WriteLine("[Warning] Memory accessed before ModuleInit - creating emergency safe proxy");
+                    Log.WriteLine("[Warning] Memory accessed before ModuleInit - creating emergency safe proxy");
                     _safeMemory = new SafeMemoryProxy(null);
                 }
 
@@ -68,13 +68,13 @@ namespace eft_dma_radar.Tarkov
             {
                 _actualMemory = new MemDMA();
                 _safeMemory = new SafeMemoryProxy(_actualMemory);
-                XMLogging.WriteLine("DMA Memory Interface initialized - Normal Mode");
+                Log.WriteLine("DMA Memory Interface initialized - Normal Mode");
             }
             else
             {
                 _actualMemory = null;
                 _safeMemory = new SafeMemoryProxy(null);
-                XMLogging.WriteLine("Safe Memory Interface initialized - Safe Mode (DMA disabled)");
+                Log.WriteLine("Safe Memory Interface initialized - Safe Mode (DMA disabled)");
             }
         }
     }
@@ -154,14 +154,14 @@ namespace eft_dma_radar.Tarkov
         /// </summary>
         private void MemoryPrimaryWorker()
         {
-            LoggingEnhancements.Log(AppLogLevel.Info, "Memory thread starting...");
+            Log.Write(AppLogLevel.Info, "Memory thread starting...");
 
             if (!MainWindow.Initialized)
             {
-                LoggingEnhancements.Log(AppLogLevel.Info, "Main window not ready, waiting...", "Waiting");
+                Log.Write(AppLogLevel.Info, "Main window not ready, waiting...", "Waiting");
                 while (!MainWindow.Initialized)
                     Thread.Sleep(100);
-                LoggingEnhancements.Log(AppLogLevel.Info, "Main window ready.", "Waiting");
+                Log.Write(AppLogLevel.Info, "Main window ready.", "Waiting");
             }
 
             while (true)
@@ -175,7 +175,7 @@ namespace eft_dma_radar.Tarkov
                 }
                 catch (Exception ex)
                 {
-                    LoggingEnhancements.Log(AppLogLevel.Error, $"FATAL ERROR on Memory Thread: {ex}");
+                    Log.Write(AppLogLevel.Error, $"FATAL ERROR on Memory Thread: {ex}");
                     if (MainWindow.Window != null)
                         NotificationsShared.Warning("FATAL ERROR on Memory Thread");
                     OnGameStopped();
@@ -194,7 +194,7 @@ namespace eft_dma_radar.Tarkov
         /// </summary>
         private void RunStartupLoop()
         {
-            XMLogging.WriteLine("New Game Startup");
+            Log.WriteLine("New Game Startup");
 
             // Track time since last ForceFullRefresh to avoid hammering the DMA hardware
             // (ForceFullRefresh drives PCIe DMA bus traffic; on systems where the DMA card
@@ -218,7 +218,7 @@ namespace eft_dma_radar.Tarkov
                     // Give the game time to load its DLLs before probing modules.
                     // When the radar starts before the game, the exe is found but
                     // UnityPlayer.dll / GameAssembly.dll may not be mapped yet.
-                    XMLogging.WriteLine("[Startup] Process found, waiting for modules to load...");
+                    Log.WriteLine("[Startup] Process found, waiting for modules to load...");
                     Thread.Sleep(5000);
                     FullRefresh();
                     refreshCooldown.Restart();
@@ -232,14 +232,14 @@ namespace eft_dma_radar.Tarkov
                     InputManager.Initialize();
                     _ready = true;
 
-                    XMLogging.WriteLine("Game Startup [OK]");
+                    Log.WriteLine("Game Startup [OK]");
                     if (MainWindow.Window != null)
                         NotificationsShared.Info("Game Startup [OK]");
                     return;
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"Game Startup [FAIL]: {ex}");
+                    Log.WriteLine($"Game Startup [FAIL]: {ex}");
                     OnGameStopped();
                     Thread.Sleep(1000);
                 }
@@ -284,7 +284,7 @@ namespace eft_dma_radar.Tarkov
                     {
                         // New raid / session begins
                         _lastMapIdForMemWrites = game.MapID;
-                        XMLogging.WriteLine($"[MemDMA] New GameInstance created. Map = '{_lastMapIdForMemWrites}'");
+                        Log.WriteLine($"[MemDMA] New GameInstance created. Map = '{_lastMapIdForMemWrites}'");
 
                         OnRaidStarted();
                         game.Start();
@@ -300,7 +300,7 @@ namespace eft_dma_radar.Tarkov
                                 !string.IsNullOrEmpty(_lastMapIdForMemWrites) &&
                                 !string.Equals(currentMapId, _lastMapIdForMemWrites, StringComparison.Ordinal))
                             {
-                                XMLogging.WriteLine(
+                                Log.WriteLine(
                                     $"[MemDMA] Map transition detected: '{_lastMapIdForMemWrites}' -> '{currentMapId}'. " +
                                     "Resetting memwrite features / caches.");
 
@@ -313,7 +313,7 @@ namespace eft_dma_radar.Tarkov
                             // 2) User-requested restart
                             if (_restartRadar)
                             {
-                                XMLogging.WriteLine("Restarting Radar per User Request.");
+                                Log.WriteLine("Restarting Radar per User Request.");
                                 if (MainWindow.Window != null)
                                     NotificationsShared.Info("Restarting Radar per User Request.");
 
@@ -336,7 +336,7 @@ namespace eft_dma_radar.Tarkov
                 }
                 catch (OperationCanceledException)
                 {
-                    XMLogging.WriteLine("Radar restart requested.");
+                    Log.WriteLine("Radar restart requested.");
                     continue;
                 }
                 catch (GameNotRunning)
@@ -345,7 +345,7 @@ namespace eft_dma_radar.Tarkov
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"CRITICAL ERROR in Game Loop: {ex}");
+                    Log.WriteLine($"CRITICAL ERROR in Game Loop: {ex}");
                     if (MainWindow.Window != null)
                         NotificationsShared.Warning("CRITICAL ERROR in Game Loop");
                     break;
@@ -357,7 +357,7 @@ namespace eft_dma_radar.Tarkov
                 }
             }
 
-            XMLogging.WriteLine("Game is no longer running!");
+            Log.WriteLine("Game is no longer running!");
             if (MainWindow.Window != null)
                 NotificationsShared.Warning("Game is no longer running!");
         }
@@ -426,17 +426,17 @@ namespace eft_dma_radar.Tarkov
             if (gameAssemblyBase != 0)
             {
                 GameAssemblyBase = gameAssemblyBase;
-                XMLogging.WriteLine($"[IL2CPP] GameAssembly.dll base: 0x{gameAssemblyBase:X}");
+                Log.WriteLine($"[IL2CPP] GameAssembly.dll base: 0x{gameAssemblyBase:X}");
             }
             else
             {
-                XMLogging.WriteLine("[IL2CPP] WARNING: GameAssembly.dll not found!");
+                Log.WriteLine("[IL2CPP] WARNING: GameAssembly.dll not found!");
             }
 
             // IL2CPP GameObjectManager (signature scan + fallback)
             GOM = IL2CPP.GameObjectManager.GetAddr(unityBase);
             ArgumentOutOfRangeException.ThrowIfZero(GOM, nameof(GOM));
-            XMLogging.WriteLine($"[IL2CPP] GOM Address: 0x{GOM:X}");
+            Log.WriteLine($"[IL2CPP] GOM Address: 0x{GOM:X}");
 
             // Mono is DEPRECATED - IL2CPP only
             MonoBase = 0;
@@ -575,7 +575,7 @@ namespace eft_dma_radar.Tarkov
                 return;
 
             _loggedSafeWarning = true;
-            XMLogging.WriteLine(message);
+            Log.WriteLine(message);
         }
 
         public SafeMemoryProxy(MemDMA actualMemory)
@@ -788,7 +788,7 @@ namespace eft_dma_radar.Tarkov
                 {
                     if (!buffers[i].SequenceEqual(buffers[0]))
                     {
-                        XMLogging.WriteLine($"[WARN] ReadBufferEnsure() -> 0x{addr:X} did not pass validation!");
+                        Log.WriteLine($"[WARN] ReadBufferEnsure() -> 0x{addr:X} did not pass validation!");
                         return null;
                     }
                 }
@@ -928,7 +928,7 @@ namespace eft_dma_radar.Tarkov
         {
             behaviour.ThrowIfInvalidVirtualAddress();
 
-            // IL2CPP Behaviour.enabled ¡ú byte
+            // IL2CPP Behaviour.enabled Â¡Ãº byte
             const uint BEHAVIOUR_ENABLED_OFFSET = 0x10;
 
             WriteValue(game, behaviour + BEHAVIOUR_ENABLED_OFFSET, enabled ? (byte)1 : (byte)0);

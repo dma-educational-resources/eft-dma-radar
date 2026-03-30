@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.ScatterAPI;
+﻿using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
@@ -43,13 +43,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 writes.Callbacks += () =>
                 {
                     _lastEnabledState = Enabled;
-                    XMLogging.WriteLine(
+                    Log.WriteLine(
                         $"[DisableFrostbite] {(Enabled ? "Disabled" : "Enabled")} (opacity={opacity})");
                 };
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[DisableFrostbite] ERROR: {ex}");
+                Log.WriteLine($"[DisableFrostbite] ERROR: {ex}");
                 _cachedFrostbiteEffect = 0;
             }
         }
@@ -62,7 +62,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             var fpsCam = game.CameraManager?.FPSCamera ?? 0;
             if (!fpsCam.IsValidVirtualAddress())
             {
-                XMLogging.WriteLine("[FrostbiteEffect] Couldnt find fpsCam");
+                Log.WriteLine("[FrostbiteEffect] Couldnt find fpsCam");
                 return 0;
             }
 
@@ -72,7 +72,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 
             if (!effectsController.IsValidVirtualAddress())
             {
-                XMLogging.WriteLine("[FrostbiteEffect] Couldnt find EffectsController in fps camera");
+                Log.WriteLine("[FrostbiteEffect] Couldnt find EffectsController in fps camera");
                 return 0;
             }
 
@@ -81,7 +81,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 
             if (!frostbite.IsValidVirtualAddress())
             {
-                XMLogging.WriteLine("[FrostbiteEffect] Wrong frostbite read.");
+                Log.WriteLine("[FrostbiteEffect] Wrong frostbite read.");
                 return 0;
             }
 

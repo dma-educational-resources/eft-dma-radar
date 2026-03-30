@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.ScatterAPI;
+﻿using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
@@ -52,13 +52,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     writes.Callbacks += () =>
                     {
                         _lastEnabledState = Enabled;
-                        XMLogging.WriteLine($"[ClearWeather] {(Enabled ? "Enabled" : "Disabled")}");
+                        Log.WriteLine($"[ClearWeather] {(Enabled ? "Enabled" : "Disabled")}");
                     };
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[ClearWeather]: {ex}");
+                Log.WriteLine($"[ClearWeather]: {ex}");
                 _cachedWeatherDebug = default;
             }
         }
@@ -108,13 +108,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 if (!weatherDebug.IsValidVirtualAddress())
                     return 0x0;
 
-                // Optional sanity check �C do NOT throw, just bail if weird
+                // Optional sanity check ï¿½C do NOT throw, just bail if weird
                 try
                 {
                     var name = ObjectClass.ReadName(weatherDebug);
                     if (!string.Equals(name, "WeatherDebug", StringComparison.Ordinal))
                     {
-                        XMLogging.WriteLine($"[ClearWeather] Fallback found unexpected object '{name}', skipping.");
+                        Log.WriteLine($"[ClearWeather] Fallback found unexpected object '{name}', skipping.");
                         return 0x0;
                     }
                 }
@@ -129,7 +129,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[ClearWeather] Fallback WeatherDebug search failed: {ex.Message}");
+                Log.WriteLine($"[ClearWeather] Fallback WeatherDebug search failed: {ex.Message}");
                 return 0x0;
             }
         }

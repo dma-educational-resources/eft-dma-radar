@@ -1,4 +1,4 @@
-using eft_dma_radar.Tarkov.Features;
+﻿using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
@@ -37,13 +37,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     writes.Callbacks += () =>
                     {
                         _lastEnabledState = Enabled;
-                        XMLogging.WriteLine($"[FastDuck] {(Enabled ? "Enabled" : "Disabled")} (Speed: {targetSpeed:F0})");
+                        Log.WriteLine($"[FastDuck] {(Enabled ? "Enabled" : "Disabled")} (Speed: {targetSpeed:F0})");
                     };
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[FastDuck]: {ex}");
+                Log.WriteLine($"[FastDuck]: {ex}");
                 _cachedEFTHardSettingsInstance = default;
             }
         }

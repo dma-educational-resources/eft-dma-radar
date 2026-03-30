@@ -61,7 +61,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                         writes.Callbacks += () =>
                         {
                             _set = true;
-                            XMLogging.WriteLine("Wide Lean [On]");
+                            Log.WriteLine("Wide Lean [On]");
                         };
                     }
                     else if (_set && dir is EWideLeanDirection.Off)
@@ -70,7 +70,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                         writes.Callbacks += () =>
                         {
                             _set = false;
-                            XMLogging.WriteLine("Wide Lean [Off]");
+                            Log.WriteLine("Wide Lean [Off]");
                         };
                     }
                 }
@@ -78,7 +78,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             catch (Exception ex)
             {
                 Direction = EWideLeanDirection.Off;
-                XMLogging.WriteLine($"Wide Lean [ERROR] {ex}");
+                Log.WriteLine($"Wide Lean [ERROR] {ex}");
             }
         }
 

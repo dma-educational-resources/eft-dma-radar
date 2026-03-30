@@ -73,7 +73,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 if (Math.Abs(breathAmt - newSway) > 0.001f)
                 {
                     writes.AddValueEntry(breathEffector + Offsets.BreathEffector.Intensity, newSway);
-                    writes.Callbacks += () => XMLogging.WriteLine($"[NoRecoil] BreathEffector {breathAmt:F3} -> {newSway:F3}");
+                    writes.Callbacks += () => Log.WriteLine($"[NoRecoil] BreathEffector {breathAmt:F3} -> {newSway:F3}");
                 }
 
                 var recoilAmtVec = new Vector3(recoilAmt, recoilAmt, recoilAmt);
@@ -81,7 +81,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 if (shotAmt != recoilAmtVec)
                 {
                     writes.AddValueEntry(newShotRecoil + Offsets.NewShotRecoil.IntensitySeparateFactors, recoilAmtVec);
-                    writes.Callbacks += () => XMLogging.WriteLine($"[NoRecoil] ShotEffector {shotAmt} -> {recoilAmtVec}");
+                    writes.Callbacks += () => Log.WriteLine($"[NoRecoil] ShotEffector {shotAmt} -> {recoilAmtVec}");
                 }
 
                 var resetMask = (newSway > 0 && _lastSway == 0) || (recoilAmt > 0 && _lastRecoil == 0);
@@ -97,12 +97,12 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 void WriteMask(int newMask, int currentMask)
                 {
                     writes.AddValueEntry(localPlayer.PWA + Offsets.ProceduralWeaponAnimation.Mask, newMask);
-                    writes.Callbacks += () => XMLogging.WriteLine($"[NoRecoil] Mask {currentMask} -> {newMask}");
+                    writes.Callbacks += () => Log.WriteLine($"[NoRecoil] Mask {currentMask} -> {newMask}");
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[NoRecoil]: {ex}");
+                Log.WriteLine($"[NoRecoil]: {ex}");
                 ClearCache();
             }
         }

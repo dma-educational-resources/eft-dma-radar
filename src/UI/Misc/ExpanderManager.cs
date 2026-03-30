@@ -106,7 +106,7 @@ namespace eft_dma_radar.UI.Misc
             Config.ExpanderStates.ExpanderStates.Clear();
             Config.Save();
 
-            XMLogging.WriteLine("[ExpanderManager] All expander states reset to defaults");
+            Log.WriteLine("[ExpanderManager] All expander states reset to defaults");
         }
     }
 }

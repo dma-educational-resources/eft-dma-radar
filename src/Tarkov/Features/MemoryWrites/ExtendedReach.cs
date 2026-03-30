@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.ScatterAPI;
+﻿using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Tarkov.EFTPlayer;
@@ -50,20 +50,20 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                         if (Enabled)
                         {
                             if (!wasEnabled)
-                                XMLogging.WriteLine($"[ExtendedReach] Enabled (Distance: {currentDistance:F1})");
+                                Log.WriteLine($"[ExtendedReach] Enabled (Distance: {currentDistance:F1})");
                             else if (distanceChanged)
-                                XMLogging.WriteLine($"[ExtendedReach] Distance Updated to {currentDistance:F1}");
+                                Log.WriteLine($"[ExtendedReach] Distance Updated to {currentDistance:F1}");
                         }
                         else
                         {
-                            XMLogging.WriteLine("[ExtendedReach] Disabled");
+                            Log.WriteLine("[ExtendedReach] Disabled");
                         }
                     };
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[ExtendedReach]: {ex}");
+                Log.WriteLine($"[ExtendedReach]: {ex}");
                 _cachedEFTHardSettingsInstance = default;
             }
         }

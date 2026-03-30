@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA;
+ï»¿using eft_dma_radar.Common.DMA;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Tarkov.Features;
@@ -14,7 +14,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         private bool _lastEnabledState;
         private float _lastBrightness;
 
-        // Make the pointer global for the process; it¡¯s global game state anyway
+        // Make the pointer global for the process; itÂ¡Â¯s global game state anyway
         private static ulong _cachedLevelSettings;
         private static volatile bool _resolving;
 
@@ -60,9 +60,9 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 if (!stateChanged && !brightnessChanged)
                     return;
 
-                // ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+                // Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤
                 // Resolve LevelSettings SAFELY (non-blocking)
-                // ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+                // Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤
                 ulong levelSettings = _cachedLevelSettings;
 
                 // 1) Use global Memory.LevelSettings if cache is empty
@@ -75,18 +75,18 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     }
                 }
 
-                // 2) If still invalid, *schedule* a resolver but don¡¯t block
+                // 2) If still invalid, *schedule* a resolver but donÂ¡Â¯t block
                 if (!levelSettings.IsValidVirtualAddress())
                 {
                     KickOffLevelSettingsResolve();
                     // Skip this tick; other features keep running
-                    // XMLogging.WriteLine("[FullBright] LevelSettings not resolved yet, skipping tick.");
+                    // Log.WriteLine("[FullBright] LevelSettings not resolved yet, skipping tick.");
                     return;
                 }
 
-                // ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+                // Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤
                 // Queue writes
-                // ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+                // Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤
                 ApplyFullBrightSettings(writes, levelSettings, Enabled, configBrightness);
 
                 // Commit state only after a successful scatter write
@@ -96,16 +96,16 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     _lastBrightness = configBrightness;
 
                     if (Enabled)
-                        XMLogging.WriteLine($"[FullBright] Enabled (Intensity: {configBrightness:F2})");
+                        Log.WriteLine($"[FullBright] Enabled (Intensity: {configBrightness:F2})");
                     else
-                        XMLogging.WriteLine("[FullBright] Disabled");
+                        Log.WriteLine("[FullBright] Disabled");
                 };
             }
             catch (Exception ex)
             {
                 // HARD NON-FATAL GUARANTEE:
                 // Any bug in this feature affects ONLY FullBright, never the whole memwrite batch.
-                XMLogging.WriteLine($"[FullBright] ERROR (non-fatal): {ex}");
+                Log.WriteLine($"[FullBright] ERROR (non-fatal): {ex}");
                 _cachedLevelSettings = 0; // force re-resolve next time
                 // DO NOT rethrow
             }
@@ -129,16 +129,16 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     if (levelSettings.IsValidVirtualAddress())
                     {
                         _cachedLevelSettings = levelSettings;
-                        XMLogging.WriteLine($"[FullBright] Resolved LevelSettings @ 0x{levelSettings:X}");
+                        Log.WriteLine($"[FullBright] Resolved LevelSettings @ 0x{levelSettings:X}");
                     }
                     else
                     {
-                        XMLogging.WriteLine("[FullBright] LevelSettingsResolver returned invalid pointer.");
+                        Log.WriteLine("[FullBright] LevelSettingsResolver returned invalid pointer.");
                     }
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[FullBright] LevelSettingsResolver error: {ex.Message}");
+                    Log.WriteLine($"[FullBright] LevelSettingsResolver error: {ex.Message}");
                     _cachedLevelSettings = 0;
                 }
                 finally
@@ -169,7 +169,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             }
             else
             {
-                // Minimal revert ¨C you can extend this if you later cache original values.
+                // Minimal revert Â¨C you can extend this if you later cache original values.
                 writes.AddValueEntry(levelSettings + Offsets.LevelSettings.AmbientMode, (int)AmbientMode.Flat);
             }
         }

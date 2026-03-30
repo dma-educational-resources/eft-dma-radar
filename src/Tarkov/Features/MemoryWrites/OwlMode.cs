@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.ScatterAPI;
+﻿using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Tarkov.Features;
@@ -42,13 +42,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     writes.Callbacks += () =>
                     {
                         _lastEnabledState = Enabled;
-                        XMLogging.WriteLine($"[OwlMode] {(Enabled ? "Enabled" : "Disabled")}");
+                        Log.WriteLine($"[OwlMode] {(Enabled ? "Enabled" : "Disabled")}");
                     };
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[OwlMode]: {ex}");
+                Log.WriteLine($"[OwlMode]: {ex}");
                 _cachedEFTHardSettingsInstance = default;
             }
         }

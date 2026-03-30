@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Threading;
 using eft_dma_radar.Common.DMA;
@@ -15,9 +15,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
     /// returns the <c>objectClass</c> ptr of the first matching component, identical to the
     /// pattern used by <c>AntiAfk</c> for <c>TarkovApplication</c>.
     /// From there: <c>objectClass + Offsets.MatchingProgressView._matchingProgress</c>
-    /// → <c>MatchingProgress</c> instance pointer.
+    /// â†’ <c>MatchingProgress</c> instance pointer.
     ///
-    /// <c>MatchingProgressView</c> is a pre-raid matchmaking UI MonoBehaviour — it only
+    /// <c>MatchingProgressView</c> is a pre-raid matchmaking UI MonoBehaviour â€” it only
     /// exists in the GOM while the queue / matching screen is active.
     /// </summary>
     internal static class MatchingProgressResolver
@@ -30,33 +30,33 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         private static readonly object _lock = new();
         private static volatile int _resolvingAsync; // 0 = idle, 1 = running
 
-        // ── Transition-tracking state ────────────────────────────────────────────
+        // â”€â”€ Transition-tracking state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         private static Enums.EMatchingStage _prevStage = Enums.EMatchingStage.None;
         private static Enums.EMatchingStage _highWaterStage = Enums.EMatchingStage.None;
         private static readonly Stopwatch _totalSw = new();
         private static readonly Stopwatch _stageSw = new();
 
-        // ── Background stage poller (runs independently of the main loop) ────────
+        // â”€â”€ Background stage poller (runs independently of the main loop) â”€â”€â”€â”€â”€â”€â”€â”€
         private static System.Threading.Timer _stagePoller;
         private static volatile bool _pollerActive;
 
-        // ── View-disappearance detection ─────────────────────────────────────────
+        // â”€â”€ View-disappearance detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         private const int ViewGoneThreshold = 5;
         private static volatile int _consecutiveReadFailures;
 
-        // ── GOM search skip (handles launched-mid-raid) ──────────────────────────
+        // â”€â”€ GOM search skip (handles launched-mid-raid) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         private const int MaxGomFailures = 3;
         private static int _consecutiveGomFailures;
 
-        // ── Tracks whether NotifyRaidStarted() already printed the session summary ──
+        // â”€â”€ Tracks whether NotifyRaidStarted() already printed the session summary â”€â”€
         private static volatile bool _sessionSummaryLogged;
 
-        // ─────────────────────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Public API
-        // ─────────────────────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
-        /// Called once when a <c>LocalGameWorld</c> is found — the matching phase is over.
+        /// Called once when a <c>LocalGameWorld</c> is found â€” the matching phase is over.
         /// Stops the stage poller and freezes the elapsed timer so the session-end
         /// summary reports accurate matching duration rather than in-raid time.
         /// Safe to call multiple times (idempotent).
@@ -76,8 +76,8 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
             if (highWater != Enums.EMatchingStage.None)
             {
-                XMLogging.WriteLine(
-                    $"{Tag} ──── Matching session ended ────\n" +
+                Log.WriteLine(
+                    $"{Tag} â”€â”€â”€â”€ Matching session ended â”€â”€â”€â”€\n" +
                     $"{Tag}   Furthest stage reached : {highWater} ({(int)highWater}/17)\n" +
                     $"{Tag}   Total matching elapsed  : {elapsed:F1}s");
                 _sessionSummaryLogged = true;
@@ -103,8 +103,8 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             // Log summary only if matching was aborted before NotifyRaidStarted() fired
             if (!_sessionSummaryLogged && (wasRunning || highWater != Enums.EMatchingStage.None))
             {
-                XMLogging.WriteLine(
-                    $"{Tag} ──── Matching session ended (aborted) ────\n" +
+                Log.WriteLine(
+                    $"{Tag} â”€â”€â”€â”€ Matching session ended (aborted) â”€â”€â”€â”€\n" +
                     $"{Tag}   Furthest stage reached : {highWater} ({(int)highWater}/17)\n" +
                     $"{Tag}   Total matching elapsed  : {elapsed:F1}s");
             }
@@ -125,7 +125,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             _consecutiveGomFailures = 0;
             _resolvingAsync = 0;
             _sessionSummaryLogged = false;
-            LoggingEnhancements.Log(AppLogLevel.Debug, "Cache invalidated.", "MatchingProgressResolver");
+            Log.Write(AppLogLevel.Debug, "Cache invalidated.", "MatchingProgressResolver");
         }
 
         /// <summary>
@@ -157,11 +157,11 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 {
                     var mp = GetMatchingProgress();
                     if (mp.IsValidVirtualAddress())
-                        LoggingEnhancements.Log(AppLogLevel.Debug, $"ResolveAsync: MatchingProgress @ 0x{mp:X}", "MatchingProgressResolver");
+                        Log.Write(AppLogLevel.Debug, $"ResolveAsync: MatchingProgress @ 0x{mp:X}", "MatchingProgressResolver");
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"{Tag} ResolveAsync error: {ex}");
+                    Log.WriteLine($"{Tag} ResolveAsync error: {ex}");
                 }
                 finally
                 {
@@ -174,12 +174,12 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         {
             _consecutiveGomFailures++;
             if (_consecutiveGomFailures == MaxGomFailures)
-                XMLogging.WriteLine($"{Tag} MatchingProgressView not found in GOM after {_consecutiveGomFailures} attempts.");
+                Log.WriteLine($"{Tag} MatchingProgressView not found in GOM after {_consecutiveGomFailures} attempts.");
         }
 
         /// <summary>
         /// Synchronous resolver. Returns the cached value on subsequent calls.
-        /// Walks the GOM by class name — same pattern as <c>AntiAfk.TarkovApplication</c>.
+        /// Walks the GOM by class name â€” same pattern as <c>AntiAfk.TarkovApplication</c>.
         /// </summary>
         public static ulong GetMatchingProgress()
         {
@@ -195,7 +195,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 var gom = GameObjectManager.Get(gomAddr);
 
                 // FindBehaviourByClassName returns the objectClass ptr of the first
-                // component whose IL2CPP class name matches — exactly like AntiAfk does
+                // component whose IL2CPP class name matches â€” exactly like AntiAfk does
                 // for "TarkovApplication".
                 ulong viewObjectClass;
                 try
@@ -204,7 +204,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 }
                 catch
                 {
-                    // Memory unreadable during GOM scan — treat same as "not found"
+                    // Memory unreadable during GOM scan â€” treat same as "not found"
                     HandleGomFailure();
                     return 0;
                 }
@@ -215,14 +215,14 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                     return 0;
                 }
 
-                _consecutiveGomFailures = 0; // successful find — reset counter
+                _consecutiveGomFailures = 0; // successful find â€” reset counter
 
-                LoggingEnhancements.Log(AppLogLevel.Debug, $"MatchingProgressView objectClass @ 0x{viewObjectClass:X}", "MatchingProgressResolver");
+                Log.Write(AppLogLevel.Debug, $"MatchingProgressView objectClass @ 0x{viewObjectClass:X}", "MatchingProgressResolver");
 
                 var mpPtr = Memory.ReadPtr(viewObjectClass + Offsets.MatchingProgressView._matchingProgress);
                 if (!mpPtr.IsValidVirtualAddress())
                 {
-                    LoggingEnhancements.Log(AppLogLevel.Debug, $"_matchingProgress ptr invalid @ objectClass+0x{Offsets.MatchingProgressView._matchingProgress:X}", "MatchingProgressResolver");
+                    Log.Write(AppLogLevel.Debug, $"_matchingProgress ptr invalid @ objectClass+0x{Offsets.MatchingProgressView._matchingProgress:X}", "MatchingProgressResolver");
                     return 0;
                 }
 
@@ -232,7 +232,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                     _cachedMatchingProgress = mpPtr;
                 }
 
-                LoggingEnhancements.Log(AppLogLevel.Info, $"MatchingProgress resolved @ 0x{mpPtr:X}", "MatchingProgressResolver");
+                Log.Write(AppLogLevel.Info, $"MatchingProgress resolved @ 0x{mpPtr:X}", "MatchingProgressResolver");
                 _totalSw.Restart();
                 _stageSw.Restart();
                 TryUpdateStage();
@@ -241,7 +241,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"{Tag} GetMatchingProgress error: {ex}");
+                Log.WriteLine($"{Tag} GetMatchingProgress error: {ex}");
                 return 0;
             }
         }
@@ -262,7 +262,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
             try
             {
-                // Memory read outside the lock — this is the slow path.
+                // Memory read outside the lock â€” this is the slow path.
                 var stage = (Enums.EMatchingStage)Memory.ReadValue<int>(mp + Offsets.MatchingProgress.CurrentStage, useCache: false);
 
                 // All state mutation under a single lock acquisition to prevent the
@@ -302,8 +302,8 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
                 if (didTransition)
                 {
-                    XMLogging.WriteLine(
-                        $"{Tag} Stage TRANSITION: {prevForLog}({(int)prevForLog}) → {stage}({(int)stage}) | " +
+                    Log.WriteLine(
+                        $"{Tag} Stage TRANSITION: {prevForLog}({(int)prevForLog}) â†’ {stage}({(int)stage}) | " +
                         $"prev held {stageElapsed:F1}s | total {totalElapsed:F1}s");
 
                     if (needsSnapshot)
@@ -315,7 +315,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             catch (Exception ex)
             {
                 Interlocked.Increment(ref _consecutiveReadFailures);
-                LoggingEnhancements.Log(AppLogLevel.Debug, $"TryUpdateStage read failure #{_consecutiveReadFailures}: {ex.Message}", "MatchingProgressResolver");
+                Log.Write(AppLogLevel.Debug, $"TryUpdateStage read failure #{_consecutiveReadFailures}: {ex.Message}", "MatchingProgressResolver");
                 return false;
             }
         }
@@ -330,9 +330,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 return _cachedStage;
         }
 
-        // ─────────────────────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Background stage poller
-        // ─────────────────────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
         /// Starts a background <see cref="Timer"/> that calls <see cref="TryUpdateStage"/>
@@ -368,8 +368,8 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                             _cachedViewObjectClass = 0;
                         }
 
-                        XMLogging.WriteLine(
-                            $"{Tag} ██ MatchingProgressView DISAPPEARED from GOM ██\n" +
+                        Log.WriteLine(
+                            $"{Tag} â–ˆâ–ˆ MatchingProgressView DISAPPEARED from GOM â–ˆâ–ˆ\n" +
                             $"{Tag}   Last known stage     : {lastStage} ({(int)lastStage}/17)\n" +
                             $"{Tag}   Furthest stage       : {highWater} ({(int)highWater}/17)\n" +
                             $"{Tag}   Total elapsed        : {totalElapsed:F1}s\n" +
@@ -379,11 +379,11 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"{Tag} StagePoller tick error: {ex.Message}");
+                    Log.WriteLine($"{Tag} StagePoller tick error: {ex.Message}");
                 }
             }, null, 0, 100);
 
-            LoggingEnhancements.Log(AppLogLevel.Debug, "Stage poller started.", "MatchingProgressResolver");
+            Log.Write(AppLogLevel.Debug, "Stage poller started.", "MatchingProgressResolver");
         }
 
         /// <summary>
@@ -396,13 +396,13 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             if (t != null)
             {
                 t.Dispose();
-                LoggingEnhancements.Log(AppLogLevel.Debug, "Stage poller stopped.", "MatchingProgressResolver");
+                Log.Write(AppLogLevel.Debug, "Stage poller stopped.", "MatchingProgressResolver");
             }
         }
 
-        // ─────────────────────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Diagnostic snapshots
-        // ─────────────────────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
         /// Reads the <c>MatchingProgressView</c> component-level fields and writes them to
@@ -432,7 +432,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                     ? Memory.ReadValue<int>(view + Offsets.MatchingProgressView._matchingWarningType, useCache: false)
                     : (int?)null;
 
-                LoggingEnhancements.Log(AppLogLevel.Debug,
+                Log.Write(AppLogLevel.Debug,
                     $"ViewSnapshot @ 0x{view:X} | " +
                     $"ServersLimited={serversLimited} CanUpdateStatus={canUpdateStatus} " +
                     $"MaxMatchingTime={maxMatchingTime}s " +
@@ -441,7 +441,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             }
             catch (Exception ex)
             {
-                LoggingEnhancements.Log(AppLogLevel.Debug, $"LogViewSnapshot error: {ex}", "MatchingProgressResolver");
+                Log.Write(AppLogLevel.Debug, $"LogViewSnapshot error: {ex}", "MatchingProgressResolver");
             }
         }
 
@@ -478,7 +478,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 var lastDelayedStage = (Enums.EMatchingStage)Memory.ReadValue<int>(mp + Offsets.MatchingProgress.LastMemorizedDelayedStage, useCache: false);
                 var lastDelayedProgress = Memory.ReadValue<float>(mp + Offsets.MatchingProgress.LastMemorizedDelayedStageProgress, useCache: false);
 
-                LoggingEnhancements.Log(AppLogLevel.Debug,
+                Log.Write(AppLogLevel.Debug,
                     $"Snapshot @ 0x{mp:X} | " +
                     $"Stage={currentStage}({(int)currentStage}) Group={currentStageGroup}({(int)currentStageGroup}) " +
                     $"Progress={stageProgress:F3} EstimateTime={estimateTime}s | " +
@@ -490,7 +490,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             }
             catch (Exception ex)
             {
-                LoggingEnhancements.Log(AppLogLevel.Debug, $"LogSnapshot error: {ex}", "MatchingProgressResolver");
+                Log.Write(AppLogLevel.Debug, $"LogSnapshot error: {ex}", "MatchingProgressResolver");
             }
         }
     }

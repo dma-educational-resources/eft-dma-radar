@@ -81,17 +81,17 @@ namespace eft_dma_radar.Common.Unity
                         {
                             width = monitor.Width;
                             height = monitor.Height;
-                            XMLogging.WriteLine($"[CameraManager] Viewport set to Monitor {monitor.Index}: {width}x{height}");
+                            Log.WriteLine($"[CameraManager] Viewport set to Monitor {monitor.Index}: {width}x{height}");
                         }
                         else
                         {
-                            XMLogging.WriteLine($"[CameraManager] Monitor not found, using config: {width}x{height}");
+                            Log.WriteLine($"[CameraManager] Monitor not found, using config: {width}x{height}");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[CameraManager] Error getting monitor info: {ex.Message}, using {width}x{height}");
+                    Log.WriteLine($"[CameraManager] Error getting monitor info: {ex.Message}, using {width}x{height}");
                 }
 
                 Viewport = new Rectangle(0, 0, width, height);

@@ -118,11 +118,11 @@ namespace eft_dma_radar.UI.Controls
             try
             {
                 _useInputManager = false;
-                XMLogging.WriteLine("[KeyInputBox] InputManager availability will be checked when needed");
+                Log.WriteLine("[KeyInputBox] InputManager availability will be checked when needed");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[KeyInputBox] Error checking InputManager: {ex.Message}");
+                Log.WriteLine($"[KeyInputBox] Error checking InputManager: {ex.Message}");
                 _useInputManager = false;
             }
         }
@@ -138,7 +138,7 @@ namespace eft_dma_radar.UI.Controls
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[KeyInputBox] Error accessing InputManager: {ex.Message}");
+                Log.WriteLine($"[KeyInputBox] Error accessing InputManager: {ex.Message}");
                 return false;
             }
         }
@@ -160,7 +160,7 @@ namespace eft_dma_radar.UI.Controls
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[KeyInputBox] Error starting global capture: {ex.Message}");
+                Log.WriteLine($"[KeyInputBox] Error starting global capture: {ex.Message}");
                 _useInputManager = false;
             }
         }
@@ -204,7 +204,7 @@ namespace eft_dma_radar.UI.Controls
                     }
                     catch (Exception ex)
                     {
-                        XMLogging.WriteLine($"[KeyInputBox] Failed to register key {keyCode}: {ex.Message}");
+                        Log.WriteLine($"[KeyInputBox] Failed to register key {keyCode}: {ex.Message}");
                     }
                 }
             }
@@ -281,7 +281,7 @@ namespace eft_dma_radar.UI.Controls
                     }
                     catch (Exception ex)
                     {
-                        XMLogging.WriteLine($"[KeyInputBox] Error handling global key event: {ex.Message}");
+                        Log.WriteLine($"[KeyInputBox] Error handling global key event: {ex.Message}");
                     }
                 });
             }
@@ -302,14 +302,14 @@ namespace eft_dma_radar.UI.Controls
                     }
                     catch (Exception ex)
                     {
-                        XMLogging.WriteLine($"[KeyInputBox] Failed to unregister action {actionId}: {ex.Message}");
+                        Log.WriteLine($"[KeyInputBox] Failed to unregister action {actionId}: {ex.Message}");
                     }
                 }
                 _registeredActionIds.Clear();
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[KeyInputBox] Error stopping global capture: {ex.Message}");
+                Log.WriteLine($"[KeyInputBox] Error stopping global capture: {ex.Message}");
             }
         }
 
@@ -386,7 +386,7 @@ namespace eft_dma_radar.UI.Controls
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[KeyInputBox] Error checking left mouse state: {ex.Message}");
+                Log.WriteLine($"[KeyInputBox] Error checking left mouse state: {ex.Message}");
                 _ignoreLeftMouseUntilRelease = false;
                 _leftMouseReleaseTimer.Stop();
             }

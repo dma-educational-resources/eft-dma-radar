@@ -81,7 +81,7 @@ namespace eft_dma_radar.UI.Pages
                 }
                 catch (TimeoutException ex)
                 {
-                    XMLogging.WriteLine($"[PANELS] {ex.Message}");
+                    Log.WriteLine($"[PANELS] {ex.Message}");
                 }
             };
         }
@@ -275,7 +275,7 @@ namespace eft_dma_radar.UI.Pages
             }
 
             Config.Save();
-            XMLogging.WriteLine($"Updated loot filter option: {optionName} = {isSelected}");
+            Log.WriteLine($"Updated loot filter option: {optionName} = {isSelected}");
         }
 
         private void InitializeLootFilterOptions()
@@ -446,7 +446,7 @@ namespace eft_dma_radar.UI.Pages
                 }
 
                 Config.Save();
-                XMLogging.WriteLine("Saved Convig");
+                Log.WriteLine("Saved Convig");
             }
         }
 
@@ -519,7 +519,7 @@ namespace eft_dma_radar.UI.Pages
             Config.ShowCorpseMarkers = IsFilterOptionSelected("Corpse Markers (X)");
 
             Config.Save();
-            XMLogging.WriteLine("Saved loot filter settings");
+            Log.WriteLine("Saved loot filter settings");
         }
         #endregion
         #endregion

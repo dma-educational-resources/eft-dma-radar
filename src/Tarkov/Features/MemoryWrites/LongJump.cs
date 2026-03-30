@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.ScatterAPI;
+﻿using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Tarkov.Features;
@@ -48,15 +48,15 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                         _lastMultiplier = currentMultiplier;
 
                         if (Enabled)
-                            XMLogging.WriteLine($"[LongJump] Enabled (Multiplier: {currentMultiplier:F2})");
+                            Log.WriteLine($"[LongJump] Enabled (Multiplier: {currentMultiplier:F2})");
                         else
-                            XMLogging.WriteLine("[LongJump] Disabled");
+                            Log.WriteLine("[LongJump] Disabled");
                     };
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[LongJump]: {ex}");
+                Log.WriteLine($"[LongJump]: {ex}");
                 _cachedEFTHardSettingsInstance = default;
             }
         }

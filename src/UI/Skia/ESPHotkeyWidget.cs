@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.Misc;
+﻿using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Misc.Data.EFT;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.UI.Misc;
@@ -241,7 +241,7 @@ namespace eft_dma_radar.UI.ESP
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Exception in IsHotkeyActive: {ex.Message}");
+                Log.WriteLine($"Exception in IsHotkeyActive: {ex.Message}");
                 return false;
             }
         }
@@ -478,13 +478,13 @@ namespace eft_dma_radar.UI.ESP
                         return Config.QuestHelper.Enabled;
 
                     default:
-                        XMLogging.WriteLine($"Unknown action name in CheckFeatureActiveState: '{actionName}'");
+                        Log.WriteLine($"Unknown action name in CheckFeatureActiveState: '{actionName}'");
                         return false;
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Exception in CheckFeatureActiveState for '{actionName}': {ex.Message}");
+                Log.WriteLine($"Exception in CheckFeatureActiveState for '{actionName}': {ex.Message}");
                 return false;
             }
         }

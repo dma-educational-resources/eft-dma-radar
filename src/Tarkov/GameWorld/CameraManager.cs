@@ -62,8 +62,8 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
             FPSCamera_ = FPSCamera;
 
-            LoggingEnhancements.Log(AppLogLevel.Info, $"FPSCamera:   0x{FPSCamera:X}", "CameraManager");
-            LoggingEnhancements.Log(AppLogLevel.Info, $"OpticCamera: 0x{OpticCamera:X}", "CameraManager");
+            Log.Write(AppLogLevel.Info, $"FPSCamera:   0x{FPSCamera:X}", "CameraManager");
+            Log.Write(AppLogLevel.Info, $"OpticCamera: 0x{OpticCamera:X}", "CameraManager");
         }
 
         static CameraManager()
@@ -90,7 +90,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             }
             catch (Exception ex)
             {
-                LoggingEnhancements.Log(AppLogLevel.Error, $"Static pre-warm failed: {ex.Message}", "CameraManager");
+                Log.Write(AppLogLevel.Error, $"Static pre-warm failed: {ex.Message}", "CameraManager");
             }
         }
 
@@ -105,25 +105,25 @@ namespace eft_dma_radar.Tarkov.GameWorld
             _eftCameraManagerInstance = FindCameraManagerInstance();
             if (_eftCameraManagerInstance.IsValidVirtualAddress())
             {
-                LoggingEnhancements.Log(AppLogLevel.Info, $"OK Initialized CameraManager.Instance @ 0x{_eftCameraManagerInstance:X}", "CameraManager");
+                Log.Write(AppLogLevel.Info, $"OK Initialized CameraManager.Instance @ 0x{_eftCameraManagerInstance:X}", "CameraManager");
                 if (TryResolveViaCameraManagerInstance(out fpsCamera, out opticCamera))
                 {
-                    LoggingEnhancements.Log(AppLogLevel.Info, "Using CameraManager.Instance cameras.", "CameraManager");
+                    Log.Write(AppLogLevel.Info, "Using CameraManager.Instance cameras.", "CameraManager");
                     return true;
                 }
-                LoggingEnhancements.Log(AppLogLevel.Warning, "Instance found but camera fields unreadable — falling back to AllCameras.", "CameraManager");
+                Log.Write(AppLogLevel.Warning, "Instance found but camera fields unreadable — falling back to AllCameras.", "CameraManager");
             }
 
             // 2) Backup: Unity AllCameras + name-based search
             if (TryResolveViaAllCamerasByName(out fpsCamera, out opticCamera))
             {
-                LoggingEnhancements.Log(AppLogLevel.Info, "Using Unity AllCameras + name search fallback.", "CameraManager");
+                Log.Write(AppLogLevel.Info, "Using Unity AllCameras + name search fallback.", "CameraManager");
                 return true;
             }
 
             fpsCamera = 0;
             opticCamera = 0;
-            LoggingEnhancements.Log(AppLogLevel.Error, "Could not resolve cameras via any path.", "CameraManager");
+            Log.Write(AppLogLevel.Error, "Could not resolve cameras via any path.", "CameraManager");
             return false;
         }
 
@@ -192,14 +192,14 @@ namespace eft_dma_radar.Tarkov.GameWorld
             {
                 if (!_allCamerasAddr.IsValidVirtualAddress())
                 {
-                    LoggingEnhancements.Log(AppLogLevel.Warning, "AllCameras address not resolved.", "CameraManager");
+                    Log.Write(AppLogLevel.Warning, "AllCameras address not resolved.", "CameraManager");
                     return false;
                 }
 
                 var allCamerasPtr = Memory.ReadPtr(_allCamerasAddr, false);
                 if (!allCamerasPtr.IsValidVirtualAddress())
                 {
-                    LoggingEnhancements.Log(AppLogLevel.Warning, "AllCameras pointer invalid.", "CameraManager");
+                    Log.Write(AppLogLevel.Warning, "AllCameras pointer invalid.", "CameraManager");
                     return false;
                 }
 
@@ -216,23 +216,23 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 }
                 catch (Exception ex)
                 {
-                    LoggingEnhancements.Log(AppLogLevel.Error, $"Failed reading AllCameras header: {ex.Message}", "CameraManager");
+                    Log.Write(AppLogLevel.Error, $"Failed reading AllCameras header: {ex.Message}", "CameraManager");
                     return false;
                 }
 
                 if (!itemsPtr.IsValidVirtualAddress() || count <= 0 || count > 1024)
                 {
-                    LoggingEnhancements.Log(AppLogLevel.Warning, $"AllCameras list invalid: items=0x{itemsPtr:X}, count={count}", "CameraManager");
+                    Log.Write(AppLogLevel.Warning, $"AllCameras list invalid: items=0x{itemsPtr:X}, count={count}", "CameraManager");
                     return false;
                 }
 
-                LoggingEnhancements.Log(AppLogLevel.Debug, $"AllCameras: items=0x{itemsPtr:X}, count={count}", "CameraManager");
+                Log.Write(AppLogLevel.Debug, $"AllCameras: items=0x{itemsPtr:X}, count={count}", "CameraManager");
 
                 FindCamerasByName(itemsPtr, count, out fpsCamera, out opticCamera);
 
                 if (!fpsCamera.IsValidVirtualAddress() || !ValidateCameraMatrix(fpsCamera))
                 {
-                    LoggingEnhancements.Log(AppLogLevel.Warning, "AllCameras fallback: FPS camera invalid/matrix failed.", "CameraManager");
+                    Log.Write(AppLogLevel.Warning, "AllCameras fallback: FPS camera invalid/matrix failed.", "CameraManager");
                     fpsCamera = 0;
                 }
 
@@ -243,7 +243,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             }
             catch (Exception ex)
             {
-                LoggingEnhancements.Log(AppLogLevel.Error, $"TryResolveViaAllCamerasByName failed: {ex.Message}", "CameraManager");
+                Log.Write(AppLogLevel.Error, $"TryResolveViaAllCamerasByName failed: {ex.Message}", "CameraManager");
                 fpsCamera = 0;
                 opticCamera = 0;
                 return false;
@@ -364,7 +364,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             var unityBase = Memory.UnityBase;
             if (!unityBase.IsValidVirtualAddress())
             {
-                LoggingEnhancements.Log(AppLogLevel.Warning, "Unity base not loaded; AllCameras unavailable.", "CameraManager");
+                Log.Write(AppLogLevel.Warning, "Unity base not loaded; AllCameras unavailable.", "CameraManager");
                 return 0;
             }
 
@@ -404,11 +404,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
             var fallbackAddr = unityBase + ModuleBase.AllCameras;
             if (fallbackAddr.IsValidVirtualAddress())
             {
-                LoggingEnhancements.Log(AppLogLevel.Warning, "AllCameras sig scan missed — using hardcoded fallback.", "CameraManager");
+                Log.Write(AppLogLevel.Warning, "AllCameras sig scan missed — using hardcoded fallback.", "CameraManager");
                 return fallbackAddr;
             }
 
-            LoggingEnhancements.Log(AppLogLevel.Error, "AllCameras resolution FAILED.", "CameraManager");
+            Log.Write(AppLogLevel.Error, "AllCameras resolution FAILED.", "CameraManager");
             return 0;
         }
 
@@ -423,7 +423,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             var unityBase = Memory.UnityBase;
             if (!unityBase.IsValidVirtualAddress())
             {
-                XMLogging.WriteLine("[CameraManager] DEBUG: Unity base not loaded — skipping sig audit.");
+                Log.WriteLine("[CameraManager] DEBUG: Unity base not loaded — skipping sig audit.");
                 return;
             }
 
@@ -711,7 +711,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
 #endif
             lines.Add($"{tag} ╚{new string('═', W)}╝");
 
-            XMLogging.WriteBlock(lines); // Block output kept as-is for formatted box drawing
+            Log.WriteBlock(lines); // Block output kept as-is for formatted box drawing
         }
 
         private static string FormatPtr(ulong ptr) =>
@@ -793,12 +793,12 @@ namespace eft_dma_radar.Tarkov.GameWorld
             var resolved = TryResolveCameraOffset(sigs, fieldName, unityBase);
             if (resolved.HasValue && resolved.Value != target)
             {
-                LoggingEnhancements.Log(AppLogLevel.Info, $"Camera.{fieldName} UPDATED: 0x{target:X} → 0x{resolved.Value:X}", "CameraManager");
+                Log.Write(AppLogLevel.Info, $"Camera.{fieldName} UPDATED: 0x{target:X} → 0x{resolved.Value:X}", "CameraManager");
                 target = resolved.Value;
             }
             else if (!resolved.HasValue)
             {
-                LoggingEnhancements.Log(AppLogLevel.Warning, $"Camera.{fieldName} sig scan FAILED — using hardcoded 0x{target:X}", "CameraManager");
+                Log.Write(AppLogLevel.Warning, $"Camera.{fieldName} sig scan FAILED — using hardcoded 0x{target:X}", "CameraManager");
             }
         }
 
@@ -878,7 +878,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 var gameAssemblyBase = MemoryInterface.Memory.GameAssemblyBase;
                 if (!gameAssemblyBase.IsValidVirtualAddress())
                 {
-                    LoggingEnhancements.Log(AppLogLevel.Warning, "GameAssembly.dll not loaded.", "CameraManager");
+                    Log.Write(AppLogLevel.Warning, "GameAssembly.dll not loaded.", "CameraManager");
                     return 0;
                 }
 
@@ -888,7 +888,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 byte[] methodBytes = Memory.ReadBuffer(methodAddr, 128, false);
                 if (methodBytes == null || methodBytes.Length < 64)
                 {
-                    LoggingEnhancements.Log(AppLogLevel.Warning, "Failed to read get_Instance method bytes.", "CameraManager");
+                    Log.Write(AppLogLevel.Warning, "Failed to read get_Instance method bytes.", "CameraManager");
                     return 0;
                 }
 
@@ -949,7 +949,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             }
             catch (Exception ex)
             {
-                LoggingEnhancements.Log(AppLogLevel.Error, $"FindCameraManagerInstance error: {ex.Message}", "CameraManager");
+                Log.Write(AppLogLevel.Error, $"FindCameraManagerInstance error: {ex.Message}", "CameraManager");
                 return 0;
             }
         }
@@ -1032,7 +1032,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             }
             catch (Exception ex)
             {
-                LoggingEnhancements.Log(AppLogLevel.Error, $"CheckIfScoped error: {ex.Message}", "CameraManager");
+                Log.Write(AppLogLevel.Error, $"CheckIfScoped error: {ex.Message}", "CameraManager");
                 return false;
             }
         }

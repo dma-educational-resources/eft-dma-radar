@@ -106,7 +106,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PlayerHistory] Error in AddOrUpdate: {ex.Message}");
+                Log.WriteLine($"[PlayerHistory] Error in AddOrUpdate: {ex.Message}");
             }
         }
 
@@ -136,7 +136,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PlayerHistory] Error in Remove: {ex.Message}");
+                Log.WriteLine($"[PlayerHistory] Error in Remove: {ex.Message}");
             }
         }
 
@@ -157,7 +157,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PlayerHistory] Error in Reset: {ex.Message}");
+                Log.WriteLine($"[PlayerHistory] Error in Reset: {ex.Message}");
             }
         }
 
@@ -179,7 +179,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PlayerHistory] Error in Clear: {ex.Message}");
+                Log.WriteLine($"[PlayerHistory] Error in Clear: {ex.Message}");
             }
         }
 
@@ -218,7 +218,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PlayerHistory] Error saving to disk: {ex.Message}");
+                Log.WriteLine($"[PlayerHistory] Error saving to disk: {ex.Message}");
             }
         }
 
@@ -251,11 +251,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections
                     }
                 }
 
-                XMLogging.WriteLine($"[PlayerHistory] Loaded {persisted.Count} entries from disk.");
+                Log.WriteLine($"[PlayerHistory] Loaded {persisted.Count} entries from disk.");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PlayerHistory] Error loading from disk: {ex.Message}");
+                Log.WriteLine($"[PlayerHistory] Error loading from disk: {ex.Message}");
             }
         }
 

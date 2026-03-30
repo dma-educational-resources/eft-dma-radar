@@ -79,7 +79,7 @@ namespace eft_dma_radar
                                            Native.EXECUTION_STATE.ES_DISPLAY_REQUIRED);
             var highPerformanceGuid = new Guid("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c");
             if (Native.PowerSetActiveScheme(IntPtr.Zero, ref highPerformanceGuid) != 0)
-                XMLogging.WriteLine("WARNING: Unable to set High Performance Power Plan");
+                Log.WriteLine("WARNING: Unable to set High Performance Power Plan");
         }
 
         /// <summary>
@@ -102,7 +102,7 @@ namespace eft_dma_radar
                     $"Windows 10 version 1809 (OS build {MinBuild}) or later is required.\n" +
                     $"Detected: {os.VersionString}");
 
-            XMLogging.WriteLine($"[SystemRequirements] OS: {os.VersionString} \u2713");
+            Log.WriteLine($"[SystemRequirements] OS: {os.VersionString} \u2713");
 
             // Soft check: physical RAM — recommend ≥ 8 GB
             try
@@ -112,15 +112,15 @@ namespace eft_dma_radar
                 {
                     var totalGb = Convert.ToInt64(obj["TotalPhysicalMemory"]) / (1024.0 * 1024.0 * 1024.0);
                     if (totalGb < 8.0)
-                        XMLogging.WriteLine($"[SystemRequirements] WARNING: {totalGb:F1} GB RAM detected — 8 GB or more is recommended for stable operation.");
+                        Log.WriteLine($"[SystemRequirements] WARNING: {totalGb:F1} GB RAM detected — 8 GB or more is recommended for stable operation.");
                     else
-                        XMLogging.WriteLine($"[SystemRequirements] RAM: {totalGb:F1} GB \u2713");
+                        Log.WriteLine($"[SystemRequirements] RAM: {totalGb:F1} GB \u2713");
                     break;
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[SystemRequirements] RAM check skipped: {ex.Message}");
+                Log.WriteLine($"[SystemRequirements] RAM check skipped: {ex.Message}");
             }
         }
 

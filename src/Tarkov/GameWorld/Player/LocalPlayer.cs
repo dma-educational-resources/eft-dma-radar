@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.Misc;
+﻿using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 
 using eft_dma_radar.Common.DMA;
@@ -119,7 +119,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 _healthController = Memory.ReadPtr(Base + Offsets.Player._healthController, false);
                 if (!_healthController.IsValidVirtualAddress())
                 {
-                    LoggingEnhancements.Log(AppLogLevel.Warning, "HealthController address invalid", "LocalPlayer");
+                    Log.Write(AppLogLevel.Warning, "HealthController address invalid", "LocalPlayer");
                     return;
                 }
 
@@ -128,16 +128,16 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
 
                 if (_energyPtr.IsValidVirtualAddress() && _hydrationPtr.IsValidVirtualAddress())
                 {
-                    LoggingEnhancements.Log(AppLogLevel.Debug, $"Health pointers initialized: Energy=0x{_energyPtr:X}, Hydration=0x{_hydrationPtr:X}", "LocalPlayer");
+                    Log.Write(AppLogLevel.Debug, $"Health pointers initialized: Energy=0x{_energyPtr:X}, Hydration=0x{_hydrationPtr:X}", "LocalPlayer");
                 }
                 else
                 {
-                    LoggingEnhancements.Log(AppLogLevel.Warning, "Energy/Hydration pointers invalid", "LocalPlayer");
+                    Log.Write(AppLogLevel.Warning, "Energy/Hydration pointers invalid", "LocalPlayer");
                 }
             }
             catch (Exception ex)
             {
-                LoggingEnhancements.Log(AppLogLevel.Error, $"Failed to initialize health pointers: {ex.Message}", "LocalPlayer");
+                Log.Write(AppLogLevel.Error, $"Failed to initialize health pointers: {ex.Message}", "LocalPlayer");
             }
         }
 
@@ -209,7 +209,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"CheckIfADS() ERROR: {ex}");
+                Log.WriteLine($"CheckIfADS() ERROR: {ex}");
                 return false;
             }
         }
@@ -232,7 +232,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"GetEnergy() ERROR: {ex}");
+                Log.WriteLine($"GetEnergy() ERROR: {ex}");
                 return _cachedEnergy;
             }
         }
@@ -255,7 +255,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"GetHydration() ERROR: {ex}");
+                Log.WriteLine($"GetHydration() ERROR: {ex}");
                 return _cachedHydration;
             }
         }
@@ -286,7 +286,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             catch (Exception ex)
             {
                 // Rate limit this error message
-                LoggingEnhancements.LogRateLimited(
+                Log.WriteRateLimited(
                     AppLogLevel.Error,
                     "update_energy_hydration",
                     TimeSpan.FromSeconds(30),

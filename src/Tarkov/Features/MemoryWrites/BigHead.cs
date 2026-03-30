@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.ScatterAPI;
+﻿using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
@@ -49,7 +49,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[BigHead]: {ex}");
+                Log.WriteLine($"[BigHead]: {ex}");
             }
         }
 
@@ -92,7 +92,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     var names = string.Join(", ", playersToReset.Select(p => p.Name));
                     var deadPlayers = playersToReset.Where(p => !p.IsAlive).ToList();
                     var action = deadPlayers.Count > 0 ? "died" : "disconnected";
-                    XMLogging.WriteLine($"[BigHead] Reset scales for {playersToReset.Count} player(s) who {action}: {names}");
+                    Log.WriteLine($"[BigHead] Reset scales for {playersToReset.Count} player(s) who {action}: {names}");
                 };
             }
 
@@ -114,7 +114,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             }
 
             if (hasWrites && stateChanged && Enabled)
-                writes.Callbacks += () => XMLogging.WriteLine($"[BigHead] Enabled (Scale: {scale:F1})");
+                writes.Callbacks += () => Log.WriteLine($"[BigHead] Enabled (Scale: {scale:F1})");
         }
 
         private static void ApplyHeadScale(ScatterWriteHandle writes, Player player, UnityTransform headTransform, Vector3 scale)
@@ -126,7 +126,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[BigHead] Error applying head scale to player '{player.Name}': {ex}");
+                Log.WriteLine($"[BigHead] Error applying head scale to player '{player.Name}': {ex}");
             }
         }
 
@@ -154,12 +154,12 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 
                 if (resetCount > 0)
                 {
-                    writes.Callbacks += () => XMLogging.WriteLine($"[BigHead] Disabled (Reset {resetCount} player head scales)");
+                    writes.Callbacks += () => Log.WriteLine($"[BigHead] Disabled (Reset {resetCount} player head scales)");
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[BigHead] Error resetting head scales: {ex}");
+                Log.WriteLine($"[BigHead] Error resetting head scales: {ex}");
             }
         }
 

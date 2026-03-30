@@ -61,9 +61,9 @@ namespace eft_dma_radar.Tarkov.WebRadar
             {
                 var ok = await TryConfigureUPnPAsync(port);
                 if (ok)
-                    XMLogging.WriteLine($"[WebRadar] UPnP port mapped: TCP {port} -> TCP {port}");
+                    Log.WriteLine($"[WebRadar] UPnP port mapped: TCP {port} -> TCP {port}");
                 else
-                    XMLogging.WriteLine($"[WebRadar] UPnP failed (router may not support it / disabled / CGNAT). Continuing without UPnP.");
+                    Log.WriteLine($"[WebRadar] UPnP failed (router may not support it / disabled / CGNAT). Continuing without UPnP.");
             }
 
             var builder = WebApplication.CreateBuilder();
@@ -128,7 +128,7 @@ namespace eft_dma_radar.Tarkov.WebRadar
                 });
             }
 
-            XMLogging.WriteLine($"[WebRadar] HTTP server running on {port}");
+            Log.WriteLine($"[WebRadar] HTTP server running on {port}");
         }
 
 
@@ -198,7 +198,7 @@ namespace eft_dma_radar.Tarkov.WebRadar
 
                 foreach (var m in maps)
                 {
-                    XMLogging.WriteLine(
+                    Log.WriteLine(
                         $"[UPnP MAP] {m.Protocol} {m.PublicPort} -> {m.PrivateIP}:{m.PrivatePort}"
                     );
                 }
@@ -206,7 +206,7 @@ namespace eft_dma_radar.Tarkov.WebRadar
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[WebRadar] UPnP map error: {ex.Message}");
+                Log.WriteLine($"[WebRadar] UPnP map error: {ex.Message}");
                 return false;
             }
         }
@@ -305,7 +305,7 @@ namespace eft_dma_radar.Tarkov.WebRadar
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[WebRadar] Worker error: {ex}");
+                    Log.WriteLine($"[WebRadar] Worker error: {ex}");
                 }
 
                 Thread.Sleep(_tickRate);
@@ -424,7 +424,7 @@ namespace eft_dma_radar.Tarkov.WebRadar
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[GetLocalIP] Error: {ex.Message}");
+                Log.WriteLine($"[GetLocalIP] Error: {ex.Message}");
                 return null;
             }
         }

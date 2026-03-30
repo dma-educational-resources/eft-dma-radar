@@ -1,4 +1,4 @@
-using static eft_dma_radar.Tarkov.MemoryInterface;
+﻿using static eft_dma_radar.Tarkov.MemoryInterface;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Common.Unity.Collections;
@@ -71,7 +71,7 @@ namespace eft_dma_radar.Tarkov.QuestPlanner
 
             if (profile == 0)
             {
-                XMLogging.WriteLine("[QuestMemoryReader] Invalid profile address (0)");
+                Log.WriteLine("[QuestMemoryReader] Invalid profile address (0)");
                 return new AvailableQuests();
             }
 
@@ -85,7 +85,7 @@ namespace eft_dma_radar.Tarkov.QuestPlanner
 
                 if (questsDataPtr == 0)
                 {
-                    XMLogging.WriteLine("[QuestMemoryReader] QuestsData pointer is null");
+                    Log.WriteLine("[QuestMemoryReader] QuestsData pointer is null");
                     return new AvailableQuests();
                 }
 
@@ -156,13 +156,13 @@ namespace eft_dma_radar.Tarkov.QuestPlanner
                         _lastStarted = started.Count;
                         _lastAvailableForStart = availableForStart.Count;
                         _lastAvailableForFinish = availableForFinish.Count;
-                        XMLogging.WriteLine($"[QuestMemoryReader] Found {started.Count} Started, {availableForStart.Count} AvailableForStart, {availableForFinish.Count} AvailableForFinish quests");
+                        Log.WriteLine($"[QuestMemoryReader] Found {started.Count} Started, {availableForStart.Count} AvailableForStart, {availableForFinish.Count} AvailableForFinish quests");
                     }
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[QuestMemoryReader] Error reading quests: {ex.Message}");
+                Log.WriteLine($"[QuestMemoryReader] Error reading quests: {ex.Message}");
             }
 
             return new AvailableQuests
@@ -192,7 +192,7 @@ namespace eft_dma_radar.Tarkov.QuestPlanner
                 if (dictPtr == 0)
                     return counters;
 
-                // Dictionary<MongoID, TaskConditionCounter> — value is a pointer to the counter object
+                // Dictionary<MongoID, TaskConditionCounter> â€” value is a pointer to the counter object
                 using var dict = MemDictionary<Types.MongoID, ulong>.Get(dictPtr);
 
                 foreach (var entry in dict)
@@ -219,7 +219,7 @@ namespace eft_dma_radar.Tarkov.QuestPlanner
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[QuestMemoryReader] Error reading condition counters: {ex.Message}");
+                Log.WriteLine($"[QuestMemoryReader] Error reading condition counters: {ex.Message}");
             }
 
             return counters;

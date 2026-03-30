@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.Misc;
+﻿using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Common.Unity.LowLevel;
 using eft_dma_radar.Common.Unity.LowLevel.Types;
@@ -53,7 +53,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Loot Chams] Error processing: {ex.Message}");
+                Log.WriteLine($"[Loot Chams] Error processing: {ex.Message}");
             }
         }
 
@@ -70,7 +70,7 @@ namespace eft_dma_radar.Tarkov.Features
             _activeLootChams.Clear();
 
             if (itemsToRevert.Count > 0)
-                XMLogging.WriteLine($"[Loot Chams] Reverted all chams for {itemsToRevert.Count} items");
+                Log.WriteLine($"[Loot Chams] Reverted all chams for {itemsToRevert.Count} items");
         }
 
         public static void Reset()
@@ -95,7 +95,7 @@ namespace eft_dma_radar.Tarkov.Features
 
             ChamsManager.MaterialsUpdated += OnMaterialsUpdated;
 
-            XMLogging.WriteLine("[Loot Chams] Manager initialized");
+            Log.WriteLine("[Loot Chams] Manager initialized");
         }
 
         private static void OnMaterialsUpdated()
@@ -106,11 +106,11 @@ namespace eft_dma_radar.Tarkov.Features
                 {
                     await Task.Delay(200);
                     ApplyConfiguredColors();
-                    XMLogging.WriteLine("[Loot Chams] Applied colors after materials update");
+                    Log.WriteLine("[Loot Chams] Applied colors after materials update");
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[Loot Chams] Error applying colors after materials update: {ex.Message}");
+                    Log.WriteLine($"[Loot Chams] Error applying colors after materials update: {ex.Message}");
                 }
             });
         }
@@ -122,7 +122,7 @@ namespace eft_dma_radar.Tarkov.Features
                 if (!ChamsConfig.Enabled)
                     return;
 
-                XMLogging.WriteLine("[Loot Chams] Applying configured colors to materials...");
+                Log.WriteLine("[Loot Chams] Applying configured colors to materials...");
 
                 using var chamsColorMem = new RemoteBytes(SizeChecker<UnityColor>.Size);
                 var colorsApplied = 0;
@@ -175,16 +175,16 @@ namespace eft_dma_radar.Tarkov.Features
                         }
                         catch (Exception ex)
                         {
-                            XMLogging.WriteLine($"[Loot Chams] Failed to set color for {mode}/{entityType}: {ex.Message}");
+                            Log.WriteLine($"[Loot Chams] Failed to set color for {mode}/{entityType}: {ex.Message}");
                         }
                     }
                 }
 
-                XMLogging.WriteLine($"[Loot Chams] Applied colors to {colorsApplied} materials");
+                Log.WriteLine($"[Loot Chams] Applied colors to {colorsApplied} materials");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Loot Chams] Failed to apply configured colors: {ex.Message}");
+                Log.WriteLine($"[Loot Chams] Failed to apply configured colors: {ex.Message}");
             }
         }
 
@@ -202,7 +202,7 @@ namespace eft_dma_radar.Tarkov.Features
             {
                 // Only log this if we actually need advanced materials
                 if (importantItemSettings.Mode != ChamsMode.Basic && importantItemSettings.Mode != ChamsMode.Visible)
-                    XMLogging.WriteLine($"[Loot Chams] Materials not ready for ImportantItem with mode {importantItemSettings.Mode}");
+                    Log.WriteLine($"[Loot Chams] Materials not ready for ImportantItem with mode {importantItemSettings.Mode}");
                 return;
             }
 
@@ -228,7 +228,7 @@ namespace eft_dma_radar.Tarkov.Features
             if (!IsModeAvailable(questItemSettings.Mode, ChamsEntityType.QuestItem))
             {
                 if (questItemSettings.Mode != ChamsMode.Basic && questItemSettings.Mode != ChamsMode.Visible)
-                    XMLogging.WriteLine($"[Loot Chams] Materials not ready for QuestItem with mode {questItemSettings.Mode}");
+                    Log.WriteLine($"[Loot Chams] Materials not ready for QuestItem with mode {questItemSettings.Mode}");
                 return;
             }
 
@@ -313,7 +313,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to get basic material ID: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to get basic material ID: {ex}");
                 return -1;
             }
         }
@@ -362,7 +362,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to get visible material ID: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to get visible material ID: {ex}");
                 return -1;
             }
         }
@@ -413,7 +413,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to get visible material ID: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to get visible material ID: {ex}");
                 return -1;
             }
         }
@@ -436,7 +436,7 @@ namespace eft_dma_radar.Tarkov.Features
                 ApplyChamsToItemGroup(itemGroup, materialId);
 
                 _activeLootChams[itemId] = mode;
-                XMLogging.WriteLine($"[Loot Chams] Applied {mode} to {itemGroup.Count()} instances of {itemId}");
+                Log.WriteLine($"[Loot Chams] Applied {mode} to {itemGroup.Count()} instances of {itemId}");
             }
         }
 
@@ -459,7 +459,7 @@ namespace eft_dma_radar.Tarkov.Features
             {
                 if (_cachedMaterials.ContainsKey(itemId))
                 {
-                    XMLogging.WriteLine($"[Loot Chams] Materials already cached for {itemId}");
+                    Log.WriteLine($"[Loot Chams] Materials already cached for {itemId}");
                     return;
                 }
 
@@ -474,16 +474,16 @@ namespace eft_dma_radar.Tarkov.Features
                         CacheTime = DateTime.UtcNow
                     };
 
-                    XMLogging.WriteLine($"[Loot Chams] Successfully cached {materials.Count} original materials for {itemId}");
+                    Log.WriteLine($"[Loot Chams] Successfully cached {materials.Count} original materials for {itemId}");
                 }
                 else
                 {
-                    XMLogging.WriteLine($"[Loot Chams] No materials found to cache for {itemId}");
+                    Log.WriteLine($"[Loot Chams] No materials found to cache for {itemId}");
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Loot Chams] Failed to cache materials for {itemId}: {ex.Message}");
+                Log.WriteLine($"[Loot Chams] Failed to cache materials for {itemId}: {ex.Message}");
             }
         }
 
@@ -512,7 +512,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Loot Chams] Error extracting materials: {ex.Message}");
+                Log.WriteLine($"[Loot Chams] Error extracting materials: {ex.Message}");
             }
 
             return materials;
@@ -539,7 +539,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Loot Chams] Error extracting renderer materials: {ex.Message}");
+                Log.WriteLine($"[Loot Chams] Error extracting renderer materials: {ex.Message}");
             }
         }
 
@@ -560,7 +560,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
 
             if (itemsToRevert.Any())
-                XMLogging.WriteLine($"[Loot Chams] Reverted chams for {itemsToRevert.Count} items");
+                Log.WriteLine($"[Loot Chams] Reverted chams for {itemsToRevert.Count} items");
         }
 
         private static void RevertItemChams(string itemId)
@@ -569,7 +569,7 @@ namespace eft_dma_radar.Tarkov.Features
             {
                 if (!_cachedMaterials.TryGetValue(itemId, out var cached))
                 {
-                    XMLogging.WriteLine($"[Loot Chams] No cached materials found for {itemId}");
+                    Log.WriteLine($"[Loot Chams] No cached materials found for {itemId}");
                     return;
                 }
 
@@ -587,11 +587,11 @@ namespace eft_dma_radar.Tarkov.Features
                 }
 
                 _activeLootChams.TryRemove(itemId, out _);
-                XMLogging.WriteLine($"[Loot Chams] Reverted chams for {itemInstances.Count} instances of {itemId}");
+                Log.WriteLine($"[Loot Chams] Reverted chams for {itemInstances.Count} instances of {itemId}");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Loot Chams] Failed to revert {itemId}: {ex.Message}");
+                Log.WriteLine($"[Loot Chams] Failed to revert {itemId}: {ex.Message}");
             }
         }
 
@@ -618,7 +618,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Loot Chams] Failed to restore materials: {ex.Message}");
+                Log.WriteLine($"[Loot Chams] Failed to restore materials: {ex.Message}");
             }
         }
 
@@ -643,7 +643,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Loot Chams] Failed to restore renderer materials: {ex.Message}");
+                Log.WriteLine($"[Loot Chams] Failed to restore renderer materials: {ex.Message}");
             }
         }
 
@@ -676,7 +676,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Loot Chams] Failed to apply colors to material: {ex.Message}");
+                Log.WriteLine($"[Loot Chams] Failed to apply colors to material: {ex.Message}");
                 return false;
             }
         }
@@ -697,11 +697,11 @@ namespace eft_dma_radar.Tarkov.Features
                     _cachedMaterials[kvp.Key] = kvp.Value;
                 }
 
-                XMLogging.WriteLine($"[Loot Chams] Loaded {cache.Count} cached loot materials");
+                Log.WriteLine($"[Loot Chams] Loaded {cache.Count} cached loot materials");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Loot Chams] Failed to load cache: {ex.Message}");
+                Log.WriteLine($"[Loot Chams] Failed to load cache: {ex.Message}");
             }
         }
 
@@ -725,13 +725,13 @@ namespace eft_dma_radar.Tarkov.Features
                     }
                     catch (Exception ex)
                     {
-                        XMLogging.WriteLine($"[Loot Chams] Failed to save cache: {ex.Message}");
+                        Log.WriteLine($"[Loot Chams] Failed to save cache: {ex.Message}");
                     }
                 });
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Loot Chams] Failed to prepare cache for saving: {ex.Message}");
+                Log.WriteLine($"[Loot Chams] Failed to prepare cache for saving: {ex.Message}");
             }
         }
 

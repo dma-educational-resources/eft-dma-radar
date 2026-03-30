@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.ScatterAPI;
+﻿using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
@@ -35,13 +35,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     writes.Callbacks += () =>
                     {
                         _lastEnabledState = Enabled;
-                        XMLogging.WriteLine($"[DisableWeaponCollision] {(Enabled ? "Enabled" : "Disabled")} (Layers: {targetLayers})");
+                        Log.WriteLine($"[DisableWeaponCollision] {(Enabled ? "Enabled" : "Disabled")} (Layers: {targetLayers})");
                     };
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[DisableWeaponCollision]: {ex}");
+                Log.WriteLine($"[DisableWeaponCollision]: {ex}");
                 _cachedEFTHardSettingsInstance = default;
             }
         }

@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.Misc;
+﻿using eft_dma_radar.Common.Misc;
 using System.Collections.Concurrent;
 
 namespace eft_dma_radar.Tarkov.Features.MemoryWrites.Chams
@@ -22,7 +22,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites.Chams
         {
             if (!IsPlayerEntityType(playerType))
             {
-                XMLogging.WriteLine($"[Chams] Warning: {playerType} is not a valid player entity type");
+                Log.WriteLine($"[Chams] Warning: {playerType} is not a valid player entity type");
                 return -1;
             }
 
@@ -36,7 +36,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites.Chams
         {
             if (!IsLootEntityType(lootType))
             {
-                XMLogging.WriteLine($"[Chams] Warning: {lootType} is not a valid loot entity type");
+                Log.WriteLine($"[Chams] Warning: {lootType} is not a valid loot entity type");
                 return -1;
             }
 
@@ -118,7 +118,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites.Chams
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[CHAMS] Error notifying materials updated: {ex.Message}");
+                Log.WriteLine($"[CHAMS] Error notifying materials updated: {ex.Message}");
             }
         }
 

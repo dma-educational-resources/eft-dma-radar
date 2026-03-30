@@ -446,13 +446,13 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                             ClearAlerts();
                             UpdateAlerts(alertReason);
 
-                            XMLogging.WriteLine($"[Streaming] {Name} ({AccountID}) is no longer streaming");
+                            Log.WriteLine($"[Streaming] {Name} ({AccountID}) is no longer streaming");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[Streaming] Error checking if {Name} [{AccountID}] is live: {ex.Message}");
+                    Log.WriteLine($"[Streaming] Error checking if {Name} [{AccountID}] is live: {ex.Message}");
                 }
             });
         }
@@ -530,7 +530,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                         _identityApplied = true;
                         PlayerHistory.AddOrUpdate(this);
 
-                        XMLogging.WriteLine(
+                        Log.WriteLine(
                             $"[ObservedPlayer] Identity applied from PlayerList.json: {Name} ({AccountID})");
                     }
                     else
@@ -625,7 +625,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"ERROR updating Member Category for '{Name}': {ex}");
+                Log.WriteLine($"ERROR updating Member Category for '{Name}': {ex}");
             }
         }
 
@@ -653,7 +653,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"ERROR updating Health Status for '{Name}': {ex}");
+                Log.WriteLine($"ERROR updating Health Status for '{Name}': {ex}");
             }
         }
 
@@ -672,13 +672,13 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 //if (!IsAI)
                 //{
                 //    ZoomLevel = GetObservedScopeZoom(pwa);
-                //    //XMLogging.WriteLine($"Player '{Name}' Aiming Status: {IsAiming}, ZoomLevel: {ZoomLevel:F2}x");
+                //    //Log.WriteLine($"Player '{Name}' Aiming Status: {IsAiming}, ZoomLevel: {ZoomLevel:F2}x");
                 //}
 
             }
             catch //(Exception ex)
             {
-                //XMLogging.WriteLine($"ERROR updating Aiming Status for '{Name}': {ex}" +
+                //Log.WriteLine($"ERROR updating Aiming Status for '{Name}': {ex}" +
                 //    $"\n  HandsControllerAddr : 0x{HandsControllerAddr:X}" +
                 //    $"\n  HandsController     : 0x{handsController:X}" +
                 //    $"\n  BundleAnimBones     : 0x{bundleAnimBones:X}" +
@@ -707,7 +707,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"GetObservedScopeZoom ERROR: {ex}");
+                Log.WriteLine($"GetObservedScopeZoom ERROR: {ex}");
                 return 1f;
             }
         }

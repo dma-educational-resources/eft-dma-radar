@@ -260,7 +260,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 // ✅ SET PROFILE ID ONCE
                 player.ProfileID = profileId;
 
-                XMLogging.WriteLine(
+                Log.WriteLine(
                     $"[GearManager] Resolved ProfileID for {player}: {profileId}");
 
                 // Register this profileId in the local database. AccountId is not

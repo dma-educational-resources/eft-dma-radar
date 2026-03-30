@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Numerics;
 using eft_dma_radar.Common.DMA.ScatterAPI;
@@ -19,7 +19,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
     public sealed class Tripwire : IExplosiveItem, IWorldEntity, IMapEntity, IESPEntity
     {
         private static void Log(string msg) =>
-            XMLogging.WriteLine($"[TRIPWIRE] {msg}");
+            eft_dma_radar.Common.Misc.Log.WriteLine($"[TRIPWIRE] {msg}");
 
         public static implicit operator ulong(Tripwire x) => x.Addr;
 

@@ -1,4 +1,4 @@
-using eft_dma_radar.Tarkov.Features;
+﻿using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
@@ -36,13 +36,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     writes.Callbacks += () =>
                     {
                         _lastEnabledState = Enabled;
-                        XMLogging.WriteLine($"[NightVision] {(Enabled ? "Enabled" : "Disabled")}");
+                        Log.WriteLine($"[NightVision] {(Enabled ? "Enabled" : "Disabled")}");
                     };
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[NightVision]: {ex}");
+                Log.WriteLine($"[NightVision]: {ex}");
                 _cachedNightVisionComponent = default;
             }
         }

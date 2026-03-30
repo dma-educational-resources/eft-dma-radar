@@ -27,7 +27,7 @@ namespace eft_dma_radar.Common.Misc.Data.TarkovMarket
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"{nameof(TarkovMarketJob)} [FAIL]: {ex}");
+                Log.WriteLine($"{nameof(TarkovMarketJob)} [FAIL]: {ex}");
                 throw;
             }
         }

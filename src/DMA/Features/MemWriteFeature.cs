@@ -34,7 +34,7 @@ namespace eft_dma_radar.Common.DMA.Features
             {
                 if (!Memory.InRaid)
                 {
-                    //XMLogging.WriteLine($"[{typeof(T).Name}] Cannot run: Not in raid or raid not started. InRaid={Memory.InRaid}, RaidHasStarted={Memory.RaidHasStarted}");
+                    //Log.WriteLine($"[{typeof(T).Name}] Cannot run: Not in raid or raid not started. InRaid={Memory.InRaid}, RaidHasStarted={Memory.RaidHasStarted}");
                     return false;
                 }
                 if (!DelayElapsed)

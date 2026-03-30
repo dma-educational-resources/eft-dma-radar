@@ -89,7 +89,7 @@ namespace eft_dma_radar.UI.Pages
                 }
                 catch (TimeoutException ex)
                 {
-                    XMLogging.WriteLine($"[PANELS] {ex.Message}");
+                    Log.WriteLine($"[PANELS] {ex.Message}");
                 }
             };
         }
@@ -730,7 +730,7 @@ namespace eft_dma_radar.UI.Pages
             }
 
             Config.Save();
-            XMLogging.WriteLine($"Updated aimbot option: {optionName} = {isSelected}");
+            Log.WriteLine($"Updated aimbot option: {optionName} = {isSelected}");
         }
         #endregion
 
@@ -760,7 +760,7 @@ namespace eft_dma_radar.UI.Pages
                         break;
                 }
 
-                XMLogging.WriteLine($"[Checkbox] {cb.Name} changed to {value}");
+                Log.WriteLine($"[Checkbox] {cb.Name} changed to {value}");
 
                 switch (tag)
                 {
@@ -894,7 +894,7 @@ namespace eft_dma_radar.UI.Pages
                 }
 
                 Config.Save();
-                XMLogging.WriteLine("Saved Convig");
+                Log.WriteLine("Saved Convig");
             }
         }
 
@@ -1091,7 +1091,7 @@ namespace eft_dma_radar.UI.Pages
                 }
 
                 Config.Save();
-                XMLogging.WriteLine("Saved Convig");
+                Log.WriteLine("Saved Convig");
             }
         }
 
@@ -1147,7 +1147,7 @@ namespace eft_dma_radar.UI.Pages
             }
 
             Config.Save();
-            XMLogging.WriteLine("Saved aimbot options settings");
+            Log.WriteLine("Saved aimbot options settings");
         }
 
         private async void btnAntiAFK_Click(object sender, RoutedEventArgs e)
@@ -1273,13 +1273,13 @@ namespace eft_dma_radar.UI.Pages
                 {
                     case MemoryWritingDecision.DisableAll:
                         importedConfig.MemWrites.MemWritesEnabled = false;
-                        XMLogging.WriteLine("[Config] User chose to disable all Memory Writing features during import");
+                        Log.WriteLine("[Config] User chose to disable all Memory Writing features during import");
                         NotificationsShared.Info("[Config] All Memory Writing features have been disabled. You can enable them later in the Memory Writing panel if needed.");
                         break;
 
                     case MemoryWritingDecision.EnableBasicOnly:
                         importedConfig.MemWrites.MemWritesEnabled = true;
-                        XMLogging.WriteLine("[Config] User chose to enable Memory Writing features during import");
+                        Log.WriteLine("[Config] User chose to enable Memory Writing features during import");
                         NotificationsShared.Warning("[Config] Memory Writing features are enabled. Please be aware of the associated risks.");
                         break;
 

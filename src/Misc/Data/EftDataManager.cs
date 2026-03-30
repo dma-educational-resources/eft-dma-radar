@@ -62,7 +62,7 @@ namespace eft_dma_radar.Common.Misc.Data
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Error loading data: {ex}");
+                Log.WriteLine($"Error loading data: {ex}");
                 loading.UpdateStatus("Error loading data. Generating default data set...", loading.PercentComplete);
 
                 data = CreateMinimalDataSet();
@@ -102,7 +102,7 @@ namespace eft_dma_radar.Common.Misc.Data
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Error processing data: {ex}");
+                Log.WriteLine($"Error processing data: {ex}");
                 loading.UpdateStatus("Error processing data. Using empty data structures.", loading.PercentComplete);
 
                 AllItems = new Dictionary<string, TarkovMarketItem>(StringComparer.OrdinalIgnoreCase).ToFrozenDictionary();
@@ -119,7 +119,7 @@ namespace eft_dma_radar.Common.Misc.Data
         /// </summary>
         private static TarkovMarketData CreateMinimalDataSet()
         {
-            XMLogging.WriteLine("Creating minimal data set as last resort");
+            Log.WriteLine("Creating minimal data set as last resort");
 
             return new TarkovMarketData
             {
@@ -173,7 +173,7 @@ namespace eft_dma_radar.Common.Misc.Data
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"Error loading cached data: {ex}");
+                    Log.WriteLine($"Error loading cached data: {ex}");
                     loading.UpdateStatus("Cached data is invalid, will create new data", loading.PercentComplete);
 
                     try
@@ -209,7 +209,7 @@ namespace eft_dma_radar.Common.Misc.Data
                             }
                             catch (Exception ex)
                             {
-                                XMLogging.WriteLine($"Warning: Could not save API data to file: {ex}");
+                                Log.WriteLine($"Warning: Could not save API data to file: {ex}");
                             }
 
                             return data;
@@ -218,7 +218,7 @@ namespace eft_dma_radar.Common.Misc.Data
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"Error fetching API data: {ex}");
+                    Log.WriteLine($"Error fetching API data: {ex}");
                     loading.UpdateStatus("API fetch failed, falling back to embedded data", loading.PercentComplete);
                 }
             }
@@ -257,7 +257,7 @@ namespace eft_dma_radar.Common.Misc.Data
                         }
                         catch (Exception ex)
                         {
-                            XMLogging.WriteLine($"Warning: Could not save default data to file: {ex}");
+                            Log.WriteLine($"Warning: Could not save default data to file: {ex}");
                         }
 
                         return data;
@@ -266,7 +266,7 @@ namespace eft_dma_radar.Common.Misc.Data
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Error loading embedded data: {ex}");
+                Log.WriteLine($"Error loading embedded data: {ex}");
                 loading.UpdateStatus("Embedded data load failed, using minimal dataset", loading.PercentComplete);
             }
 
@@ -288,7 +288,7 @@ namespace eft_dma_radar.Common.Misc.Data
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Error checking file age: {ex}");
+                Log.WriteLine($"Error checking file age: {ex}");
                 return true;
             }
         }
@@ -333,7 +333,7 @@ namespace eft_dma_radar.Common.Misc.Data
                     }
                     catch (Exception ex)
                     {
-                        XMLogging.WriteLine($"Error updating default data: {ex}");
+                        Log.WriteLine($"Error updating default data: {ex}");
                         loading.UpdateStatus("Error updating default data, will use existing data", loading.PercentComplete);
                     }
                 }
@@ -344,7 +344,7 @@ namespace eft_dma_radar.Common.Misc.Data
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Error in UpdateDefaultDataAsync: {ex}");
+                Log.WriteLine($"Error in UpdateDefaultDataAsync: {ex}");
                 loading.UpdateStatus("Error checking default data, continuing with existing data", loading.PercentComplete);
             }
         }
@@ -356,7 +356,7 @@ namespace eft_dma_radar.Common.Misc.Data
         {
             try
             {
-                XMLogging.WriteLine("Starting background data update");
+                Log.WriteLine("Starting background data update");
                 string json = await TarkovMarketJob.GetUpdatedMarketDataAsync();
 
                 if (!string.IsNullOrEmpty(json))
@@ -395,7 +395,7 @@ namespace eft_dma_radar.Common.Misc.Data
                             .ToDictionary(t => t.Id, t => t.Name, StringComparer.OrdinalIgnoreCase)
                             .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
-                        XMLogging.WriteLine("Background data update successful");
+                        Log.WriteLine("Background data update successful");
                         return true;
                     }
                 }
@@ -404,7 +404,7 @@ namespace eft_dma_radar.Common.Misc.Data
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Background data update failed: {ex}");
+                Log.WriteLine($"Background data update failed: {ex}");
                 return false;
             }
         }
@@ -418,16 +418,16 @@ namespace eft_dma_radar.Common.Misc.Data
             {
                 if (IsDataFileOutdated(_dataFile, _defaultDataUpdateInterval))
                 {
-                    XMLogging.WriteLine($"Data file is outdated (older than {_defaultDataUpdateInterval.TotalHours} hours), updating...");
+                    Log.WriteLine($"Data file is outdated (older than {_defaultDataUpdateInterval.TotalHours} hours), updating...");
                     return await UpdateDataFileAsync();
                 }
 
-                XMLogging.WriteLine($"Data file is up to date (updated in the last {_defaultDataUpdateInterval.TotalHours} hours)");
+                Log.WriteLine($"Data file is up to date (updated in the last {_defaultDataUpdateInterval.TotalHours} hours)");
                 return false;
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Error checking for data update: {ex}");
+                Log.WriteLine($"Error checking for data update: {ex}");
                 return false;
             }
         }
@@ -473,7 +473,7 @@ namespace eft_dma_radar.Common.Misc.Data
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Error creating default data file: {ex}");
+                Log.WriteLine($"Error creating default data file: {ex}");
                 throw;
             }
         }

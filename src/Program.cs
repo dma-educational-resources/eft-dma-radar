@@ -88,7 +88,7 @@ namespace eft_dma_radar
             Config = newConfig;
             SharedProgram.UpdateConfig(Config);
 
-            XMLogging.WriteLine("[Program] Global config reference updated");
+            Log.WriteLine("[Program] Global config reference updated");
         }
 
         /// <summary>
@@ -204,11 +204,11 @@ namespace eft_dma_radar
                                 File.Copy(legacyConfigPath, destPath);
 
                                 selectedConfigFile = "config-eft-v3.json";
-                                XMLogging.WriteLine("[Program] Migrated legacy config-eft-v3.json to custom config directory");
+                                Log.WriteLine("[Program] Migrated legacy config-eft-v3.json to custom config directory");
                             }
                             catch (Exception ex)
                             {
-                                XMLogging.WriteLine($"[Program] Error migrating legacy config: {ex}");
+                                Log.WriteLine($"[Program] Error migrating legacy config: {ex}");
                             }
                         }
                     }
@@ -230,7 +230,7 @@ namespace eft_dma_radar
                             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
                         }));
 
-                        XMLogging.WriteLine("[Program] Created new config-eft-v3.json");
+                        Log.WriteLine("[Program] Created new config-eft-v3.json");
                     }
                 }
 
@@ -315,7 +315,7 @@ namespace eft_dma_radar
             try
             {
                 loading.UpdateStatus("Starting in Safe Mode...", 10);
-                XMLogging.WriteLine("Starting application in Safe Mode - DMA functionality disabled");
+                Log.WriteLine("Starting application in Safe Mode - DMA functionality disabled");
 
                 loading.UpdateStatus("Loading Configuration...", 25);
 
@@ -333,7 +333,7 @@ namespace eft_dma_radar
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"Non-critical safe mode component failed: {ex.Message}");
+                    Log.WriteLine($"Non-critical safe mode component failed: {ex.Message}");
                 }
 
                 loading.UpdateStatus("Initializing Safe Mode Features...", 85);
@@ -342,7 +342,7 @@ namespace eft_dma_radar
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Safe Mode initialization failed: {ex}");
+                Log.WriteLine($"Safe Mode initialization failed: {ex}");
                 loading.UpdateStatus("Safe Mode initialization failed", 100);
                 Thread.Sleep(1000);
             }
@@ -412,7 +412,7 @@ namespace eft_dma_radar
                 try
                 {
                     // Use debug level for icon caching - only visible when debug logging is enabled
-                    LoggingEnhancements.Log(AppLogLevel.Debug, $"Caching item icon: {itemId}", "IconCache");
+                    Log.Write(AppLogLevel.Debug, $"Caching item icon: {itemId}", "IconCache");
                     await Converters.ItemIconConverter.SaveItemIconAsPng(itemId, iconCachePath);
                 }
                 catch (Exception ex)
@@ -437,20 +437,20 @@ namespace eft_dma_radar
             {
                 Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
 
-                XMLogging.WriteLine("[DPI] Successfully enabled PerMonitorV2 DPI awareness");
+                Log.WriteLine("[DPI] Successfully enabled PerMonitorV2 DPI awareness");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[DPI] Failed to set DPI awareness: {ex.Message}");
+                Log.WriteLine($"[DPI] Failed to set DPI awareness: {ex.Message}");
 
                 try
                 {
                     Application.SetHighDpiMode(HighDpiMode.SystemAware);
-                    XMLogging.WriteLine("[DPI] Fallback: Enabled SystemAware DPI awareness");
+                    Log.WriteLine("[DPI] Fallback: Enabled SystemAware DPI awareness");
                 }
                 catch
                 {
-                    XMLogging.WriteLine("[DPI] Warning: Could not enable DPI awareness");
+                    Log.WriteLine("[DPI] Warning: Could not enable DPI awareness");
                 }
             }
         }

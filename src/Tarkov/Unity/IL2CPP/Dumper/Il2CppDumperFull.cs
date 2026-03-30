@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using eft_dma_radar.Common.DMA.ScatterAPI;
@@ -12,7 +12,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         private static readonly string FullDumpFilePath =
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "il2cpp_full_dump.txt");
 
-        // ── Extended FieldInfo struct ────────────────────────────────────────────
+        // â”€â”€ Extended FieldInfo struct â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Same stride (0x20) as RawFieldInfo, adds TypePtr at 0x08.
         [StructLayout(LayoutKind.Explicit, Size = 0x20)]
         private struct RawFieldInfoFull
@@ -22,12 +22,12 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             [FieldOffset(0x18)] public int Offset;    // int32 offset (signed)
         }
 
-        // ── Il2CppType header ────────────────────────────────────────────────────
+        // â”€â”€ Il2CppType header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // data union (0x00, 8 bytes):
-        //   CLASS / VALUETYPE → TypeDefinitionIndex (int32, lower 4 bytes)
-        //   SZARRAY           → Il2CppArrayType*
-        //   GENERICINST       → Il2CppGenericInst*
-        //   PTR / BYREF       → Il2CppType*
+        //   CLASS / VALUETYPE â†’ TypeDefinitionIndex (int32, lower 4 bytes)
+        //   SZARRAY           â†’ Il2CppArrayType*
+        //   GENERICINST       â†’ Il2CppGenericInst*
+        //   PTR / BYREF       â†’ Il2CppType*
         [StructLayout(LayoutKind.Explicit, Size = 0x10)]
         private struct RawIl2CppType
         {
@@ -36,7 +36,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             [FieldOffset(0x0C)] public byte TypeEnum;  // Il2CppTypeEnum value
         }
 
-        // ── Il2CppTypeEnum → C# type name ────────────────────────────────────────
+        // â”€â”€ Il2CppTypeEnum â†’ C# type name â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         private static string Il2CppTypeEnumName(byte t) => t switch
         {
             0x01 => "void",
@@ -67,7 +67,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             _ => $"type_0x{t:X2}",
         };
 
-        // ── Type name resolution ─────────────────────────────────────────────────
+        // â”€â”€ Type name resolution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
         /// Resolves the human-readable type name for a CLASS, VALUETYPE, or ENUM
@@ -101,7 +101,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             return fallback;
         }
 
-        // ── ReadClassFieldsFull ──────────────────────────────────────────────────
+        // â”€â”€ ReadClassFieldsFull â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
         /// Like <see cref="ReadClassFields"/>, but also reads each field's
@@ -170,29 +170,29 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             return result;
         }
 
-        // ── DumpAll ──────────────────────────────────────────────────────────────
+        // â”€â”€ DumpAll â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
         /// Dumps every IL2CPP class, field (offset + type), and method RVA found
         /// in the TypeInfoTable to <c>il2cpp_full_dump.txt</c> next to the
         /// executable.
-        /// Intended for reverse-engineering and SDK authoring — call once after
+        /// Intended for reverse-engineering and SDK authoring â€” call once after
         /// the game has fully loaded.
         /// </summary>
         public static void DumpAll()
         {
-            XMLogging.WriteLine("[Il2CppDumper] DumpAll starting...");
+            Log.WriteLine("[Il2CppDumper] DumpAll starting...");
 
             var gaBase = Memory.GameAssemblyBase;
             if (gaBase == 0)
             {
-                XMLogging.WriteLine("[Il2CppDumper] DumpAll ERROR: GameAssemblyBase is 0 — game not ready.");
+                Log.WriteLine("[Il2CppDumper] DumpAll ERROR: GameAssemblyBase is 0 â€” game not ready.");
                 return;
             }
 
             if (!ResolveTypeInfoTableRva(gaBase))
             {
-                XMLogging.WriteLine("[Il2CppDumper] DumpAll ABORT: TypeInfoTable resolution failed.");
+                Log.WriteLine("[Il2CppDumper] DumpAll ABORT: TypeInfoTable resolution failed.");
                 return;
             }
 
@@ -200,23 +200,23 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             try { tablePtr = Memory.ReadPtr(gaBase + Offsets.Special.TypeInfoTableRva, false); }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Il2CppDumper] DumpAll ReadPtr failed: {ex.Message}");
+                Log.WriteLine($"[Il2CppDumper] DumpAll ReadPtr failed: {ex.Message}");
                 return;
             }
 
             if (!tablePtr.IsValidVirtualAddress())
             {
-                XMLogging.WriteLine("[Il2CppDumper] DumpAll: TypeInfoTable pointer is invalid.");
+                Log.WriteLine("[Il2CppDumper] DumpAll: TypeInfoTable pointer is invalid.");
                 return;
             }
 
-            XMLogging.WriteLine("[Il2CppDumper] DumpAll: Scanning type table...");
+            Log.WriteLine("[Il2CppDumper] DumpAll: Scanning type table...");
             var classes = ReadAllClassesFromTable(tablePtr);
-            XMLogging.WriteLine($"[Il2CppDumper] DumpAll: {classes.Count} classes found. Writing dump...");
+            Log.WriteLine($"[Il2CppDumper] DumpAll: {classes.Count} classes found. Writing dump...");
 
             // Build type-resolution lookup tables used by ReadClassFieldsFull.
-            // TypeDefinitionIndex (= position in typeInfos array) → full class name.
-            // Il2CppClass* pointer                                 → full class name.
+            // TypeDefinitionIndex (= position in typeInfos array) â†’ full class name.
+            // Il2CppClass* pointer                                 â†’ full class name.
             var typeIndexToName = new Dictionary<int, string>(classes.Count);
             var typePtrToName = new Dictionary<ulong, string>(classes.Count);
             foreach (var (name, ns, ptr, idx) in classes)
@@ -230,7 +230,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             {
                 using var sw = new StreamWriter(FullDumpFilePath, false, Encoding.UTF8, 1 << 16);
 
-                sw.WriteLine($"// IL2CPP Full Dump — {DateTime.UtcNow:u}");
+                sw.WriteLine($"// IL2CPP Full Dump â€” {DateTime.UtcNow:u}");
                 sw.WriteLine($"// GameAssembly Base : 0x{gaBase:X16}");
                 sw.WriteLine($"// TypeInfoTable RVA : 0x{Offsets.Special.TypeInfoTableRva:X}");
                 sw.WriteLine($"// Total Classes     : {classes.Count}");
@@ -270,14 +270,14 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                     processed++;
 
                     if (processed % 5000 == 0)
-                        XMLogging.WriteLine($"[Il2CppDumper] DumpAll: {processed}/{classes.Count} classes processed...");
+                        Log.WriteLine($"[Il2CppDumper] DumpAll: {processed}/{classes.Count} classes processed...");
                 }
 
-                XMLogging.WriteLine($"[Il2CppDumper] DumpAll complete — {processed} classes written to: {FullDumpFilePath}");
+                Log.WriteLine($"[Il2CppDumper] DumpAll complete â€” {processed} classes written to: {FullDumpFilePath}");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Il2CppDumper] DumpAll write failed: {ex.Message}");
+                Log.WriteLine($"[Il2CppDumper] DumpAll write failed: {ex.Message}");
             }
         }
     }

@@ -1,4 +1,4 @@
-/*
+ï»¿/*
  * Lone EFT DMA Radar
  * MIT License
  *
@@ -94,7 +94,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 
         private static void WorkerLoop()
         {
-            XMLogging.WriteLine("[TeammatesWorker] Thread started");
+            Log.WriteLine("[TeammatesWorker] Thread started");
 
             while (true)
             {
@@ -120,7 +120,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[TeammatesWorker] CRITICAL ERROR: {ex}");
+                    Log.WriteLine($"[TeammatesWorker] CRITICAL ERROR: {ex}");
                     Thread.Sleep(500);
                 }
             }
@@ -138,8 +138,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             string? sessionId = GetSessionId();
             if (string.IsNullOrWhiteSpace(sessionId))
             {
-                XMLogging.WriteLine(
-                    "[TeammatesWorker] SessionID invalid but in raid ¨C preserving list");
+                Log.WriteLine(
+                    "[TeammatesWorker] SessionID invalid but in raid Â¨C preserving list");
                 return;
             }
 
@@ -147,7 +147,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 
             if (file.SessionId == sessionId)
             {
-                XMLogging.WriteLine(
+                Log.WriteLine(
                     $"[TeammatesWorker] Resuming raid {sessionId}");
 
                 _currentSessionId = sessionId;
@@ -159,7 +159,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 return;
             }
 
-            XMLogging.WriteLine(
+            Log.WriteLine(
                 $"[TeammatesWorker] New raid {sessionId}");
 
             _currentSessionId = sessionId;
@@ -173,8 +173,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 return;
 
             ResetState();
-            XMLogging.WriteLine(
-                "[TeammatesWorker] Raid ended ¨C cleared Teammates.json");
+            Log.WriteLine(
+                "[TeammatesWorker] Raid ended Â¨C cleared Teammates.json");
         }
 
         private static void ResetState()
@@ -268,7 +268,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             {
                 target.UpdatePlayerType(entry.OriginalType);
 
-                XMLogging.WriteLine(
+                Log.WriteLine(
                     $"[TeammatesWorker] Removed teammate VoipID={voipId}, restored={entry.OriginalType}");
 
                 Save();
@@ -284,7 +284,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 
             if (_teammates.TryAdd(voipId, newEntry))
             {
-                XMLogging.WriteLine(
+                Log.WriteLine(
                     $"[TeammatesWorker] Added teammate VoipID={voipId}, original={target.Type}");
 
                 Save();
@@ -306,7 +306,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 if (p == null || p.VoipId <= 0)
                     continue;
 
-                // CASE 1: Latched teammate ¡ú force Teammate
+                // CASE 1: Latched teammate Â¡Ãº force Teammate
                 if (_teammates.TryGetValue(p.VoipId, out var entry))
                 {
                     if (p.Type != PlayerType.Teammate)
@@ -316,7 +316,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                     continue;
                 }
 
-                // CASE 2: Previously latched but now removed ¡ú restore
+                // CASE 2: Previously latched but now removed Â¡Ãº restore
                 if (p.Type == PlayerType.Teammate)
                 {
                     RestoreOriginalType(p);

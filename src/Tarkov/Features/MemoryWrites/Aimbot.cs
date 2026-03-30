@@ -76,7 +76,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         /// </summary>
         private void AimbotWorker()
         {
-            XMLogging.WriteLine("Aimbot thread starting...");
+            Log.WriteLine("Aimbot thread starting...");
             while (true)
             {
                 try
@@ -94,7 +94,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                         TryRunBallisticsDiagnostic();
 
                         // ALWAYS log on first iteration after raid starts (per iteration check)
-                        //XMLogging.WriteLine($"[Aimbot] WORKER CHECK: Enabled={Enabled}, MemWrites.Enabled={MemWrites.Enabled}, Engaged={Engaged}");
+                        //Log.WriteLine($"[Aimbot] WORKER CHECK: Enabled={Enabled}, MemWrites.Enabled={MemWrites.Enabled}, Engaged={Engaged}");
 
                         // Only run aimbot if enabled AND MemWrites enabled
                         if (Enabled && MemWrites.Enabled)
@@ -113,7 +113,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"CRITICAL ERROR on Aimbot Thread: {ex}"); // Log CRITICAL error
+                    Log.WriteLine($"CRITICAL ERROR on Aimbot Thread: {ex}"); // Log CRITICAL error
                 }
                 finally
                 {
@@ -130,7 +130,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         {
             if (_ballisticsDiagnosticLogged) return;
 
-            XMLogging.WriteLine("[Aimbot] RunBallisticsDiagnosticOnce called from LocalGameWorld...");
+            Log.WriteLine("[Aimbot] RunBallisticsDiagnosticOnce called from LocalGameWorld...");
 
             try
             {
@@ -147,7 +147,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                         handsController = ILocalPlayer.HandsController;
                         if (handsController != 0 && handsController.IsValidVirtualAddress())
                         {
-                            XMLogging.WriteLine($"[Aimbot] HandsController ready after {2000 + (i + 1) * 500}ms");
+                            Log.WriteLine($"[Aimbot] HandsController ready after {2000 + (i + 1) * 500}ms");
                             break;
                         }
                     }
@@ -155,18 +155,18 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 
                 if (handsController == 0 || !handsController.IsValidVirtualAddress())
                 {
-                    XMLogging.WriteLine("[Aimbot] Diagnostic skipped - HandsController not ready (equip a weapon!)");
+                    Log.WriteLine("[Aimbot] Diagnostic skipped - HandsController not ready (equip a weapon!)");
                     _ballisticsDiagnosticLogged = true;
                     return;
                 }
 
-                XMLogging.WriteLine($"[Aimbot] HandsController @ 0x{handsController:X} - running diagnostic...");
+                Log.WriteLine($"[Aimbot] HandsController @ 0x{handsController:X} - running diagnostic...");
                 LogBallisticsDiagnostic(handsController, null);
                 _ballisticsDiagnosticLogged = true;
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Aimbot] Diagnostic error: {ex.Message}");
+                Log.WriteLine($"[Aimbot] Diagnostic error: {ex.Message}");
                 _ballisticsDiagnosticLogged = true;
             }
         }
@@ -179,17 +179,17 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         {
             if (_ballisticsDiagnosticLogged) return;
 
-            XMLogging.WriteLine("[Aimbot] TryRunBallisticsDiagnostic starting...");
+            Log.WriteLine("[Aimbot] TryRunBallisticsDiagnostic starting...");
 
             try
             {
                 if (Memory.LocalPlayer is not LocalPlayer localPlayer)
                 {
-                    XMLogging.WriteLine("[Aimbot] Diagnostic: LocalPlayer is null");
+                    Log.WriteLine("[Aimbot] Diagnostic: LocalPlayer is null");
                     return;
                 }
 
-                XMLogging.WriteLine("[Aimbot] Diagnostic: Waiting for HandsController...");
+                Log.WriteLine("[Aimbot] Diagnostic: Waiting for HandsController...");
 
                 // HandsController is set by OnRealtimeLoop - may take a few seconds after raid start
                 var handsController = ILocalPlayer.HandsController;
@@ -202,30 +202,30 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                         handsController = ILocalPlayer.HandsController;
                         if (handsController != 0 && handsController.IsValidVirtualAddress())
                         {
-                            XMLogging.WriteLine($"[Aimbot] Diagnostic: HandsController ready after {(i + 1) * 500}ms");
+                            Log.WriteLine($"[Aimbot] Diagnostic: HandsController ready after {(i + 1) * 500}ms");
                             break;
                         }
                     }
 
                     if (handsController == 0 || !handsController.IsValidVirtualAddress())
                     {
-                        XMLogging.WriteLine("[Aimbot] Diagnostic skipped - HandsController not ready after 10s (no weapon equipped?)");
+                        Log.WriteLine("[Aimbot] Diagnostic skipped - HandsController not ready after 10s (no weapon equipped?)");
                         _ballisticsDiagnosticLogged = true; // Don't retry
                         return;
                     }
                 }
                 else
                 {
-                    XMLogging.WriteLine($"[Aimbot] Diagnostic: HandsController already ready @ 0x{handsController:X}");
+                    Log.WriteLine($"[Aimbot] Diagnostic: HandsController already ready @ 0x{handsController:X}");
                 }
 
-                XMLogging.WriteLine("[Aimbot] Weapon detected - running ballistics diagnostic...");
+                Log.WriteLine("[Aimbot] Weapon detected - running ballistics diagnostic...");
                 LogBallisticsDiagnostic(handsController, null);
                 _ballisticsDiagnosticLogged = true;
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Aimbot] Diagnostic failed: {ex.Message}");
+                Log.WriteLine($"[Aimbot] Diagnostic failed: {ex.Message}");
                 _ballisticsDiagnosticLogged = true; // Don't spam retries on error
             }
         }
@@ -247,7 +247,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     // One-time ballistics diagnostic log - runs on first weapon equip regardless of aimbot state
                     if (!_ballisticsDiagnosticLogged)
                     {
-                        XMLogging.WriteLine("[Aimbot] Weapon detected - running ballistics diagnostic...");
+                        Log.WriteLine("[Aimbot] Weapon detected - running ballistics diagnostic...");
                         LogBallisticsDiagnostic(handsController, null);
                         _ballisticsDiagnosticLogged = true;
                     }
@@ -257,7 +257,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 {
                     if (Cache != hc)
                     {
-                        XMLogging.WriteLine("[Aimbot] ENGAGED - Initializing cache...");
+                        Log.WriteLine("[Aimbot] ENGAGED - Initializing cache...");
                         Cache?.ResetLock();
                         Cache = new AimbotCache(hc);
 
@@ -267,7 +267,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                             currentAccuracy > 0f && currentAccuracy < 1f)
                         {
                             Memory.WriteValue(game, hc + Offsets.FirearmController.TotalCenterOfImpact, targetAccuracy);
-                            XMLogging.WriteLine($"[Aimbot] Set Weapon Accuracy {currentAccuracy} -> {targetAccuracy}");
+                            Log.WriteLine($"[Aimbot] Set Weapon Accuracy {currentAccuracy} -> {targetAccuracy}");
                         }
                     }
 
@@ -325,7 +325,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     // Only log once when first locking onto a target
                     if (!_firstLock)
                     {
-                        XMLogging.WriteLine($"[Aimbot] LOCKED onto {Cache.AimbotLockedPlayer.Name}!");
+                        Log.WriteLine($"[Aimbot] LOCKED onto {Cache.AimbotLockedPlayer.Name}!");
                         _firstLock = true;
                     }
                     BeginSilentAim(null, lp);
@@ -336,7 +336,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     // Engaged but conditions not met
                     var lpValid = Memory.LocalPlayer is LocalPlayer;
                     var hcAddr = ILocalPlayer.HandsController;
-                    XMLogging.WriteLine($"[Aimbot] Engaged but can't run: LocalPlayer={lpValid}, HandsController=0x{hcAddr:X}");
+                    Log.WriteLine($"[Aimbot] Engaged but can't run: LocalPlayer={lpValid}, HandsController=0x{hcAddr:X}");
                     Thread.Sleep(100);
                 }
                 else
@@ -348,7 +348,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Aimbot [FAIL] {ex}");
+                Log.WriteLine($"Aimbot [FAIL] {ex}");
             }
         }
 
@@ -376,7 +376,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     {
                         _lastRandomBone = Config.RandomBone.GetRandomBone();
                         _lastShotIndex = shotIndex;
-                        XMLogging.WriteLine($"New Random Bone {_lastRandomBone.GetDescription()} ({shotIndex})");
+                        Log.WriteLine($"New Random Bone {_lastRandomBone.GetDescription()} ({shotIndex})");
                     }
                     bone = _lastRandomBone;
                 }
@@ -473,7 +473,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Silent Aim [FAIL] {ex}");
+                Log.WriteLine($"Silent Aim [FAIL] {ex}");
                 ResetSilentAim();
             }
         }
@@ -548,81 +548,81 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         {
             try
             {
-                XMLogging.WriteLine("================================================================");
-                XMLogging.WriteLine("         AIMBOT BALLISTICS DIAGNOSTIC (ONE-TIME)               ");
-                XMLogging.WriteLine("================================================================");
+                Log.WriteLine("================================================================");
+                Log.WriteLine("         AIMBOT BALLISTICS DIAGNOSTIC (ONE-TIME)               ");
+                Log.WriteLine("================================================================");
 
                 // === POINTER CHAIN VERIFICATION ===
-                XMLogging.WriteLine("[DIAG] === POINTER CHAINS ===");
-                XMLogging.WriteLine($"[DIAG] HandsController @ 0x{handsController:X}");
+                Log.WriteLine("[DIAG] === POINTER CHAINS ===");
+                Log.WriteLine($"[DIAG] HandsController @ 0x{handsController:X}");
 
                 // Fireport chain: [0x150, 0x10, 0x10]
                 var fireportPtr = Memory.ReadPtr(handsController + Offsets.FirearmController.Fireport, false);
-                XMLogging.WriteLine($"[DIAG] Fireport (0x{Offsets.FirearmController.Fireport:X}) -> 0x{fireportPtr:X} {(fireportPtr.IsValidVirtualAddress() ? "OK" : "FAIL")}");
+                Log.WriteLine($"[DIAG] Fireport (0x{Offsets.FirearmController.Fireport:X}) -> 0x{fireportPtr:X} {(fireportPtr.IsValidVirtualAddress() ? "OK" : "FAIL")}");
 
                 if (fireportPtr.IsValidVirtualAddress())
                 {
                     var originalTransform = Memory.ReadPtr(fireportPtr + 0x10, false);
-                    XMLogging.WriteLine($"[DIAG]   +0x10 (Original) -> 0x{originalTransform:X} {(originalTransform.IsValidVirtualAddress() ? "OK" : "FAIL")}");
+                    Log.WriteLine($"[DIAG]   +0x10 (Original) -> 0x{originalTransform:X} {(originalTransform.IsValidVirtualAddress() ? "OK" : "FAIL")}");
 
                     if (originalTransform.IsValidVirtualAddress())
                     {
                         var transformInternal = Memory.ReadPtr(originalTransform + 0x10, false);
-                        XMLogging.WriteLine($"[DIAG]   +0x10 (TransformInternal) -> 0x{transformInternal:X} {(transformInternal.IsValidVirtualAddress() ? "OK" : "FAIL")}");
+                        Log.WriteLine($"[DIAG]   +0x10 (TransformInternal) -> 0x{transformInternal:X} {(transformInternal.IsValidVirtualAddress() ? "OK" : "FAIL")}");
 
                         // Get position from TransformInternal
                         if (transformInternal.IsValidVirtualAddress())
                         {
                             var fireport = new UnityTransform(transformInternal);
                             _ = fireport.UpdatePosition();
-                            XMLogging.WriteLine($"[DIAG]   Fireport Position: {fireport.Position}");
+                            Log.WriteLine($"[DIAG]   Fireport Position: {fireport.Position}");
                         }
                     }
                 }
 
                 // === OFFSET VALUES ===
-                XMLogging.WriteLine("[DIAG] === OFFSET VALUES ===");
-                XMLogging.WriteLine($"[DIAG] FirearmController.TotalCenterOfImpact: 0x{Offsets.FirearmController.TotalCenterOfImpact:X}");
-                XMLogging.WriteLine($"[DIAG] FirearmController.Fireport: 0x{Offsets.FirearmController.Fireport:X}");
-                XMLogging.WriteLine($"[DIAG] ClientFirearmController.ShotIndex: 0x{Offsets.ClientFirearmController.ShotIndex:X}");
-                XMLogging.WriteLine($"[DIAG] ItemHandsController.Item: 0x{Offsets.ItemHandsController.Item:X}");
-                XMLogging.WriteLine($"[DIAG] LootItem.Template: 0x{Offsets.LootItem.Template:X}");
-                XMLogging.WriteLine($"[DIAG] LootItem.Version: 0x{Offsets.LootItem.Version:X}");
-                XMLogging.WriteLine($"[DIAG] AmmoTemplate.InitialSpeed: 0x{Offsets.AmmoTemplate.InitialSpeed:X}");
-                XMLogging.WriteLine($"[DIAG] AmmoTemplate.BallisticCoeficient: 0x{Offsets.AmmoTemplate.BallisticCoeficient:X}");
-                XMLogging.WriteLine($"[DIAG] AmmoTemplate.BulletMassGram: 0x{Offsets.AmmoTemplate.BulletMassGram:X}");
-                XMLogging.WriteLine($"[DIAG] AmmoTemplate.BulletDiameterMilimeters: 0x{Offsets.AmmoTemplate.BulletDiameterMilimeters:X}");
-                XMLogging.WriteLine($"[DIAG] WeaponTemplate.Velocity: 0x{Offsets.WeaponTemplate.Velocity:X}");
-                XMLogging.WriteLine($"[DIAG] ModTemplate.Velocity: 0x{Offsets.ModTemplate.Velocity:X}");
-                XMLogging.WriteLine($"[DIAG] LootItemMod.Slots: 0x{Offsets.LootItemMod.Slots:X}");
-                XMLogging.WriteLine($"[DIAG] Slot.ContainedItem: 0x{Offsets.Slot.ContainedItem:X}");
-                XMLogging.WriteLine($"[DIAG] ObservedMovementController.Velocity: 0x{Offsets.ObservedMovementController.Velocity:X}");
+                Log.WriteLine("[DIAG] === OFFSET VALUES ===");
+                Log.WriteLine($"[DIAG] FirearmController.TotalCenterOfImpact: 0x{Offsets.FirearmController.TotalCenterOfImpact:X}");
+                Log.WriteLine($"[DIAG] FirearmController.Fireport: 0x{Offsets.FirearmController.Fireport:X}");
+                Log.WriteLine($"[DIAG] ClientFirearmController.ShotIndex: 0x{Offsets.ClientFirearmController.ShotIndex:X}");
+                Log.WriteLine($"[DIAG] ItemHandsController.Item: 0x{Offsets.ItemHandsController.Item:X}");
+                Log.WriteLine($"[DIAG] LootItem.Template: 0x{Offsets.LootItem.Template:X}");
+                Log.WriteLine($"[DIAG] LootItem.Version: 0x{Offsets.LootItem.Version:X}");
+                Log.WriteLine($"[DIAG] AmmoTemplate.InitialSpeed: 0x{Offsets.AmmoTemplate.InitialSpeed:X}");
+                Log.WriteLine($"[DIAG] AmmoTemplate.BallisticCoeficient: 0x{Offsets.AmmoTemplate.BallisticCoeficient:X}");
+                Log.WriteLine($"[DIAG] AmmoTemplate.BulletMassGram: 0x{Offsets.AmmoTemplate.BulletMassGram:X}");
+                Log.WriteLine($"[DIAG] AmmoTemplate.BulletDiameterMilimeters: 0x{Offsets.AmmoTemplate.BulletDiameterMilimeters:X}");
+                Log.WriteLine($"[DIAG] WeaponTemplate.Velocity: 0x{Offsets.WeaponTemplate.Velocity:X}");
+                Log.WriteLine($"[DIAG] ModTemplate.Velocity: 0x{Offsets.ModTemplate.Velocity:X}");
+                Log.WriteLine($"[DIAG] LootItemMod.Slots: 0x{Offsets.LootItemMod.Slots:X}");
+                Log.WriteLine($"[DIAG] Slot.ContainedItem: 0x{Offsets.Slot.ContainedItem:X}");
+                Log.WriteLine($"[DIAG] ObservedMovementController.Velocity: 0x{Offsets.ObservedMovementController.Velocity:X}");
 
                 // === READ LIVE VALUES ===
-                XMLogging.WriteLine("[DIAG] === LIVE VALUES ===");
+                Log.WriteLine("[DIAG] === LIVE VALUES ===");
 
                 var coi = Memory.ReadValue<float>(handsController + Offsets.FirearmController.TotalCenterOfImpact, false);
-                XMLogging.WriteLine($"[DIAG] TotalCenterOfImpact: {coi} {(coi > 0 && coi < 1 ? "OK" : "CHECK")}");
+                Log.WriteLine($"[DIAG] TotalCenterOfImpact: {coi} {(coi > 0 && coi < 1 ? "OK" : "CHECK")}");
 
                 var shotIndex = Memory.ReadValue<sbyte>(handsController + Offsets.ClientFirearmController.ShotIndex, false);
-                XMLogging.WriteLine($"[DIAG] ShotIndex: {shotIndex}");
+                Log.WriteLine($"[DIAG] ShotIndex: {shotIndex}");
 
                 // Item chain
                 var itemBase = Memory.ReadPtr(handsController + Offsets.ItemHandsController.Item, false);
-                XMLogging.WriteLine($"[DIAG] ItemBase @ 0x{itemBase:X} {(itemBase.IsValidVirtualAddress() ? "OK" : "FAIL")}");
+                Log.WriteLine($"[DIAG] ItemBase @ 0x{itemBase:X} {(itemBase.IsValidVirtualAddress() ? "OK" : "FAIL")}");
 
                 if (itemBase.IsValidVirtualAddress())
                 {
                     var itemTemplate = Memory.ReadPtr(itemBase + Offsets.LootItem.Template, false);
-                    XMLogging.WriteLine($"[DIAG] ItemTemplate @ 0x{itemTemplate:X} {(itemTemplate.IsValidVirtualAddress() ? "OK" : "FAIL")}");
+                    Log.WriteLine($"[DIAG] ItemTemplate @ 0x{itemTemplate:X} {(itemTemplate.IsValidVirtualAddress() ? "OK" : "FAIL")}");
 
                     var weaponVersion = Memory.ReadValue<int>(itemBase + Offsets.LootItem.Version, false);
-                    XMLogging.WriteLine($"[DIAG] WeaponVersion: {weaponVersion}");
+                    Log.WriteLine($"[DIAG] WeaponVersion: {weaponVersion}");
 
                     if (itemTemplate.IsValidVirtualAddress())
                     {
                         var weaponVelocity = Memory.ReadValue<float>(itemTemplate + Offsets.WeaponTemplate.Velocity, false);
-                        XMLogging.WriteLine($"[DIAG] WeaponTemplate.Velocity: {weaponVelocity}%");
+                        Log.WriteLine($"[DIAG] WeaponTemplate.Velocity: {weaponVelocity}%");
                     }
 
                     // Try to get ammo template
@@ -631,17 +631,17 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                         var ammoTemplate = FirearmManager.MagazineManager.GetAmmoTemplateFromWeapon(itemBase);
                         if (ammoTemplate.IsValidVirtualAddress())
                         {
-                            XMLogging.WriteLine($"[DIAG] AmmoTemplate @ 0x{ammoTemplate:X}");
+                            Log.WriteLine($"[DIAG] AmmoTemplate @ 0x{ammoTemplate:X}");
 
                             var initialSpeed = Memory.ReadValue<float>(ammoTemplate + Offsets.AmmoTemplate.InitialSpeed, false);
                             var ballisticCoef = Memory.ReadValue<float>(ammoTemplate + Offsets.AmmoTemplate.BallisticCoeficient, false);
                             var bulletMass = Memory.ReadValue<float>(ammoTemplate + Offsets.AmmoTemplate.BulletMassGram, false);
                             var bulletDiameter = Memory.ReadValue<float>(ammoTemplate + Offsets.AmmoTemplate.BulletDiameterMilimeters, false);
 
-                            XMLogging.WriteLine($"[DIAG]   InitialSpeed: {initialSpeed} m/s {(initialSpeed > 100 && initialSpeed < 2000 ? "OK" : "CHECK")}");
-                            XMLogging.WriteLine($"[DIAG]   BallisticCoef: {ballisticCoef} {(ballisticCoef > 0 && ballisticCoef < 2 ? "OK" : "CHECK")}");
-                            XMLogging.WriteLine($"[DIAG]   BulletMass: {bulletMass}g {(bulletMass > 0 && bulletMass < 100 ? "OK" : "CHECK")}");
-                            XMLogging.WriteLine($"[DIAG]   BulletDiameter: {bulletDiameter}mm {(bulletDiameter > 1 && bulletDiameter < 30 ? "OK" : "CHECK")}");
+                            Log.WriteLine($"[DIAG]   InitialSpeed: {initialSpeed} m/s {(initialSpeed > 100 && initialSpeed < 2000 ? "OK" : "CHECK")}");
+                            Log.WriteLine($"[DIAG]   BallisticCoef: {ballisticCoef} {(ballisticCoef > 0 && ballisticCoef < 2 ? "OK" : "CHECK")}");
+                            Log.WriteLine($"[DIAG]   BulletMass: {bulletMass}g {(bulletMass > 0 && bulletMass < 100 ? "OK" : "CHECK")}");
+                            Log.WriteLine($"[DIAG]   BulletDiameter: {bulletDiameter}mm {(bulletDiameter > 1 && bulletDiameter < 30 ? "OK" : "CHECK")}");
 
                             // Calculate total velocity with attachments
                             float velMod = 0f;
@@ -650,27 +650,27 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                             // This is expensive so just log the base
                             var totalVelMod = 1f + (velMod / 100f);
                             var calculatedSpeed = initialSpeed * totalVelMod;
-                            XMLogging.WriteLine($"[DIAG]   Calculated Muzzle Velocity: ~{calculatedSpeed:F1} m/s (without attachments)");
+                            Log.WriteLine($"[DIAG]   Calculated Muzzle Velocity: ~{calculatedSpeed:F1} m/s (without attachments)");
                         }
                         else
                         {
-                            XMLogging.WriteLine("[DIAG] AmmoTemplate: NOT LOADED (no round in chamber?)");
+                            Log.WriteLine("[DIAG] AmmoTemplate: NOT LOADED (no round in chamber?)");
                         }
                     }
                     catch (Exception ex)
                     {
-                        XMLogging.WriteLine($"[DIAG] AmmoTemplate read failed: {ex.Message}");
+                        Log.WriteLine($"[DIAG] AmmoTemplate read failed: {ex.Message}");
                     }
                 }
 
                 // === VELOCITY OFFSET TEST ===
                 LogTargetVelocityDiagnostic();
 
-                XMLogging.WriteLine("[DIAG] === END BALLISTICS DIAGNOSTIC ===");
+                Log.WriteLine("[DIAG] === END BALLISTICS DIAGNOSTIC ===");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[DIAG] Ballistics diagnostic failed: {ex.Message}");
+                Log.WriteLine($"[DIAG] Ballistics diagnostic failed: {ex.Message}");
             }
         }
 
@@ -682,24 +682,24 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         {
             try
             {
-                XMLogging.WriteLine("[DIAG] === TARGET VELOCITY TEST ===");
-                XMLogging.WriteLine($"[DIAG] ObservedMovementController.Velocity offset: 0x{Offsets.ObservedMovementController.Velocity:X}");
-                XMLogging.WriteLine($"[DIAG] ObservedPlayerController.MovementController chain: [0x{Offsets.ObservedPlayerController.MovementController[0]:X}, 0x{Offsets.ObservedPlayerController.MovementController[1]:X}]");
+                Log.WriteLine("[DIAG] === TARGET VELOCITY TEST ===");
+                Log.WriteLine($"[DIAG] ObservedMovementController.Velocity offset: 0x{Offsets.ObservedMovementController.Velocity:X}");
+                Log.WriteLine($"[DIAG] ObservedPlayerController.MovementController chain: [0x{Offsets.ObservedPlayerController.MovementController[0]:X}, 0x{Offsets.ObservedPlayerController.MovementController[1]:X}]");
 
                 if (Memory.Game is not LocalGameWorld game)
                 {
-                    XMLogging.WriteLine("[DIAG] No game instance");
+                    Log.WriteLine("[DIAG] No game instance");
                     return;
                 }
 
                 var players = game.Players?.Where(x => x is ObservedPlayer && x.IsActive).Take(3).ToList();
                 if (players == null || players.Count == 0)
                 {
-                    XMLogging.WriteLine("[DIAG] No ObservedPlayers found to test velocity");
+                    Log.WriteLine("[DIAG] No ObservedPlayers found to test velocity");
                     return;
                 }
 
-                XMLogging.WriteLine($"[DIAG] Testing velocity on {players.Count} player(s):");
+                Log.WriteLine($"[DIAG] Testing velocity on {players.Count} player(s):");
 
                 foreach (var player in players)
                 {
@@ -708,7 +708,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                         var movementContext = player.MovementContext;
                         if (movementContext == 0)
                         {
-                            XMLogging.WriteLine($"[DIAG]   {player.Name}: MovementContext is NULL");
+                            Log.WriteLine($"[DIAG]   {player.Name}: MovementContext is NULL");
                             continue;
                         }
 
@@ -717,21 +717,21 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                         bool isValid = Math.Abs(velocity.X) < 25f && Math.Abs(velocity.Y) < 25f && Math.Abs(velocity.Z) < 25f;
                         bool isMoving = Math.Abs(velocity.X) > 0.1f || Math.Abs(velocity.Y) > 0.1f || Math.Abs(velocity.Z) > 0.1f;
 
-                        XMLogging.WriteLine($"[DIAG]   {player.Name}:");
-                        XMLogging.WriteLine($"[DIAG]     MovementContext: 0x{movementContext:X}");
-                        XMLogging.WriteLine($"[DIAG]     Velocity: X={velocity.X:F2}, Y={velocity.Y:F2}, Z={velocity.Z:F2}");
-                        XMLogging.WriteLine($"[DIAG]     Speed: {velocity.Length():F2} m/s");
-                        XMLogging.WriteLine($"[DIAG]     Valid: {(isValid ? "OK" : "FAIL - garbage values!")} | Moving: {(isMoving ? "YES" : "STATIONARY")}");
+                        Log.WriteLine($"[DIAG]   {player.Name}:");
+                        Log.WriteLine($"[DIAG]     MovementContext: 0x{movementContext:X}");
+                        Log.WriteLine($"[DIAG]     Velocity: X={velocity.X:F2}, Y={velocity.Y:F2}, Z={velocity.Z:F2}");
+                        Log.WriteLine($"[DIAG]     Speed: {velocity.Length():F2} m/s");
+                        Log.WriteLine($"[DIAG]     Valid: {(isValid ? "OK" : "FAIL - garbage values!")} | Moving: {(isMoving ? "YES" : "STATIONARY")}");
                     }
                     catch (Exception ex)
                     {
-                        XMLogging.WriteLine($"[DIAG]   {player.Name}: Error reading velocity - {ex.Message}");
+                        Log.WriteLine($"[DIAG]   {player.Name}: Error reading velocity - {ex.Message}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[DIAG] Target velocity test failed: {ex.Message}");
+                Log.WriteLine($"[DIAG] Target velocity test failed: {ex.Message}");
             }
         }
 
@@ -766,7 +766,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"AIMBOT ERROR RecurseWeaponAttachVelocity() -> {ex}");
+                Log.WriteLine($"AIMBOT ERROR RecurseWeaponAttachVelocity() -> {ex}");
             }
         }
 
@@ -794,7 +794,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     var ammoTemplate = FirearmManager.MagazineManager.GetAmmoTemplateFromWeapon(Cache.ItemBase);
                     if (Cache.LoadedAmmo != ammoTemplate)
                     {
-                        XMLogging.WriteLine("[Aimbot] Ammo changed!");
+                        Log.WriteLine("[Aimbot] Ammo changed!");
                         Cache.Ballistics.BulletMassGrams = Memory.ReadValue<float>(ammoTemplate + Offsets.AmmoTemplate.BulletMassGram);
                         Cache.Ballistics.BulletDiameterMillimeters =
                             Memory.ReadValue<float>(ammoTemplate + Offsets.AmmoTemplate.BulletDiameterMilimeters);
@@ -827,7 +827,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 var now = DateTime.UtcNow;
                 if (_ballisticsErrorCount <= 3 || now - _lastBallisticsErrorLog >= BallisticsErrorLogCooldown)
                 {
-                    XMLogging.WriteLine($"Aimbot [WARNING] - Unable to set/update Ballistics: {ex.GetType().Name}: {ex.Message}" +
+                    Log.WriteLine($"Aimbot [WARNING] - Unable to set/update Ballistics: {ex.GetType().Name}: {ex.Message}" +
                         (_ballisticsErrorCount > 3 ? $" (repeated {_ballisticsErrorCount} times)" : ""));
                     _lastBallisticsErrorLog = now;
                 }
@@ -890,7 +890,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     if (Cache.LastVelocityLogTime == 0 || (DateTime.UtcNow.Ticks - Cache.LastVelocityLogTime) / TimeSpan.TicksPerMillisecond >= 1000)
                     {
                         float targetSpeed = targetVelocity.Length() / sim.TravelTime; // Original speed
-                        XMLogging.WriteLine($"[Aimbot] Lead applied: {targetSpeed:F1}m/s, Travel={sim.TravelTime * 1000:F0}ms, Drop={sim.DropCompensation:F2}m");
+                        Log.WriteLine($"[Aimbot] Lead applied: {targetSpeed:F1}m/s, Travel={sim.TravelTime * 1000:F0}ms, Drop={sim.DropCompensation:F2}m");
                         Cache.LastVelocityLogTime = DateTime.UtcNow.Ticks;
                     }
                 }
@@ -904,7 +904,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             {
                 Cache.LoadedAmmo = default;
                 Cache.LastWeaponVersion = default;
-                XMLogging.WriteLine("Aimbot [WARNING] - Invalid Ammo Ballistics! Running without prediction.");
+                Log.WriteLine("Aimbot [WARNING] - Invalid Ammo Ballistics! Running without prediction.");
             }
 
             return Vector3.Normalize(targetPosition - sourcePosition); // Return direction
@@ -1014,7 +1014,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         {
             if (pwaAddress == 0)
             {
-                XMLogging.WriteLine("[AIMBOT] WriteShotDirection: PWA address is null!");
+                Log.WriteLine("[AIMBOT] WriteShotDirection: PWA address is null!");
                 return;
             }
 
@@ -1034,7 +1034,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             {
                 if (!_shotDirectionDiagLogged)
                 {
-                    XMLogging.WriteLine("[AIMBOT] WriteShotDirection: Failed to get fireport rotation!");
+                    Log.WriteLine("[AIMBOT] WriteShotDirection: Failed to get fireport rotation!");
                 }
                 return;
             }
@@ -1064,16 +1064,16 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 _lastDryRunLogTicks = logNow;
 
                 var targetAddr = pwaAddress + Offsets.ProceduralWeaponAnimation._shotDirection;
-                XMLogging.WriteLine("=== DATA-BASED SILENT AIM (PWA METHOD) ===");
-                XMLogging.WriteLine($"*** DRY RUN MODE: {SILENT_AIM_DRY_RUN} ***");
-                XMLogging.WriteLine($"PWA Address: 0x{pwaAddress:X}");
-                XMLogging.WriteLine($"_shotDirection offset: 0x{Offsets.ProceduralWeaponAnimation._shotDirection:X}");
-                XMLogging.WriteLine($"Target Address: 0x{targetAddr:X}");
-                XMLogging.WriteLine($"World Direction: X={worldDirection.X:F6}, Y={worldDirection.Y:F6}, Z={worldDirection.Z:F6}");
-                XMLogging.WriteLine($"Fireport Rotation: X={fireportRot.Value.X:F4}, Y={fireportRot.Value.Y:F4}, Z={fireportRot.Value.Z:F4}, W={fireportRot.Value.W:F4}");
-                XMLogging.WriteLine($"LOCAL Direction: X={localDirection.X:F6}, Y={localDirection.Y:F6}, Z={localDirection.Z:F6}");
-                XMLogging.WriteLine(SILENT_AIM_DRY_RUN ? "DRY RUN - NOT writing to memory" : "Writing LOCAL Vector3 to _shotDirection");
-                XMLogging.WriteLine("=== END DATA-BASED SILENT AIM ===");
+                Log.WriteLine("=== DATA-BASED SILENT AIM (PWA METHOD) ===");
+                Log.WriteLine($"*** DRY RUN MODE: {SILENT_AIM_DRY_RUN} ***");
+                Log.WriteLine($"PWA Address: 0x{pwaAddress:X}");
+                Log.WriteLine($"_shotDirection offset: 0x{Offsets.ProceduralWeaponAnimation._shotDirection:X}");
+                Log.WriteLine($"Target Address: 0x{targetAddr:X}");
+                Log.WriteLine($"World Direction: X={worldDirection.X:F6}, Y={worldDirection.Y:F6}, Z={worldDirection.Z:F6}");
+                Log.WriteLine($"Fireport Rotation: X={fireportRot.Value.X:F4}, Y={fireportRot.Value.Y:F4}, Z={fireportRot.Value.Z:F4}, W={fireportRot.Value.W:F4}");
+                Log.WriteLine($"LOCAL Direction: X={localDirection.X:F6}, Y={localDirection.Y:F6}, Z={localDirection.Z:F6}");
+                Log.WriteLine(SILENT_AIM_DRY_RUN ? "DRY RUN - NOT writing to memory" : "Writing LOCAL Vector3 to _shotDirection");
+                Log.WriteLine("=== END DATA-BASED SILENT AIM ===");
             }
 
             // DRY RUN: Skip actual memory write - just log for analysis

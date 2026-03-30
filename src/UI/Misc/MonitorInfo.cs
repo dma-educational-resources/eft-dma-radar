@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.Misc;
+﻿using eft_dma_radar.Common.Misc;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -95,7 +95,7 @@ namespace eft_dma_radar.UI.Misc
                         }
                         catch (Exception ex)
                         {
-                            XMLogging.WriteLine($"[MonitorInfo] Error getting monitor info: {ex.Message}");
+                            Log.WriteLine($"[MonitorInfo] Error getting monitor info: {ex.Message}");
                         }
 
                         return true;
@@ -104,7 +104,7 @@ namespace eft_dma_radar.UI.Misc
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[MonitorInfo] Error enumerating monitors: {ex.Message}");
+                Log.WriteLine($"[MonitorInfo] Error enumerating monitors: {ex.Message}");
             }
 
             // Fallback to primary monitor if enumeration fails

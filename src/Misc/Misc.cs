@@ -123,14 +123,14 @@ namespace eft_dma_radar.Common.Misc
             if (!_first && _avgs.TryGetValue(_name, out var avgs)) // Skip first (JIT)
                 avgs.Add(ticks);
             if (_printEvery)
-                XMLogging.WriteLine($"{_name} Runtime -> {ticks} ticks");
+                Log.WriteLine($"{_name} Runtime -> {ticks} ticks");
         }
 
         public readonly void PrintAverage()
         {
             if (_avgs.TryGetValue(_name, out var avgs) &&
                 avgs.TryGetAverage(out var avg))
-                XMLogging.WriteLine($"** {_name} Avg -> {avg} ticks");
+                Log.WriteLine($"** {_name} Avg -> {avg} ticks");
         }
 
         /// <summary>

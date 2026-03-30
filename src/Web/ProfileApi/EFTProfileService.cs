@@ -113,7 +113,7 @@ namespace eft_dma_radar.Tarkov.API
                     }
                     catch (Exception ex)
                     {
-                        XMLogging.WriteLine($"[EFTProfileService] ERROR: {ex}");
+                        Log.WriteLine($"[EFTProfileService] ERROR: {ex}");
                     }
                     finally { await Task.Delay(250); } // Rate-Limit
                 }
@@ -184,13 +184,13 @@ namespace eft_dma_radar.Tarkov.API
                 using var response = await _client.GetAsync(url);
                 if (response.StatusCode is HttpStatusCode.NotFound)
                 {
-                    XMLogging.WriteLine($"[EFTProfileService] Profile '{accountId}' not found by Tarkov.Dev.");
+                    Log.WriteLine($"[EFTProfileService] Profile '{accountId}' not found by Tarkov.Dev.");
                     _tdevNotFound.Add(accountId);
                     return null;
                 }
                 if (response.StatusCode is HttpStatusCode.TooManyRequests) // Force Rate-Limit
                 {
-                    XMLogging.WriteLine("[EFTProfileService] Rate-Limited by Tarkov.Dev - Pausing for 1 minute.");
+                    Log.WriteLine("[EFTProfileService] Rate-Limited by Tarkov.Dev - Pausing for 1 minute.");
                     await Task.Delay(TimeSpan.FromMinutes(1));
                     return null;
                 }
@@ -198,12 +198,12 @@ namespace eft_dma_radar.Tarkov.API
                 using var stream = await response.Content.ReadAsStreamAsync();
                 var result = await JsonSerializer.DeserializeAsync<ProfileData>(stream) ??
                     throw new ArgumentNullException("result");
-                XMLogging.WriteLine($"[EFTProfileService] Got Profile '{accountId}' via Tarkov.Dev!");
+                Log.WriteLine($"[EFTProfileService] Got Profile '{accountId}' via Tarkov.Dev!");
                 return result;
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[EFTProfileService] Unhandled ERROR looking up profile '{accountId}' via Tarkov.Dev: {ex}");
+                Log.WriteLine($"[EFTProfileService] Unhandled ERROR looking up profile '{accountId}' via Tarkov.Dev: {ex}");
                 return null;
             }
         }
@@ -224,16 +224,16 @@ namespace eft_dma_radar.Tarkov.API
                 string loadedKey;
 
                 if (ApiKeyStore.TryLoadApiKey(out loadedKey))
-                    XMLogging.WriteLine($"Got API Key{loadedKey}");
+                    Log.WriteLine($"Got API Key{loadedKey}");
 
                 if (string.IsNullOrWhiteSpace(loadedKey))
                 {
-                    XMLogging.WriteLine("[EFTProfileService] eft-api.tech requires an API key but none was found.");
+                    Log.WriteLine("[EFTProfileService] eft-api.tech requires an API key but none was found.");
                     return null;
                 }
                 if (string.IsNullOrWhiteSpace(loadedKey))
                 {
-                    XMLogging.WriteLine("[EFTProfileService] eft-api.tech requires an API key. API Key is empty/null.");
+                    Log.WriteLine("[EFTProfileService] eft-api.tech requires an API key. API Key is empty/null.");
                     return null;
                 }
 
@@ -248,14 +248,14 @@ namespace eft_dma_radar.Tarkov.API
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
-                    XMLogging.WriteLine($"[EFTProfileService] Profile '{accountId}' not found by eft-api.tech.");
+                    Log.WriteLine($"[EFTProfileService] Profile '{accountId}' not found by eft-api.tech.");
                     _eftApiNotFound.Add(accountId);
                     return null;
                 }
 
                 if (response.StatusCode == HttpStatusCode.TooManyRequests)
                 {
-                    XMLogging.WriteLine("[EFTProfileService] Rate-Limited by eft-api.tech - Pausing for 1 minute.");
+                    Log.WriteLine("[EFTProfileService] Rate-Limited by eft-api.tech - Pausing for 1 minute.");
                     await Task.Delay(TimeSpan.FromMinutes(1), ct);
                     return null;
                 }
@@ -267,18 +267,18 @@ namespace eft_dma_radar.Tarkov.API
 
                 if (container == null)
                 {
-                    XMLogging.WriteLine("[EFTProfileService] Deserialization returned null container from eft-api.tech.");
+                    Log.WriteLine("[EFTProfileService] Deserialization returned null container from eft-api.tech.");
                     return null;
                 }
 
                 // Data may legitimately be null if API has no stats for that account
                 if (container.Data == null)
                 {
-                    XMLogging.WriteLine($"[EFTProfileService] Profile '{accountId}' returned no Data from eft-api.tech (null).");
+                    Log.WriteLine($"[EFTProfileService] Profile '{accountId}' returned no Data from eft-api.tech (null).");
                     return null;
                 }
 
-                XMLogging.WriteLine($"[EFTProfileService] Got Profile '{accountId}' via eft-api.tech!");
+                Log.WriteLine($"[EFTProfileService] Got Profile '{accountId}' via eft-api.tech!");
                 return container;
             }
             catch (OperationCanceledException)
@@ -288,7 +288,7 @@ namespace eft_dma_radar.Tarkov.API
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[EFTProfileService] Unhandled ERROR looking up profile '{accountId}' via eft-api.tech: {ex}");
+                Log.WriteLine($"[EFTProfileService] Unhandled ERROR looking up profile '{accountId}' via eft-api.tech: {ex}");
                 return null;
             }
         }

@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.Features;
+﻿using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Tarkov.EFTPlayer;
@@ -61,18 +61,18 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     writes.Callbacks += () =>
                     {
                         _lastEnabledState = true;
-                        XMLogging.WriteLine("[MuleMode] Enabled");
+                        Log.WriteLine("[MuleMode] Enabled");
                     };
                 }
                 else if (!Enabled && _lastEnabledState)
                 {
                     _lastEnabledState = false;
-                    XMLogging.WriteLine("[MuleMode] Disabled");
+                    Log.WriteLine("[MuleMode] Disabled");
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[MuleMode]: {ex}");
+                Log.WriteLine($"[MuleMode]: {ex}");
                 _cachedPhysical = default;
             }
         }

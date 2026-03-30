@@ -42,13 +42,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 
                     writes.Callbacks += () =>
                     {
-                        XMLogging.WriteLine($"[InstantPlant] Updated speed from {currentPlantTime:F6} to {INSTANT_SPEED:F6}");
+                        Log.WriteLine($"[InstantPlant] Updated speed from {currentPlantTime:F6} to {INSTANT_SPEED:F6}");
                     };
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[InstantPlant]: {ex}");
+                Log.WriteLine($"[InstantPlant]: {ex}");
                 _cachedPlantState = default;
             }
         }

@@ -1,4 +1,4 @@
-using eft_dma_radar.Tarkov.EFTPlayer;
+﻿using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;
@@ -71,7 +71,7 @@ namespace eft_dma_radar.UI.SKWidgetControl
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"CRITICAL ESP WIDGET RENDER ERROR: {ex}");
+                Log.WriteLine($"CRITICAL ESP WIDGET RENDER ERROR: {ex}");
             }
 
             _aimviewCanvas.Flush();

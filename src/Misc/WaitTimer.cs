@@ -117,7 +117,7 @@ namespace eft_dma_radar.Common.Misc
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[WARNING] Unable to cleanup WaitTimer: {ex}");
+                Log.WriteLine($"[WARNING] Unable to cleanup WaitTimer: {ex}");
                 return false;
             }
         }

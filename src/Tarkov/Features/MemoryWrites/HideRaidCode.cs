@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
@@ -68,7 +68,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites.Patches
         //                if (_sessionIdText.IsValidVirtualAddress())
         //                    Memory.WriteUnityString(_sessionIdText, string.Empty);
         //
-        //                XMLogging.WriteLine("HideRaidCode [ON]");
+        //                Log.WriteLine("HideRaidCode [ON]");
         //                _set = true;
         //            }
         //        }
@@ -80,20 +80,20 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites.Patches
         //            if (_sessionIdText.IsValidVirtualAddress() && _originalSessionText != null)
         //                Memory.WriteUnityString(_sessionIdText, _originalSessionText);
         //
-        //            XMLogging.WriteLine("HideRaidCode [OFF]");
+        //            Log.WriteLine("HideRaidCode [OFF]");
         //            _set = false;
         //        }
         //    }
         //    catch (Exception ex)
         //    {
-        //        XMLogging.WriteLine($"ERROR configuring HideRaidCode: {ex}");
+        //        Log.WriteLine($"ERROR configuring HideRaidCode: {ex}");
         //        ResetCache();
         //    }
         //}
         //
-        //// ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+        //// Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤
         //// Helpers
-        //// ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+        //// Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤Â©Â¤
         //
         //private static ulong ResolvePreloaderUI()
         //{

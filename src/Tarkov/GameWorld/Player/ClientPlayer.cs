@@ -186,7 +186,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             catch (Exception ex)
             {
                 _skeletonFailed = true;
-                XMLogging.WriteLine($"[Skeleton] LocalPlayer not ready yet: {ex.Message}");
+                Log.WriteLine($"[Skeleton] LocalPlayer not ready yet: {ex.Message}");
             }
         }
         public override void OnRealtimeLoop(ScatterReadIndex index)

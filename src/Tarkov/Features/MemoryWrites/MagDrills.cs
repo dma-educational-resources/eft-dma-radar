@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.ScatterAPI;
+﻿using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Tarkov.EFTPlayer;
@@ -68,7 +68,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 
                     writes.Callbacks += () =>
                     {
-                        XMLogging.WriteLine(
+                        Log.WriteLine(
                             $"[FastLoadUnload] Enabled (Load={FAST_LOAD_SPEED}, Unload={FAST_UNLOAD_SPEED})");
                         _appliedThisRaid = true;
                     };
@@ -80,7 +80,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 
                     writes.Callbacks += () =>
                     {
-                        XMLogging.WriteLine(
+                        Log.WriteLine(
                             $"[FastLoadUnload] Disabled (Load={NORMAL_LOAD_SPEED}, Unload={NORMAL_UNLOAD_SPEED})");
                         _appliedThisRaid = false;
                     };
@@ -93,7 +93,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[FastLoadUnload] ERROR: {ex}");
+                Log.WriteLine($"[FastLoadUnload] ERROR: {ex}");
             }
         }
 

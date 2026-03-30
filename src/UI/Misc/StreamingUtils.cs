@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.Misc;
+﻿using eft_dma_radar.Common.Misc;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -50,7 +50,7 @@ namespace eft_dma_radar.UI.Misc
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Streaming] Error checking if {username} is live on {platform}: {ex.Message}");
+                Log.WriteLine($"[Streaming] Error checking if {username} is live on {platform}: {ex.Message}");
                 return false;
             }
         }
@@ -82,7 +82,7 @@ namespace eft_dma_radar.UI.Misc
                     var response = await httpClient.GetAsync(url);
                     if (!response.IsSuccessStatusCode)
                     {
-                        XMLogging.WriteLine($"[Streaming] Failed to fetch {url}: Status code {response.StatusCode}");
+                        Log.WriteLine($"[Streaming] Failed to fetch {url}: Status code {response.StatusCode}");
                         return false;
                     }
 
@@ -92,7 +92,7 @@ namespace eft_dma_radar.UI.Misc
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Streaming] Twitch check error for {input}: {ex.Message}");
+                Log.WriteLine($"[Streaming] Twitch check error for {input}: {ex.Message}");
                 return false;
             }
         }
@@ -126,7 +126,7 @@ namespace eft_dma_radar.UI.Misc
                     var response = await httpClient.GetAsync(url);
                     if (!response.IsSuccessStatusCode)
                     {
-                        XMLogging.WriteLine($"[Streaming] Failed to fetch {url}: Status code {response.StatusCode}");
+                        Log.WriteLine($"[Streaming] Failed to fetch {url}: Status code {response.StatusCode}");
                         return false;
                     }
 
@@ -136,7 +136,7 @@ namespace eft_dma_radar.UI.Misc
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Streaming] YouTube check error for {input}: {ex.Message}");
+                Log.WriteLine($"[Streaming] YouTube check error for {input}: {ex.Message}");
                 return false;
             }
         }

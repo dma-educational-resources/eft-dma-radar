@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using System.Collections.Concurrent;
 using System.IO;
 using System.Text.Json;
@@ -103,9 +103,9 @@ namespace eft_dma_radar.Web.ProfileApi
             return entry;
         }
 
-        // ─────────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Persistence
-        // ─────────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private static ConcurrentDictionary<string, DbEntry> Load()
         {
@@ -117,14 +117,14 @@ namespace eft_dma_radar.Web.ProfileApi
                     var db = JsonSerializer.Deserialize<DbFile>(json);
                     if (db?.Entries is { Count: > 0 } entries)
                     {
-                        XMLogging.WriteLine($"[DogtagDB] Loaded {entries.Count} entries from disk.");
+                        Log.WriteLine($"[DogtagDB] Loaded {entries.Count} entries from disk.");
                         return entries;
                     }
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[DogtagDB] Failed to load: {ex.Message}");
+                Log.WriteLine($"[DogtagDB] Failed to load: {ex.Message}");
             }
             return new ConcurrentDictionary<string, DbEntry>(StringComparer.OrdinalIgnoreCase);
         }
@@ -154,18 +154,18 @@ namespace eft_dma_radar.Web.ProfileApi
                     File.Move(tmp, _dbPath, overwrite: true);
                     _dirty = false;
                     // Use debug level - only logged when debug logging is enabled
-                    LoggingEnhancements.Log(AppLogLevel.Debug, $"Flushed {_entries.Count} entries to disk.", "DogtagDB");
+                    Log.Write(AppLogLevel.Debug, $"Flushed {_entries.Count} entries to disk.", "DogtagDB");
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[DogtagDB] Failed to flush: {ex.Message}");
+                    Log.WriteLine($"[DogtagDB] Failed to flush: {ex.Message}");
                 }
             }
         }
 
-        // ─────────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Models
-        // ─────────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         internal sealed class DbEntry
         {

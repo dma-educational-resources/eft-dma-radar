@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Misc.Data;
 using eft_dma_radar.Common.Unity;
@@ -127,7 +127,7 @@ internal static class QuestPlannerWorker
     /// </summary>
     private static void Worker()
     {
-        XMLogging.WriteLine("[QuestPlannerWorker] Thread starting...");
+        Log.WriteLine("[QuestPlannerWorker] Thread starting...");
 
         while (true)
         {
@@ -138,7 +138,7 @@ internal static class QuestPlannerWorker
             catch (Exception ex)
             {
                 var msg = ex.InnerException is { } inner ? $"{ex.Message} | Inner: {inner.Message}" : ex.Message;
-                XMLogging.WriteLine($"[QuestPlannerWorker] ERROR: {msg}");
+                Log.WriteLine($"[QuestPlannerWorker] ERROR: {msg}");
                 State = QuestConnectionState.Disconnected;
                 Current = null;
             }
@@ -158,7 +158,7 @@ internal static class QuestPlannerWorker
         {
             if (State != QuestConnectionState.Disconnected)
             {
-                XMLogging.WriteLine("[QuestPlannerWorker] DMA disconnected");
+                Log.WriteLine("[QuestPlannerWorker] DMA disconnected");
                 State = QuestConnectionState.Disconnected;
                 Current = null;
                 IsStale = false;
@@ -175,7 +175,7 @@ internal static class QuestPlannerWorker
         {
             if (State != QuestConnectionState.InRaid)
             {
-                XMLogging.WriteLine("[QuestPlannerWorker] In raid - suspending quest planning");
+                Log.WriteLine("[QuestPlannerWorker] In raid - suspending quest planning");
                 State = QuestConnectionState.InRaid;
                 Current = null;
                 IsStale = false;
@@ -208,7 +208,7 @@ internal static class QuestPlannerWorker
             // Log once, then stay quiet until profile is resolved
             if (!_profileUnavailableLogged)
             {
-                XMLogging.WriteLine("[QuestPlannerWorker] Profile not available - waiting for lobby");
+                Log.WriteLine("[QuestPlannerWorker] Profile not available - waiting for lobby");
                 _profileUnavailableLogged = true;
                 IsStale = Current != null; // Only stale if we had previous data
             }
@@ -223,7 +223,7 @@ internal static class QuestPlannerWorker
         // Profile resolved - clear stale flag and reset backoff
         if (_profileUnavailableLogged)
         {
-            XMLogging.WriteLine("[QuestPlannerWorker] Profile available - resuming quest planning");
+            Log.WriteLine("[QuestPlannerWorker] Profile available - resuming quest planning");
             _profileUnavailableLogged = false;
         }
         _profileFailCount = 0;
@@ -232,7 +232,7 @@ internal static class QuestPlannerWorker
         // 5. Ensure task data is ready before doing any memory reads or diff work
         if (!EftDataManager.IsInitialized)
         {
-            XMLogging.WriteLine("[QuestPlannerWorker] TaskData not yet initialized - skipping");
+            Log.WriteLine("[QuestPlannerWorker] TaskData not yet initialized - skipping");
             return;
         }
 
@@ -249,7 +249,7 @@ internal static class QuestPlannerWorker
         }
 
         // 8. Recompute quest summary
-        XMLogging.WriteLine($"[QuestPlannerWorker] Recomputing plan ({quests.Started.Count} active quests)");
+        Log.WriteLine($"[QuestPlannerWorker] Recomputing plan ({quests.Started.Count} active quests)");
 
         var settings = ConfigManager.CurrentConfig.QuestPlanner;
         var summary = QuestPlanBuilder.GetSummary(quests, EftDataManager.TaskData, settings);
@@ -257,7 +257,7 @@ internal static class QuestPlannerWorker
         _lastQuestState = quests;
         _forceRecompute = false;
 
-        XMLogging.WriteLine($"[QuestPlannerWorker] Plan computed: {summary.Maps.Count} maps, {summary.TotalCompletableObjectives} objectives");
+        Log.WriteLine($"[QuestPlannerWorker] Plan computed: {summary.Maps.Count} maps, {summary.TotalCompletableObjectives} objectives");
 
         // Wait remainder of lobby poll interval (interruptible)
         _wakeSignal.Wait((int)LobbyPollInterval.TotalMilliseconds - 1000);

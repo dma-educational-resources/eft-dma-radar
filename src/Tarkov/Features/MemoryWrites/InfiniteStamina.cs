@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.ScatterAPI;
+﻿using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity.Collections;
@@ -44,7 +44,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     if (stateChanged)
                     {
                         _lastEnabledState = false;
-                        XMLogging.WriteLine("[InfStamina] Disabled");
+                        Log.WriteLine("[InfStamina] Disabled");
                     }
                     return;
                 }
@@ -57,12 +57,12 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 if (stateChanged)
                 {
                     _lastEnabledState = true;
-                    XMLogging.WriteLine("[InfStamina] Enabled");
+                    Log.WriteLine("[InfStamina] Enabled");
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[InfStamina]: {ex}");
+                Log.WriteLine($"[InfStamina]: {ex}");
                 ClearCache();
             }
         }
@@ -85,7 +85,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 writes.AddValueEntry(staminaObj + Offsets.PhysicalValue.Current, MAX_STAMINA);
 
                 writes.Callbacks += () =>
-                    XMLogging.WriteLine($"[InfStamina] Stamina refilled: {currentStamina:F1} -> {MAX_STAMINA:F1}");
+                    Log.WriteLine($"[InfStamina] Stamina refilled: {currentStamina:F1} -> {MAX_STAMINA:F1}");
             }
 
             if (currentOxygen < MAX_OXYGEN * REFILL_THRESHOLD)
@@ -93,7 +93,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 writes.AddValueEntry(oxygenObj + Offsets.PhysicalValue.Current, MAX_OXYGEN);
 
                 writes.Callbacks += () =>
-                    XMLogging.WriteLine($"[InfStamina] Oxygen refilled: {currentOxygen:F1} -> {MAX_OXYGEN:F1}");
+                    Log.WriteLine($"[InfStamina] Oxygen refilled: {currentOxygen:F1} -> {MAX_OXYGEN:F1}");
             }
         }
 
@@ -155,13 +155,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 if (originalState == 0x0)
                 {
                     _bypassApplied = true;
-                    XMLogging.WriteLine("[InfStamina] Fatigue bypass already applied");
+                    Log.WriteLine("[InfStamina] Fatigue bypass already applied");
                     return;
                 }
 
                 if (!patchState.IsValidVirtualAddress())
                 {
-                    XMLogging.WriteLine("[InfStamina] Failed to find patch state");
+                    Log.WriteLine("[InfStamina] Failed to find patch state");
                     return;
                 }
 
@@ -171,11 +171,11 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 Memory.WriteValueEnsure(originalState + Offsets.MovementState.Name, INF_STAM_TARGET_STATE_NAME);
 
                 _bypassApplied = true;
-                XMLogging.WriteLine("[InfStamina] Fatigue bypass applied successfully");
+                Log.WriteLine("[InfStamina] Fatigue bypass applied successfully");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[InfStamina] Fatigue bypass failed: {ex}");
+                Log.WriteLine($"[InfStamina] Fatigue bypass failed: {ex}");
             }
         }
 

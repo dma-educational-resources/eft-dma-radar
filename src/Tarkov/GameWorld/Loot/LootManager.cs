@@ -137,7 +137,7 @@ namespace eft_dma_radar.Tarkov.Loot
                 if (!_initialRefreshDone)
                 {
                     _initialRefreshDone = true;
-                    XMLogging.WriteLine($"[LootManager] Initial load: {UnfilteredLoot?.Count ?? 0} items, {StaticLootContainers?.Count ?? 0} containers");
+                    Log.WriteLine($"[LootManager] Initial load: {UnfilteredLoot?.Count ?? 0} items, {StaticLootContainers?.Count ?? 0} containers");
                 }
 
                 LootItem.CleanupNotificationHistory(UnfilteredLoot);
@@ -148,7 +148,7 @@ namespace eft_dma_radar.Tarkov.Loot
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"CRITICAL ERROR - Failed to refresh loot: {ex}");
+                Log.WriteLine($"CRITICAL ERROR - Failed to refresh loot: {ex}");
             }
         }
 

@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.ScatterAPI;
+﻿using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
@@ -51,7 +51,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites.Chams
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Chams]: {ex}");
+                Log.WriteLine($"[Chams]: {ex}");
             }
         }
 

@@ -128,7 +128,7 @@ namespace eft_dma_radar.UI.Pages
                 }
                 catch (TimeoutException ex)
                 {
-                    XMLogging.WriteLine($"[PANELS] {ex.Message}");
+                    Log.WriteLine($"[PANELS] {ex.Message}");
                 }
             };
         }
@@ -323,7 +323,7 @@ namespace eft_dma_radar.UI.Pages
             if (newIndex > currentIndex)
                 newIndex--;
 
-            XMLogging.WriteLine($"[Filters] Reordering '{draggedGroup.Name}' from index {currentIndex} to {newIndex}");
+            Log.WriteLine($"[Filters] Reordering '{draggedGroup.Name}' from index {currentIndex} to {newIndex}");
 
             _groupList.RemoveAt(currentIndex);
             LootFilterManager.CurrentGroups.Groups.RemoveAt(currentIndex);
@@ -499,7 +499,7 @@ namespace eft_dma_radar.UI.Pages
             if (newIndex > currentIndex)
                 newIndex--;
 
-            XMLogging.WriteLine($"[Filters] Reordering '{draggedItem.Name}' from index {currentIndex} to {newIndex} in group '{_selectedGroup.Name}'");
+            Log.WriteLine($"[Filters] Reordering '{draggedItem.Name}' from index {currentIndex} to {newIndex} in group '{_selectedGroup.Name}'");
 
             _groupItems.RemoveAt(currentIndex);
             _selectedGroup.Items.RemoveAt(currentIndex);
@@ -724,7 +724,7 @@ namespace eft_dma_radar.UI.Pages
         {
             if (_groupList.Count == 0)
             {
-                XMLogging.WriteLine("[Filters] Creating default filter group.");
+                Log.WriteLine("[Filters] Creating default filter group.");
 
                 var defaultGroup = new LootFilterGroup
                 {
@@ -1125,7 +1125,7 @@ namespace eft_dma_radar.UI.Pages
             catch (Exception ex)
             {
                 NotificationsShared.Error($"[Filters] Failed to export filter to clipboard: {ex.Message}");
-                XMLogging.WriteLine($"[Filters] Export error: {ex}");
+                Log.WriteLine($"[Filters] Export error: {ex}");
             }
         }
 
@@ -1158,7 +1158,7 @@ namespace eft_dma_radar.UI.Pages
             catch (Exception ex)
             {
                 NotificationsShared.Error($"[Filters] Failed to export filters to clipboard: {ex.Message}");
-                XMLogging.WriteLine($"[Filters] Export error: {ex}");
+                Log.WriteLine($"[Filters] Export error: {ex}");
             }
         }
 
@@ -1280,7 +1280,7 @@ namespace eft_dma_radar.UI.Pages
             catch (Exception ex)
             {
                 NotificationsShared.Error($"[Filters] Failed to import filters from clipboard: {ex.Message}");
-                XMLogging.WriteLine($"[Filters] Import error: {ex}");
+                Log.WriteLine($"[Filters] Import error: {ex}");
             }
         }
 
@@ -1493,12 +1493,12 @@ namespace eft_dma_radar.UI.Pages
             if (LootFilterManager.CurrentGroups.Groups.Any(g => g.Name == groupName))
                 return null;
 
-            XMLogging.WriteLine($"[Filters] Creating dynamic group for weapon: {groupName}");
+            Log.WriteLine($"[Filters] Creating dynamic group for weapon: {groupName}");
 
             if (!EftDataManager.AllItems.TryGetValue(weaponBsgId, out var weaponItem) ||
                 string.IsNullOrEmpty(weaponItem.Caliber))
             {
-                XMLogging.WriteLine($"[Filters] Caliber not found for weapon ID: {weaponBsgId}");
+                Log.WriteLine($"[Filters] Caliber not found for weapon ID: {weaponBsgId}");
                 return null;
             }
 
@@ -1533,7 +1533,7 @@ namespace eft_dma_radar.UI.Pages
             var lootFilterSettings = MainWindow.Window!.LootFilterControl;
             lootFilterSettings.RefreshGroupsListView(dynamicGroup);
 
-            XMLogging.WriteLine($"[Filters] Created dynamic group: {groupName} with {dynamicGroup.Items.Count} items.");
+            Log.WriteLine($"[Filters] Created dynamic group: {groupName} with {dynamicGroup.Items.Count} items.");
             return dynamicGroup;
         }
 
@@ -1567,11 +1567,11 @@ namespace eft_dma_radar.UI.Pages
                 {
                     lootFilterSettings._groupList.Remove(group);
                     LootFilterManager.CurrentGroups.Groups.Remove(group);
-                    XMLogging.WriteLine($"[Filters] Removed non-static group: {group.Name}");
+                    Log.WriteLine($"[Filters] Removed non-static group: {group.Name}");
                     needsRefresh = true;
                 }
 
-                XMLogging.WriteLine($"[Filters] Removed {nonStaticGroups.Count} non-static groups.");
+                Log.WriteLine($"[Filters] Removed {nonStaticGroups.Count} non-static groups.");
 
                 if (needsRefresh)
                 {
@@ -1754,7 +1754,7 @@ namespace eft_dma_radar.UI.Pages
 
             if (selectedGroup != null)
             {
-                XMLogging.WriteLine($"[Filters] Selected group changed to: {selectedGroup.Name}, Index: {selectedGroup.Index}");
+                Log.WriteLine($"[Filters] Selected group changed to: {selectedGroup.Name}, Index: {selectedGroup.Index}");
                 SetSelectedGroup(selectedGroup);
             }
         }

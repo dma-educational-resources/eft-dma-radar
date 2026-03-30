@@ -1,4 +1,4 @@
-using eft_dma_radar.Tarkov.EFTPlayer;
+ï»¿using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.Tarkov.Features.MemoryWrites.Patches;
@@ -579,7 +579,7 @@ namespace eft_dma_radar.UI.ESP
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[ESPForm] Error closing ESP window: {ex}");
+                Log.WriteLine($"[ESPForm] Error closing ESP window: {ex}");
                 // Ensure we clean up even if there was an error
                 Window = null;
                 CameraManagerBase.EspRunning = false;
@@ -794,7 +794,7 @@ namespace eft_dma_radar.UI.ESP
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"ESP RENDER CRITICAL ERROR: {ex}");
+                Log.WriteLine($"ESP RENDER CRITICAL ERROR: {ex}");
             }
 
             // Skia auto-flushes on swap; explicit flush not needed
@@ -973,7 +973,7 @@ namespace eft_dma_radar.UI.ESP
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"ERROR Setting ESP Status Text: {ex}");
+                Log.WriteLine($"ERROR Setting ESP Status Text: {ex}");
             }
         }
 
@@ -1781,7 +1781,7 @@ namespace eft_dma_radar.UI.ESP
 
         #endregion
 
-        #region Mini Radar (Optimized – Layer-Stable & Throttled)
+        #region Mini Radar (Optimized â€“ Layer-Stable & Throttled)
 
         private static readonly SKPaint _radarBgPaint =
             new SKPaint { Color = new SKColor(0, 0, 0, 180) };
@@ -1853,7 +1853,7 @@ namespace eft_dma_radar.UI.ESP
             var mapParams = map.GetParametersE(radarSize, _radarZoom, ref center);
 
             // ------------------------------------------------------------
-            // MAP CACHE — STABLE & FLOAT-SAFE
+            // MAP CACHE â€” STABLE & FLOAT-SAFE
             // ------------------------------------------------------------
 
             long now = Environment.TickCount64;

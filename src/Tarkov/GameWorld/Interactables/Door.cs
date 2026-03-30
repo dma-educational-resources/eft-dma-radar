@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
@@ -57,7 +57,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Interactables
                 }
                 catch (Exception e)
                 {
-                    XMLogging.WriteLine($"[DOOR] Failed to read KeyId or resolve name: {e.Message}");
+                    Log.WriteLine($"[DOOR] Failed to read KeyId or resolve name: {e.Message}");
                 }
 
                 try
@@ -67,7 +67,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Interactables
                 }
                 catch (Exception e)
                 {
-                    XMLogging.WriteLine($"[DOOR] Failed to read Id: {e.Message}");
+                    Log.WriteLine($"[DOOR] Failed to read Id: {e.Message}");
                 }
 
                 try
@@ -79,7 +79,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Interactables
                 }
                 catch (Exception e)
                 {
-                    XMLogging.WriteLine($"[DOOR] Failed to get Position: {e.Message}");
+                    Log.WriteLine($"[DOOR] Failed to get Position: {e.Message}");
                 }
 
                 try
@@ -88,12 +88,12 @@ namespace eft_dma_radar.Tarkov.GameWorld.Interactables
                 }
                 catch (Exception e)
                 {
-                    XMLogging.WriteLine($"[DOOR] Failed to read DoorState: {e.Message}");
+                    Log.WriteLine($"[DOOR] Failed to read DoorState: {e.Message}");
                 }
             }
             catch (Exception e)
             {
-                XMLogging.WriteLine($"[DOOR] Fatal error initializing door: {e}");
+                Log.WriteLine($"[DOOR] Fatal error initializing door: {e}");
             }
         }
 

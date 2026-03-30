@@ -1,4 +1,4 @@
-
+﻿
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
@@ -47,7 +47,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 menuOperation + 0x60);
                 var _alphaVersionText = Memory.ReadPtr(
                 preloaderui + 0x110);
-                XMLogging.WriteLine($"Game Version: {Memory.ReadUnityString(_alphaVersionText)}");
+                Log.WriteLine($"Game Version: {Memory.ReadUnityString(_alphaVersionText)}");
             }
             catch (Exception ex)
             {

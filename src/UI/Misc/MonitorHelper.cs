@@ -29,12 +29,12 @@ namespace eft_dma_radar.UI.Misc
                         IsPrimary = screen.Primary
                     });
 
-                    XMLogging.WriteLine($"[MonitorHelper] Monitor: {screen.Bounds.Width}x{screen.Bounds.Height}, Primary: {screen.Primary}");
+                    Log.WriteLine($"[MonitorHelper] Monitor: {screen.Bounds.Width}x{screen.Bounds.Height}, Primary: {screen.Primary}");
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[MonitorHelper] Failed to fetch monitors: {ex}");
+                Log.WriteLine($"[MonitorHelper] Failed to fetch monitors: {ex}");
             }
 
             return result;

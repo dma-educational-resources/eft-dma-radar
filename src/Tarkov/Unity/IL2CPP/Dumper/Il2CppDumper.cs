@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -11,7 +11,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 {
     public static partial class Il2CppDumper
     {
-        // ── IL2CPP struct field offsets ──────────────────────────────────────────
+        // â”€â”€ IL2CPP struct field offsets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         private const uint K_Name = 0x10;   // char*    Il2CppClass::name
         private const uint K_Fields = 0x80;   // FieldInfo*  (direct array)
         private const uint K_Methods = 0x98;   // MethodInfo** (array of pointers)
@@ -21,7 +21,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         private const int MaxClasses = 80_000;
         private const int MaxNameLen = 256;
 
-        // ── Scatter-read raw structs ─────────────────────────────────────────────
+        // â”€â”€ Scatter-read raw structs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
         /// Contiguous name + namespace pointers read from Il2CppClass at offset 0x10.
@@ -54,17 +54,17 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             [FieldOffset(0x18)] public ulong NamePtr;       // char* name
         }
 
-        // ── Run-once guard ────────────────────────────────────────────────────────
+        // â”€â”€ Run-once guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
         /// Set to <c>true</c> after the first successful dump (live or from cache).
         /// Prevents re-running the expensive type-table scan on subsequent game
-        /// restarts within the same process lifetime — the resolved offsets are
+        /// restarts within the same process lifetime â€” the resolved offsets are
         /// already in memory and the TypeInfoTable may no longer be readable.
         /// </summary>
         private static volatile bool _dumped;
 
-        // ── Entry point ──────────────────────────────────────────────────────────
+        // â”€â”€ Entry point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
         /// Resolves IL2CPP offsets at runtime and applies them to
@@ -86,7 +86,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             _dumped = false;
             if (File.Exists(CacheFilePath))
                 File.Delete(CacheFilePath);
-            XMLogging.WriteLine("[Il2CppDumper] Force re-dump requested — cache cleared.");
+            Log.WriteLine("[Il2CppDumper] Force re-dump requested â€” cache cleared.");
             Dump();
         }
 
@@ -94,16 +94,16 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         {
             if (_dumped)
             {
-                XMLogging.WriteLine("[Il2CppDumper] Already dumped this session — skipping.");
+                Log.WriteLine("[Il2CppDumper] Already dumped this session â€” skipping.");
                 return;
             }
 
-            XMLogging.WriteLine("[Il2CppDumper] Dump starting...");
+            Log.WriteLine("[Il2CppDumper] Dump starting...");
 
             var gaBase = Memory.GameAssemblyBase;
             if (gaBase == 0)
             {
-                XMLogging.WriteLine("[Il2CppDumper] ERROR: GameAssemblyBase is 0 — game not ready.");
+                Log.WriteLine("[Il2CppDumper] ERROR: GameAssemblyBase is 0 â€” game not ready.");
                 NotificationsShared.Error("IL2CPP dump failed: GameAssembly not found.");
                 return;
             }
@@ -126,46 +126,46 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 if (rvaAttempt < maxRvaRetries)
                 {
                     int delay = rvaAttempt <= 10 ? 1000 : 2000;
-                    XMLogging.WriteLine($"[Il2CppDumper] TypeInfoTable not ready, retrying in {delay}ms... ({rvaAttempt}/{maxRvaRetries})");
+                    Log.WriteLine($"[Il2CppDumper] TypeInfoTable not ready, retrying in {delay}ms... ({rvaAttempt}/{maxRvaRetries})");
                     Thread.Sleep(delay);
                 }
             }
 
             if (!rvaResolved)
             {
-                XMLogging.WriteLine("[Il2CppDumper] ABORT: TypeInfoTable resolution failed after all retries — cannot dump offsets.");
+                Log.WriteLine("[Il2CppDumper] ABORT: TypeInfoTable resolution failed after all retries â€” cannot dump offsets.");
                 NotificationsShared.Error("IL2CPP dump failed: TypeInfoTable not found. Offsets may be stale.");
                 return;
             }
 
-            // ── Fast path: load from cache ───────────────────────────────────────
+            // â”€â”€ Fast path: load from cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             // If the cache was written against the same TypeInfoTableRva (i.e. the
             // same game binary), skip the expensive live memory read entirely.
             if (TryLoadCache(Offsets.Special.TypeInfoTableRva))
             {
                 _dumped = true;
-                XMLogging.WriteLine("[Il2CppDumper] Offsets restored from cache — live dump skipped.");
+                Log.WriteLine("[Il2CppDumper] Offsets restored from cache â€” live dump skipped.");
                 return;
             }
 
-            // ── Live path: read TypeInfoTable from memory ────────────────────────
+            // â”€â”€ Live path: read TypeInfoTable from memory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-            // Resolve the type-info table pointer once — used by both paths.
+            // Resolve the type-info table pointer once â€” used by both paths.
             ulong tablePtr;
             try { tablePtr = Memory.ReadPtr(gaBase + Offsets.Special.TypeInfoTableRva, false); }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Il2CppDumper] ReadPtr(TypeInfoTableRva) failed: {ex.Message}");
+                Log.WriteLine($"[Il2CppDumper] ReadPtr(TypeInfoTableRva) failed: {ex.Message}");
                 return;
             }
 
             if (!tablePtr.IsValidVirtualAddress())
             {
-                XMLogging.WriteLine("[Il2CppDumper] TypeInfoTable pointer is invalid.");
+                Log.WriteLine("[Il2CppDumper] TypeInfoTable pointer is invalid.");
                 return;
             }
 
-            // Scan the full type table — needed for name lookups AND TypeIndex resolution.
+            // Scan the full type table â€” needed for name lookups AND TypeIndex resolution.
             // Retry up to 10 times (with 1s delay) for transient DMA failures during loading.
             const int MinExpectedClasses = 1_000;
             const int maxRetries = 10;
@@ -180,7 +180,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
                 if (attempt < maxRetries)
                 {
-                    XMLogging.WriteLine($"[Il2CppDumper] Only {classes.Count} classes found (expected ≥{MinExpectedClasses}), retrying... ({attempt}/{maxRetries})");
+                    Log.WriteLine($"[Il2CppDumper] Only {classes.Count} classes found (expected â‰¥{MinExpectedClasses}), retrying... ({attempt}/{maxRetries})");
                     Thread.Sleep(1000);
                 }
             }
@@ -189,7 +189,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             // If we found very few, the table pointer is likely stale or corrupt.
             if (classes.Count < MinExpectedClasses)
             {
-                XMLogging.WriteLine($"[Il2CppDumper] ABORT: Only {classes.Count} classes found (expected ≥{MinExpectedClasses}) — TypeInfoTable likely corrupt or stale.");
+                Log.WriteLine($"[Il2CppDumper] ABORT: Only {classes.Count} classes found (expected â‰¥{MinExpectedClasses}) â€” TypeInfoTable likely corrupt or stale.");
                 return;
             }
 
@@ -215,7 +215,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 }
 
                 // Dedup numbering by sanitized base name:
-                // First "World" → key "World", second → "World_2", third → "World_3", etc.
+                // First "World" â†’ key "World", second â†’ "World_2", third â†’ "World_3", etc.
                 if (baseNameSeen.TryGetValue(san, out int seen))
                 {
                     int next = seen + 1;
@@ -254,7 +254,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
                     if (!klassPtr.IsValidVirtualAddress())
                     {
-                        XMLogging.WriteLine($"[Il2CppDumper] SKIP '{sc.CsName}': TypeIndex={sc.TypeIndex.Value} resolved to invalid pointer.");
+                        Log.WriteLine($"[Il2CppDumper] SKIP '{sc.CsName}': TypeIndex={sc.TypeIndex.Value} resolved to invalid pointer.");
                         classesSkipped++;
                         continue;
                     }
@@ -263,7 +263,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 {
                     if (!nameLookup.TryGetValue(sc.Il2CppName, out klassPtr))
                     {
-                        XMLogging.WriteLine($"[Il2CppDumper] SKIP '{sc.Il2CppName}': not found in type table.");
+                        Log.WriteLine($"[Il2CppDumper] SKIP '{sc.Il2CppName}': not found in type table.");
                         classesSkipped++;
                         continue;
                     }
@@ -274,7 +274,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 var nestedType = offsetsType.GetNestedType(sc.CsName, BindingFlags.Public | BindingFlags.NonPublic);
                 if (nestedType is null)
                 {
-                    XMLogging.WriteLine($"[Il2CppDumper] WARN: struct Offsets.{sc.CsName} not found via reflection — skipping.");
+                    Log.WriteLine($"[Il2CppDumper] WARN: struct Offsets.{sc.CsName} not found via reflection â€” skipping.");
                     classesSkipped++;
                     continue;
                 }
@@ -301,7 +301,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                         }
                         else
                         {
-                            XMLogging.WriteLine($"[Il2CppDumper] WARN: method '{methodName}' not found in '{sc.CsName}' — using fallback.");
+                            Log.WriteLine($"[Il2CppDumper] WARN: method '{methodName}' not found in '{sc.CsName}' â€” using fallback.");
                             fallback++;
                         }
                     }
@@ -312,13 +312,13 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                             var alt = FlipBackingFieldConvention(sf.Il2CppName);
                             if (alt is null || !fieldMap.TryGetValue(alt, out offset))
                             {
-                                XMLogging.WriteLine($"[Il2CppDumper] WARN: field '{sf.Il2CppName}' not found in '{sc.CsName}' — using fallback.");
+                                Log.WriteLine($"[Il2CppDumper] WARN: field '{sf.Il2CppName}' not found in '{sc.CsName}' â€” using fallback.");
                                 fallback++;
                                 continue;
                             }
                         }
 
-                        // FieldInfo::offset is signed. Positive → uint, negative → int.
+                        // FieldInfo::offset is signed. Positive â†’ uint, negative â†’ int.
                         object value = offset >= 0 ? (object)(uint)offset : (object)offset;
                         if (TrySetField(nestedType, sf.CsName, value, bf))
                             updated++;
@@ -329,7 +329,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             }
 
             DebugDumpResolverState(classes.Count, updated, fallback, classesSkipped);
-            XMLogging.WriteLine($"[Il2CppDumper] Done. {updated} offsets updated, {fallback} fallback, {classesSkipped} skipped.");
+            Log.WriteLine($"[Il2CppDumper] Done. {updated} offsets updated, {fallback} fallback, {classesSkipped} skipped.");
 
             if (fallback > 0 || classesSkipped > 0)
                 NotificationsShared.Warning($"IL2CPP dump partial: {fallback} fallback offset(s), {classesSkipped} class(es) skipped. Check logs.");
@@ -340,7 +340,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             SaveCache();
         }
 
-        // ── Reflection helpers ───────────────────────────────────────────────────
+        // â”€â”€ Reflection helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
         /// Attempts to set a static field on a type via reflection.
@@ -353,11 +353,11 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             var fi = type.GetField(fieldName, bf);
             if (fi is null)
             {
-                XMLogging.WriteLine($"[Il2CppDumper] WARN: field '{fieldName}' not found on '{type.Name}' via reflection.");
+                Log.WriteLine($"[Il2CppDumper] WARN: field '{fieldName}' not found on '{type.Name}' via reflection.");
                 return false;
             }
 
-            // const (literal) fields cannot be changed at runtime — skip silently.
+            // const (literal) fields cannot be changed at runtime â€” skip silently.
             if (fi.IsLiteral)
                 return true;
 
@@ -380,13 +380,13 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                     if (arr is not null && arr.Length > 0)
                     {
                         arr[0] = Convert.ToUInt32(value);
-                        return true; // array is reference type — already mutated in place
+                        return true; // array is reference type â€” already mutated in place
                     }
                     return false;
                 }
                 else
                 {
-                    XMLogging.WriteLine($"[Il2CppDumper] WARN: unsupported field type '{target}' for '{type.Name}.{fieldName}'.");
+                    Log.WriteLine($"[Il2CppDumper] WARN: unsupported field type '{target}' for '{type.Name}.{fieldName}'.");
                     return false;
                 }
 
@@ -395,12 +395,12 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Il2CppDumper] ERROR: Failed to set '{type.Name}.{fieldName}': {ex.Message}");
+                Log.WriteLine($"[Il2CppDumper] ERROR: Failed to set '{type.Name}.{fieldName}': {ex.Message}");
                 return false;
             }
         }
 
-        // ── Memory helpers ───────────────────────────────────────────────────────
+        // â”€â”€ Memory helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
         /// Reads all IL2CppClass* entries from a pre-resolved type-info table pointer.
@@ -423,8 +423,8 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 catch (Exception ex)
                 {
                     if (allPtrs.Count == 0)
-                        XMLogging.WriteLine($"[Il2CppDumper] ReadArray failed: {ex.Message}");
-                    break; // DMA failure — use whatever we've read so far
+                        Log.WriteLine($"[Il2CppDumper] ReadArray failed: {ex.Message}");
+                    break; // DMA failure â€” use whatever we've read so far
                 }
 
                 // Check if this chunk has any valid entries.
@@ -625,11 +625,11 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             return result;
         }
 
-        // ── String / pointer helpers ─────────────────────────────────────────────
+        // â”€â”€ String / pointer helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
         /// Converts between the two IL2CPP backing field naming conventions:
-        ///   "&lt;Name&gt;k__BackingField"  ↔  "_Name_k__BackingField"
+        ///   "&lt;Name&gt;k__BackingField"  â†”  "_Name_k__BackingField"
         /// Returns null if the input is not a backing field name.
         /// </summary>
         private static string FlipBackingFieldConvention(string name)
@@ -640,14 +640,14 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
             if (name.Length > suffix.Length + 2 && name[0] == '<')
             {
-                // <Name>k__BackingField → _Name_k__BackingField
+                // <Name>k__BackingField â†’ _Name_k__BackingField
                 var inner = name[1..name.IndexOf('>')];
                 return $"_{inner}_{suffix}";
             }
 
             if (name.Length > suffix.Length + 2 && name[0] == '_')
             {
-                // _Name_k__BackingField → <Name>k__BackingField
+                // _Name_k__BackingField â†’ <Name>k__BackingField
                 var inner = name[1..^suffix.Length];
                 if (inner.EndsWith('_'))
                     inner = inner[..^1];
@@ -673,7 +673,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
         /// <summary>
         /// Replaces non-alphanumeric/non-underscore characters with '_'.
-        /// e.g. "World`2" → "World_2", "SlotView`2" → "SlotView_2"
+        /// e.g. "World`2" â†’ "World_2", "SlotView`2" â†’ "SlotView_2"
         /// </summary>
         private static string SanitizeName(string name)
         {

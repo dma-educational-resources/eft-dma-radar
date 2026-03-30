@@ -1,4 +1,4 @@
-using System.Collections.Frozen;
+﻿using System.Collections.Frozen;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Misc.Data;
@@ -142,7 +142,7 @@ namespace eft_dma_radar.Tarkov.Hideout
         long FleaPrice,
         int StackCount)
     {
-        /// <summary>Best sell value for this stack (max of trader vs flea × stack count).</summary>
+        /// <summary>Best sell value for this stack (max of trader vs flea Ã— stack count).</summary>
         public long BestPrice => Math.Max(TraderPrice, FleaPrice) * StackCount;
         /// <summary>True when flea beats trader for this item.</summary>
         public bool SellOnFlea => FleaPrice > TraderPrice;
@@ -150,24 +150,24 @@ namespace eft_dma_radar.Tarkov.Hideout
 
     /// <summary>
     /// Manages reading the hideout stash via the IL2CPP GOM.
-    /// Confirmed chain: HideoutArea(+0xA8) → HideoutAreaStashController(+0x10)
-    ///   → OfflineInventoryController(+0x100) → Inventory(+0x20) → Grid[](+0x78)
+    /// Confirmed chain: HideoutArea(+0xA8) â†’ HideoutAreaStashController(+0x10)
+    ///   â†’ OfflineInventoryController(+0x100) â†’ Inventory(+0x20) â†’ Grid[](+0x78)
     /// </summary>
     public sealed class HideoutManager
     {
         private const string HideoutAreaClassName = "HideoutArea";
         private const string HideoutControllerClassName = "HideoutController";
 
-        // ── Stash pointer-chain ───────────────────────────────────────────────────────────
-        // HideoutArea(+0xA8) → HideoutAreaStashController(+0x10)
-        //   → OfflineInventoryController(+0x100) → Inventory(+0x20) → Grid[](+0x78)
+        // â”€â”€ Stash pointer-chain â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // HideoutArea(+0xA8) â†’ HideoutAreaStashController(+0x10)
+        //   â†’ OfflineInventoryController(+0x100) â†’ Inventory(+0x20) â†’ Grid[](+0x78)
         private const uint OffStashCtrl = 0xA8;  // HideoutArea.<StashController>
-        private const uint OffInvCtrl = 0x10;  // HideoutAreaStashController → OfflineInventoryController
+        private const uint OffInvCtrl = 0x10;  // HideoutAreaStashController â†’ OfflineInventoryController
         private const uint OffInventory = 0x100; // OfflineInventoryController._Inventory
         private const uint OffStash = 0x20;  // Inventory.Stash (CompoundItem)
         private const uint OffGrids = 0x78;  // CompoundItem.Grids (Grid[])
 
-        // ── HideoutController._areas Dictionary<EAreaType, HideoutArea> ──────────────────
+        // â”€â”€ HideoutController._areas Dictionary<EAreaType, HideoutArea> â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         private const uint OffAreas = 0x80; // HideoutController._areas
         private const uint DictCountOff = 0x20; // Dictionary.count
         private const uint DictEntriesOff = 0x18; // Dictionary.entries (Entry[])
@@ -175,34 +175,34 @@ namespace eft_dma_radar.Tarkov.Hideout
         private const int DictEntrySize = 24;   // sizeof(Entry<int,ulong>)
         private const uint DictValueOff = 16;   // Entry.value offset
 
-        // ── HideoutArea fields ────────────────────────────────────────────────────────────
+        // â”€â”€ HideoutArea fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         private const uint OffAreaData = 0x70; // HideoutArea._data (AreaData)
         private const uint OffAreaLevels = 0x48; // HideoutArea._areaLevels (HideoutAreaLevel[])
-        // HideoutArea._currentLevel (+0x78) is the CURRENT built level — NOT the next one.
+        // HideoutArea._currentLevel (+0x78) is the CURRENT built level â€” NOT the next one.
         // Do NOT use it for requirement lookups; always index _areaLevels[currentLevel + 1].
 
-        // ── AreaData fields ───────────────────────────────────────────────────────────────
+        // â”€â”€ AreaData fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         private const uint OffCurLevel = 0xA8; // AreaData._currentLevel (int)
         private const uint OffStatus = 0xC8; // AreaData._status (EAreaStatus, int)
 
-        // ── HideoutAreaLevel._stage ───────────────────────────────────────────────────────
+        // â”€â”€ HideoutAreaLevel._stage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // SerializedMonoBehaviour user fields start at 0x60; _stage is at 0xA0
         private const uint OffStage = 0xA0; // HideoutAreaLevel._stage (Stage)
 
-        // ── Stage fields ─────────────────────────────────────────────────────────────────
+        // â”€â”€ Stage fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         private const uint OffRequirements = 0x18; // Stage.Requirements (RelatedRequirements)
 
-        // ── RelatedRequirements.Data ──────────────────────────────────────────────────────
+        // â”€â”€ RelatedRequirements.Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         private const uint OffRelData = 0x10; // RelatedRequirements.Data (List<Requirement>)
 
-        // ── Requirement base fields ───────────────────────────────────────────────────────
+        // â”€â”€ Requirement base fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         private const uint OffReqFulfilled = 0x18; // Requirement.<Fulfilled>
 
-        // ── ItemRequirement / ToolRequirement item count fields ───────────────────────────
+        // â”€â”€ ItemRequirement / ToolRequirement item count fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         private const uint OffReqUserCount = 0x54; // ItemRequirement.<UserItemsCount> (int)
         private const uint OffReqBaseCount = 0x5C; // ItemRequirement._baseCount (int)
 
-        // ── ItemRequirement / ToolRequirement ─────────────────────────────────────────────
+        // â”€â”€ ItemRequirement / ToolRequirement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // _userValue @ 0x30 is the last base field
         // ItemRequirement: <TemplateId> (string*) @ 0x48
         // ToolRequirement: <TemplateId> (string*) @ 0x48
@@ -255,7 +255,7 @@ namespace eft_dma_radar.Tarkov.Hideout
             {
                 if (Memory.InRaid)
                 {
-                    XMLogging.WriteLine("[HideoutManager] TryFind skipped — player is in raid.");
+                    Log.WriteLine("[HideoutManager] TryFind skipped â€” player is in raid.");
                     return false;
                 }
 
@@ -270,7 +270,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                 var behaviour = gom.FindBehaviourByClassName(HideoutAreaClassName);
                 if (!behaviour.IsValidVirtualAddress())
                 {
-                    XMLogging.WriteLine($"[HideoutManager] \"{HideoutAreaClassName}\" not found in GOM.");
+                    Log.WriteLine($"[HideoutManager] \"{HideoutAreaClassName}\" not found in GOM.");
                     return false;
                 }
 
@@ -286,19 +286,19 @@ namespace eft_dma_radar.Tarkov.Hideout
                 if (ctrlBehaviour.IsValidVirtualAddress())
                 {
                     AreasControllerBase = ctrlBehaviour;
-                    XMLogging.WriteLine($"[HideoutManager] HideoutController @ 0x{AreasControllerBase:X}");
+                    Log.WriteLine($"[HideoutManager] HideoutController @ 0x{AreasControllerBase:X}");
                 }
                 else
                 {
-                    XMLogging.WriteLine("[HideoutManager] HideoutController not found in GOM.");
+                    Log.WriteLine("[HideoutManager] HideoutController not found in GOM.");
                 }
 
-                XMLogging.WriteLine($"[HideoutManager] Ready. Base=0x{Base:X} StashGridPtr=0x{StashGridPtr:X}");
+                Log.WriteLine($"[HideoutManager] Ready. Base=0x{Base:X} StashGridPtr=0x{StashGridPtr:X}");
                 return true;
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[HideoutManager] TryFind error: {ex.Message}");
+                Log.WriteLine($"[HideoutManager] TryFind error: {ex.Message}");
                 return false;
             }
         }
@@ -318,13 +318,13 @@ namespace eft_dma_radar.Tarkov.Hideout
                 var items = new List<StashItem>();
                 GetItemsInGrid(StashGridPtr, items);
                 Items = items;
-                XMLogging.WriteLine(
+                Log.WriteLine(
                     $"[HideoutManager] Refresh: {Items.Count} item(s) | " +
-                    $"best ₽{TotalBestValue:N0} | trader ₽{TotalTraderValue:N0} | flea ₽{TotalFleaValue:N0}");
+                    $"best â‚½{TotalBestValue:N0} | trader â‚½{TotalTraderValue:N0} | flea â‚½{TotalFleaValue:N0}");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[HideoutManager] Refresh error: {ex.Message}");
+                Log.WriteLine($"[HideoutManager] Refresh error: {ex.Message}");
             }
         }
 
@@ -334,21 +334,21 @@ namespace eft_dma_radar.Tarkov.Hideout
         /// Uses scatter reads to minimise the number of DMA round-trips.
         /// Results are stored in <see cref="Areas"/>.
         /// Round map (13 total):
-        ///   1  – dictPtr (sequential)
-        ///   2  – count + entriesPtr
-        ///   3  – areaType + areaPtr per entry
-        ///   4  – dataPtr + arrayPtr per area            [merged, was R4+R6]
-        ///   5  – level + status per area
-        ///   6  – arrayCount + levelObjPtr per upgradeable area
-        ///   7  – stagePtr per valid area
-        ///   seq– listPtr via ReadPtrChain(stage→relReq→list) [replaces R9+R10]
-        ///   8  – reqCount + itemsArrPtr per area
-        ///   9  – reqPtr per flat requirement
-        ///   10 – fulfilled + vtablePtr per requirement
-        ///   11 – namePtr per requirement
-        ///   seq– class name reads (cached UTF-8, ~10 unique types)
-        ///   12 – type-specific fields (multi-index)
-        ///   13 – UnicodeString fields
+        ///   1  â€“ dictPtr (sequential)
+        ///   2  â€“ count + entriesPtr
+        ///   3  â€“ areaType + areaPtr per entry
+        ///   4  â€“ dataPtr + arrayPtr per area            [merged, was R4+R6]
+        ///   5  â€“ level + status per area
+        ///   6  â€“ arrayCount + levelObjPtr per upgradeable area
+        ///   7  â€“ stagePtr per valid area
+        ///   seqâ€“ listPtr via ReadPtrChain(stageâ†’relReqâ†’list) [replaces R9+R10]
+        ///   8  â€“ reqCount + itemsArrPtr per area
+        ///   9  â€“ reqPtr per flat requirement
+        ///   10 â€“ fulfilled + vtablePtr per requirement
+        ///   11 â€“ namePtr per requirement
+        ///   seqâ€“ class name reads (cached UTF-8, ~10 unique types)
+        ///   12 â€“ type-specific fields (multi-index)
+        ///   13 â€“ UnicodeString fields
         /// </summary>
         public void ReadAreas()
         {
@@ -358,11 +358,11 @@ namespace eft_dma_radar.Tarkov.Hideout
                 return;
             try
             {
-                // ── Round 1 – dict pointer (dependent chain, must be sequential) ────────
+                // â”€â”€ Round 1 â€“ dict pointer (dependent chain, must be sequential) â”€â”€â”€â”€â”€â”€â”€â”€
                 var dictPtr = Memory.ReadPtr(AreasControllerBase + OffAreas);
                 if (!dictPtr.IsValidVirtualAddress()) return;
 
-                // ── Round 2 – count + entriesPtr ─────────────────────────────────────────
+                // â”€â”€ Round 2 â€“ count + entriesPtr â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 int count;
                 ulong entriesPtr;
                 using (var r2 = ScatterReadRound.Get(false))
@@ -376,7 +376,7 @@ namespace eft_dma_radar.Tarkov.Hideout
 
                 var dataBase = entriesPtr + DictDataOff;
 
-                // ── Round 3 – per-entry: areaType + areaPtr ───────────────────────────────
+                // â”€â”€ Round 3 â€“ per-entry: areaType + areaPtr â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 var areaTypes = new int[count];
                 var areaPtrs = new ulong[count];
                 using (var r3 = ScatterReadRound.Get(false))
@@ -395,7 +395,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                     }
                 }
 
-                // ── Round 4 – per-area: dataPtr + arrayPtr (_areaLevels) [merged R4+R6] ───
+                // â”€â”€ Round 4 â€“ per-area: dataPtr + arrayPtr (_areaLevels) [merged R4+R6] â”€â”€â”€
                 // Both fields live on areaPtrs[i] and neither depends on the other,
                 // so they are read in a single DMA round, saving one full round-trip.
                 var dataPtrs = new ulong[count];
@@ -416,7 +416,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                     }
                 }
 
-                // ── Round 5 – per-area: level + status ────────────────────────────────────
+                // â”€â”€ Round 5 â€“ per-area: level + status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 var levels = new int[count];
                 var statuses = new int[count];
                 using (var r5 = ScatterReadRound.Get(false))
@@ -441,7 +441,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                              && (EAreaStatus)statuses[i] != EAreaStatus.NoFutureUpgrades)
                     .ToList();
 
-                // ── Round 6 – arrayCount + levelObjPtr per upgradeable area ───────────────
+                // â”€â”€ Round 6 â€“ arrayCount + levelObjPtr per upgradeable area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 // (arrayPtrs already populated in Round 4 for all areas)
                 var arrayCounts = new int[count];
                 var levelObjPtrs = new ulong[count];
@@ -469,7 +469,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                              && arrayCounts[i] > levels[i] + 1)
                     .ToList();
 
-                // ── Round 7 – stagePtr per valid area ──────────────────────────────────────
+                // â”€â”€ Round 7 â€“ stagePtr per valid area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 var stagePtrs = new ulong[count];
                 using (var r7 = ScatterReadRound.Get(false))
                 {
@@ -480,7 +480,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                         r7[0].TryGetResult(i, out stagePtrs[i]);
                 }
 
-                // ── Sequential ptr-chain: stagePtr → relReqPtr → listPtr ──────────────────
+                // â”€â”€ Sequential ptr-chain: stagePtr â†’ relReqPtr â†’ listPtr â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 // Each hop is a single pointer dereference with no parallelism across hops,
                 // so ReadPtrChain is equivalent to two sequential scatter rounds but avoids
                 // the per-round VmmScatter setup overhead for this small set of areas.
@@ -493,10 +493,10 @@ namespace eft_dma_radar.Tarkov.Hideout
                         listPtrs[i] = Memory.ReadPtrChain(stagePtrs[i],
                             [OffRequirements, OffRelData], useCache: false);
                     }
-                    catch { /* leave as 0 — handled below */ }
+                    catch { /* leave as 0 â€” handled below */ }
                 }
 
-                // ── Round 8 – reqCount + itemsArrPtr per area ──────────────────────────────
+                // â”€â”€ Round 8 â€“ reqCount + itemsArrPtr per area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 var reqCounts = new int[count];
                 var itemsArrPtrs = new ulong[count];
                 using (var r11 = ScatterReadRound.Get(false))
@@ -515,7 +515,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                     }
                 }
 
-                // Build flat list of (areaIdx, reqSlot) — one entry per requirement pointer
+                // Build flat list of (areaIdx, reqSlot) â€” one entry per requirement pointer
                 var flatMap = new List<(int areaIdx, int slot)>();
                 foreach (var i in validUpgIdx)
                 {
@@ -531,7 +531,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                 var vtablePtrs = new ulong[flat];
                 var namePtrs = new ulong[flat];
 
-                // ── Round 9 – reqPtr per flat requirement ──────────────────────────────────────
+                // â”€â”€ Round 9 â€“ reqPtr per flat requirement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 using (var r9 = ScatterReadRound.Get(false))
                 {
                     for (int k = 0; k < flat; k++)
@@ -545,7 +545,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                         r9[0].TryGetResult(k, out reqPtrs[k]);
                 }
 
-                // ── Round 10 – fulfilled + vtablePtr ──────────────────────────────────────────
+                // â”€â”€ Round 10 â€“ fulfilled + vtablePtr â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 using (var r10 = ScatterReadRound.Get(false))
                 {
                     for (int k = 0; k < flat; k++)
@@ -562,7 +562,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                     }
                 }
 
-                // ── Round 11 – namePtr (vtable + 0x10) ────────────────────────────────────────
+                // â”€â”€ Round 11 â€“ namePtr (vtable + 0x10) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 using (var r11 = ScatterReadRound.Get(false))
                 {
                     for (int k = 0; k < flat; k++)
@@ -573,13 +573,13 @@ namespace eft_dma_radar.Tarkov.Hideout
                         r11[0].TryGetResult(k, out namePtrs[k]);
                 }
 
-                // Sequential class name reads — UTF-8 C strings, cached, ~10 unique types
+                // Sequential class name reads â€” UTF-8 C strings, cached, ~10 unique types
                 var classNames = new string[flat];
                 for (int k = 0; k < flat; k++)
                     if (namePtrs[k].IsValidVirtualAddress())
                         classNames[k] = Memory.ReadString(namePtrs[k], 64, useCache: true);
 
-                // ── Round 12 – type-specific fields (multi-index) ─────────────────────────
+                // â”€â”€ Round 12 â€“ type-specific fields (multi-index) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 // r[0] = field @ 0x48 (ptr: tplId / traderId)
                 // r[1] = baseCount @ 0x5C (int: Item/Tool)
                 // r[2] = userCount @ 0x54 (int: Item/Tool)
@@ -638,7 +638,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                     }
                 }
 
-                // ── Round 13 – UnicodeString scatter for string fields ────────────────────
+                // â”€â”€ Round 13 â€“ UnicodeString scatter for string fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 // r[0] = field48 (tplId for Item/Tool, traderId for Loyalty) at ptr + 0x14
                 // r[1] = skillName at ptr + 0x14
                 const int StringCB = 128;
@@ -673,7 +673,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                     }
                 }
 
-                // ── Build result list ──────────────────────────────────────────────────────
+                // â”€â”€ Build result list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 // Group requirements back to their area index
                 var reqsByArea = new Dictionary<int, List<HideoutRequirement>>();
                 foreach (var i in validUpgIdx)
@@ -726,8 +726,8 @@ namespace eft_dma_radar.Tarkov.Hideout
                     else
                         req = new HideoutRequirement(ERequirementType.Resource, isFulfilled);
 
-                    var label = $"{(EAreaType)areaTypes[ai]} lv{levels[ai]}→{levels[ai] + 1}";
-                    XMLogging.WriteLine($"[HideoutManager] [{label}] req[{slot}] {FormatReq(req)}");
+                    var label = $"{(EAreaType)areaTypes[ai]} lv{levels[ai]}â†’{levels[ai] + 1}";
+                    Log.WriteLine($"[HideoutManager] [{label}] req[{slot}] {FormatReq(req)}");
                     reqList.Add(req);
                 }
 
@@ -766,18 +766,18 @@ namespace eft_dma_radar.Tarkov.Hideout
                         StringComparer.OrdinalIgnoreCase);
 
                 var upgradeable = areas.Where(a => !a.IsMaxLevel).ToList();
-                XMLogging.WriteLine(
+                Log.WriteLine(
                     $"[HideoutManager] ReadAreas: {areas.Count} area(s), " +
                     $"{upgradeable.Count} upgradeable, " +
                     $"{areas.Count - upgradeable.Count} max level.");
                 foreach (var a in upgradeable)
-                    XMLogging.WriteLine(
+                    Log.WriteLine(
                         $"  {a.AreaType,-24} lv{a.CurrentLevel} [{a.Status}] " +
                         $"{a.NextLevelRequirements.Count} req(s)");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[HideoutManager] ReadAreas error: {ex.Message}");
+                Log.WriteLine($"[HideoutManager] ReadAreas error: {ex.Message}");
             }
         }
 
@@ -801,14 +801,14 @@ namespace eft_dma_radar.Tarkov.Hideout
         private static string FormatReq(HideoutRequirement req) => req.Type switch
         {
             ERequirementType.Item or ERequirementType.Tool
-                => $"{req.ItemName ?? req.ItemTemplateId ?? "-"} {req.CurrentCount}/{req.RequiredCount}{(req.Fulfilled ? " ✓" : $" need {req.StillNeeded}")}",
+                => $"{req.ItemName ?? req.ItemTemplateId ?? "-"} {req.CurrentCount}/{req.RequiredCount}{(req.Fulfilled ? " âœ“" : $" need {req.StillNeeded}")}",
             ERequirementType.Area
-                => $"{req.RequiredArea} lvl {req.RequiredLevel}{(req.Fulfilled ? " ✓" : "")}",
+                => $"{req.RequiredArea} lvl {req.RequiredLevel}{(req.Fulfilled ? " âœ“" : "")}",
             ERequirementType.Skill
-                => $"{req.SkillName ?? "-"} lvl {req.SkillLevel}{(req.Fulfilled ? " ✓" : "")}",
+                => $"{req.SkillName ?? "-"} lvl {req.SkillLevel}{(req.Fulfilled ? " âœ“" : "")}",
             ERequirementType.TraderLoyalty
-                => $"{req.TraderName ?? req.TraderId ?? "-"} loyalty {req.LoyaltyLevel}{(req.Fulfilled ? " ✓" : "")}",
-            _ => req.Fulfilled ? "✓" : ""
+                => $"{req.TraderName ?? req.TraderId ?? "-"} loyalty {req.LoyaltyLevel}{(req.Fulfilled ? " âœ“" : "")}",
+            _ => req.Fulfilled ? "âœ“" : ""
         };
 
         /// <summary>
@@ -821,23 +821,23 @@ namespace eft_dma_radar.Tarkov.Hideout
             {
                 if (Memory.InRaid)
                 {
-                    XMLogging.WriteLine("[HideoutManager] RefreshAsync skipped — player is in raid.");
-                    return "Not available in raid — return to your hideout.";
+                    Log.WriteLine("[HideoutManager] RefreshAsync skipped â€” player is in raid.");
+                    return "Not available in raid â€” return to your hideout.";
                 }
 
                 // 1. Pull fresh market data from the API
-                XMLogging.WriteLine("[HideoutManager] RefreshAsync: updating market data...");
+                Log.WriteLine("[HideoutManager] RefreshAsync: updating market data...");
                 bool marketUpdated = await EftDataManager.UpdateDataFileAsync();
-                XMLogging.WriteLine(marketUpdated
+                Log.WriteLine(marketUpdated
                     ? "[HideoutManager] Market data updated."
-                    : "[HideoutManager] Market data update skipped/failed — using cached prices.");
+                    : "[HideoutManager] Market data update skipped/failed â€” using cached prices.");
 
                 // 2. Re-validate pointer chain (game might have reloaded).
                 // Always retry TryFind when either the stash or the areas controller
-                // pointer is missing — HideoutController may not have been present the
+                // pointer is missing â€” HideoutController may not have been present the
                 // first time TryFind ran even though the stash was already located.
                 if ((!IsValid || !IsAreasValid) && !TryFind())
-                    return "Stash not found — are you in the hideout?";
+                    return "Stash not found â€” are you in the hideout?";
 
                 // 3. Re-read all stash items with the (possibly refreshed) prices
                 Refresh();
@@ -849,7 +849,7 @@ namespace eft_dma_radar.Tarkov.Hideout
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[HideoutManager] RefreshAsync error: {ex.Message}");
+                Log.WriteLine($"[HideoutManager] RefreshAsync error: {ex.Message}");
                 return $"Error: {ex.Message}";
             }
         }
@@ -877,7 +877,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                     int itemCount = itemList.Count;
                     if (itemCount == 0) continue;
 
-                    // ── Scatter A – templatePtr per item ─────────────────────────────────
+                    // â”€â”€ Scatter A â€“ templatePtr per item â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                     var templatePtrs = new ulong[itemCount];
                     using (var rA = ScatterReadRound.Get(false))
                     {
@@ -888,7 +888,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                             rA[0].TryGetResult(k, out templatePtrs[k]);
                     }
 
-                    // ── Scatter B – MongoID struct + stackCount + childGridsPtr ──────────
+                    // â”€â”€ Scatter B â€“ MongoID struct + stackCount + childGridsPtr â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                     // r[0] = MongoID (value type, reads struct at templatePtr + ItemTemplate._id)
                     // r[1] = stackCount (int at item + StackObjectsCount)
                     // r[2] = childGridsPtr (ulong at item + LootItemMod.Grids)
@@ -913,7 +913,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                         }
                     }
 
-                    // ── Scatter C – UnicodeString for each MongoID.StringID ───────────────
+                    // â”€â”€ Scatter C â€“ UnicodeString for each MongoID.StringID â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                     var ids = new string[itemCount];
                     using (var rC = ScatterReadRound.Get(false))
                     {
@@ -928,7 +928,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                             if (rC[0].TryGetResult<UnicodeString>(k, out var s)) ids[k] = s;
                     }
 
-                    // ── Resolve and record ────────────────────────────────────────────────
+                    // â”€â”€ Resolve and record â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                     for (int k = 0; k < itemCount; k++)
                     {
                         try
@@ -984,7 +984,7 @@ namespace eft_dma_radar.Tarkov.Hideout
                     var gomAddr = Memory.GOM;
                     if (!gomAddr.IsValidVirtualAddress())
                     {
-                        XMLogging.WriteLine("[GOM Dump] GOM is not resolved — not ready.");
+                        Log.WriteLine("[GOM Dump] GOM is not resolved â€” not ready.");
                         return;
                     }
 
@@ -1063,11 +1063,11 @@ namespace eft_dma_radar.Tarkov.Hideout
                     sb.AppendLine("[GOM Dump] ============================================================");
 
                     // Write in one shot so it doesn't interleave with other log lines
-                    XMLogging.WriteLine(sb.ToString());
+                    Log.WriteLine(sb.ToString());
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[GOM Dump] ERROR: {ex.Message}");
+                    Log.WriteLine($"[GOM Dump] ERROR: {ex.Message}");
                 }
             });
     }

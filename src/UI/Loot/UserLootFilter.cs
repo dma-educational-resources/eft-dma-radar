@@ -35,7 +35,7 @@ namespace eft_dma_radar.UI.LootFilters
                 }
                 catch
                 {
-                    XMLogging.WriteLine("[LootFilterManager] Failed to load grouped loot filter config. Using defaults.");
+                    Log.WriteLine("[LootFilterManager] Failed to load grouped loot filter config. Using defaults.");
                     CurrentGroups = new();
                 }
             }
@@ -55,7 +55,7 @@ namespace eft_dma_radar.UI.LootFilters
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[LootFilterManager] Failed to save grouped loot filter config: {ex.Message}");
+                Log.WriteLine($"[LootFilterManager] Failed to save grouped loot filter config: {ex.Message}");
             }
         }
     }

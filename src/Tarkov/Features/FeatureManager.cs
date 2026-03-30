@@ -41,9 +41,9 @@ namespace eft_dma_radar.Tarkov.Features
 
         private static void Worker()
         {
-            XMLogging.WriteLine("Features Thread Starting...");
+            Log.WriteLine("Features Thread Starting...");
             if (HARD_DISABLE_ALL_MEMWRITES)
-                XMLogging.WriteLine("[FeatureManager] *** MEMORY WRITES HARD DISABLED ***");
+                Log.WriteLine("[FeatureManager] *** MEMORY WRITES HARD DISABLED ***");
 
             while (true)
             {
@@ -94,7 +94,7 @@ namespace eft_dma_radar.Tarkov.Features
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[Features Thread] CRITICAL ERROR: {ex}");
+                    Log.WriteLine($"[Features Thread] CRITICAL ERROR: {ex}");
                 }
                 finally
                 {
@@ -135,14 +135,14 @@ namespace eft_dma_radar.Tarkov.Features
                             sw!.Stop();
                             if (sw.ElapsedMilliseconds > SLOW_FEATURE_THRESHOLD_MS)
                             {
-                                //XMLogging.WriteLine(
+                                //Log.WriteLine(
                                 //    $"[FeatureManager] SLOW feature {name} took {sw.ElapsedMilliseconds} ms in TryApply/OnApply");
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        XMLogging.WriteLine($"[FeatureManager] Feature {feature.GetType().Name} threw: {ex}");
+                        Log.WriteLine($"[FeatureManager] Feature {feature.GetType().Name} threw: {ex}");
                         // Don’t kill the batch because one feature is buggy
                     }
                 }
@@ -162,7 +162,7 @@ namespace eft_dma_radar.Tarkov.Features
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[MemWrites] IsSafeToWriteMem / InRaid check threw: {ex.Message}");
+                    Log.WriteLine($"[MemWrites] IsSafeToWriteMem / InRaid check threw: {ex.Message}");
                     safeToWrite = false;
                 }
 
@@ -173,7 +173,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"MemWrites [FAIL] {ex}");
+                Log.WriteLine($"MemWrites [FAIL] {ex}");
             }
         }
 

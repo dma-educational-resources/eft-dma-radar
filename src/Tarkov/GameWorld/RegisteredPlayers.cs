@@ -66,7 +66,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     {
                         if (existingPlayer.ErrorTimer.ElapsedMilliseconds >= 1500) // Erroring out a lot? Re-Alloc
                         {
-                            XMLogging.WriteLine($"WARNING - Existing player '{existingPlayer.Name}' being re-allocated due to excessive errors...");
+                            Log.WriteLine($"WARNING - Existing player '{existingPlayer.Name}' being re-allocated due to excessive errors...");
                             _ = Player.Allocate(_players, playerBase); // Ignore result, already in dict
                         }
                         // Nothing else needs to happen here
@@ -85,13 +85,9 @@ namespace eft_dma_radar.Tarkov.GameWorld
                         if (Player.Allocate(_players, playerBase))
                         {
                             _failedAllocations.TryRemove(playerBase, out _); // Clear fail count on success
-                            LoggingEnhancements.Log(AppLogLevel.Info, $"New Player Allocated: {i} - {playerBase:X}", "Players");
-                            foreach (var player in _players.Values)
-                            {
-                                if (player.ListIndex == i) // Ensure ListIndex is set correctly
-                                    continue;
-                                player.ListIndex = i; // Set ListIndex for new player
-                            }
+                            if (_players.TryGetValue(playerBase, out var newPlayer))
+                                newPlayer.ListIndex = i;
+                            Log.Write(AppLogLevel.Info, $"New Player Allocated: {i} - {playerBase:X}", "Players");
                         }
                         else
                         {
@@ -119,7 +115,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"CRITICAL ERROR - RegisteredPlayers Loop FAILED: {ex}");
+                Log.WriteLine($"CRITICAL ERROR - RegisteredPlayers Loop FAILED: {ex}");
             }
         }
         private void HandleBtrStickiness()
@@ -201,7 +197,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 {
                     if (isLocal)
                     {
-                        LoggingEnhancements.LogRateLimited(
+                        Log.WriteRateLimited(
                             AppLogLevel.Warning,
                             "btr_fix_local",
                             TimeSpan.FromSeconds(5),
@@ -214,7 +210,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     }
                     else
                     {
-                        LoggingEnhancements.LogRateLimited(
+                        Log.WriteRateLimited(
                             AppLogLevel.Warning,
                             $"btr_fix_{player.Base:X}",
                             TimeSpan.FromSeconds(5),
@@ -313,7 +309,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             var btr = new BtrOperator(btrView, btrPlayerBase);
             _players[btrPlayerBase] = btr;
 
-            XMLogging.WriteLine("BTR AI operator allocated");
+            Log.WriteLine("BTR AI operator allocated");
         }
 
         #region IReadOnlyCollection

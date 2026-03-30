@@ -71,7 +71,7 @@ namespace eft_dma_radar.UI.Pages
                 }
                 catch (TimeoutException ex)
                 {
-                    XMLogging.WriteLine($"[PANELS] {ex.Message}");
+                    Log.WriteLine($"[PANELS] {ex.Message}");
                 }
             };
         }
@@ -197,11 +197,11 @@ namespace eft_dma_radar.UI.Pages
                 ToggleUsernameControl();
                 RefreshWatchlistView();
 
-                XMLogging.WriteLine($"[Watchlist] Loaded {Player.PlayerWatchlist.Entries.Count} entries");
+                Log.WriteLine($"[Watchlist] Loaded {Player.PlayerWatchlist.Entries.Count} entries");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Watchlist] Error loading: {ex}");
+                Log.WriteLine($"[Watchlist] Error loading: {ex}");
                 NotificationsShared.Error($"Error loading watchlist: {ex.Message}");
             }
         }
@@ -225,7 +225,7 @@ namespace eft_dma_radar.UI.Pages
 
                 if (!File.Exists(WatchlistFilePath))
                 {
-                    XMLogging.WriteLine($"[Watchlist] No watchlist file found at {WatchlistFilePath}. Creating empty file.");
+                    Log.WriteLine($"[Watchlist] No watchlist file found at {WatchlistFilePath}. Creating empty file.");
                     File.WriteAllText(WatchlistFilePath, "[]");
 
                     var bindingList = Player.PlayerWatchlist.GetReferenceUnsafe();
@@ -247,12 +247,12 @@ namespace eft_dma_radar.UI.Pages
                             bindingList.Add(entry);
                     }
 
-                    XMLogging.WriteLine($"[Watchlist] Loaded {entries.Count} entries from {WatchlistFilePath}");
+                    Log.WriteLine($"[Watchlist] Loaded {entries.Count} entries from {WatchlistFilePath}");
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Watchlist] Error loading from file: {ex}");
+                Log.WriteLine($"[Watchlist] Error loading from file: {ex}");
             }
         }
 
@@ -551,7 +551,7 @@ namespace eft_dma_radar.UI.Pages
             catch (Exception ex)
             {
                 NotificationsShared.Error($"[Watchlist] Failed to export watchlist to clipboard: {ex.Message}");
-                XMLogging.WriteLine($"[Watchlist] Export error: {ex}");
+                Log.WriteLine($"[Watchlist] Export error: {ex}");
             }
         }
 
@@ -685,7 +685,7 @@ namespace eft_dma_radar.UI.Pages
             catch (Exception ex)
             {
                 NotificationsShared.Error($"[Watchlist] Failed to import from clipboard: {ex.Message}");
-                XMLogging.WriteLine($"[Watchlist] Import error: {ex}");
+                Log.WriteLine($"[Watchlist] Import error: {ex}");
             }
         }
 
@@ -707,11 +707,11 @@ namespace eft_dma_radar.UI.Pages
 
                 File.WriteAllText(WatchlistFilePath, json);
 
-                XMLogging.WriteLine($"[Watchlist] Saved {entries.Count} entries to {WatchlistFilePath}");
+                Log.WriteLine($"[Watchlist] Saved {entries.Count} entries to {WatchlistFilePath}");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Watchlist] Error saving to file: {ex}");
+                Log.WriteLine($"[Watchlist] Error saving to file: {ex}");
             }
         }
 

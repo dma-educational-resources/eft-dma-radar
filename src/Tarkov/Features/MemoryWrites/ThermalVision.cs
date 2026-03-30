@@ -1,4 +1,4 @@
-using eft_dma_radar.Tarkov.Features;
+﻿using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Common.Misc;
@@ -47,12 +47,12 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 writes.Callbacks += () =>
                 {
                     _currentState = targetState;
-                    XMLogging.WriteLine($"[ThermalVision] {(targetState ? "Enabled" : "Disabled")}");
+                    Log.WriteLine($"[ThermalVision] {(targetState ? "Enabled" : "Disabled")}");
                 };
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[ThermalVision]: {ex}");
+                Log.WriteLine($"[ThermalVision]: {ex}");
                 _cachedThermalVisionComponent = default;
             }
         }

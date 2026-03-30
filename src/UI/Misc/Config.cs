@@ -75,7 +75,7 @@ public static class ConfigManager
         }
 
         CurrentConfigName = CurrentConfig.Filename;
-        XMLogging.WriteLine($"[Config] Loaded config: {CurrentConfigName}");
+        Log.WriteLine($"[Config] Loaded config: {CurrentConfigName}");
     }
 
     // Get the last selected config filename
@@ -94,7 +94,7 @@ public static class ConfigManager
         }
         catch (Exception ex)
         {
-            XMLogging.WriteLine($"[Config] Error reading last selected config: {ex}");
+            Log.WriteLine($"[Config] Error reading last selected config: {ex}");
         }
 
         return null;
@@ -113,7 +113,7 @@ public static class ConfigManager
         }
         catch (Exception ex)
         {
-            XMLogging.WriteLine($"[Config] Error saving last selected config: {ex}");
+            Log.WriteLine($"[Config] Error saving last selected config: {ex}");
         }
     }
 
@@ -134,13 +134,13 @@ public static class ConfigManager
                 if (config != null)
                 {
                     configs.Add(config);
-                    XMLogging.WriteLine($"[Config] Found config: {config.Filename}");
+                    Log.WriteLine($"[Config] Found config: {config.Filename}");
                 }
             }
         }
         catch (Exception ex)
         {
-            XMLogging.WriteLine($"[Config] Error getting config list: {ex}");
+            Log.WriteLine($"[Config] Error getting config list: {ex}");
         }
 
         return configs;
@@ -171,7 +171,7 @@ public static class ConfigManager
         }
         catch (Exception ex)
         {
-            XMLogging.WriteLine($"[Config] Failed to load config '{path}': {ex}");
+            Log.WriteLine($"[Config] Failed to load config '{path}': {ex}");
             return null;
         }
     }
@@ -192,7 +192,7 @@ public static class ConfigManager
         }
         catch (Exception ex)
         {
-            XMLogging.WriteLine($"[Config] Failed to save config '{path}': {ex}");
+            Log.WriteLine($"[Config] Failed to save config '{path}': {ex}");
             return false;
         }
     }
@@ -226,7 +226,7 @@ public static class ConfigManager
         }
         catch (Exception ex)
         {
-            XMLogging.WriteLine($"[Config] Error loading config {configName}: {ex}");
+            Log.WriteLine($"[Config] Error loading config {configName}: {ex}");
         }
 
         return false;
@@ -255,12 +255,12 @@ public static class ConfigManager
             var filePath = Path.Combine(CustomConfigDirectory, configName);
             SafeSaveConfig(configToSave, filePath);
 
-            XMLogging.WriteLine($"[Config] Saved new config: {configName}");
+            Log.WriteLine($"[Config] Saved new config: {configName}");
             return true;
         }
         catch (Exception ex)
         {
-            XMLogging.WriteLine($"[Config] Error saving new config {configName}: {ex}");
+            Log.WriteLine($"[Config] Error saving new config {configName}: {ex}");
             return false;
         }
     }
@@ -316,7 +316,7 @@ public static class ConfigManager
         }
         catch (Exception ex)
         {
-            XMLogging.WriteLine($"[Config] Error deleting config {configName}: {ex}");
+            Log.WriteLine($"[Config] Error deleting config {configName}: {ex}");
             return false;
         }
     }
@@ -735,7 +735,7 @@ namespace eft_dma_radar.UI.Misc
                             }
                             catch (Exception ex)
                             {
-                                XMLogging.WriteLine($"Error deserializing config: {ex.Message}");
+                                Log.WriteLine($"Error deserializing config: {ex.Message}");
 
                                 config = new Config();
                                 config.Filename = filename;
@@ -775,7 +775,7 @@ namespace eft_dma_radar.UI.Misc
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"CRITICAL ERROR Loading Config: {ex.Message}");
+                    Log.WriteLine($"CRITICAL ERROR Loading Config: {ex.Message}");
                     var config = new Config();
                     config.Filename = filename;
                     config.ConfigName = Path.GetFileNameWithoutExtension(filename);
@@ -1028,7 +1028,7 @@ namespace eft_dma_radar.UI.Misc
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[SaveInternal] Error saving config: {ex.Message}");
+                Log.WriteLine($"[SaveInternal] Error saving config: {ex.Message}");
                 throw;
             }
         }

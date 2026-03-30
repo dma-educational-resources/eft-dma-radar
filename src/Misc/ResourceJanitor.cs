@@ -28,7 +28,7 @@ namespace eft_dma_radar.Common
                     var info = new MEMORYSTATUSEX();
                     if (GlobalMemoryStatusEx(ref info) && info.dwMemoryLoad >= 85) // Over 85% memory usage
                     {
-                        XMLogging.WriteLine("[ResourceJanitor] High Memory Load, running cleanup...");
+                        Log.WriteLine("[ResourceJanitor] High Memory Load, running cleanup...");
                         Run(false);
                     }
                 }
@@ -67,7 +67,7 @@ namespace eft_dma_radar.Common
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"ResourceJanitor ERROR: {ex}");
+                    Log.WriteLine($"ResourceJanitor ERROR: {ex}");
                 }
             }
         }

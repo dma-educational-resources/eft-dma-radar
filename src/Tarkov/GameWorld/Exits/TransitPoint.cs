@@ -1,4 +1,4 @@
-using eft_dma_radar.Tarkov.EFTPlayer;
+﻿using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.Common.Maps;
@@ -69,19 +69,19 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                 var currentMapId = Memory.MapID;
                 if (string.IsNullOrEmpty(currentMapId))
                 {
-                    XMLogging.WriteLine($"[TransitPoint] MapID is null/empty");
+                    Log.WriteLine($"[TransitPoint] MapID is null/empty");
                     return new Vector3(0, -100, 0);
                 }
 
                 if (EftDataManager.MapData == null)
                 {
-                    XMLogging.WriteLine($"[TransitPoint] MapData is null!");
+                    Log.WriteLine($"[TransitPoint] MapData is null!");
                     return new Vector3(0, -100, 0);
                 }
 
                 if (EftDataManager.MapData.Count == 0)
                 {
-                    XMLogging.WriteLine($"[TransitPoint] MapData is empty!");
+                    Log.WriteLine($"[TransitPoint] MapData is empty!");
                     return new Vector3(0, -100, 0);
                 }
 
@@ -89,7 +89,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                 {
                     if (mapData.Transits == null || mapData.Transits.Count == 0)
                     {
-                        XMLogging.WriteLine($"[TransitPoint] No transits in MapData for '{currentMapId}'");
+                        Log.WriteLine($"[TransitPoint] No transits in MapData for '{currentMapId}'");
                         return new Vector3(0, -100, 0);
                     }
 
@@ -110,17 +110,17 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                     }
                     else
                     {
-                        XMLogging.WriteLine($"[TransitPoint] No matching transit for '{transitName}' in map '{currentMapId}' (available: {string.Join(", ", mapData.Transits.Select(t => t.Description))})");
+                        Log.WriteLine($"[TransitPoint] No matching transit for '{transitName}' in map '{currentMapId}' (available: {string.Join(", ", mapData.Transits.Select(t => t.Description))})");
                     }
                 }
                 else
                 {
-                    XMLogging.WriteLine($"[TransitPoint] MapData doesn't contain key '{currentMapId}' (available: {string.Join(", ", EftDataManager.MapData.Keys)})");
+                    Log.WriteLine($"[TransitPoint] MapData doesn't contain key '{currentMapId}' (available: {string.Join(", ", EftDataManager.MapData.Keys)})");
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[TransitPoint] Error getting static position: {ex.Message}");
+                Log.WriteLine($"[TransitPoint] Error getting static position: {ex.Message}");
             }
 
             // Fallback: off-map position

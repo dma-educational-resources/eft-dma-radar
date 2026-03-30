@@ -1,4 +1,4 @@
-using eft_dma_radar.Tarkov.Features;
+﻿using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.Common.DMA.Features;
@@ -55,7 +55,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     if (!listPtr.IsValidVirtualAddress())
                     {
                         // Not resolved yet; background thread is working on it.
-                        // Just skip this tick �C other features keep running.
+                        // Just skip this tick ï¿½C other features keep running.
                         return;
                     }
 
@@ -64,23 +64,23 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     writes.Callbacks += () =>
                     {
                         _lastEnabledState = Enabled;
-                        XMLogging.WriteLine($"[DisableGrass] {(Enabled ? "Enabled" : "Disabled")}");
+                        Log.WriteLine($"[DisableGrass] {(Enabled ? "Enabled" : "Disabled")}");
                     };
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[DisableGrass]: {ex}");
+                Log.WriteLine($"[DisableGrass]: {ex}");
                 ResetGpuState();
             }
         }
 
-        // ��������������������������������������������������������������������������������������������������������������������������
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         // FULLY ROBUST RESOLUTION (auto-restart on failure)
-        // ��������������������������������������������������������������������������������������������������������������������������
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         private ulong GetGPUManagerListPtr()
         {
-            // 1) Fast path �C already resolved
+            // 1) Fast path ï¿½C already resolved
             if (_cachedGPUManagerListPtr.IsValidVirtualAddress())
                 return _cachedGPUManagerListPtr;
 
@@ -98,11 +98,11 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     var listPtr = GPUInstancerListResolver.GetListPtr();
 
                     _cachedGPUManagerListPtr = listPtr;
-                    XMLogging.WriteLine($"[DisableGrass] Resolved GPUInstancer list @ 0x{listPtr:X}");
+                    Log.WriteLine($"[DisableGrass] Resolved GPUInstancer list @ 0x{listPtr:X}");
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[DisableGrass] Resolve error: {ex.Message}");
+                    Log.WriteLine($"[DisableGrass] Resolve error: {ex.Message}");
                     ResetGpuState();
                 }
                 finally
@@ -148,7 +148,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[DisableGrass] Apply error: {ex}");
+                Log.WriteLine($"[DisableGrass] Apply error: {ex}");
             }
         }
 

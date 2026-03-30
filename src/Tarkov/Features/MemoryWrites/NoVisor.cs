@@ -49,13 +49,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     writes.Callbacks += () =>
                     {
                         _lastEnabledState = Enabled;
-                        XMLogging.WriteLine($"[NoVisor] {(Enabled ? "Enabled" : "Disabled")} (Intensity: {targetIntensity})");
+                        Log.WriteLine($"[NoVisor] {(Enabled ? "Enabled" : "Disabled")} (Intensity: {targetIntensity})");
                     };
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[NoVisor]: {ex}");
+                Log.WriteLine($"[NoVisor]: {ex}");
                 _cachedVisorEffect = default;
             }
         }

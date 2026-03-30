@@ -1,4 +1,4 @@
-using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
+﻿using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections;
 using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
@@ -100,7 +100,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             PlayerHistory.Reset();
             _playerScavNumber = 0;
             _verticesOwner.Clear();
-            LoggingEnhancements.ClearCaches();
+            Log.ClearCaches();
         }
 
         #endregion
@@ -122,13 +122,13 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             {
                 var player = AllocateInternal(playerBase);
                 playerDict[player] = player; // Insert or swap
-                LoggingEnhancements.Log(AppLogLevel.Info, $"Player '{player.Name}' allocated.", "Player");
+                Log.Write(AppLogLevel.Info, $"Player '{player.Name}' allocated.", "Player");
                 return true;
             }
             catch (Exception ex)
             {
                 // Rate limit error messages - log each unique player base error only once per 5 seconds
-                LoggingEnhancements.LogRateLimited(
+                Log.WriteRateLimited(
                     AppLogLevel.Error,
                     $"player_alloc_{playerBase:X}",
                     TimeSpan.FromSeconds(5),
@@ -166,7 +166,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         }
         public void SoftResetRuntimeState()
         {
-            XMLogging.WriteLine(
+            Log.WriteLine(
                 $"[PlayerReset] Soft reset runtime state for '{Name}' @ 0x{Base:X}");
 
             // Core flags
@@ -198,7 +198,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine(
+                Log.WriteLine(
                     $"[PlayerReset] Skeleton reset failed for {Name}: {ex}");
             }
 
@@ -219,7 +219,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         public int ListIndex { get; set; }
         public bool IsVisible { get; set; } = false;
         public Dictionary<Bones, bool> BoneVisibility { get; } = new();
-        public static readonly List<(Bones start, Bones end)> BoneSegments = new List<(Bones, Bones)>
+        public static readonly IReadOnlyList<(Bones start, Bones end)> BoneSegments = new (Bones, Bones)[]
         {
             (Bones.HumanHead, Bones.HumanNeck),
             (Bones.HumanNeck, Bones.HumanSpine3),
@@ -436,7 +436,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         {
             get
             {
-                // HARD GUARD ¡ª prevents ALL render crashes
+                // HARD GUARD Â¡Âª prevents ALL render crashes
                 if (Skeleton == null || Skeleton.Root == null)
                     return ref _cachedPosition;
 
@@ -718,7 +718,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                         }
                         catch
                         {
-                            // Transform chain likely invalidated ¡ú rebuild just this bone
+                            // Transform chain likely invalidated Â¡Ãº rebuild just this bone
                             Skeleton.ResetTransform(tr.Key);
                             bonesOk = false;
                         }
@@ -749,11 +749,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     ErrorTimer.ElapsedMilliseconds > 800)
                 {
                     // Rate limit skeleton fix messages to prevent spam (max once per 10 seconds per player)
-                    LoggingEnhancements.LogRateLimited(
+                    Log.WriteRateLimited(
                         AppLogLevel.Warning,
                         $"skeleton_fix_{Base:X}",
                         TimeSpan.FromSeconds(10),
-                        $"{Name} skeleton frozen → soft reset",
+                        $"{Name} skeleton frozen â†’ soft reset",
                         "SKELETON FIX");
 
                     SoftResetRuntimeState();
@@ -784,7 +784,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 var rootVerts = skeleton.Root.VerticesAddr;
                 if (!_verticesOwner.TryAdd(rootVerts, this))
                 {
-                    // Already owned by someone else — stale Body pointer, retry later.
+                    // Already owned by someone else â€” stale Body pointer, retry later.
                     if (_verticesOwner.TryGetValue(rootVerts, out var owner) && owner != this)
                         throw new InvalidOperationException(
                             $"VerticesAddr 0x{rootVerts:X} already owned by player 0x{owner:X}");
@@ -798,7 +798,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 // Release any claim we might have registered before failing.
                 if (Skeleton == null && Body != 0)
                 {
-                    // Nothing was assigned yet — no claim to release.
+                    // Nothing was assigned yet â€” no claim to release.
                 }
                 Skeleton = null;
                 return false;
@@ -870,9 +870,9 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                         }
                         catch (Exception ex)
                         {
-                            XMLogging.WriteLine($"ERROR rebuilding skeleton for '{Name}': {ex}");
+                            Log.WriteLine($"ERROR rebuilding skeleton for '{Name}': {ex}");
                         }
-                        return; // Root changed → all bones already reset, skip per-bone check
+                        return; // Root changed â†’ all bones already reset, skip per-bone check
                     }
 
                     // Non-root bones
@@ -925,7 +925,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[GearManager] ERROR for Player {Name}: {ex}");
+                Log.WriteLine($"[GearManager] ERROR for Player {Name}: {ex}");
             }
         }
 
@@ -1128,7 +1128,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     Name = "Bear",
                     Type = PlayerType.AIRaider
                 };
-            XMLogging.WriteLine($"Unknown Voice Line: {voiceLine}");
+            Log.WriteLine($"Unknown Voice Line: {voiceLine}");
             return new AIRole()
             {
                 Name = "AI",
@@ -1501,7 +1501,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                         Type = PlayerType.AIBoss
                     };
                 default:
-                    XMLogging.WriteLine("WARNING: Unknown WildSpawnType: " + (int)wildSpawnType);
+                    Log.WriteLine("WARNING: Unknown WildSpawnType: " + (int)wildSpawnType);
                     return new AIRole()
                     {
                         Name = "defaultAI",
@@ -1662,7 +1662,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"WARNING! Player Draw Error: {ex}");
+                Log.WriteLine($"WARNING! Player Draw Error: {ex}");
             }
         }
 
@@ -2127,7 +2127,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     var p0 = Skeleton.ESPBuffer[idx];
                     var p1 = Skeleton.ESPBuffer[idx + 1];
 
-                    // HARD GUARD ¡ú prevents long diagonal lines
+                    // HARD GUARD Â¡Ãº prevents long diagonal lines
                     if (!p0.IsFinite() || !p1.IsFinite())
                         continue;
 
@@ -2269,7 +2269,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             for (int i = 0; i < bones.Length; i++)
             {
                 BoneVisibility[bones[i]] = results[i];
-                //XMLogging.WriteLine($"Bone {bones[i]} visibility: {results[i]}"); // Your log line
+                //Log.WriteLine($"Bone {bones[i]} visibility: {results[i]}"); // Your log line
             }
         }
 

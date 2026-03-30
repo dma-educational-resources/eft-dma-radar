@@ -59,7 +59,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 {
                     _cachedAnimator = default;
                     _lastHandsController = handsController;
-                    XMLogging.WriteLine($"[FastWeaponOps] Hands controller changed to {controllerClassName}");
+                    Log.WriteLine($"[FastWeaponOps] Hands controller changed to {controllerClassName}");
                 }
 
                 if (!IsSupportedController(controllerClassName))
@@ -97,7 +97,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 if (_consecutiveErrors <= MAX_CONSECUTIVE_ERRORS_BEFORE_THROTTLE ||
                     now - _lastErrorLog >= ErrorLogCooldown)
                 {
-                    XMLogging.WriteLine($"[FastWeaponOps]: {ex.GetType().Name}: {ex.Message}" +
+                    Log.WriteLine($"[FastWeaponOps]: {ex.GetType().Name}: {ex.Message}" +
                         (_consecutiveErrors > MAX_CONSECUTIVE_ERRORS_BEFORE_THROTTLE
                             ? $" (repeated {_consecutiveErrors} times, throttling logs)"
                             : ""));
@@ -180,11 +180,11 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 var path = Path.Combine(AppContext.BaseDirectory, "AnimatorSpeedCandidates.txt");
                 File.WriteAllText(path, sb.ToString());
 
-                XMLogging.WriteLine($"[Animator] Candidate scan written to {path}");
+                Log.WriteLine($"[Animator] Candidate scan written to {path}");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[AnimatorScan] {ex}");
+                Log.WriteLine($"[AnimatorScan] {ex}");
             }
         }
         private ulong GetAnimator(LocalPlayer localPlayer)
@@ -227,7 +227,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 {
                     writes.AddValueEntry(animator + UnityOffsets.UnityAnimator.Speed, FAST_SPEED);
                     writes.Callbacks += () =>
-                        XMLogging.WriteLine($"[FastWeaponOps] Enabled for {controllerClassName} (Speed: {currentSpeed:F1} -> {FAST_SPEED:F1})");
+                        Log.WriteLine($"[FastWeaponOps] Enabled for {controllerClassName} (Speed: {currentSpeed:F1} -> {FAST_SPEED:F1})");
                 }
             }
             else
@@ -238,7 +238,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 writes.AddValueEntry(localPlayer.PWA + Offsets.ProceduralWeaponAnimation._aimingSpeed, NORMAL_SPEED);
 
                 writes.Callbacks += () =>
-                    XMLogging.WriteLine($"[FastWeaponOps] Disabled for {controllerClassName} (Speed: {currentSpeed:F1} -> {NORMAL_SPEED:F1})");
+                    Log.WriteLine($"[FastWeaponOps] Disabled for {controllerClassName} (Speed: {currentSpeed:F1} -> {NORMAL_SPEED:F1})");
             }
         }
 

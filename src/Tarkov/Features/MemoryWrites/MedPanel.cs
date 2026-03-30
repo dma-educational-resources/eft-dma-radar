@@ -1,4 +1,4 @@
-using eft_dma_radar.Tarkov.Features;
+﻿using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.DMA.ScatterAPI;
@@ -33,13 +33,13 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     writes.Callbacks += () =>
                     {
                         _lastEnabledState = Enabled;
-                        XMLogging.WriteLine($"[MedPanel] {(Enabled ? "Enabled" : "Disabled")}");
+                        Log.WriteLine($"[MedPanel] {(Enabled ? "Enabled" : "Disabled")}");
                     };
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[MedPanel]: {ex}");
+                Log.WriteLine($"[MedPanel]: {ex}");
                 _cachedEFTHardSettingsInstance = default;
             }
         }

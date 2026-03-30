@@ -1,4 +1,4 @@
-using eft_dma_radar.Common.DMA.Features;
+﻿using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Tarkov.EFTPlayer;
@@ -33,7 +33,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     var hardSettings = GetSettingsPointers();
                     if (!hardSettings.IsValidVirtualAddress())
                     {
-                        XMLogging.WriteLine($"[NoInertia] Could not resolve settings pointers. HardSettings: 0x{hardSettings:X}");
+                        Log.WriteLine($"[NoInertia] Could not resolve settings pointers. HardSettings: 0x{hardSettings:X}");
                         return;
                     }
                     var movementContext = localPlayer.MovementContext;
@@ -45,25 +45,25 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     writes.Callbacks += () =>
                     {
                         _lastEnabledState = Enabled;
-                        XMLogging.WriteLine($"[NoInertia] {(Enabled ? "Enabled" : "Disabled")}");
+                        Log.WriteLine($"[NoInertia] {(Enabled ? "Enabled" : "Disabled")}");
                     };
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[NoInertia]: {ex}");
+                Log.WriteLine($"[NoInertia]: {ex}");
                 ClearCache();
             }
         }
 
         private ulong GetSettingsPointers()
         {
-            XMLogging.WriteLine("[Settings] GetSettingsPointers() begin");
+            Log.WriteLine("[Settings] GetSettingsPointers() begin");
 
             if (_cachedHardSettings.IsValidVirtualAddress() &&
                 _cachedInertiaSettings.IsValidVirtualAddress())
             {
-                XMLogging.WriteLine(
+                Log.WriteLine(
                     $"[Settings] Using cached values hard=0x{_cachedHardSettings:X} inertia=0x{_cachedInertiaSettings:X}");
                 return _cachedHardSettings;
             }
@@ -71,20 +71,20 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
             // -------------------------------
             // EFTHardSettings (static)
             // -------------------------------
-            XMLogging.WriteLine("[Settings] Resolving EFTHardSettings...");
+            Log.WriteLine("[Settings] Resolving EFTHardSettings...");
             var hardSettings = EftHardSettingsResolver.GetInstance();
-            XMLogging.WriteLine($"[Settings] EFTHardSettings = 0x{hardSettings:X}");
+            Log.WriteLine($"[Settings] EFTHardSettings = 0x{hardSettings:X}");
 
             if (!hardSettings.IsValidVirtualAddress())
             {
-                XMLogging.WriteLine("[Settings][FAIL] EFTHardSettings invalid");
+                Log.WriteLine("[Settings][FAIL] EFTHardSettings invalid");
                 return 0;
             }
 
 
             _cachedHardSettings = hardSettings;
 
-            XMLogging.WriteLine(
+            Log.WriteLine(
                 $"[Settings][OK] hard=0x{hardSettings:X}");
 
             return (hardSettings);

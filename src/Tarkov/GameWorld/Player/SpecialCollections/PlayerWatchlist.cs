@@ -85,7 +85,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PlayerWatchlist] Error in ManualAdd: {ex.Message}");
+                Log.WriteLine($"[PlayerWatchlist] Error in ManualAdd: {ex.Message}");
             }
         }
 
@@ -103,7 +103,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PlayerWatchlist] Error in Clear: {ex.Message}");
+                Log.WriteLine($"[PlayerWatchlist] Error in Clear: {ex.Message}");
             }
         }
 

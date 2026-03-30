@@ -97,7 +97,7 @@ namespace eft_dma_radar.Converters
             image.CacheOption = BitmapCacheOption.OnLoad;
             image.UriSource = new Uri(path);
             image.EndInit();
-            //XMLogging.WriteLine($"[IconCache] Loaded icon for {itemId} from {path}");
+            //Log.WriteLine($"[IconCache] Loaded icon for {itemId} from {path}");
             return image;
         }
 

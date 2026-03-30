@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using eft_dma_radar.Tarkov;
 using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Tarkov.EFTPlayer;
@@ -711,7 +711,7 @@ namespace eft_dma_radar
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"CRITICAL RENDER ERROR: {ex}");
+                Log.WriteLine($"CRITICAL RENDER ERROR: {ex}");
             }
         }
 
@@ -738,12 +738,12 @@ namespace eft_dma_radar
                         Position = lootItem.Position,
                         StartTime = DateTime.UtcNow
                     });
-                    XMLogging.WriteLine($"[Ping] Pinged item: {lootItem.Name} at {lootItem.Position}");
+                    Log.WriteLine($"[Ping] Pinged item: {lootItem.Name} at {lootItem.Position}");
                 }
             }
             else
             {
-                XMLogging.WriteLine($"[Ping] Item '{itemName}' not found.");
+                Log.WriteLine($"[Ping] Item '{itemName}' not found.");
             }
         }
 
@@ -786,7 +786,7 @@ namespace eft_dma_radar
 
             if (TeammatesWorker.IsTeammate(player))
             {
-                // Removing teammate � restore handled by worker auto-flag
+                // Removing teammate – restore handled by worker auto-flag
                 TeammatesWorker.ForceRemove(player.VoipId);
             }
             else
@@ -1090,7 +1090,7 @@ namespace eft_dma_radar
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"ERROR Setting Aim UI Text: {ex}");
+                Log.WriteLine($"ERROR Setting Aim UI Text: {ex}");
             }
         }
 
@@ -1134,7 +1134,7 @@ namespace eft_dma_radar
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Render timer error: {ex.Message}");
+                Log.WriteLine($"Render timer error: {ex.Message}");
                 _isRendering = false;
             }
         }
@@ -1853,7 +1853,7 @@ namespace eft_dma_radar
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"Error during application shutdown: {ex}");
+                Log.WriteLine($"Error during application shutdown: {ex}");
             }
         }
 
@@ -1993,7 +1993,7 @@ namespace eft_dma_radar
                 }), DispatcherPriority.Loaded);
             });
 
-            XMLogging.WriteLine("[PANELS] All panels are ready!");
+            Log.WriteLine("[PANELS] All panels are ready!");
             Initialized = true;
         }
 
@@ -2015,11 +2015,11 @@ namespace eft_dma_radar
                 if (customToolbar != null)
                     EnsurePanelInBounds(customToolbar, mainContentGrid);
 
-                XMLogging.WriteLine("[PANELS] Ensured all panels are within window bounds");
+                Log.WriteLine("[PANELS] Ensured all panels are within window bounds");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PANELS] Error ensuring panels in bounds: {ex.Message}");
+                Log.WriteLine($"[PANELS] Error ensuring panels in bounds: {ex.Message}");
             }
         }
 
@@ -2029,7 +2029,7 @@ namespace eft_dma_radar
             {
                 if (Config.PanelPositions == null)
                 {
-                    XMLogging.WriteLine("[PANELS] No panel positions in imported config");
+                    Log.WriteLine("[PANELS] No panel positions in imported config");
                     return;
                 }
 
@@ -2084,7 +2084,7 @@ namespace eft_dma_radar
 
                             if (needsSave)
                             {
-                                XMLogging.WriteLine($"[PANELS] Fixed imported position for {panelKey}: " +
+                                Log.WriteLine($"[PANELS] Fixed imported position for {panelKey}: " +
                                     $"({originalLeft},{originalTop},{originalWidth},{originalHeight}) -> " +
                                     $"({posConfig.Left},{posConfig.Top},{posConfig.Width},{posConfig.Height})");
                             }
@@ -2094,12 +2094,12 @@ namespace eft_dma_radar
                 if (needsSave)
                 {
                     Config.Save();
-                    XMLogging.WriteLine("[PANELS] Saved corrected panel positions");
+                    Log.WriteLine("[PANELS] Saved corrected panel positions");
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PANELS] Error validating imported panel positions: {ex.Message}");
+                Log.WriteLine($"[PANELS] Error validating imported panel positions: {ex.Message}");
             }
         }
 
@@ -2109,7 +2109,7 @@ namespace eft_dma_radar
             {
                 if (Config.ToolbarPosition == null)
                 {
-                    XMLogging.WriteLine("[TOOLBAR] No toolbar position in imported config");
+                    Log.WriteLine("[TOOLBAR] No toolbar position in imported config");
                     return;
                 }
 
@@ -2147,12 +2147,12 @@ namespace eft_dma_radar
                 if (needsSave)
                 {
                     Config.Save();
-                    XMLogging.WriteLine($"[TOOLBAR] Fixed imported toolbar position: ({originalLeft},{originalTop}) -> ({toolbarConfig.Left},{toolbarConfig.Top})");
+                    Log.WriteLine($"[TOOLBAR] Fixed imported toolbar position: ({originalLeft},{originalTop}) -> ({toolbarConfig.Left},{toolbarConfig.Top})");
                 }
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[TOOLBAR] Error validating imported toolbar position: {ex.Message}");
+                Log.WriteLine($"[TOOLBAR] Error validating imported toolbar position: {ex.Message}");
             }
         }
 
@@ -2207,7 +2207,7 @@ namespace eft_dma_radar
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PANELS] Error in EnsurePanelInBounds for {panel?.Name}: {ex.Message}");
+                Log.WriteLine($"[PANELS] Error in EnsurePanelInBounds for {panel?.Name}: {ex.Message}");
 
                 Canvas.SetLeft(panel, 0);
                 Canvas.SetTop(panel, 0);
@@ -2503,11 +2503,11 @@ namespace eft_dma_radar
                 }
 
                 Config.Save();
-                XMLogging.WriteLine("[PANELS] Saved panel positions to config");
+                Log.WriteLine("[PANELS] Saved panel positions to config");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PANELS] Error saving panel positions: {ex.Message}");
+                Log.WriteLine($"[PANELS] Error saving panel positions: {ex.Message}");
             }
         }
 
@@ -2527,7 +2527,7 @@ namespace eft_dma_radar
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PANELS] Error saving panel position for {panelKey}: {ex.Message}");
+                Log.WriteLine($"[PANELS] Error saving panel position for {panelKey}: {ex.Message}");
             }
         }
 
@@ -2556,11 +2556,11 @@ namespace eft_dma_radar
                     }
                 }
 
-                XMLogging.WriteLine("[PANELS] Restored panel positions from config with bounds checking");
+                Log.WriteLine("[PANELS] Restored panel positions from config with bounds checking");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[PANELS] Error restoring panel positions: {ex.Message}");
+                Log.WriteLine($"[PANELS] Error restoring panel positions: {ex.Message}");
             }
         }
 
@@ -2569,11 +2569,11 @@ namespace eft_dma_radar
             try
             {
                 Config.ToolbarPosition = ToolbarPositionConfig.FromToolbar(customToolbar);
-                XMLogging.WriteLine("[TOOLBAR] Saved toolbar position to config");
+                Log.WriteLine("[TOOLBAR] Saved toolbar position to config");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[TOOLBAR] Error saving toolbar position: {ex.Message}");
+                Log.WriteLine($"[TOOLBAR] Error saving toolbar position: {ex.Message}");
             }
         }
 
@@ -2584,7 +2584,7 @@ namespace eft_dma_radar
                 if (Config.ToolbarPosition != null)
                 {
                     Config.ToolbarPosition.ApplyToToolbar(customToolbar);
-                    XMLogging.WriteLine("[TOOLBAR] Restored toolbar position from config");
+                    Log.WriteLine("[TOOLBAR] Restored toolbar position from config");
                 }
                 else
                 {
@@ -2594,7 +2594,7 @@ namespace eft_dma_radar
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[TOOLBAR] Error restoring toolbar position: {ex.Message}");
+                Log.WriteLine($"[TOOLBAR] Error restoring toolbar position: {ex.Message}");
                 Canvas.SetLeft(customToolbar, 900);
                 Canvas.SetTop(customToolbar, 5);
             }

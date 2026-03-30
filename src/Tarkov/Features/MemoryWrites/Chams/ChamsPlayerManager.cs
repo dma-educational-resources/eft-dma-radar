@@ -1,4 +1,4 @@
-#nullable enable
+ï»¿#nullable enable
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
@@ -35,7 +35,7 @@ namespace eft_dma_radar.Tarkov.Features
         private static ChamsConfig ChamsConfig => Config.ChamsConfig;
 
         // Toggle: Config.Debug?.PlayerChams == true
-        // If you don¡¯t have Config.Debug, just hard-force this to true temporarily.
+        // If you donÂ¡Â¯t have Config.Debug, just hard-force this to true temporarily.
         private static bool DebugChams = false;
 
         // Avoid log spam from huge renderer sets
@@ -45,7 +45,7 @@ namespace eft_dma_radar.Tarkov.Features
         private static void DLog(string msg)
         {
             if (DebugChams)
-                XMLogging.WriteLine("[Player Chams DEBUG] " + msg);
+                Log.WriteLine("[Player Chams DEBUG] " + msg);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -102,7 +102,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Error processing: {ex}");
+                Log.WriteLine($"[Player Chams] Error processing: {ex}");
             }
         }
 
@@ -158,11 +158,11 @@ namespace eft_dma_radar.Tarkov.Features
 
                 UpdateStateForAimbot(player, aimbotSettings.ClothingChamsMode, aimbotSettings.GearChamsMode, clothingMaterialId, gearMaterialId);
 
-                //XMLogging.WriteLine($"[Player Chams] Applied aimbot chams (Clothing: {aimbotSettings.ClothingChamsMode}, Gear: {aimbotSettings.GearChamsMode}) to {player.Name}");
+                //Log.WriteLine($"[Player Chams] Applied aimbot chams (Clothing: {aimbotSettings.ClothingChamsMode}, Gear: {aimbotSettings.GearChamsMode}) to {player.Name}");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to apply aimbot chams to {player.Name}: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to apply aimbot chams to {player.Name}: {ex}");
             }
         }
 
@@ -185,7 +185,7 @@ namespace eft_dma_radar.Tarkov.Features
                 state.IsAimbotTarget = false;
                 state.IsActive = false;
 
-                //XMLogging.WriteLine($"[Player Chams] Removed aimbot chams from {player.Name}");
+                //Log.WriteLine($"[Player Chams] Removed aimbot chams from {player.Name}");
 
                 if (revertToNormalChams)
                 {
@@ -211,7 +211,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to remove aimbot chams from {player.Name}: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to remove aimbot chams from {player.Name}: {ex}");
             }
         }
 
@@ -262,11 +262,11 @@ namespace eft_dma_radar.Tarkov.Features
                     state.IsActive = false;
                 }
 
-                //XMLogging.WriteLine($"[Player Chams] Applied death material to {player.Name}");
+                //Log.WriteLine($"[Player Chams] Applied death material to {player.Name}");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to apply death material to {player.Name}: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to apply death material to {player.Name}: {ex}");
             }
         }
 
@@ -303,7 +303,7 @@ namespace eft_dma_radar.Tarkov.Features
 
             ChamsManager.MaterialsUpdated += OnMaterialsUpdated;
 
-            XMLogging.WriteLine("[Player Chams] Manager initialized");
+            Log.WriteLine("[Player Chams] Manager initialized");
         }
 
         private static void OnMaterialsUpdated()
@@ -316,11 +316,11 @@ namespace eft_dma_radar.Tarkov.Features
                 {
                     await Task.Delay(200);
                     ApplyConfiguredColors();
-                    XMLogging.WriteLine("[Player Chams] Applied colors after materials update");
+                    Log.WriteLine("[Player Chams] Applied colors after materials update");
                 }
                 catch (Exception ex)
                 {
-                    XMLogging.WriteLine($"[Player Chams] Error applying colors after materials update: {ex}");
+                    Log.WriteLine($"[Player Chams] Error applying colors after materials update: {ex}");
                 }
             });
         }
@@ -394,11 +394,11 @@ namespace eft_dma_radar.Tarkov.Features
 
                 UpdateState(state, entitySettings, clothingMaterialId, gearMaterialId);
 
-                //XMLogging.WriteLine($"[Player Chams] Applied chams to {player.Name} - Clothing: {entitySettings.ClothingChamsMode}, Gear: {entitySettings.GearChamsMode}");
+                //Log.WriteLine($"[Player Chams] Applied chams to {player.Name} - Clothing: {entitySettings.ClothingChamsMode}, Gear: {entitySettings.GearChamsMode}");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to apply chams to {player.Name}: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to apply chams to {player.Name}: {ex}");
             }
         }
 
@@ -636,7 +636,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to write material to renderer: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to write material to renderer: {ex}");
             }
         }
 
@@ -722,7 +722,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to get basic material ID: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to get basic material ID: {ex}");
                 return -1;
             }
         }
@@ -772,7 +772,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to get visible material ID: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to get visible material ID: {ex}");
                 return -1;
             }
         }
@@ -787,11 +787,11 @@ namespace eft_dma_radar.Tarkov.Features
             {
                 if (!ChamsConfig.Enabled || ChamsManager.Materials.Count == 0)
                 {
-                    XMLogging.WriteLine("[Player Chams] Skipping color application - chams disabled or no materials loaded");
+                    Log.WriteLine("[Player Chams] Skipping color application - chams disabled or no materials loaded");
                     return;
                 }
 
-                XMLogging.WriteLine("[Player Chams] Applying configured colors to materials...");
+                Log.WriteLine("[Player Chams] Applying configured colors to materials...");
 
                 using var chamsColorMem = new RemoteBytes(SizeChecker<UnityColor>.Size);
                 var colorsApplied = 0;
@@ -846,16 +846,16 @@ namespace eft_dma_radar.Tarkov.Features
                         }
                         catch (Exception ex)
                         {
-                            XMLogging.WriteLine($"[Player Chams] Failed to set color for {mode}/{entityType}: {ex}");
+                            Log.WriteLine($"[Player Chams] Failed to set color for {mode}/{entityType}: {ex}");
                         }
                     }
                 }
 
-                XMLogging.WriteLine($"[Player Chams] Applied colors to {colorsApplied} materials");
+                Log.WriteLine($"[Player Chams] Applied colors to {colorsApplied} materials");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to apply configured colors: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to apply configured colors: {ex}");
             }
         }
 
@@ -930,7 +930,7 @@ namespace eft_dma_radar.Tarkov.Features
                         else if (entitySettings.DeathMaterialEnabled)
                         {
                             state.IsActive = false;
-                            //XMLogging.WriteLine($"[Player Chams] Player {playerBase:X} died - keeping death material applied");
+                            //Log.WriteLine($"[Player Chams] Player {playerBase:X} died - keeping death material applied");
                         }
                     }
                 }
@@ -959,11 +959,11 @@ namespace eft_dma_radar.Tarkov.Features
                 state.IsActive = false;
                 _playerDeathTimes.TryRemove(playerBase, out _);
 
-                //XMLogging.WriteLine($"[Player Chams] Reverted chams for player {playerBase:X}");
+                //Log.WriteLine($"[Player Chams] Reverted chams for player {playerBase:X}");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to revert chams for player {playerBase:X}: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to revert chams for player {playerBase:X}: {ex}");
             }
         }
 
@@ -983,11 +983,11 @@ namespace eft_dma_radar.Tarkov.Features
                 RestoreClothingMaterials(player, cached.ClothingMaterials);
                 RestoreGearMaterials(player, cached.GearMaterials);
 
-                //XMLogging.WriteLine($"[Player Chams] Restored materials for {cached.PlayerName}");
+                //Log.WriteLine($"[Player Chams] Restored materials for {cached.PlayerName}");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to restore materials for player {playerBase:X}: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to restore materials for player {playerBase:X}: {ex}");
             }
         }
 
@@ -1022,7 +1022,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to restore clothing materials: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to restore clothing materials: {ex}");
             }
         }
 
@@ -1091,7 +1091,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to restore gear materials: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to restore gear materials: {ex}");
             }
         }
 
@@ -1117,7 +1117,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to restore renderer materials: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to restore renderer materials: {ex}");
             }
         }
 
@@ -1139,7 +1139,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
 
             if (inactivePlayerBases.Any())
-                XMLogging.WriteLine($"[Player Chams] Cleaned up {inactivePlayerBases.Count} inactive players");
+                Log.WriteLine($"[Player Chams] Cleaned up {inactivePlayerBases.Count} inactive players");
         }
 
         #endregion
@@ -1177,7 +1177,7 @@ namespace eft_dma_radar.Tarkov.Features
                         CacheTime = DateTime.UtcNow
                     };
 
-                    //XMLogging.WriteLine($"[Player Chams] Cached materials for {player.Name} - Clothing: {clothingMaterials.Count}, Gear: {gearMaterials.Count}");
+                    //Log.WriteLine($"[Player Chams] Cached materials for {player.Name} - Clothing: {clothingMaterials.Count}, Gear: {gearMaterials.Count}");
                 }
                 else
                 {
@@ -1186,7 +1186,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to cache materials for {player.Name}: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to cache materials for {player.Name}: {ex}");
             }
         }
 
@@ -1223,7 +1223,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to cache clothing materials: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to cache clothing materials: {ex}");
             }
         }
 
@@ -1297,7 +1297,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to cache gear materials: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to cache gear materials: {ex}");
             }
         }
 
@@ -1335,7 +1335,7 @@ namespace eft_dma_radar.Tarkov.Features
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to cache renderer materials: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to cache renderer materials: {ex}");
             }
 
             return materials;
@@ -1351,12 +1351,12 @@ namespace eft_dma_radar.Tarkov.Features
                 foreach (var kvp in cache)
                     _cachedMaterials[kvp.Key] = kvp.Value;
 
-                //XMLogging.WriteLine($"[Player Chams] Loaded {cache.Count} cached player materials");
+                //Log.WriteLine($"[Player Chams] Loaded {cache.Count} cached player materials");
                 DLog($"LoadCache done | cached={_cachedMaterials.Count}");
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to load cache: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to load cache: {ex}");
             }
         }
 
@@ -1381,13 +1381,13 @@ namespace eft_dma_radar.Tarkov.Features
                     }
                     catch (Exception ex)
                     {
-                        XMLogging.WriteLine($"[Player Chams] Failed to save cache: {ex}");
+                        Log.WriteLine($"[Player Chams] Failed to save cache: {ex}");
                     }
                 });
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"[Player Chams] Failed to prepare cache for saving: {ex}");
+                Log.WriteLine($"[Player Chams] Failed to prepare cache for saving: {ex}");
             }
         }
 

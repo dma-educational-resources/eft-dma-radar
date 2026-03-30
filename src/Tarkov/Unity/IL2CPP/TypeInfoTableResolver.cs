@@ -71,22 +71,22 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             {
                 var prev = Offsets.Special.TypeInfoTableRva;
                 Offsets.Special.TypeInfoTableRva = first.Value.rva;
-                XMLogging.WriteLine($"{LogTag} TypeInfoTable resolved: rva=0x{first.Value.rva:X}, unique={testedRvas.Count}");
+                Log.WriteLine($"{LogTag} TypeInfoTable resolved: rva=0x{first.Value.rva:X}, unique={testedRvas.Count}");
                 if (prev != first.Value.rva)
-                    XMLogging.WriteLine($"{LogTag} TypeInfoTableRva UPDATED: 0x{prev:X} → 0x{first.Value.rva:X}");
+                    Log.WriteLine($"{LogTag} TypeInfoTableRva UPDATED: 0x{prev:X} → 0x{first.Value.rva:X}");
                 _lastResolutionMode = "signature";
                 success = true;
             }
             else if (Offsets.Special.TypeInfoTableRva != 0 && ValidateTypeInfoTable(gaBase, Offsets.Special.TypeInfoTableRva))
             {
-                XMLogging.WriteLine($"{LogTag} TypeInfoTable using fallback RVA: 0x{Offsets.Special.TypeInfoTableRva:X}");
+                Log.WriteLine($"{LogTag} TypeInfoTable using fallback RVA: 0x{Offsets.Special.TypeInfoTableRva:X}");
                 _lastResolutionMode = "fallback (hardcoded)";
                 success = true;
             }
             else
             {
                 if (!quiet)
-                    XMLogging.WriteLine($"{LogTag} WARNING: All TypeInfoTable resolution strategies failed — offsets may be stale!");
+                    Log.WriteLine($"{LogTag} WARNING: All TypeInfoTable resolution strategies failed — offsets may be stale!");
                 _lastResolutionMode = "FAILED";
                 success = false;
             }
@@ -105,7 +105,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             }
             catch (Exception ex)
             {
-                XMLogging.WriteLine($"{LogTag} TypeInfoTable sig[{index}] scan error: {ex.Message}");
+                Log.WriteLine($"{LogTag} TypeInfoTable sig[{index}] scan error: {ex.Message}");
                 return (null, new SigScanResult(index, desc, "ERROR", 0, 0, 0));
             }
 
@@ -274,7 +274,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 if (nameToIndex.TryGetValue(il2cppName, out var index))
                     UpdateTypeIndexField(fi, (uint)index);
                 else
-                    XMLogging.WriteLine($"{LogTag} WARN: '{il2cppName}' not found in type table — {fieldName} using fallback ({fi.GetValue(null) ?? 0u}).");
+                    Log.WriteLine($"{LogTag} WARN: '{il2cppName}' not found in type table — {fieldName} using fallback ({fi.GetValue(null) ?? 0u}).");
             }
         }
 
@@ -286,10 +286,10 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             var previous = (uint)(fi.GetValue(null) ?? 0u);
             fi.SetValue(null, newValue);
             if (previous != newValue)
-                XMLogging.WriteLine($"{LogTag} {fi.Name} UPDATED: {previous} → {newValue}");
+                Log.WriteLine($"{LogTag} {fi.Name} UPDATED: {previous} → {newValue}");
         }
 
         internal static void DebugDumpResolverState(int classCount, int updated, int fallback, int skipped) =>
-            XMLogging.WriteBlock(BuildUserReportBox(classCount, updated, fallback, skipped));
+            Log.WriteBlock(BuildUserReportBox(classCount, updated, fallback, skipped));
     }
 }
