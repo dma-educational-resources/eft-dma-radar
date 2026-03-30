@@ -100,6 +100,10 @@ namespace eft_dma_radar.UI.Pages
 
         private MainWindow mainWindow => MainWindow.Window;
 
+        // ── Font picker ───────────────────────────────────────────────────────
+        private static readonly string FontFolder =
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fonts");
+
         private readonly string[] _availableInformation = new string[]
         {
             "ADS",
@@ -708,6 +712,7 @@ namespace eft_dma_radar.UI.Pages
 
             InitializePlayerTypeSettings();
             InitializeEntityTypeSettings();
+            LoadFontDropdown();
         }
 
         private void InitializePlayerTypeSettings()
@@ -2006,6 +2011,176 @@ namespace eft_dma_radar.UI.Pages
             SaveEntityTypeSettings();
         }
         #endregion
+        #endregion
+
+        #region Font Picker
+        private void LoadFontDropdown(string selectName = null)
+        {
+            if (cmbFontSelector == null) return;
+
+            cmbFontSelector.SelectionChanged -= cmbFontSelector_SelectionChanged;
+            cmbFontSelector.Items.Clear();
+
+            Directory.CreateDirectory(FontFolder);
+
+            var fonts = Directory.GetFiles(FontFolder, "*.ttf", SearchOption.TopDirectoryOnly)
+                .Concat(Directory.GetFiles(FontFolder, "*.otf", SearchOption.TopDirectoryOnly))
+                .OrderBy(f => f)
+                .ToArray();
+
+            if (fonts.Length == 0)
+            {
+                cmbFontSelector.Items.Add("(no fonts — upload one)");
+                cmbFontSelector.SelectedIndex = 0;
+                cmbFontSelector.IsEnabled = false;
+                cmbFontSelector.SelectionChanged += cmbFontSelector_SelectionChanged;
+                return;
+            }
+
+            cmbFontSelector.IsEnabled = true;
+            foreach (var f in fonts)
+                cmbFontSelector.Items.Add(Path.GetFileNameWithoutExtension(f));
+
+            var target = selectName ?? Config.FontName;
+            int idx = 0;
+            for (int i = 0; i < cmbFontSelector.Items.Count; i++)
+            {
+                if (string.Equals(cmbFontSelector.Items[i].ToString(), target,
+                                  StringComparison.OrdinalIgnoreCase))
+                { idx = i; break; }
+            }
+
+            cmbFontSelector.SelectedIndex = idx;
+            cmbFontSelector.SelectionChanged += cmbFontSelector_SelectionChanged;
+
+            if (cmbFontSelector.Items[idx] is string name)
+                ApplyFont(name);
+        }
+
+        private void cmbFontSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (cmbFontSelector.SelectedItem is string fontName && cmbFontSelector.IsEnabled)
+                ApplyFont(fontName);
+        }
+
+        private void btnUploadFont_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Select a font file",
+                Filter = "Font files (*.ttf;*.otf)|*.ttf;*.otf",
+                Multiselect = false
+            };
+
+            if (dialog.ShowDialog() != true) return;
+
+            var dest = Path.Combine(FontFolder, Path.GetFileName(dialog.FileName));
+
+            if (File.Exists(dest))
+            {
+                var result = System.Windows.MessageBox.Show(
+                    $"'{Path.GetFileName(dest)}' already exists. Overwrite it?",
+                    "Font exists", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (result != MessageBoxResult.Yes) return;
+            }
+
+            try
+            {
+                File.Copy(dialog.FileName, dest, overwrite: true);
+                NotificationsShared.Success($"Font '{Path.GetFileNameWithoutExtension(dest)}' uploaded successfully!");
+                LoadFontDropdown(selectName: Path.GetFileNameWithoutExtension(dest));
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Failed to copy font:\n{ex.Message}",
+                    "Upload Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ApplyFont(string fontName)
+        {
+            var path = Path.Combine(FontFolder, fontName + ".ttf");
+            if (!File.Exists(path))
+                path = Path.Combine(FontFolder, fontName + ".otf");
+            if (!File.Exists(path)) return;
+
+            try
+            {
+                var typeface = SKTypeface.FromFile(path);
+                if (typeface is null) return;
+
+                // Push into every text SKPaint in SKPaints.cs
+                SKPaints.TextMouseoverGroup.Typeface                  = typeface;
+                SKPaints.TextLocalPlayer.Typeface                     = typeface;
+                SKPaints.TextTeammate.Typeface                        = typeface;
+                SKPaints.TextUSEC.Typeface                            = typeface;
+                SKPaints.TextBEAR.Typeface                            = typeface;
+                SKPaints.TextSpecial.Typeface                         = typeface;
+                SKPaints.TextStreamer.Typeface                        = typeface;
+                SKPaints.TextAimbotLocked.Typeface                    = typeface;
+                SKPaints.TextScav.Typeface                            = typeface;
+                SKPaints.TextRaider.Typeface                          = typeface;
+                SKPaints.TextBoss.Typeface                            = typeface;
+                SKPaints.TextFocused.Typeface                         = typeface;
+                SKPaints.TextPScav.Typeface                           = typeface;
+                SKPaints.TextMouseover.Typeface                       = typeface;
+                SKPaints.TextCorpse.Typeface                          = typeface;
+                SKPaints.TextMeds.Typeface                            = typeface;
+                SKPaints.TextFood.Typeface                            = typeface;
+                SKPaints.TextWeapons.Typeface                         = typeface;
+                SKPaints.TextBackpacks.Typeface                       = typeface;
+                SKPaints.TextQuestItem.Typeface                       = typeface;
+                SKPaints.TextAirdrop.Typeface                         = typeface;
+                SKPaints.TextWishlistItem.Typeface                    = typeface;
+                SKPaints.QuestHelperText.Typeface                     = typeface;
+                SKPaints.TextLoot.Typeface                            = typeface;
+                SKPaints.TextImportantLoot.Typeface                   = typeface;
+                SKPaints.TextContainer.Typeface                       = typeface;
+                SKPaints.TextRadarStatus.Typeface                     = typeface;
+                SKPaints.TextStatusSmall.Typeface                     = typeface;
+                SKPaints.TextExplosives.Typeface                      = typeface;
+                SKPaints.TextExplosivesDanger.Typeface                = typeface;
+                SKPaints.TextExfilOpen.Typeface                       = typeface;
+                SKPaints.TextExfilPending.Typeface                    = typeface;
+                SKPaints.TextExfilClosed.Typeface                     = typeface;
+                SKPaints.TextExfilInactive.Typeface                   = typeface;
+                SKPaints.TextExfilTransit.Typeface                    = typeface;
+                SKPaints.TextDoorOpen.Typeface                        = typeface;
+                SKPaints.TextDoorLocked.Typeface                      = typeface;
+                SKPaints.TextDoorShut.Typeface                        = typeface;
+                SKPaints.TextDoorInteracting.Typeface                 = typeface;
+                SKPaints.TextDoorBreaching.Typeface                   = typeface;
+                SKPaints.TextPulsingAsterisk.Typeface                 = typeface;
+                SKPaints.TextPulsingAsteriskOutline.Typeface          = typeface;
+                SKPaints.TextSwitch.Typeface                          = typeface;
+                SKPaints.TextOutline.Typeface                         = typeface;
+                SKPaints.TextBasicESP.Typeface                        = typeface;
+                SKPaints.TextBasicESPLeftAligned.Typeface             = typeface;
+                SKPaints.TextESPFPS.Typeface                          = typeface;
+                SKPaints.TextESPRaidStats.Typeface                    = typeface;
+                SKPaints.TextESPStatusText.Typeface                   = typeface;
+                SKPaints.TextMagazineESP.Typeface                     = typeface;
+                SKPaints.TextMagazineInfoESP.Typeface                 = typeface;
+                SKPaints.TextEnergyHydrationBarESP.Typeface           = typeface;
+                SKPaints.TextEnergyHydrationBarOutlineESP.Typeface    = typeface;
+                SKPaints.TextESPClosestPlayer.Typeface                = typeface;
+                SKPaints.TextESPTopLoot.Typeface                      = typeface;
+                SKPaints.TextOverridePlayerESP.Typeface               = typeface;
+                SKPaints.TextPulsingAsteriskESP.Typeface              = typeface;
+
+                // Persist the selection
+                Config.FontName = fontName;
+                Config.Save();
+
+                XMLogging.WriteLine($"[Font] Applied font: {fontName}");
+            }
+            catch (Exception ex)
+            {
+                XMLogging.WriteLine($"[Font] Error applying font '{fontName}': {ex.Message}");
+                System.Windows.MessageBox.Show($"Error applying font '{fontName}':\n{ex.Message}",
+                    "Font Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
         #endregion
 
         #region Colors Tab
