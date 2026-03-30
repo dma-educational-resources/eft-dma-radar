@@ -65,6 +65,20 @@ namespace eft_dma_radar.Common.Misc
         }
 
         /// <summary>
+        /// Returns true (and updates the rate-limit timestamp) if the key has not been seen
+        /// within <paramref name="interval"/>, otherwise returns false.
+        /// Use this to gate a block of manual Log() calls at a fixed frequency.
+        /// </summary>
+        public static bool TryThrottle(string key, TimeSpan interval)
+        {
+            var now = DateTime.UtcNow;
+            if (_rateLimitCache.TryGetValue(key, out var lastLogged) && now - lastLogged < interval)
+                return false;
+            _rateLimitCache[key] = now;
+            return true;
+        }
+
+        /// <summary>
         /// Logs a message only if it hasn't been logged within the specified time window
         /// </summary>
         public static void LogRateLimited(AppLogLevel level, string key, TimeSpan interval, string message, string category = "")
