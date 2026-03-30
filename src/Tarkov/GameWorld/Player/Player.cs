@@ -183,6 +183,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             // Position / rotation
             _cachedPosition = Vector3.Zero;
             Rotation = default;
+            MapRotation = 0f;
 
             // Timers / state
             ErrorTimer.Reset();
@@ -280,15 +281,9 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
 
         /// <summary>
         /// Player's Map Rotation (with 90 degree correction applied).
+        /// Cached — recomputed when <see cref="Rotation"/> is set.
         /// </summary>
-        public float MapRotation
-        {
-            get
-            {
-                float mapRotation = ((Rotation.X - 90f) % 360f + 360f) % 360f;
-                return mapRotation;
-            }
-        }
+        public float MapRotation { get; private set; }
 
         /// <summary>
         /// Corpse field value.
@@ -927,6 +922,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 ArgumentOutOfRangeException.ThrowIfLessThan(rotation.Y, -90f);
                 ArgumentOutOfRangeException.ThrowIfGreaterThan(rotation.Y, 90f);
                 Rotation = rotation;
+                MapRotation = ((rotation.X - 90f) % 360f + 360f) % 360f;
                 return true;
             }
             catch

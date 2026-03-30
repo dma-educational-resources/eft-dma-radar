@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -91,6 +92,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
         private static readonly TimeSpan s_rateLimitInterval1ms = TimeSpan.FromMilliseconds(1);
         private static readonly TimeSpan s_rateLimitInterval10s = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan s_rateLimitInterval30s = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan s_miscSleepTarget = TimeSpan.FromMilliseconds(50);
+        private static readonly TimeSpan s_grenadeSleepTarget = TimeSpan.FromMilliseconds(10);
+        private static readonly TimeSpan s_fastSleepTarget = TimeSpan.FromMilliseconds(100);
+        private static readonly TimeSpan s_interactablesSleepTarget = TimeSpan.FromMilliseconds(750);
 
         public bool InRaid => !_disposed;
         public IReadOnlyCollection<Player> Players => _rgtPlayers;
@@ -873,8 +878,13 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 {
                     if (Memory.IsDisposed) { Dispose(); break; }
                     ct.ThrowIfCancellationRequested();
+                    long start = Stopwatch.GetTimestamp();
                     UpdateMisc();
-                    Thread.Sleep(50);
+                    // Dynamic sleep: target 50ms total cycle time (subtract work duration)
+                    var elapsed = Stopwatch.GetElapsedTime(start);
+                    var remaining = s_miscSleepTarget - elapsed;
+                    if (remaining > TimeSpan.Zero)
+                        Thread.Sleep(remaining);
                 }
             }
             catch (OperationCanceledException)
@@ -1032,8 +1042,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 {
                     if (Memory.IsDisposed) { Dispose(); break; }
                     ct.ThrowIfCancellationRequested();
+                    long start = Stopwatch.GetTimestamp();
                     _grenadeManager.Refresh();
-                    Thread.Sleep(10);
+                    var remaining = s_grenadeSleepTarget - Stopwatch.GetElapsedTime(start);
+                    if (remaining > TimeSpan.Zero)
+                        Thread.Sleep(remaining);
                 }
             }
             catch (OperationCanceledException)
@@ -1072,9 +1085,12 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 {
                     if (Memory.IsDisposed) { Dispose(); break; }
                     ct.ThrowIfCancellationRequested();
+                    long start = Stopwatch.GetTimestamp();
                     RefreshCameraManager();
                     RefreshFast();
-                    Thread.Sleep(100);
+                    var remaining = s_fastSleepTarget - Stopwatch.GetElapsedTime(start);
+                    if (remaining > TimeSpan.Zero)
+                        Thread.Sleep(remaining);
                 }
             }
             catch (OperationCanceledException)
@@ -1105,8 +1121,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 {
                     if (Memory.IsDisposed) { Dispose(); break; }
                     ct.ThrowIfCancellationRequested();
+                    long start = Stopwatch.GetTimestamp();
                     RefreshWorldInteractables();
-                    Thread.Sleep(750);
+                    var remaining = s_interactablesSleepTarget - Stopwatch.GetElapsedTime(start);
+                    if (remaining > TimeSpan.Zero)
+                        Thread.Sleep(remaining);
                 }
             }
             catch (OperationCanceledException)
