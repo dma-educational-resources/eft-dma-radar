@@ -1120,13 +1120,13 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 return new AIRole()
                 {
                     Name = "Usec",
-                    Type = PlayerType.AIScav
+                    Type = PlayerType.AIRaider
                 };
             if (voiceLine.Contains("bear", StringComparison.OrdinalIgnoreCase))
                 return new AIRole()
                 {
                     Name = "Bear",
-                    Type = PlayerType.AIScav
+                    Type = PlayerType.AIRaider
                 };
             XMLogging.WriteLine($"Unknown Voice Line: {voiceLine}");
             return new AIRole()

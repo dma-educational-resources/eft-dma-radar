@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using eft_dma_radar.Common.Misc;
 using static eft_dma_radar.Tarkov.EFTPlayer.Player;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
@@ -40,10 +41,12 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 
         #region Static Data
 
-        private static readonly Dictionary<string, MapGuardData> _mapGuardData = new();
-        private static readonly Dictionary<string, GuardCheckResult> _resultCache = new();
-        private static readonly object _cacheLock = new object();
-        private static bool _initialized = false;
+            internal static bool DebugLogging = false;
+
+            private static readonly Dictionary<string, MapGuardData> _mapGuardData = new();
+            private static readonly Dictionary<string, GuardCheckResult> _resultCache = new();
+            private static readonly object _cacheLock = new object();
+            private static bool _initialized = false;
 
         #endregion
 
@@ -299,7 +302,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 }
             });
 
-            AddMapData("streets", new MapGuardData
+            var streetsGuardData = new MapGuardData
             {
                 Backpacks = new HashSet<string> { "Attack 2" },
                 Helmets = new HashSet<string> { "Altyn", "LShZ-2DTM", "Maska-1SCh", "Vulkan-5", "ZSh-1-2M" },
@@ -322,7 +325,9 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                         }
                     }
                 }
-            });
+            };
+            AddMapData("streets", streetsGuardData);
+            AddMapData("tarkovstreets", streetsGuardData);
 
             _initialized = true;
         }
@@ -344,23 +349,44 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         /// <param name="mapId">Current map identifier</param>
         /// <param name="playerType">Current player type (should be scav-based)</param>
         /// <returns>True if player is identified as a guard</returns>
-        public static bool TryIdentifyGuard(GearManager gear, HandsManager hands, string mapId, PlayerType playerType)
+        public static bool TryIdentifyGuard(GearManager gear, HandsManager hands, string mapId, PlayerType playerType, string playerName = null)
         {
+            var log = DebugLogging;
+            var tag = playerName != null ? $" [{playerName}]" : "";
+
+            if (log)
+                XMLogging.WriteLine($"[GuardManager]{tag} TryIdentifyGuard called — mapId: {mapId}, playerType: {playerType}");
+
             if (!ShouldCheckForGuards(mapId, playerType))
+            {
+                if (log)
+                    XMLogging.WriteLine($"[GuardManager]{tag} ShouldCheckForGuards returned false — skipping");
                 return false;
+            }
 
             var normalizedMapId = mapId?.ToLower() ?? string.Empty;
             var cacheKey = GenerateCacheKey(gear, hands, normalizedMapId);
+
+            if (log)
+                XMLogging.WriteLine($"[GuardManager]{tag} cacheKey: {cacheKey}");
 
             lock (_cacheLock)
             {
                 if (_resultCache.TryGetValue(cacheKey, out var cachedResult))
                 {
+                    if (log)
+                        XMLogging.WriteLine($"[GuardManager]{tag} Cache hit — IsGuard: {cachedResult.IsGuard}, Reason: {cachedResult.Reason}");
                     return cachedResult.IsGuard;
                 }
             }
 
-            var result = PerformGuardCheck(gear, hands, normalizedMapId);
+            if (log)
+                XMLogging.WriteLine($"[GuardManager]{tag} Cache miss — performing guard check for map: {normalizedMapId}");
+
+            var result = PerformGuardCheck(gear, hands, normalizedMapId, log, tag);
+
+            if (log)
+                XMLogging.WriteLine($"[GuardManager]{tag} Final result — IsGuard: {result.IsGuard}, Reason: {result.Reason ?? "N/A"}");
 
             lock (_cacheLock)
             {
@@ -402,29 +428,71 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 
         #region Private Methods
 
+        private static readonly string[] _mapsWithoutGuards =
+        {
+            "factory4", "interchange", "laboratory", "lighthouse", "sandbox"
+        };
+
         private static bool ShouldCheckForGuards(string mapId, PlayerType playerType)
         {
-            if (Memory.Players?.Count(x => x.Type is PlayerType.AIBoss) == 0)
-                return false;
+            var normalizedMap = mapId?.ToLower() ?? string.Empty;
 
-            var mapsWithoutGuards = new HashSet<string>
+            foreach (var excluded in _mapsWithoutGuards)
             {
-                "factory4", "interchange", "laboratory", "lighthouse", "sandbox"
-            };
+                if (normalizedMap.StartsWith(excluded, StringComparison.Ordinal))
+                {
+                    if (DebugLogging)
+                        XMLogging.WriteLine($"[GuardManager] ShouldCheckForGuards — map '{normalizedMap}' matched exclusion '{excluded}'");
+                    return false;
+                }
+            }
 
-            if (mapsWithoutGuards.Contains(mapId?.ToLower()))
-                return false;
+            var typeOk = playerType is PlayerType.AIScav or PlayerType.AIRaider;
 
-            return playerType.ToString().ToLower().Contains("scav");
+            if (DebugLogging && !typeOk)
+                XMLogging.WriteLine($"[GuardManager] ShouldCheckForGuards — playerType '{playerType}' not eligible (need AIScav or AIRaider)");
+
+            return typeOk;
         }
 
-        private static GuardCheckResult PerformGuardCheck(GearManager gear, HandsManager hands, string mapId)
+        private static GuardCheckResult PerformGuardCheck(GearManager gear, HandsManager hands, string mapId, bool log = false, string tag = "")
         {
             var result = new GuardCheckResult { IsGuard = false };
 
+            if (log)
+            {
+                var equipCount = gear?.Equipment?.Count ?? 0;
+                var lootCount = gear?.Loot?.Count ?? 0;
+                XMLogging.WriteLine($"[GuardManager]{tag} --- Gear Dump for map '{mapId}' (Equipment: {equipCount} slots, Loot: {lootCount} items) ---");
+
+                if (gear?.Equipment != null)
+                {
+                    foreach (var kvp in gear.Equipment)
+                        XMLogging.WriteLine($"[GuardManager]{tag}   Equipment[{kvp.Key}] = Short: {kvp.Value?.Short ?? "null"}, Long: {kvp.Value?.Long ?? "null"}");
+                }
+                else
+                {
+                    XMLogging.WriteLine($"[GuardManager]{tag}   Equipment: null/empty");
+                }
+
+                if (gear?.Loot != null)
+                {
+                    foreach (var loot in gear.Loot.Where(l => l.IsWeapon || l.IsWeaponMod))
+                        XMLogging.WriteLine($"[GuardManager]{tag}   Loot: {loot.ShortName} (IsWeapon: {loot.IsWeapon}, IsWeaponMod: {loot.IsWeaponMod})");
+                }
+                else
+                {
+                    XMLogging.WriteLine($"[GuardManager]{tag}   Loot: null");
+                }
+
+                XMLogging.WriteLine($"[GuardManager]{tag}   Hands.CurrentItem: {hands?.CurrentItem ?? "null"}");
+                XMLogging.WriteLine($"[GuardManager]{tag} --- End Gear Dump ---");
+            }
+
             if (mapId == "woods")
             {
-                if (IsWoodsGuard(gear))
+                var woodsResult = IsWoodsGuard(gear, log, tag);
+                if (woodsResult)
                 {
                     result.IsGuard = true;
                     result.Reason = "Woods Guard (Camper + 12ga)";
@@ -433,40 +501,52 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             }
 
             if (!_mapGuardData.TryGetValue(mapId, out var guardData))
+            {
+                if (log)
+                    XMLogging.WriteLine($"[GuardManager]{tag} No guard data found for map '{mapId}' (registered maps: [{string.Join(", ", _mapGuardData.Keys)}])");
                 return result;
+            }
 
-            if (IsGuardByBackpack(gear, guardData))
+            if (log)
+            {
+                XMLogging.WriteLine($"[GuardManager]{tag} Guard data for '{mapId}' — Backpacks: [{string.Join(", ", guardData.Backpacks)}], Helmets: [{string.Join(", ", guardData.Helmets)}], Ammo: [{string.Join(", ", guardData.Ammo)}], Weapons: [{string.Join(", ", guardData.Weapons.Keys)}]");
+            }
+
+            if (IsGuardByBackpack(gear, guardData, log, tag))
             {
                 result.IsGuard = true;
                 result.Reason = "Guard Backpack";
                 return result;
             }
 
-            if (IsGuardByHelmet(gear, guardData))
+            if (IsGuardByHelmet(gear, guardData, log, tag))
             {
                 result.IsGuard = true;
                 result.Reason = "Guard Helmet";
                 return result;
             }
 
-            if (IsGuardByAmmo(hands, guardData))
+            if (IsGuardByAmmo(hands, guardData, log, tag))
             {
                 result.IsGuard = true;
                 result.Reason = "Guard Ammo";
                 return result;
             }
 
-            if (IsGuardByWeapon(gear, guardData))
+            if (IsGuardByWeapon(gear, guardData, log, tag))
             {
                 result.IsGuard = true;
                 result.Reason = "Guard Weapon/Mods";
                 return result;
             }
 
+            if (log)
+                XMLogging.WriteLine($"[GuardManager]{tag} No guard match found for map '{mapId}'");
+
             return result;
         }
 
-        private static bool IsWoodsGuard(GearManager gear)
+        private static bool IsWoodsGuard(GearManager gear, bool log = false, string tag = "")
         {
             if (gear?.Equipment == null) return false;
 
@@ -476,39 +556,56 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             var hasShotgun = gear.Equipment.TryGetValue("SecondPrimaryWeapon", out var shotgun) &&
                             shotgun?.Long?.ToLower().Contains("12ga") == true;
 
+            if (log)
+                XMLogging.WriteLine($"[GuardManager]{tag} IsWoodsGuard — Scabbard: {knife?.Short ?? "null"} (camper={hasKnife}), SecondPrimary: {shotgun?.Long ?? "null"} (12ga={hasShotgun}), result: {hasKnife && hasShotgun}");
+
             return hasKnife && hasShotgun;
         }
 
-        private static bool IsGuardByBackpack(GearManager gear, MapGuardData guardData)
+        private static bool IsGuardByBackpack(GearManager gear, MapGuardData guardData, bool log = false, string tag = "")
         {
             if (guardData.Backpacks.Count == 0 || gear?.Equipment == null)
                 return false;
 
-            return gear.Equipment.TryGetValue("Backpack", out var backpack) &&
-                   backpack != null &&
-                   guardData.Backpacks.Contains(backpack.Short);
+            gear.Equipment.TryGetValue("Backpack", out var backpack);
+            var match = backpack != null && guardData.Backpacks.Contains(backpack.Short);
+
+            if (log)
+                XMLogging.WriteLine($"[GuardManager]{tag} IsGuardByBackpack — Backpack: {backpack?.Short ?? "null"}, expected: [{string.Join(", ", guardData.Backpacks)}], match: {match}");
+
+            return match;
         }
 
-        private static bool IsGuardByHelmet(GearManager gear, MapGuardData guardData)
+        private static bool IsGuardByHelmet(GearManager gear, MapGuardData guardData, bool log = false, string tag = "")
         {
             if (guardData.Helmets.Count == 0 || gear?.Equipment == null)
                 return false;
 
-            return gear.Equipment.TryGetValue("Headwear", out var headwear) &&
-                   headwear != null &&
-                   guardData.Helmets.Contains(headwear.Short);
+            gear.Equipment.TryGetValue("Headwear", out var headwear);
+            var match = headwear != null && guardData.Helmets.Contains(headwear.Short);
+
+            if (log)
+                XMLogging.WriteLine($"[GuardManager]{tag} IsGuardByHelmet — Headwear: {headwear?.Short ?? "null"}, expected: [{string.Join(", ", guardData.Helmets)}], match: {match}");
+
+            return match;
         }
 
-        private static bool IsGuardByAmmo(HandsManager hands, MapGuardData guardData)
+        private static bool IsGuardByAmmo(HandsManager hands, MapGuardData guardData, bool log = false, string tag = "")
         {
             if (guardData.Ammo.Count == 0 || hands?.CurrentItem == null)
                 return false;
 
             var currentItem = hands.CurrentItem.ToLower();
-            return guardData.Ammo.Any(ammo => currentItem.Contains(ammo));
+            var matchedAmmo = guardData.Ammo.FirstOrDefault(ammo => currentItem.Contains(ammo));
+            var match = matchedAmmo != null;
+
+            if (log)
+                XMLogging.WriteLine($"[GuardManager]{tag} IsGuardByAmmo — CurrentItem: {hands.CurrentItem}, expected: [{string.Join(", ", guardData.Ammo)}], matched: {matchedAmmo ?? "none"}");
+
+            return match;
         }
 
-        private static bool IsGuardByWeapon(GearManager gear, MapGuardData guardData)
+        private static bool IsGuardByWeapon(GearManager gear, MapGuardData guardData, bool log = false, string tag = "")
         {
             if (guardData.Weapons.Count == 0 || gear?.Loot == null)
                 return false;
@@ -524,22 +621,44 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                     playerMods.Add(loot.ShortName);
             }
 
+            if (log)
+                XMLogging.WriteLine($"[GuardManager]{tag} IsGuardByWeapon — Player weapons: [{string.Join(", ", playerWeapons)}], Player mods: [{string.Join(", ", playerMods)}]");
+
             foreach (var weaponEntry in guardData.Weapons)
             {
                 string weaponName = weaponEntry.Key;
                 var weaponConfig = weaponEntry.Value;
 
                 if (!playerWeapons.Contains(weaponName))
-                    continue;
-
-                foreach (var requiredMods in weaponConfig.ModLoadouts)
                 {
-                    if (requiredMods.All(mod => string.IsNullOrEmpty(mod) || playerMods.Contains(mod)))
+                    if (log)
+                        XMLogging.WriteLine($"[GuardManager]{tag}   Weapon '{weaponName}' — not found in player weapons, skip");
+                    continue;
+                }
+
+                if (log)
+                    XMLogging.WriteLine($"[GuardManager]{tag}   Weapon '{weaponName}' — FOUND, checking {weaponConfig.ModLoadouts.Count} mod loadout(s)");
+
+                for (int i = 0; i < weaponConfig.ModLoadouts.Count; i++)
+                {
+                    var requiredMods = weaponConfig.ModLoadouts[i];
+                    var missingMods = requiredMods.Where(mod => !string.IsNullOrEmpty(mod) && !playerMods.Contains(mod)).ToList();
+
+                    if (missingMods.Count == 0)
                     {
+                        if (log)
+                            XMLogging.WriteLine($"[GuardManager]{tag}   Loadout[{i}] [{string.Join(", ", requiredMods)}] — ALL MATCHED");
                         return true;
+                    }
+                    else if (log)
+                    {
+                        XMLogging.WriteLine($"[GuardManager]{tag}   Loadout[{i}] [{string.Join(", ", requiredMods)}] — missing: [{string.Join(", ", missingMods)}]");
                     }
                 }
             }
+
+            if (log)
+                XMLogging.WriteLine($"[GuardManager]{tag} IsGuardByWeapon — no weapon/mod loadout matched");
 
             return false;
         }

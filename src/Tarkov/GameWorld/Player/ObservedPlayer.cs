@@ -197,6 +197,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 if (isAI)
                 {
                     var gearMgr = new GearManager(this, this.IsPmc);
+                    gearMgr.Refresh();
 
                     // =====================================================
                     // 1) SANTA DETECTION (FIRST, AUTHORITATIVE, SLOT-AGNOSTIC)
@@ -287,7 +288,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                         gearMgr,
                         new HandsManager(this),
                         Memory.MapID,
-                        Type))
+                        Type,
+                        Name))
                     {
                         Name = "Guard";
                         Type = PlayerType.AIRaider;
