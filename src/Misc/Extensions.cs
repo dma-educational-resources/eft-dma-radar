@@ -35,8 +35,8 @@ namespace eft_dma_radar.Common.Misc
         public static string GetDescription<TEnum>(this TEnum value)
             where TEnum : Enum
         {
-            return EnumData<TEnum>.Descriptions.AddOrUpdate(value,
-                (key) =>
+            return EnumData<TEnum>.Descriptions.GetOrAdd(value,
+                static key =>
                 {
                     string name = key.ToString();
                     var field = key.GetType().GetField(name);
@@ -49,10 +49,6 @@ namespace eft_dma_radar.Common.Misc
                             return attribute.Description;
                     }
                     return name; // Return the .ToString() value as a fallback.
-                },
-                (key, existingValue) =>
-                {
-                    return existingValue;
                 });
         }
 

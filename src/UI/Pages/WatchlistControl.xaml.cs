@@ -220,7 +220,7 @@ namespace eft_dma_radar.UI.Pages
             try
             {
                 var directory = Path.GetDirectoryName(WatchlistFilePath);
-                if (!Directory.Exists(directory))
+                if (directory is not null && !Directory.Exists(directory))
                     Directory.CreateDirectory(directory);
 
                 if (!File.Exists(WatchlistFilePath))
@@ -698,7 +698,7 @@ namespace eft_dma_radar.UI.Pages
             {
                 var directory = Path.GetDirectoryName(WatchlistFilePath);
 
-                if (!Directory.Exists(directory))
+                if (directory is not null && !Directory.Exists(directory))
                     Directory.CreateDirectory(directory);
 
                 var entries = Player.PlayerWatchlist.GetReferenceUnsafe();

@@ -21,6 +21,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
         private readonly HashSet<ulong> _registeredScratch = new(64);
         private const int MAX_FAIL_COUNT = 5;
         private static readonly TimeSpan FAIL_RETRY_COOLDOWN = TimeSpan.FromSeconds(2);
+        private int _refreshTick;
 
         /// <summary>
         /// LocalPlayer Instance.
@@ -102,11 +103,15 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 // Update Existing Players including LocalPlayer
                 UpdateExistingPlayers(registered);
                 HandleBtrStickiness();
-                // Clean up failed allocation tracking for addresses no longer in the game
-                foreach (var kvp in _failedAllocations)
+                // Clean up failed allocation tracking for addresses no longer in the game.
+                // Only run every 64 refreshes — entries are small and the list changes rarely.
+                if ((_refreshTick++ & 0x3F) == 0)
                 {
-                    if (!registered.Contains(kvp.Key))
-                        _failedAllocations.TryRemove(kvp.Key, out _);
+                    foreach (var kvp in _failedAllocations)
+                    {
+                        if (!registered.Contains(kvp.Key))
+                            _failedAllocations.TryRemove(kvp.Key, out _);
+                    }
                 }
             }
             catch (ObjectDisposedException)

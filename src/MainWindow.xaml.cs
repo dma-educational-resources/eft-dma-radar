@@ -139,7 +139,7 @@ namespace eft_dma_radar
         /// <summary>
         /// Determines if MainWindow is ready or not
         /// </summary>
-        public static volatile bool Initialized = false;
+        public static new volatile bool Initialized = false;
 
         private static List<PingEffect> _activePings = new();
 

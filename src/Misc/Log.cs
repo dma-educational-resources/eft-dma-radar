@@ -136,7 +136,7 @@ namespace eft_dma_radar.Common.Misc
 
         private static void WriteCore(string message)
         {
-            var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+            var timestamp = DateTime.UtcNow.ToString("HH:mm:ss.fff");
             var formatted = $"[{timestamp}] {message}";
 
             Debug.WriteLine(formatted);
@@ -282,9 +282,8 @@ namespace eft_dma_radar.Common.Misc
         /// </summary>
         public static void WriteOnce(AppLogLevel level, string key, string message, string category = "")
         {
-            if (_rateLimitCache.ContainsKey(key))
+            if (!_rateLimitCache.TryAdd(key, DateTime.UtcNow))
                 return;
-            _rateLimitCache[key] = DateTime.UtcNow;
             Write(level, message, category);
         }
 

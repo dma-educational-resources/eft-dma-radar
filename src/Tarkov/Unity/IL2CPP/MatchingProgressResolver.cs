@@ -410,7 +410,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         /// </summary>
         public static void LogViewSnapshot(ulong view = 0)
         {
-            if (!LoggingEnhancements.EnableDebugLogging)
+            if (!Log.EnableDebugLogging)
                 return;
 
             if (view == 0)
@@ -452,7 +452,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         /// </summary>
         public static void LogSnapshot(ulong mp = 0)
         {
-            if (!LoggingEnhancements.EnableDebugLogging)
+            if (!Log.EnableDebugLogging)
                 return;
 
             if (mp == 0)
