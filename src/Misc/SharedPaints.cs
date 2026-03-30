@@ -1,5 +1,4 @@
-﻿using eft_dma_radar.Common.Unity;
-using SkiaSharp;
+﻿using SkiaSharp;
 
 namespace eft_dma_radar.Common.Misc
 {
@@ -30,13 +29,6 @@ namespace eft_dma_radar.Common.Misc
                 0, 0, 0, 1, 0, // Alpha channel
             };
             return SKColorFilter.CreateColorMatrix(colorMatrix);
-        }
-    }
-    public static class SKColorExtensions
-    {
-        public static SKColor ToSKColor(this UnityColor color)
-        {
-            return new SKColor((byte)(color.R * 255), (byte)(color.G * 255), (byte)(color.B * 255), (byte)(color.A * 255));
         }
     }
 }

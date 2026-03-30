@@ -190,18 +190,4 @@ namespace SDK
             public readonly ulong Renderers;
         }
     }
-
-    public static class SDKExtensions
-    {
-        /// <summary>
-        /// Checks if the Player State is a valid enum.
-        /// </summary>
-        /// <param name="state"></param>
-        /// <returns>True if valid, otherwise False.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool IsValidState(this Enums.EPlayerState state)
-        {
-            return state is >= Enums.EPlayerState.None and <= Enums.EPlayerState.IdleWeaponMounting;
-        }
-    }
 }
