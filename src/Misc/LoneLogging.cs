@@ -11,6 +11,7 @@ namespace eft_dma_radar.Common.Misc
         private static StreamWriter _writer;
         private static bool _consoleAllocated = false;
         private static readonly Lock _writeLock = new();
+        private static ConsoleColor _currentColor = ConsoleColor.Gray;
 
         // P/Invoke for console allocation
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -123,37 +124,27 @@ namespace eft_dma_radar.Common.Misc
             Debug.WriteLine(formattedMessage);
 
             // Write to Console (our allocated console window)
+            // Color is only changed when the category differs from the previous line,
+            // avoiding rapid ForegroundColor/ResetColor cycling that causes WPF flicker.
             if (_consoleAllocated)
             {
-                // Color code certain log types
-                if (message.Contains("ERROR") || message.Contains("FAIL"))
+                var color = message.Contains("ERROR") || message.Contains("FAIL")
+                    ? ConsoleColor.Red
+                    : message.Contains("[IL2CPP]")
+                    ? ConsoleColor.Green
+                    : message.Contains("[GOM]") || message.Contains("[Signature]")
+                    ? ConsoleColor.Yellow
+                    : message.Contains("OK") || message.Contains("success")
+                    ? ConsoleColor.Cyan
+                    : ConsoleColor.Gray;
+
+                if (color != _currentColor)
                 {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine(formattedMessage);
-                    Console.ResetColor();
+                    Console.ForegroundColor = color;
+                    _currentColor = color;
                 }
-                else if (message.Contains("[IL2CPP]"))
-                {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine(formattedMessage);
-                    Console.ResetColor();
-                }
-                else if (message.Contains("[GOM]") || message.Contains("[Signature]"))
-                {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine(formattedMessage);
-                    Console.ResetColor();
-                }
-                else if (message.Contains("OK") || message.Contains("success"))
-                {
-                    Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine(formattedMessage);
-                    Console.ResetColor();
-                }
-                else
-                {
-                    Console.WriteLine(formattedMessage);
-                }
+
+                Console.WriteLine(formattedMessage);
             }
 
             // Write to file (if enabled via -logging flag)
