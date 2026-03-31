@@ -1,4 +1,5 @@
-﻿using Collections.Pooled;
+﻿using Mem = eft_dma_radar.DMA.Memory;
+using Collections.Pooled;
 
 namespace eft_dma_radar.Common.Unity.Collections
 {
@@ -25,7 +26,7 @@ namespace eft_dma_radar.Common.Unity.Collections
         /// <returns></returns>
         public static UnityHashSet<T> Create(ulong addr, bool useCache = true)
         {
-            var count = Tarkov.MemoryInterface.Memory.ReadValue<int>(addr + CountOffset, useCache);
+            var count = Mem.ReadValue<int>(addr + CountOffset, useCache);
             ArgumentOutOfRangeException.ThrowIfGreaterThan(count, 16384, nameof(count));
             var hs = new UnityHashSet<T>(count);
             try
@@ -34,8 +35,8 @@ namespace eft_dma_radar.Common.Unity.Collections
                 {
                     return hs;
                 }
-                var hashSetBase = Tarkov.MemoryInterface.Memory.ReadPtr(addr + ArrOffset, useCache) + ArrStartOffset;
-                Tarkov.MemoryInterface.Memory.ReadBuffer(hashSetBase, hs.Span, useCache);
+                var hashSetBase = Mem.ReadPtr(addr + ArrOffset, useCache) + ArrStartOffset;
+                Mem.ReadBuffer(hashSetBase, hs.Span, useCache);
                 return hs;
             }
             catch

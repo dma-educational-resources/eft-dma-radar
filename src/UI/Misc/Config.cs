@@ -5,7 +5,6 @@ using eft_dma_radar.UI;
 using eft_dma_radar.UI.LootFilters;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;
-using eft_dma_radar.Common.DMA;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Misc.Config;
@@ -544,10 +543,10 @@ namespace eft_dma_radar.UI.Misc
         public int MinValuableLootValue { get; set; } = 200000;
 
         /// <summary>
-        /// FPGA Read Algorithm
+        /// FPGA Device String (e.g. "fpga", "fpga://algo=0", etc.)
         /// </summary>
-        [JsonPropertyName("fpgaAlgo")]
-        public FpgaAlgo FpgaAlgo { get; set; } = FpgaAlgo.Auto;
+        [JsonPropertyName("deviceStr")]
+        public string DeviceStr { get; set; } = "fpga";
 
         /// <summary>
         /// Use a Memory Map for FPGA DMA Connection.

@@ -320,7 +320,7 @@ namespace eft_dma_radar
                 loading.UpdateStatus("Loading Configuration...", 25);
 
                 loading.UpdateStatus("Initializing Safe Memory Interface...", 40);
-                MemoryInterface.ModuleInit();
+                Memory.ModuleInit();
 
                 loading.UpdateStatus("Loading Safe UI Components...", 50);
                 try
@@ -371,7 +371,7 @@ namespace eft_dma_radar
                 XMMapManager.ModuleInit();
 
                 loading.UpdateStatus("Starting DMA Connection...", 50);
-                MemoryInterface.ModuleInit();
+                Memory.ModuleInit();
 
                 loading.UpdateStatus("Loading Remaining Modules...", 75);
                 FeatureManager.ModuleInit();

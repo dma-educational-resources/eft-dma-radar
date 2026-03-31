@@ -5,9 +5,9 @@ using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.UI.Misc;
-using static eft_dma_radar.Common.Misc.InputManager;
+using static eft_dma_radar.DMA.InputManager;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
-using KeyEventArgs = eft_dma_radar.Common.Misc.InputManager.KeyEventArgs;
+using KeyEventArgs = eft_dma_radar.DMA.InputManager.KeyEventArgs;
 
 namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 {

@@ -241,9 +241,9 @@ namespace eft_dma_radar.Tarkov.WebRadar
         {
             while (!ct.IsCancellationRequested)
             {
-                bool hasLocal = Memory?.LocalPlayer is not null;
+                bool hasLocal = Memory.LocalPlayer is not null;
                 bool handsValid = hasLocal &&
-                                  Memory!.LocalPlayer!.Firearm.HandsController.Item1.IsValidVirtualAddress();
+                                  Memory.LocalPlayer!.Firearm.HandsController.Item1.IsValidVirtualAddress();
                 if (!handsValid)
                 {
                     _latest = new WebRadarUpdate();
@@ -252,9 +252,9 @@ namespace eft_dma_radar.Tarkov.WebRadar
                 }
                 try
                 {
-                    _latest.InGame = Memory!.InRaid;
-                    _latest.InRaid = Memory!.InRaid;
-                    _latest.MapID = Memory!.MapID;
+                    _latest.InGame = Memory.InRaid;
+                    _latest.InRaid = Memory.InRaid;
+                    _latest.MapID = Memory.MapID;
                     _latest.SendTime = DateTime.UtcNow;
                     _latest.Version++;
 
@@ -269,7 +269,7 @@ namespace eft_dma_radar.Tarkov.WebRadar
                     // =========================
                     // EXFILS (world entities)
                     // =========================
-                    var exitManager = Memory?.Game?.Exits;
+                    var exitManager = Memory.Game?.Exits;
 
                     _latest.Exfils = exitManager?
                         .OfType<eft_dma_radar.Tarkov.GameWorld.Exits.Exfil>() // 👈 important
@@ -284,7 +284,7 @@ namespace eft_dma_radar.Tarkov.WebRadar
                     // =========================
                     // PLAYERS
                     // =========================
-                    _latest.Players = Memory?.Players?
+                    _latest.Players = Memory.Players?
                         .Where(p => p != null)
                         .Select(WebRadarPlayer.CreateFromPlayer)
                         .ToArray();
@@ -292,14 +292,14 @@ namespace eft_dma_radar.Tarkov.WebRadar
                     // =========================
                     // LOOT
                     // =========================
-                    _latest.Loot = Memory?.Loot?.UnfilteredLoot?
+                    _latest.Loot = Memory.Loot?.UnfilteredLoot?
                         .Select(WebRadarLoot.CreateFromLoot)
                         .ToArray();
 
                     // =========================
                     // DOORS
                     // =========================
-                    _latest.Doors = Memory?.Game?.Interactables?._Doors?
+                    _latest.Doors = Memory.Game?.Interactables?._Doors?
                         .Select(WebRadarDoor.CreateFromDoor)
                         .ToArray();
                 }

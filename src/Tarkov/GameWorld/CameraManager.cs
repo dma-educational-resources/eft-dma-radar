@@ -11,7 +11,6 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using eft_dma_radar.Common.DMA;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
@@ -70,7 +69,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         static CameraManager()
         {
-            MemDMABase.GameStopped += MemDMA_GameStopped;
+            Memory.GameStopped += MemDMA_GameStopped;
         }
 
         /// <summary>
@@ -877,7 +876,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             try
             {
                 // Get GameAssembly base (IL2CPP binary)
-                var gameAssemblyBase = MemoryInterface.Memory.GameAssemblyBase;
+                var gameAssemblyBase = Memory.GameAssemblyBase;
                 if (!gameAssemblyBase.IsValidVirtualAddress())
                 {
                     Log.Write(AppLogLevel.Warning, "GameAssembly.dll not loaded.", "CameraManager");

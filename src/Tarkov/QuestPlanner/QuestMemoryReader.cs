@@ -1,4 +1,3 @@
-using static eft_dma_radar.Tarkov.MemoryInterface;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Common.Unity.Collections;

@@ -85,7 +85,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                     // Wait for raid signal (blocks until raid starts)
                     // WaitForRaid() returns true when OnRaidStarted() is called
                     // At that point Memory.Game is already set to a LocalGameWorld instance
-                    if (MemDMABase.WaitForRaid() && Memory.Game is LocalGameWorld game)
+                    if (Memory.WaitForRaid() && Memory.Game is LocalGameWorld game)
                     {
                         // NOTE: We don't check game.RaidHasStarted anymore because it uses MonoLib
                         // which is deprecated and doesn't work in IL2CPP.

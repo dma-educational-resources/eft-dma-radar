@@ -40,8 +40,8 @@ namespace eft_dma_radar.Tarkov.API
                 Priority = ThreadPriority.Lowest,
                 IsBackground = true
             }.Start();
-            MemDMA.GameStarted += MemDMA_GameStarted;
-            MemDMA.GameStopped += MemDMA_GameStopped;
+            eft_dma_radar.DMA.Memory.GameStarted += MemDMA_GameStarted;
+            eft_dma_radar.DMA.Memory.GameStopped += MemDMA_GameStopped;
         }
 
         private static void MemDMA_GameStopped(object sender, EventArgs e)
@@ -90,7 +90,7 @@ namespace eft_dma_radar.Tarkov.API
         {
             while (true)
             {
-                if (MemDMABase.WaitForProcess())
+                if (eft_dma_radar.DMA.Memory.WaitForProcess())
                 {
                     try
                     {

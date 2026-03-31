@@ -1,7 +1,7 @@
 ﻿using eft_dma_radar.Common.Misc;
 using System.Runtime.CompilerServices;
 
-namespace eft_dma_radar.Common.DMA
+namespace eft_dma_radar.Common.DMA.ScatterAPI
 {
     /// <summary>
     /// Represents a 64-Bit Unsigned Pointer Address.

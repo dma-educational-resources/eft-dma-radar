@@ -19,7 +19,7 @@ using UserControl = System.Windows.Controls.UserControl;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
 using eft_dma_radar.Common.Misc;
-using InputManager = eft_dma_radar.Common.Misc.InputManager;
+using InputManager = eft_dma_radar.DMA.InputManager;
 using System.Windows.Threading;
 
 namespace eft_dma_radar.UI.Controls

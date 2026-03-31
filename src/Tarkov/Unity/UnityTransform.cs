@@ -164,7 +164,7 @@ namespace eft_dma_radar.Common.Unity
         public void UpdateRootPosition(ref Vector3 newPos)
         {
             newPos.ThrowIfAbnormal();
-            Memory.WriteValue(HierarchyAddr + TransformHierarchy.RootPosOffset, ref newPos);
+            Memory.WriteValue(HierarchyAddr + TransformHierarchy.RootPosOffset, newPos);
         }
 
         // ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤

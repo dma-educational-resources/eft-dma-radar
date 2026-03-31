@@ -174,7 +174,7 @@ namespace eft_dma_radar
         {
             get
             {
-                var id = Memory?.MapID ?? "null";
+                var id = Memory.MapID ?? "null";
                 return id;
             }
         }
@@ -196,23 +196,23 @@ namespace eft_dma_radar
         /// <summary>
         /// Game has started and Radar is starting up...
         /// </summary>
-        private static bool Starting => Memory?.Starting ?? false;
+        private static bool Starting => Memory.Starting;
 
         /// <summary>
         /// Radar has found Escape From Tarkov process and is ready.
         /// </summary>
-        private static bool Ready => Memory?.Ready ?? false;
+        private static bool Ready => Memory.Ready;
 
         /// <summary>
         /// Radar has found Local Game World, and a Raid Instance is active.
         /// </summary>
-        private static bool InRaid => Memory?.InRaid ?? false;
+        private static bool InRaid => Memory.InRaid;
 
         /// <summary>
         /// LocalPlayer (who is running Radar) 'Player' object.
         /// Returns the player the Current Window belongs to.
         /// </summary>
-        private static LocalPlayer? LocalPlayer => Memory?.LocalPlayer ?? null;
+        private static LocalPlayer? LocalPlayer => Memory.LocalPlayer;
 
         /// <summary>
         /// All Filtered Loot on the map.
@@ -1849,7 +1849,7 @@ namespace eft_dma_radar
 
                 Window = null;
 
-                Memory.CloseFPGA(); // Close FPGA
+                Memory.Close(); // Close FPGA
             }
             catch (Exception ex)
             {

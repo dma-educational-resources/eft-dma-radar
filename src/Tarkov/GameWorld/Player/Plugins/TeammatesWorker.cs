@@ -100,7 +100,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             {
                 try
                 {
-                    if (!MemDMABase.WaitForRaid() ||
+                    if (!Memory.WaitForRaid() ||
                         Memory.Game is not LocalGameWorld game ||
                         !IsActuallyInRaid())
                     {

@@ -1,4 +1,5 @@
-﻿using Collections.Pooled;
+﻿using Mem = eft_dma_radar.DMA.Memory;
+using Collections.Pooled;
 
 namespace eft_dma_radar.Common.Unity.Collections
 {
@@ -25,7 +26,7 @@ namespace eft_dma_radar.Common.Unity.Collections
         /// <returns></returns>
         public static UnityList<T> Create(ulong addr, bool useCache = true)
         {
-            var count = Tarkov.MemoryInterface.Memory.ReadValue<int>(addr + CountOffset, useCache);
+            var count = Mem.ReadValue<int>(addr + CountOffset, useCache);
             ArgumentOutOfRangeException.ThrowIfGreaterThan(count, 16384, nameof(count));
             var list = new UnityList<T>(count);
             try
@@ -34,8 +35,8 @@ namespace eft_dma_radar.Common.Unity.Collections
                 {
                     return list;
                 }
-                var listBase = Tarkov.MemoryInterface.Memory.ReadPtr(addr + ArrOffset, useCache) + ArrStartOffset;
-                Tarkov.MemoryInterface.Memory.ReadBuffer(listBase, list.Span, useCache);
+                var listBase = Mem.ReadPtr(addr + ArrOffset, useCache) + ArrStartOffset;
+                Mem.ReadBuffer(listBase, list.Span, useCache);
                 return list;
             }
             catch

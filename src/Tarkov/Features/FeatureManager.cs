@@ -33,10 +33,10 @@ namespace eft_dma_radar.Tarkov.Features
 
         static FeatureManager()
         {
-            MemDMABase.GameStarted += Memory_GameStarted;
-            MemDMABase.GameStopped += Memory_GameStopped;
-            MemDMABase.RaidStarted += Memory_RaidStarted;
-            MemDMABase.RaidStopped += Memory_RaidStopped;
+            Memory.GameStarted += Memory_GameStarted;
+            Memory.GameStopped += Memory_GameStopped;
+            Memory.RaidStarted += Memory_RaidStarted;
+            Memory.RaidStopped += Memory_RaidStopped;
         }
 
         private static void Worker()
@@ -56,7 +56,7 @@ namespace eft_dma_radar.Tarkov.Features
                     }
 
                     // Wait for process to be up (blocks until GameStarted)
-                    if (!MemDMABase.WaitForProcess())
+                    if (!Memory.WaitForProcess())
                     {
                         Thread.Sleep(250);
                         continue;

@@ -132,7 +132,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         static LocalGameWorld()
         {
-            MemDMABase.GameStopped += Memory_GameStopped;
+            Memory.GameStopped += Memory_GameStopped;
         }
 
         private static void Memory_GameStopped(object sender, EventArgs e)
@@ -279,6 +279,13 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 return false;
 
             Log.WriteLine($"[Raid] RegisteredPlayers validated: {playerCount} player(s)");
+
+            // Validate MainPlayer pointer is also ready — it is read by RegisteredPlayers constructor
+            // and may still be zero/garbage while RegisteredPlayers is already populated.
+            var mainPlayer = Memory.ReadPtr(Base + Offsets.ClientLocalGameWorld.MainPlayer, false);
+            if (mainPlayer == 0 || !mainPlayer.IsValidVirtualAddress())
+                return false;
+
             return true;
         }
 
@@ -298,7 +305,6 @@ namespace eft_dma_radar.Tarkov.GameWorld
             _lootManager = new LootManager(Base, ct);
             _exfilManager = new ExitManager(Base, _rgtPlayers.LocalPlayer.IsPmc);
             _grenadeManager = new ExplosivesManager(Base);
-            Log.WriteLine($"[WorldInteractablesManager] Calling from LocalGameWorld: 0x{Base:X}");
             _worldInteractablesManager = new WorldInteractablesManager(Base);
 
             Log.WriteLine("[Raid] Game data initialized successfully!");

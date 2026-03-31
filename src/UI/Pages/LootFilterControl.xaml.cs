@@ -1484,8 +1484,8 @@ namespace eft_dma_radar.UI.Pages
 
         public static LootFilterGroup CreateWeaponAmmoGroup()
         {
-            var groupName = Memory?.LocalPlayer.Hands.CurrentItem;
-            var weaponBsgId = Memory?.LocalPlayer.Hands.CurrentItemId;
+            var groupName = Memory.LocalPlayer?.Hands.CurrentItem;
+            var weaponBsgId = Memory.LocalPlayer?.Hands.CurrentItemId;
 
             if (string.IsNullOrEmpty(groupName) || string.IsNullOrEmpty(weaponBsgId))
                 return null;

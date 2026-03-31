@@ -6,7 +6,6 @@ using eft_dma_radar.Tarkov.QuestPlanner.Models;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 using eft_dma_radar.UI.Misc;
 using SDK;
-using static eft_dma_radar.Tarkov.MemoryInterface;
 
 namespace eft_dma_radar.Tarkov.QuestPlanner;
 
