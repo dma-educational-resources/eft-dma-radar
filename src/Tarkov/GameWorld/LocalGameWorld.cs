@@ -695,38 +695,25 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 {
                     _raidStarted = true;
 
-                    // Fire feature hooks async so we don't block the caller
+                    // Trigger player stats fetch for any player whose accountId was
+                    // already seeded from a previous corpse dogtag read.
                     Task.Run(() =>
                     {
-                        foreach (var feature in IFeature.AllFeatures)
-                        {
-                            try
-                            {
-                                feature.OnRaidStart();
-                            }
-                            catch (Exception ex)
-                            {
-                                Log.WriteLine($"[Raid] OnRaidStart error in {feature.GetType().Name}: {ex}");
-                            }
-                        }
                         foreach (var player in Memory.Players)
                         {
                             if (player is null)
                                 continue;
                             try
                             {
-                                // Trigger stats fetch if this player's accountId was already
-                                // seeded from a previous corpse dogtag read.
                                 var cached = PlayerLookupApiClient.TryGetCached(player.ProfileID);
                                 if (cached?.AccountId is string acctId)
                                     EFTProfileService.RegisterProfile(acctId);
                             }
                             catch (Exception ex)
                             {
-                                Log.WriteLine($"[Raid] OnRaidStart error in Player {player}: {ex}");
+                                Log.WriteLine($"[Raid] EFTProfileService error for Player {player}: {ex}");
                             }
                         }
-                        Log.WriteLine("[Raid] Raid fully active, all features notified.");
                     });
                 }
 
@@ -1209,18 +1196,6 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     Interlocked.Exchange(ref _lastDisposedBase, Base);
 
                 Log.WriteLine("[Raid] LocalGameWorld disposed — entering cooldown.");
-
-                foreach (var feature in IFeature.AllFeatures)
-                {
-                    try
-                    {
-                        feature.OnRaidEnd();
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.WriteLine($"[Raid] OnRaidEnd error in {feature.GetType().Name}: {ex}");
-                    }
-                }
 
                 _raidStarted = false;
 
