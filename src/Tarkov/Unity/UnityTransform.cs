@@ -39,6 +39,7 @@ namespace eft_dma_radar.Common.Unity
 
             // Read TransformAccess
             var ta = Memory.ReadValue<TransformAccess>(transformInternal, useCache);
+            ArgumentOutOfRangeException.ThrowIfNegative(ta.Index, nameof(ta.Index));
             ArgumentOutOfRangeException.ThrowIfGreaterThan(ta.Index, 150000, nameof(ta.Index));
             ta.Hierarchy.ThrowIfInvalidVirtualAddress();
 

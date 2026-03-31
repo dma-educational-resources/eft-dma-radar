@@ -21,6 +21,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
         private readonly HashSet<ulong> _registeredScratch = new(64);
         private const int MAX_FAIL_COUNT = 5;
         private static readonly TimeSpan FAIL_RETRY_COOLDOWN = TimeSpan.FromSeconds(2);
+        /// <summary>
+        /// Maximum number of new player allocations allowed per Refresh() tick.
+        /// Prevents a burst of scav spawns from flooding concurrent DMA reads.
+        /// </summary>
+        private const int MAX_ALLOCS_PER_TICK = 3;
         private int _refreshTick;
 
         /// <summary>
@@ -57,6 +62,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                         _registeredScratch.Add(addr);
                 var registered = _registeredScratch;
                 int i = -1;
+                int allocsThisTick = 0;
                 // Allocate New Players
                 foreach (var playerBase in registered)
                 {
@@ -74,6 +80,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     }
                     else // Add New Player
                     {
+                        // Throttle new allocations per tick to avoid burst DMA overload
+                        if (allocsThisTick >= MAX_ALLOCS_PER_TICK)
+                            continue;
+
                         // Check if we should skip due to repeated failures
                         if (_failedAllocations.TryGetValue(playerBase, out var failInfo))
                         {
@@ -83,6 +93,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                                 continue;
                         }
 
+                        allocsThisTick++;
                         if (Player.Allocate(_players, playerBase))
                         {
                             _failedAllocations.TryRemove(playerBase, out _); // Clear fail count on success
