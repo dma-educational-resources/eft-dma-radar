@@ -130,21 +130,81 @@ namespace eft_dma_radar.Misc
             throw new AggregateException("DmaInputManager: Win11 key state resolution failed across all csrss PIDs", exceptions);
         }
 
-        // Win10: gafAsyncKeyState is a direct export of win32kbase.sys in winlogon's kernel memory.
+        // Win10: gafAsyncKeyState is a direct export of win32kbase.sys.
+        // On some builds (e.g. 19045) it is not in the EAT — fall back to signature scan.
         private ulong ResolveWin10KeyState()
         {
             uint kernelPid = _winLogonPid | Vmm.PID_PROCESS_WITH_KERNELMEMORY;
-            var eatEntries = _vmm.Map_GetEAT(kernelPid, "win32kbase.sys", out _);
-            if (eatEntries == null)
-                throw new Exception("DmaInputManager: Map_GetEAT failed for win32kbase.sys");
 
-            foreach (var entry in eatEntries)
+            // Try EAT first (present on many Win10 builds)
+            var eatEntries = _vmm.Map_GetEAT(kernelPid, "win32kbase.sys", out _);
+            if (eatEntries != null)
             {
-                if (entry.sFunction == "gafAsyncKeyState")
-                    return entry.vaFunction;
+                foreach (var entry in eatEntries)
+                {
+                    if (entry.sFunction == "gafAsyncKeyState")
+                        return entry.vaFunction;
+                }
             }
 
-            throw new Exception("DmaInputManager: gafAsyncKeyState not found in win32kbase.sys EAT");
+            // EAT export absent — fall back to RIP-relative signature scan
+            return ResolveWin10KeyStateScan(kernelPid);
+        }
+
+        /// <summary>
+        /// Win10 fallback: scans win32kbase.sys for the RIP-relative MOV that loads gafAsyncKeyState.
+        /// Handles builds (e.g. 19045) where the symbol is present but not EAT-exported.
+        /// </summary>
+        private ulong ResolveWin10KeyStateScan(uint kernelPid)
+        {
+            // Locate win32kbase.sys — try winlogon+kernel context first, then csrss.exe
+            ulong baseStart = 0, baseEnd = 0;
+            uint scanPid = kernelPid;
+
+            if (_vmm.Map_GetModuleFromName(kernelPid, "win32kbase.sys", out var kMod))
+            {
+                baseStart = kMod.vaBase;
+                baseEnd   = baseStart + kMod.cbImageSize;
+            }
+            else
+            {
+                var csrssPids = _vmm.PidGetAllFromName("csrss.exe");
+                if (csrssPids != null)
+                {
+                    foreach (uint pid in csrssPids)
+                    {
+                        if (_vmm.Map_GetModuleFromName(pid, "win32kbase.sys", out var mod))
+                        {
+                            scanPid   = pid;
+                            baseStart = mod.vaBase;
+                            baseEnd   = baseStart + mod.cbImageSize;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (baseStart == 0)
+                throw new Exception("DmaInputManager: failed to locate win32kbase.sys for Win10 signature scan");
+
+            // Win10 19041-19045 typical pattern:
+            //   48 8B 05 xx xx xx xx   mov rax, [rip+rel32]   rip+7+rel32 = &gafAsyncKeyState
+            //   48 63 D1               movsxd rdx, ecx
+            //   0F B6 44 10 08         movzx eax, byte [rax+rdx+8]
+            ulong ptr = _vmm.FindSignature(scanPid, "48 8B 05 ?? ?? ?? ?? 48 63 D1 0F B6 44 10 08", baseStart, baseEnd);
+            if (ptr == 0)
+                ptr = _vmm.FindSignature(scanPid, "48 8B 05 ?? ?? ?? ?? 48 63 D1 0F B6 44 10 00", baseStart, baseEnd);
+            if (ptr == 0)
+                ptr = _vmm.FindSignature(scanPid, "48 8B 05 ?? ?? ?? ?? 48 8B 04 C8 0F B6 04 10 83 E0 01", baseStart, baseEnd);
+            if (ptr == 0)
+                throw new Exception("DmaInputManager: gafAsyncKeyState not found via EAT or signature scan (Win10)");
+
+            int relative = _vmm.MemReadValue<int>(kernelPid, ptr + 3);
+            ulong result = ptr + 7 + (ulong)relative;
+            if (IsValidKernelVA(result))
+                return result;
+
+            throw new Exception($"DmaInputManager: Win10 signature scan returned invalid kernel VA 0x{result:X}");
         }
 
         private static bool IsValidKernelVA(ulong va) => va > 0x7FFFFFFFFFFFUL;
