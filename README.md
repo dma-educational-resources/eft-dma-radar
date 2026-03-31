@@ -1,11 +1,4 @@
-# Lone's EFT DMA Radar
-
-### As of 1/03/2026, no more features will be added & only offsets will be maintained
-
-<img width="512" height="512" alt="image" src="https://github.com/user-attachments/assets/e2bb2567-539c-43c7-87c5-1ffe59e97d4d" />
-
-## What is this?
-- This is an up-to-date build of Lone DMA EFT/Arena Radar. This is a standalone copy of the software with *No Restrictions*.
+# Lex's EFT DMA Radar Fork
 
 ## How do I start using this?
 1. Download & extract the solution
@@ -13,9 +6,6 @@
 3. Publish the `eft-dma-radar` or `arena-dma-radar` project
 4. If required, locate & move the `libSkiaSharp.dll` & `libHarfBuzzSharp.dll` from the `publish/runtimes` folder into `publish` folder
 5. Run `eft-dma-radar.exe` or `arena-dma-radar.exe` depending on what you've published
-
-## Arena
-- Arena is supported and will be maintained going forward.
 
 ## Donations
 - If you would like to donate to x0m:
