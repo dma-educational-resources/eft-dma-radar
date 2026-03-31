@@ -1,4 +1,4 @@
-# Lex's EFT DMA Radar Fork
+# EFT DMA Radar
 
 ### Currently Maintained by Keeegi
 
