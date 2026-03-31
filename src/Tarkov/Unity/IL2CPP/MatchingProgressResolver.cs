@@ -51,6 +51,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         // ── Tracks whether NotifyRaidStarted() already printed the session summary ──
         private static volatile bool _sessionSummaryLogged;
 
+        // ── Set once GameWorld is confirmed; blocks TryUpdateStage / ResolveAsync ──
+        private static volatile bool _raidStarted;
+
         // ─────────────────────────────────────────────────────────────────────────
         // Public API
         // ─────────────────────────────────────────────────────────────────────────
@@ -63,6 +66,10 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         /// </summary>
         public static void NotifyRaidStarted()
         {
+            if (_raidStarted)
+                return;
+
+            _raidStarted = true;
             _totalSw.Stop();
             StopStagePoller();
 
@@ -125,6 +132,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             _consecutiveGomFailures = 0;
             _resolvingAsync = 0;
             _sessionSummaryLogged = false;
+            _raidStarted = false;
             Log.Write(AppLogLevel.Debug, "Cache invalidated.", "MatchingProgressResolver");
         }
 
@@ -148,6 +156,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         /// </summary>
         public static void ResolveAsync()
         {
+            if (_raidStarted)
+                return;
+
             if (Interlocked.CompareExchange(ref _resolvingAsync, 1, 0) != 0)
                 return;
 
@@ -253,6 +264,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         /// </summary>
         public static bool TryUpdateStage()
         {
+            if (_raidStarted)
+                return false;
+
             ulong mp;
             lock (_lock)
                 mp = _cachedMatchingProgress;

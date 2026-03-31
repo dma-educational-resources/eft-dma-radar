@@ -226,7 +226,23 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 Log.WriteLine("[Raid] Mid-raid entry detected, skipping camera init delay.");
             }
 
-            InitializeGameData(ct);
+            const int maxInitAttempts = 10;
+            for (int initAttempt = 1; initAttempt <= maxInitAttempts; initAttempt++)
+            {
+                ct.ThrowIfCancellationRequested();
+                try
+                {
+                    InitializeGameData(ct);
+                    break;
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex) when (initAttempt < maxInitAttempts)
+                {
+                    Log.WriteLine($"[Raid] Game data init attempt {initAttempt}/{maxInitAttempts} failed ({ex.Message}), retrying in 3s...");
+                    ct.WaitHandle.WaitOne(3000);
+                }
+            }
+
             Log.WriteLine("[Raid] Waiting for real raid start...");
 
             if (IsInRealRaid())
