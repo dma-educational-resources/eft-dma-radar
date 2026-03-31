@@ -2193,7 +2193,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             {
                 string name = Name;
                 if (IsHostilePmc)
-                    name = (PlayerSide == Enums.EPlayerSide.Usec ? "U:" : "B:") + name;
+                {
+                    string prefix = PlayerSide == Enums.EPlayerSide.Usec ? "U:" : "B:";
+                    if (!name.StartsWith(prefix, StringComparison.Ordinal))
+                        name = prefix + name;
+                }
 
                 canvas.DrawText(name, new SKPoint(headPoint.X, textY), SKTextAlign.Center, SKPaints.ESPFontMedium12, textPaint);
             }
