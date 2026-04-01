@@ -578,6 +578,29 @@ namespace eft_dma_radar.DMA
                 throw new VmmException("Memory Read Failed!");
         }
 
+        /// <summary>
+        /// Reads the PE header TimeDateStamp and SizeOfImage from a remote module base address.
+        /// Together these form a cheap version fingerprint that changes when a module is rebuilt.
+        /// Returns (0, 0) on any read failure.
+        /// </summary>
+        public static (uint Timestamp, uint SizeOfImage) ReadPeFingerprint(ulong moduleBase)
+        {
+            try
+            {
+                uint eLfanew = ReadValue<uint>(moduleBase + 0x3C, false);
+                if (eLfanew == 0 || eLfanew > 0x1000)
+                    return (0, 0);
+
+                uint timestamp = ReadValue<uint>(moduleBase + eLfanew + 8, false);
+                uint sizeOfImage = ReadValue<uint>(moduleBase + eLfanew + 0x50, false);
+                return (timestamp, sizeOfImage);
+            }
+            catch
+            {
+                return (0, 0);
+            }
+        }
+
         #endregion
 
         #region Signature Scanning

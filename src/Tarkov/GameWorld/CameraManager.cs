@@ -8,9 +8,12 @@
 
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
@@ -35,6 +38,28 @@ namespace eft_dma_radar.Tarkov.GameWorld
         private static ulong _allCamerasAddr;
         private static bool _staticInitDone;
         private static bool _debugDumpDone;
+
+        // ── Camera offset cache ─────────────────────────────────────────────────
+
+        private static readonly string CameraCacheFilePath =
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                         "eft-dma-radar-public", "camera_offsets.json");
+
+        private static readonly JsonSerializerOptions _jsonOpts = new()
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        };
+
+        private sealed class CameraOffsetCache
+        {
+            public uint UnityPlayerTimestamp { get; set; }
+            public uint UnityPlayerSizeOfImage { get; set; }
+            public ulong AllCamerasRva { get; set; }
+            public uint ViewMatrix { get; set; }
+            public uint FOV { get; set; }
+            public uint AspectRatio { get; set; }
+        }
         private Action<ScatterReadIndex>? _viewMatrixCallback;
         private Action<ScatterReadIndex>? _fovAspectCallback;
 
@@ -74,9 +99,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         /// <summary>
         /// Pre-warms static camera data on game startup (once per game session).
-        /// Resolves the AllCameras global address and Camera struct offsets via
-        /// signature scan. Does NOT attempt to find CameraManager.Instance —
-        /// that is a per-raid operation performed in the constructor.
+        /// Tries to restore AllCameras address and Camera struct offsets from a
+        /// cached file (validated by PE fingerprint), falling back to signature
+        /// scans on UnityPlayer.dll if the cache is absent or stale.
+        /// Does NOT attempt to find CameraManager.Instance — that is a per-raid
+        /// operation performed in the constructor.
         /// </summary>
         public static void Initialize()
         {
@@ -84,14 +111,147 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 return;
             try
             {
+                // Fast path: restore from cache if UnityPlayer.dll hasn't changed.
+                if (TryLoadCameraCache())
+                {
+                    _staticInitDone = true;
+                    return;
+                }
+
+                // Slow path: signature scan.
                 _allCamerasAddr = ResolveAllCamerasAddr();
                 ResolveCameraOffsets();
                 _staticInitDone = true;
+
+                SaveCameraCache();
                 DebugDumpStateOnce();
             }
             catch (Exception ex)
             {
                 Log.Write(AppLogLevel.Error, $"Static pre-warm failed: {ex.Message}", "CameraManager");
+            }
+        }
+
+        // ── Camera offset cache persistence ─────────────────────────────────────
+
+        /// <summary>
+        /// Tries to restore AllCameras address and Camera struct offsets from the
+        /// cache file.  Uses the UnityPlayer.dll PE header fingerprint to ensure
+        /// the cached values belong to the same binary.
+        /// </summary>
+        private static bool TryLoadCameraCache()
+        {
+            try
+            {
+                if (!File.Exists(CameraCacheFilePath))
+                    return false;
+
+                var unityBase = Memory.UnityBase;
+                if (!unityBase.IsValidVirtualAddress())
+                    return false;
+
+                var (timestamp, sizeOfImage) = Memory.ReadPeFingerprint(unityBase);
+                if (timestamp == 0 || sizeOfImage == 0)
+                    return false;
+
+                var json = File.ReadAllText(CameraCacheFilePath);
+                var cache = JsonSerializer.Deserialize<CameraOffsetCache>(json, _jsonOpts);
+                if (cache is null)
+                    return false;
+
+                // Old files or PE mismatch → stale.
+                if (cache.UnityPlayerTimestamp != timestamp || cache.UnityPlayerSizeOfImage != sizeOfImage)
+                {
+                    Log.Write(AppLogLevel.Info, "Camera cache PE mismatch — will sig-scan.", "CameraManager");
+                    return false;
+                }
+
+                if (cache.AllCamerasRva == 0 || cache.ViewMatrix == 0 || cache.FOV == 0 || cache.AspectRatio == 0)
+                    return false;
+
+                // Compute absolute address and validate the AllCameras pointer.
+                ulong resolvedAddr = unityBase + cache.AllCamerasRva;
+                if (!ValidateAllCamerasAddr(resolvedAddr))
+                {
+                    Log.Write(AppLogLevel.Warning, "Camera cache AllCameras validation failed — will sig-scan.", "CameraManager");
+                    return false;
+                }
+
+                _allCamerasAddr = resolvedAddr;
+                UnityOffsets.Camera.ViewMatrix = cache.ViewMatrix;
+                UnityOffsets.Camera.FOV = cache.FOV;
+                UnityOffsets.Camera.AspectRatio = cache.AspectRatio;
+
+                Log.Write(AppLogLevel.Info,
+                    $"Camera offsets restored from cache (AllCameras RVA=0x{cache.AllCamerasRva:X}, " +
+                    $"VM=0x{cache.ViewMatrix:X}, FOV=0x{cache.FOV:X}, AR=0x{cache.AspectRatio:X})",
+                    "CameraManager");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Write(AppLogLevel.Warning, $"Camera cache load failed: {ex.Message}", "CameraManager");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Persists the currently resolved AllCameras RVA and Camera struct offsets
+        /// along with the UnityPlayer.dll PE fingerprint.
+        /// </summary>
+        private static void SaveCameraCache()
+        {
+            try
+            {
+                var unityBase = Memory.UnityBase;
+                if (!unityBase.IsValidVirtualAddress() || !_allCamerasAddr.IsValidVirtualAddress())
+                    return;
+
+                var (timestamp, sizeOfImage) = Memory.ReadPeFingerprint(unityBase);
+
+                var cache = new CameraOffsetCache
+                {
+                    UnityPlayerTimestamp = timestamp,
+                    UnityPlayerSizeOfImage = sizeOfImage,
+                    AllCamerasRva = _allCamerasAddr - unityBase,
+                    ViewMatrix = UnityOffsets.Camera.ViewMatrix,
+                    FOV = UnityOffsets.Camera.FOV,
+                    AspectRatio = UnityOffsets.Camera.AspectRatio,
+                };
+
+                var json = JsonSerializer.Serialize(cache, _jsonOpts);
+                Directory.CreateDirectory(Path.GetDirectoryName(CameraCacheFilePath)!);
+                File.WriteAllText(CameraCacheFilePath, json);
+                Log.Write(AppLogLevel.Info, $"Camera cache saved → {CameraCacheFilePath}", "CameraManager");
+            }
+            catch (Exception ex)
+            {
+                Log.Write(AppLogLevel.Warning, $"Camera cache save failed: {ex.Message}", "CameraManager");
+            }
+        }
+
+        /// <summary>
+        /// Quick validation of an AllCameras address: reads the list header and
+        /// checks that items pointer and count look sane.
+        /// </summary>
+        private static bool ValidateAllCamerasAddr(ulong addr)
+        {
+            try
+            {
+                if (!addr.IsValidVirtualAddress())
+                    return false;
+
+                var listPtr = Memory.ReadPtr(addr, false);
+                if (!listPtr.IsValidVirtualAddress())
+                    return false;
+
+                var items = Memory.ReadPtr(listPtr, false);
+                int count = Memory.ReadValue<int>(listPtr + 0x8, false);
+                return items.IsValidVirtualAddress() && count >= 0 && count < 1024;
+            }
+            catch
+            {
+                return false;
             }
         }
 

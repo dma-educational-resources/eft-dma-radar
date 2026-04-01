@@ -34,6 +34,19 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             public ulong TypeInfoTableRva { get; set; }
 
             /// <summary>
+            /// PE header TimeDateStamp of GameAssembly.dll when the cache was written.
+            /// Together with <see cref="GameAssemblySizeOfImage"/> this forms a cheap
+            /// fingerprint that lets us skip the expensive TypeInfoTableRva sig scan
+            /// when the game binary has not changed.
+            /// </summary>
+            public uint GameAssemblyTimestamp { get; set; }
+
+            /// <summary>
+            /// PE header SizeOfImage of GameAssembly.dll when the cache was written.
+            /// </summary>
+            public uint GameAssemblySizeOfImage { get; set; }
+
+            /// <summary>
             /// All static offset fields from every nested struct inside
             /// <see cref="Offsets"/>, keyed as "StructName.FieldName".
             /// Values are stored as strings to handle both uint and ulong cleanly.
@@ -58,9 +71,13 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         {
             try
             {
+                var (timestamp, sizeOfImage) = Memory.ReadPeFingerprint(Memory.GameAssemblyBase);
+
                 var cache = new OffsetCache
                 {
                     TypeInfoTableRva = Offsets.Special.TypeInfoTableRva,
+                    GameAssemblyTimestamp = timestamp,
+                    GameAssemblySizeOfImage = sizeOfImage,
                     Fields = CollectAllFields(),
                 };
 
@@ -122,6 +139,56 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             catch (Exception ex)
             {
                 Log.WriteLine($"[Il2CppDumper] Cache load FAILED: {ex.Message} — will perform live dump.");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Fast-path cache loader that uses the GameAssembly.dll PE header fingerprint
+        /// (TimeDateStamp + SizeOfImage) to validate the cache <em>before</em> the
+        /// expensive TypeInfoTableRva sig scan.  When the game binary has not changed,
+        /// this lets us restore all offsets in &lt;1 ms and skip the sig scan entirely.
+        /// </summary>
+        /// <returns>
+        /// <c>true</c> if the cache was loaded and applied successfully;
+        /// <c>false</c> if the PE fingerprint does not match, the cache is absent/corrupt, etc.
+        /// </returns>
+        internal static bool TryFastLoadCache(ulong gaBase)
+        {
+            try
+            {
+                if (!File.Exists(CacheFilePath))
+                    return false;
+
+                var (timestamp, sizeOfImage) = Memory.ReadPeFingerprint(gaBase);
+                if (timestamp == 0 || sizeOfImage == 0)
+                    return false;
+
+                var json = File.ReadAllText(CacheFilePath);
+                var cache = JsonSerializer.Deserialize<OffsetCache>(json, _jsonOpts);
+
+                if (cache is null || cache.Fields.Count == 0)
+                    return false;
+
+                // Old cache files won't have PE fields → values default to 0 → mismatch → fall through.
+                if (cache.GameAssemblyTimestamp != timestamp || cache.GameAssemblySizeOfImage != sizeOfImage)
+                {
+                    Log.WriteLine("[Il2CppDumper] PE fingerprint mismatch (game updated?) — will perform fresh dump.");
+                    return false;
+                }
+
+                // Restore the TypeInfoTableRva that was stored alongside the offsets
+                // so downstream code doesn't need to sig-scan for it.
+                if (cache.TypeInfoTableRva != 0)
+                    Offsets.Special.TypeInfoTableRva = cache.TypeInfoTableRva;
+
+                int applied = ApplyCachedFields(cache.Fields);
+                Log.WriteLine($"[Il2CppDumper] Fast cache loaded (PE match) — {applied}/{cache.Fields.Count} fields applied.");
+                return applied > 0;
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[Il2CppDumper] Fast cache load failed: {ex.Message}");
                 return false;
             }
         }

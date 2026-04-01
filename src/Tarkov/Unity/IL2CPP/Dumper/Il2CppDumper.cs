@@ -109,6 +109,16 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 return;
             }
 
+            // ── Fastest path: PE fingerprint match ──────────────────────────────
+            // If the GameAssembly.dll binary hasn't changed since the last dump,
+            // skip the expensive TypeInfoTableRva sig scan entirely and restore
+            // all offsets directly from the cache file.
+            if (TryFastLoadCache(gaBase))
+            {
+                _dumped = true;
+                return;
+            }
+
             // Dynamically resolve TypeInfoTableRva via sig scan (falls back to hardcoded).
             // We must do this even for the cache path so we have the RVA fingerprint
             // needed to validate whether the cache matches the current game build.
@@ -146,6 +156,10 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             {
                 _dumped = true;
                 Log.WriteLine("[Il2CppDumper] Offsets restored from cache — live dump skipped.");
+
+                // Re-save so the PE fingerprint is persisted for the fast-path
+                // (TryFastLoadCache) on the next startup.
+                SaveCache();
                 return;
             }
 
