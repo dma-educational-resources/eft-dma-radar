@@ -389,7 +389,7 @@ namespace eft_dma_radar.Tarkov.API
         public sealed class OverAllCountersItem
         {
             [JsonPropertyName("Key")]
-            public List<string> Key { get; set; } = new();
+            public List<string> Key { get; set; } = [];
 
             [JsonPropertyName("Value")]
             public int Value { get; set; }

@@ -1791,7 +1791,7 @@ namespace eft_dma_radar.UI.Misc
         /// Selected containers to display.
         /// </summary>
         [JsonPropertyName("selected")]
-        public List<string> Selected { get; set; } = new List<string>();
+        public List<string> Selected { get; set; } = [];
     }
 
     /// <summary>

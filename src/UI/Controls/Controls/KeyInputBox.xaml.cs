@@ -76,7 +76,7 @@ namespace eft_dma_radar.UI.Controls
 
         private bool _isCapturing = false;
         private bool _useInputManager = false;
-        private readonly List<int> _registeredActionIds = new List<int>();
+        private readonly List<int> _registeredActionIds = [];
         private readonly object _captureLock = new object();
         private bool _ignoreLeftMouseUntilRelease = false;
         private bool _leftMouseCurrentlyPressed = false;

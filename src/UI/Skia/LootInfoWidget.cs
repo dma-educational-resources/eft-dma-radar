@@ -12,7 +12,7 @@ namespace eft_dma_radar.UI.SKWidgetControl
 {
     public sealed class LootInfoWidget : SKWidget
     {
-        private readonly List<(float TopY, float BottomY, string ItemName)> _itemRows = new List<(float, float, string)>();
+        private readonly List<(float TopY, float BottomY, string ItemName)> _itemRows = [];
 
         /// <summary>
         /// Constructs a Loot Info Overlay.

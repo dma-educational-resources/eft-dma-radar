@@ -12,9 +12,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
         private static volatile bool _loaded = false;
 
-        private static ulong[] _typeTable = Array.Empty<ulong>();
-        private static ulong[] _namePtr = Array.Empty<ulong>();
-        private static ulong[] _nsPtr = Array.Empty<ulong>();
+        private static ulong[] _typeTable = [];
+        private static ulong[] _namePtr = [];
+        private static ulong[] _nsPtr = [];
 
         private static ulong _lastGA = 0;
         private static ulong _lastTablePtr = 0;
@@ -32,9 +32,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             Debug.WriteLine($"[Il2CppClass] Reset ?¡§? {reason}");
 
             _loaded = false;
-            _typeTable = Array.Empty<ulong>();
-            _namePtr = Array.Empty<ulong>();
-            _nsPtr = Array.Empty<ulong>();
+            _typeTable = [];
+            _namePtr = [];
+            _nsPtr = [];
             _cache.Clear();
 
             _lastGA = 0;
@@ -214,9 +214,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             {
                 _loaded = false;
                 _cache.Clear();
-                _typeTable = Array.Empty<ulong>();
-                _namePtr = Array.Empty<ulong>();
-                _nsPtr = Array.Empty<ulong>();
+                _typeTable = [];
+                _namePtr = [];
+                _nsPtr = [];
             }
         }
     }

@@ -15,7 +15,7 @@ namespace eft_dma_radar.UI.SKWidgetControl
     public abstract class SKWidget : IDisposable
     {
         #region Static Fields
-        private static readonly List<SKWidget> _widgets = new();
+        private static readonly List<SKWidget> _widgets = [];
         private static readonly object _widgetsLock = new();
         private static SKWidget _capturedWidget = null;
         #endregion

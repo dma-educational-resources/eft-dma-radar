@@ -15,7 +15,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
         private static readonly uint[] _toSyncObjects = [Offsets.GameWorld.SynchronizableObjectLogicProcessor, Offsets.SynchronizableObjectLogicProcessor._activeSynchronizableObjects];
         private readonly ulong _localGameWorld = localGameWorld;
         private readonly ConcurrentDictionary<ulong, IExplosiveItem> _explosives = new();
-        private readonly List<ulong> _expiredKeys = new();
+        private readonly List<ulong> _expiredKeys = [];
         private ulong _grenadesBase;
 
         private void Init()

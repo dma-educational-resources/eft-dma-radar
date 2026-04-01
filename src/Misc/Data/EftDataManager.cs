@@ -515,10 +515,10 @@ namespace eft_dma_radar.Common.Misc.Data
             public string NameId { get; set; }
 
             [JsonPropertyName("extracts")]
-            public List<ExtractElement> Extracts { get; set; } = new();
+            public List<ExtractElement> Extracts { get; set; } = [];
 
             [JsonPropertyName("transits")]
-            public List<TransitElement> Transits { get; set; } = new();
+            public List<TransitElement> Transits { get; set; } = [];
         }
 
         public class ExtractElement

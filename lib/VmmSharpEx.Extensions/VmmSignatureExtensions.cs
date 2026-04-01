@@ -20,13 +20,13 @@ namespace VmmSharpEx.Extensions
         public static ulong[] FindSignatures(this Vmm vmm, uint pid, string signature, string moduleName, int maxMatches = int.MaxValue)
         {
             if (string.IsNullOrWhiteSpace(signature) || maxMatches <= 0)
-                return Array.Empty<ulong>();
+                return [];
             if (!TryParseSignature(signature, out var pattern))
-                return Array.Empty<ulong>();
+                return [];
 
             var moduleBase = vmm.ProcessGetModuleBase(pid, moduleName);
             if (moduleBase == 0 || moduleBase == ulong.MaxValue)
-                return Array.Empty<ulong>();
+                return [];
 
             const ulong MAX_SEARCH_SIZE = 0xC800000;
             const ulong CHUNK_SIZE = 0x1000000;
@@ -45,17 +45,17 @@ namespace VmmSharpEx.Extensions
                     if (results.Count >= maxMatches) break;
                 }
             }
-            return results.ToArray();
+            return [.. results];
         }
 
         private static ulong[] FindSignaturesInRange(Vmm vmm, uint pid, byte?[] pattern, ulong rangeStart, ulong rangeEnd, int maxMatches)
         {
             if (pattern.Length == 0 || rangeStart >= rangeEnd || maxMatches <= 0)
-                return Array.Empty<ulong>();
+                return [];
 
             byte[] buffer = vmm.MemRead(pid, rangeStart, (uint)(rangeEnd - rangeStart), out _, VmmFlags.NOCACHE);
             if (buffer is null || buffer.Length < pattern.Length)
-                return Array.Empty<ulong>();
+                return [];
 
             var matches = new List<ulong>(Math.Min(maxMatches, 32));
             int lastStart = buffer.Length - pattern.Length;
@@ -71,20 +71,20 @@ namespace VmmSharpEx.Extensions
                 matches.Add(rangeStart + (ulong)i);
                 if (matches.Count >= maxMatches) break;
             }
-            return matches.ToArray();
+            return [.. matches];
         }
 
         private static bool TryParseSignature(string signature, out byte?[] pattern)
         {
             var parts = signature.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            if (parts.Length == 0) { pattern = Array.Empty<byte?>(); return false; }
+            if (parts.Length == 0) { pattern = []; return false; }
             pattern = new byte?[parts.Length];
             for (int i = 0; i < parts.Length; i++)
             {
                 var part = parts[i];
                 if (part is "?" or "??") { pattern[i] = null; continue; }
                 if (part.Length != 2 || !byte.TryParse(part, System.Globalization.NumberStyles.HexNumber, null, out var b))
-                { pattern = Array.Empty<byte?>(); return false; }
+                { pattern = []; return false; }
                 pattern[i] = b;
             }
             return true;

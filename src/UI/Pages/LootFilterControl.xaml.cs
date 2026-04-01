@@ -1634,7 +1634,7 @@ namespace eft_dma_radar.UI.Pages
             }
             else
             {
-                var names = search?.Split(',').Select(a => a.Trim()).ToArray() ?? Array.Empty<string>();
+                var names = search?.Split(',').Select(a => a.Trim()).ToArray() ?? [];
 
                 Predicate<LootItem> p = (x) =>
                 {

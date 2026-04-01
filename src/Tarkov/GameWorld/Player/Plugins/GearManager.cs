@@ -60,7 +60,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             _isPMC = isPMC;
 
             Equipment = FrozenDictionary<string, GearItem>.Empty;
-            Loot = Array.Empty<LootItem>();
+            Loot = [];
         }
 
         private IReadOnlyDictionary<string, ulong> Slots { get; set; }

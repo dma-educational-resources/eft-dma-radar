@@ -61,7 +61,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         {
             public string? SessionId { get; set; }
             public int NextGroupId { get; set; } = 1;
-            public List<PlayerEntry> Players { get; set; } = new();
+            public List<PlayerEntry> Players { get; set; } = [];
         }
 
         /* ==============================

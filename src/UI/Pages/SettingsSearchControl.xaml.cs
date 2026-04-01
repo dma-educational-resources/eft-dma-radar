@@ -37,7 +37,7 @@ namespace eft_dma_radar.UI.Pages
         private static Config Config => Program.Config;
 
         private bool _indexedOnce;
-        private List<SettingsIndexEntry> _index = new();
+        private List<SettingsIndexEntry> _index = [];
         #endregion
         private bool _initialized;
 

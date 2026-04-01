@@ -15,7 +15,7 @@ namespace eft_dma_radar.UI.LootFilters
 
         [JsonInclude]
         [JsonPropertyName("entries")]
-        public List<LootFilterEntry> Entries { get; init; } = new();
+        public List<LootFilterEntry> Entries { get; init; } = [];
     }
 
     public static class LootFilterManager
@@ -68,7 +68,7 @@ namespace eft_dma_radar.UI.LootFilters
         private int notTime;
         private bool enabled;
         private bool isStatic = true;
-        private List<GroupedLootFilterEntry> items = new();
+        private List<GroupedLootFilterEntry> items = [];
 
         [JsonPropertyName("index")]
         public int Index
@@ -234,6 +234,6 @@ namespace eft_dma_radar.UI.LootFilters
     public sealed class GroupedLootFilterConfig
     {
         [JsonPropertyName("groups")]
-        public List<LootFilterGroup> Groups { get; set; } = new();
+        public List<LootFilterGroup> Groups { get; set; } = [];
     }
 }

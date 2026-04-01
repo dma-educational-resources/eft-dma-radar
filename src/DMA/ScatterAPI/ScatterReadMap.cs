@@ -8,7 +8,7 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
     /// </summary>
     public sealed class ScatterReadMap : IPooledObject<ScatterReadMap>
     {
-        private readonly List<ScatterReadRound> _rounds = new();
+        private readonly List<ScatterReadRound> _rounds = [];
         /// <summary>
         /// [Optional] Callback(s) to be executed on completion of *all* scatter read executions.
         /// NOTE: Be sure to handle exceptions!

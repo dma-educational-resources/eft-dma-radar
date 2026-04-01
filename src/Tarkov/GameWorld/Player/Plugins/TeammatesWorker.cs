@@ -71,7 +71,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         private sealed class TeammatesFile
         {
             public string? SessionId { get; set; }
-            public List<TeammateEntry> Players { get; set; } = new();
+            public List<TeammateEntry> Players { get; set; } = [];
         }
 
         /* ==============================

@@ -372,7 +372,7 @@ namespace eft_dma_radar.UI.Misc
     {
         public string Name { get; }
         public string Id { get; }
-        public List<string> GroupedIds { get; set; } = new();
+        public List<string> GroupedIds { get; set; } = [];
 
         private bool _isSelected;
         public bool IsSelected
