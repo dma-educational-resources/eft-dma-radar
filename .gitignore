@@ -364,3 +364,6 @@ FodyWeavers.xsd
 /src/bin
 
 .planning/
+
+# Native DLLs in repo root (now bundled by VmmSharpEx NuGet)
+/*.dll

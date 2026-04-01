@@ -105,5 +105,13 @@
 	  <Folder Include="Tarkov\Unity\LowLevel\Hooks\" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <None Include="VmmSharpEx.Extensions\VmmSharpEx.Extensions.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\lib\VmmSharpEx.Extensions\VmmSharpEx.Extensions.csproj" />
+	</ItemGroup>
+
 </Project>
 

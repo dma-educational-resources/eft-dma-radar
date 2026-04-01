@@ -9,10 +9,8 @@ using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.Tarkov.GameWorld.Exits;
 using eft_dma_radar.Tarkov.GameWorld.Explosives;
-using eft_dma_radar.Tarkov.Hideout;
 using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
-using System.Buffers;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -63,7 +61,6 @@ namespace eft_dma_radar.DMA
         public static bool Ready => _ready;
         public static bool Starting => _starting;
         public static bool InRaid => Game?.InRaid ?? false;
-        public static bool RaidHasStarted => Game?.RaidHasStarted ?? false;
         public static bool IsOffline => LocalGameWorld.IsOffline;
         public static ulong LevelSettings => LocalGameWorld.LevelSettings;
 
@@ -74,7 +71,6 @@ namespace eft_dma_radar.DMA
         public static LootManager Loot => Game?.Loot;
         public static QuestManager QuestManager => Game?.QuestManager;
         public static LocalGameWorld Game { get; private set; }
-        public static HideoutManager Hideout { get; } = new();
 
         public static bool RestartRadar
         {
@@ -417,7 +413,7 @@ namespace eft_dma_radar.DMA
             GCSettings.LatencyMode = GCLatencyMode.Interactive;
             _syncInRaid.Reset();
             Game = null;
-            Hideout.Reset();
+            Program.Hideout.Reset();
         }
 
         /// <summary>Blocks until the game process is running.</summary>
@@ -469,17 +465,9 @@ namespace eft_dma_radar.DMA
         #region Read Methods
 
         /// <summary>
-        /// Prefetch pages into the cache.
-        /// </summary>
-        public static void ReadCache(params ulong[] va)
-        {
-            _vmm.MemPrefetchPages(_pid, va.AsSpan());
-        }
-
-        /// <summary>
         /// Read memory into a buffer of type <typeparamref name="T"/>.
         /// </summary>
-        public static void ReadBuffer<T>(ulong addr, Span<T> buffer, bool useCache = true, bool allowPartialRead = false)
+        public static void ReadBuffer<T>(ulong addr, Span<T> buffer, bool useCache = true)
             where T : unmanaged
         {
             var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
@@ -500,44 +488,25 @@ namespace eft_dma_radar.DMA
         }
 
         /// <summary>
-        /// Read an array of type <typeparamref name="T"/> from memory into a pooled buffer.
-        /// IMPORTANT: Caller must call <see cref="IDisposable.Dispose"/> on the returned value.
-        /// </summary>
-        public static IMemoryOwner<T> ReadPooled<T>(ulong addr, int count, bool useCache = true)
-            where T : unmanaged
-        {
-            var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
-            return _vmm.MemReadPooled<T>(_pid, addr, count, flags) ??
-                throw new VmmException("Memory Read Failed!");
-        }
-
-        /// <summary>
         /// Read raw bytes from memory.
         /// </summary>
-        public static byte[] ReadBuffer(ulong addr, int size, bool useCache = true, bool allowIncompleteRead = false)
+        public static byte[] ReadBuffer(ulong addr, int size, bool useCache = true)
         {
-            try
-            {
-                var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
-                var buf = _vmm.MemRead(_pid, addr, (uint)size, out uint cbRead, flags);
-                if (!allowIncompleteRead && cbRead != (uint)size)
-                    throw new Exception("Incomplete memory read!");
-                return buf ?? Array.Empty<byte>();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"[DMA] ERROR reading buffer at 0x{addr:X}", ex);
-            }
+            var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
+            var buf = _vmm.MemRead(_pid, addr, (uint)size, out uint cbRead, flags);
+            if (cbRead != (uint)size)
+                throw new VmmException($"Incomplete memory read at 0x{addr:X}");
+            return buf ?? [];
         }
 
         /// <summary>
         /// Read a chain of pointers and get the final result.
         /// </summary>
-        public static ulong ReadPtrChain(ulong addr, uint[] offsets, bool useCache = true)
+        public static ulong ReadPtrChain(ulong addr, ReadOnlySpan<uint> offsets, bool useCache = true)
         {
             var pointer = addr;
-            for (var i = 0; i < offsets.Length; i++)
-                pointer = ReadPtr(pointer + offsets[i], useCache);
+            foreach (var offset in offsets)
+                pointer = ReadPtr(pointer + offset, useCache);
             return pointer;
         }
 
@@ -563,16 +532,6 @@ namespace eft_dma_radar.DMA
         }
 
         /// <summary>
-        /// Read value type/struct from specified address (out parameter variant).
-        /// </summary>
-        public static void ReadValue<T>(ulong addr, out T result, bool useCache = true)
-            where T : unmanaged, allows ref struct
-        {
-            var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
-            result = _vmm.MemReadValue<T>(_pid, addr, flags);
-        }
-
-        /// <summary>
         /// Read value type/struct from specified address multiple times to ensure the read is correct.
         /// </summary>
         public static unsafe T ReadValueEnsure<T>(ulong addr)
@@ -593,32 +552,6 @@ namespace eft_dma_radar.DMA
         }
 
         /// <summary>
-        /// Read value type/struct from specified address multiple times to ensure the read is correct (out parameter variant).
-        /// </summary>
-        public static unsafe void ReadValueEnsure<T>(ulong addr, out T result)
-            where T : unmanaged, allows ref struct
-        {
-            int cb = sizeof(T);
-            T r1 = _vmm.MemReadValue<T>(_pid, addr, VmmFlags.NOCACHE);
-            Thread.SpinWait(5);
-            T r2 = _vmm.MemReadValue<T>(_pid, addr, VmmFlags.NOCACHE);
-            Thread.SpinWait(5);
-            T r3 = _vmm.MemReadValue<T>(_pid, addr, VmmFlags.NOCACHE);
-            var b1 = new ReadOnlySpan<byte>(&r1, cb);
-            var b2 = new ReadOnlySpan<byte>(&r2, cb);
-            var b3 = new ReadOnlySpan<byte>(&r3, cb);
-            if (!b1.SequenceEqual(b2) || !b1.SequenceEqual(b3))
-                throw new VmmException("Memory Read Failed!");
-            result = r1;
-        }
-
-        public static bool TryReadValueEnsure<T>(ulong addr, out T result) where T : unmanaged
-        {
-            try { ReadValueEnsure(addr, out result); return true; }
-            catch { result = default; return false; }
-        }
-
-        /// <summary>
         /// Read null terminated ASCII/UTF8 string.
         /// </summary>
         public static string ReadString(ulong addr, int cb = 128, bool useCache = true)
@@ -632,18 +565,12 @@ namespace eft_dma_radar.DMA
         /// <summary>
         /// Read null terminated Unity string (Unicode Encoding).
         /// </summary>
-        public static string ReadUnityString(ulong addr, int length = 64, bool useCache = true)
+        public static string ReadUnityString(ulong addr, int length = 128, bool useCache = true)
         {
-            if (length % 2 != 0) length++;
-            length *= 2;
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(length, (int)0x1000, nameof(length));
-            Span<byte> buffer = stackalloc byte[length];
-            buffer.Clear();
-            ReadBuffer(addr + 0x14, buffer, useCache, true);
-            var nullIndex = buffer.FindUtf16NullTerminatorIndex();
-            return nullIndex >= 0
-                ? Encoding.Unicode.GetString(buffer[..nullIndex])
-                : Encoding.Unicode.GetString(buffer);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(length, 0x1000, nameof(length));
+            var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
+            return _vmm.MemReadString(_pid, addr + 0x14, length, Encoding.Unicode, flags) ??
+                throw new VmmException("Memory Read Failed!");
         }
 
         #endregion
@@ -651,106 +578,26 @@ namespace eft_dma_radar.DMA
         #region Signature Scanning
 
         /// <summary>
-        /// Find a single signature match within a module using VmmSharpEx built-in scanner.
+        /// Find a single signature match within a module.
+        /// Falls back to chunked scanner for patterns exceeding VmmSharpEx's 32-byte limit.
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ulong FindSignature(string signature, string moduleName)
         {
-            return _vmm.FindSignature(_pid, signature, moduleName);
+            int tokenCount = signature.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+            if (tokenCount <= 32)
+                return _vmm.FindSignature(_pid, signature, moduleName);
+
+            var results = _vmm.FindSignatures(_pid, signature, moduleName, maxMatches: 1);
+            return results.Length > 0 ? results[0] : 0;
         }
 
         /// <summary>
-        /// Find multiple signature matches within a module (custom chunked scanner).
+        /// Find multiple signature matches within a module (delegates to VmmSharpEx.Extensions).
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ulong[] FindSignatures(string signature, string moduleName, int maxMatches = int.MaxValue)
         {
-            if (string.IsNullOrWhiteSpace(signature) || maxMatches <= 0)
-                return Array.Empty<ulong>();
-            if (!TryParseSignature(signature, out var pattern))
-                return Array.Empty<ulong>();
-
-            try
-            {
-                var moduleBase = _vmm.ProcessGetModuleBase(_pid, moduleName);
-                if (moduleBase == 0 || moduleBase == ulong.MaxValue)
-                {
-                    Log.WriteLine($"[Signature] Module {moduleName} not found");
-                    return Array.Empty<ulong>();
-                }
-
-                const ulong MAX_SEARCH_SIZE = 0xC800000;
-                const ulong CHUNK_SIZE = 0x1000000;
-                ulong rangeEnd = moduleBase + MAX_SEARCH_SIZE;
-                int overlap = Math.Max(0x100, pattern.Length - 1);
-                ulong step = CHUNK_SIZE > (ulong)overlap ? CHUNK_SIZE - (ulong)overlap : CHUNK_SIZE;
-                var results = new List<ulong>(Math.Min(maxMatches, 64));
-
-                for (ulong chunkStart = moduleBase; chunkStart < rangeEnd && results.Count < maxMatches; chunkStart += step)
-                {
-                    ulong chunkEnd = Math.Min(chunkStart + CHUNK_SIZE, rangeEnd);
-                    var chunkMatches = FindSignaturesInRange(pattern, chunkStart, chunkEnd, _pid, maxMatches - results.Count);
-                    foreach (var match in chunkMatches)
-                    {
-                        if (results.Count == 0 || results[^1] != match) results.Add(match);
-                        if (results.Count >= maxMatches) break;
-                    }
-                }
-                return results.ToArray();
-            }
-            catch (Exception ex)
-            {
-                Log.WriteLine($"[Signature] Error searching module {moduleName}: {ex.Message}");
-                return Array.Empty<ulong>();
-            }
-        }
-
-        private static ulong[] FindSignaturesInRange(byte?[] pattern, ulong rangeStart, ulong rangeEnd, uint pid, int maxMatches)
-        {
-            if (pattern.Length == 0 || rangeStart >= rangeEnd || maxMatches <= 0)
-                return Array.Empty<ulong>();
-            try
-            {
-                byte[] buffer = _vmm.MemRead(pid, rangeStart, (uint)(rangeEnd - rangeStart), out _, VmmFlags.NOCACHE);
-                if (buffer is null || buffer.Length < pattern.Length)
-                    return Array.Empty<ulong>();
-
-                var matches = new List<ulong>(Math.Min(maxMatches, 32));
-                int lastStart = buffer.Length - pattern.Length;
-                for (int i = 0; i <= lastStart; i++)
-                {
-                    bool isMatch = true;
-                    for (int j = 0; j < pattern.Length; j++)
-                    {
-                        var expected = pattern[j];
-                        if (expected.HasValue && buffer[i + j] != expected.Value) { isMatch = false; break; }
-                    }
-                    if (!isMatch) continue;
-                    matches.Add(rangeStart + (ulong)i);
-                    if (matches.Count >= maxMatches) break;
-                }
-                return matches.ToArray();
-            }
-            catch (Exception ex)
-            {
-                Log.WriteLine($"[DMA] Error in FindSignatures: {ex.Message}");
-                return Array.Empty<ulong>();
-            }
-        }
-
-        private static bool TryParseSignature(string signature, out byte?[] pattern)
-        {
-            var parts = signature.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            if (parts.Length == 0) { pattern = Array.Empty<byte?>(); return false; }
-            pattern = new byte?[parts.Length];
-            for (int i = 0; i < parts.Length; i++)
-            {
-                var part = parts[i];
-                if (part is "?" or "??") { pattern[i] = null; continue; }
-                if (part.Length != 2 || !byte.TryParse(part, System.Globalization.NumberStyles.HexNumber, null, out var b))
-                { pattern = Array.Empty<byte?>(); return false; }
-                pattern[i] = b;
-            }
-            return true;
+            return _vmm.FindSignatures(_pid, signature, moduleName, maxMatches);
         }
 
         #endregion
@@ -800,7 +647,7 @@ namespace eft_dma_radar.DMA
         public static unsafe void WriteValue<T>(ulong addr, T value)
             where T : unmanaged, allows ref struct
         {
-            if (!SharedProgram.Config?.MemWritesEnabled ?? false)
+            if (!(SharedProgram.Config?.MemWritesEnabled ?? false))
                 throw new Exception("Memory Writing is Disabled!");
             int size = sizeof(T);
             Span<byte> buffer = stackalloc byte[size];
@@ -814,7 +661,7 @@ namespace eft_dma_radar.DMA
         public static void WriteBuffer<T>(ulong addr, Span<T> buffer)
             where T : unmanaged
         {
-            if (!SharedProgram.Config?.MemWritesEnabled ?? false)
+            if (!(SharedProgram.Config?.MemWritesEnabled ?? false))
                 throw new Exception("Memory Writing is Disabled!");
             _vmm.MemWriteSpan(_pid, addr, buffer);
         }
@@ -835,7 +682,7 @@ namespace eft_dma_radar.DMA
                     WriteBuffer(addr, buffer);
                     Thread.SpinWait(5);
                     temp.Clear();
-                    ReadBuffer(addr, temp, false, false);
+                    ReadBuffer(addr, temp, false);
                     if (temp.SequenceEqual(b1)) return;
                 }
                 catch { }
@@ -885,12 +732,6 @@ namespace eft_dma_radar.DMA
             {
                 throw new Exception("ERROR Getting Game Monitor Res", ex);
             }
-        }
-
-        public static bool TryReadValue<T>(ulong addr, out T value) where T : unmanaged
-        {
-            try { value = ReadValue<T>(addr); return true; }
-            catch { value = default; return false; }
         }
 
         /// <summary>
