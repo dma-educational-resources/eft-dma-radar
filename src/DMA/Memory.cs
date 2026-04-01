@@ -3,16 +3,13 @@ global using eft_dma_radar.DMA;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Tarkov.EFTPlayer;
-using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.Tarkov.GameWorld.Exits;
 using eft_dma_radar.Tarkov.GameWorld.Explosives;
 using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Runtime;
 using System.Runtime.CompilerServices;
@@ -50,6 +47,10 @@ namespace eft_dma_radar.DMA
         private static string _lastMapIdForMemWrites;
         private static readonly Lock _restartSync = new();
         private static CancellationTokenSource _radarCts = new();
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static VmmFlags ToVmmFlags(bool useCache) =>
+            useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
 
         public static string MapID => Game?.MapID;
         public static ulong UnityBase { get; private set; }
@@ -435,7 +436,7 @@ namespace eft_dma_radar.DMA
         {
             if (count == 0) return;
 
-            var vmmFlags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
+            var vmmFlags = ToVmmFlags(useCache);
             using var scatter = new VmmScatter(_vmm, _pid, vmmFlags);
 
             for (int i = 0; i < count; i++)
@@ -470,7 +471,7 @@ namespace eft_dma_radar.DMA
         public static void ReadBuffer<T>(ulong addr, Span<T> buffer, bool useCache = true)
             where T : unmanaged
         {
-            var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
+            var flags = ToVmmFlags(useCache);
             if (!_vmm.MemReadSpan(_pid, addr, buffer, flags))
                 throw new VmmException("Memory Read Failed!");
         }
@@ -481,7 +482,7 @@ namespace eft_dma_radar.DMA
         public static T[] ReadArray<T>(ulong addr, int count, bool useCache = true)
             where T : unmanaged
         {
-            if (count <= 0) return Array.Empty<T>();
+            if (count <= 0) return [];
             T[] result = new T[count];
             ReadBuffer(addr, result.AsSpan(), useCache);
             return result;
@@ -492,7 +493,7 @@ namespace eft_dma_radar.DMA
         /// </summary>
         public static byte[] ReadBuffer(ulong addr, int size, bool useCache = true)
         {
-            var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
+            var flags = ToVmmFlags(useCache);
             var buf = _vmm.MemRead(_pid, addr, (uint)size, out uint cbRead, flags);
             if (cbRead != (uint)size)
                 throw new VmmException($"Incomplete memory read at 0x{addr:X}");
@@ -527,7 +528,7 @@ namespace eft_dma_radar.DMA
         public static T ReadValue<T>(ulong addr, bool useCache = true)
             where T : unmanaged, allows ref struct
         {
-            var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
+            var flags = ToVmmFlags(useCache);
             return _vmm.MemReadValue<T>(_pid, addr, flags);
         }
 
@@ -546,7 +547,7 @@ namespace eft_dma_radar.DMA
             var b1 = new ReadOnlySpan<byte>(&r1, cb);
             var b2 = new ReadOnlySpan<byte>(&r2, cb);
             var b3 = new ReadOnlySpan<byte>(&r3, cb);
-            if (!b1.SequenceEqual(b2) || !b1.SequenceEqual(b3) || !b2.SequenceEqual(b3))
+            if (!b1.SequenceEqual(b2) || !b1.SequenceEqual(b3))
                 throw new VmmException("Memory Read Failed!");
             return r1;
         }
@@ -557,7 +558,7 @@ namespace eft_dma_radar.DMA
         public static string ReadString(ulong addr, int cb = 128, bool useCache = true)
         {
             ArgumentOutOfRangeException.ThrowIfGreaterThan(cb, 0x1000, nameof(cb));
-            var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
+            var flags = ToVmmFlags(useCache);
             return _vmm.MemReadString(_pid, addr, cb, Encoding.UTF8, flags) ??
                 throw new VmmException("Memory Read Failed!");
         }
@@ -568,7 +569,7 @@ namespace eft_dma_radar.DMA
         public static string ReadUnityString(ulong addr, int length = 128, bool useCache = true)
         {
             ArgumentOutOfRangeException.ThrowIfGreaterThan(length, 0x1000, nameof(length));
-            var flags = useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
+            var flags = ToVmmFlags(useCache);
             return _vmm.MemReadString(_pid, addr + 0x14, length, Encoding.Unicode, flags) ??
                 throw new VmmException("Memory Read Failed!");
         }
@@ -607,14 +608,14 @@ namespace eft_dma_radar.DMA
         public static void WriteValue<T>(LocalGameWorld game, ulong addr, T value)
             where T : unmanaged
         {
-            if (!game.IsSafeToWriteMem) throw new Exception("Not safe to write!");
+            if (!game.IsSafeToWriteMem) throw new InvalidOperationException("Not safe to write!");
             WriteValue(addr, value);
         }
 
         public static void WriteBuffer<T>(LocalGameWorld game, ulong addr, Span<T> buffer)
             where T : unmanaged
         {
-            if (!game.IsSafeToWriteMem) throw new Exception("Not safe to write!");
+            if (!game.IsSafeToWriteMem) throw new InvalidOperationException("Not safe to write!");
             WriteBuffer(addr, buffer);
         }
 
@@ -648,9 +649,8 @@ namespace eft_dma_radar.DMA
             where T : unmanaged, allows ref struct
         {
             if (!(SharedProgram.Config?.MemWritesEnabled ?? false))
-                throw new Exception("Memory Writing is Disabled!");
-            int size = sizeof(T);
-            Span<byte> buffer = stackalloc byte[size];
+                throw new InvalidOperationException("Memory Writing is Disabled!");
+            Span<byte> buffer = stackalloc byte[sizeof(T)];
             Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer), value);
             _vmm.MemWriteSpan(_pid, addr, buffer);
         }
@@ -662,7 +662,7 @@ namespace eft_dma_radar.DMA
             where T : unmanaged
         {
             if (!(SharedProgram.Config?.MemWritesEnabled ?? false))
-                throw new Exception("Memory Writing is Disabled!");
+                throw new InvalidOperationException("Memory Writing is Disabled!");
             _vmm.MemWriteSpan(_pid, addr, buffer);
         }
 
