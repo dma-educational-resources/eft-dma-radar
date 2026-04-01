@@ -37,6 +37,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             ("GlobalConfiguration",   nameof(Offsets.Special.GlobalConfiguration_TypeIndex)),
             ("MatchingProgress",      nameof(Offsets.Special.MatchingProgress_TypeIndex)),
             ("MatchingProgressView",  nameof(Offsets.Special.MatchingProgressView_TypeIndex)),
+            ("GamePlayerOwner",       nameof(Offsets.Special.GamePlayerOwner_TypeIndex)),
         ];
 
         // ── State ────────────────────────────────────────────────────────────

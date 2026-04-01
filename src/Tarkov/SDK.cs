@@ -838,6 +838,7 @@ namespace SDK
             public static uint GlobalConfiguration_TypeIndex = 6406;
             public static uint MatchingProgress_TypeIndex = 15331;
             public static uint MatchingProgressView_TypeIndex = 15334;
+            public static uint GamePlayerOwner_TypeIndex = 0;
         }
         // MatchingProgress — pure data model, instance fields
         public readonly partial struct MatchingProgress
@@ -867,6 +868,10 @@ namespace SDK
             public const uint _serversLimited = 0x160; // bool
             public const uint _canUpdateStatus = 0x161; // bool
             public const uint _maxMatchingTimeInSeconds = 0x164; // int
+        }
+        public readonly partial struct GamePlayerOwner
+        {
+            public static uint _myPlayer = 0x8;
         }
         public readonly partial struct Il2CppClass
         {
