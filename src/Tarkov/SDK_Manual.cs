@@ -52,7 +52,7 @@ namespace SDK
 
         public readonly partial struct HealthValue
         {
-            public const uint Value = 0x10; // Value : EFT.HealthSystem.ValueStruct
+            public static uint Value = 0x10; // Value : EFT.HealthSystem.ValueStruct
         }
 
         public readonly partial struct TaskConditionCounter

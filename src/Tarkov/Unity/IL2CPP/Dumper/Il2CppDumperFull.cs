@@ -1,6 +1,7 @@
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.Misc;
 using SDK;
@@ -28,12 +29,17 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         //   SZARRAY           → Il2CppArrayType*
         //   GENERICINST       → Il2CppGenericInst*
         //   PTR / BYREF       → Il2CppType*
+        // Bitfield layout at 0x08 (Little-Endian x64):
+        //   [0x08..0x09] attrs     (16 bits)
+        //   [0x0A]       type      (8 bits) — Il2CppTypeEnum
+        //   [0x0B]       num_mods(5) + byref(1) + pinned(1) + pad(1)
         [StructLayout(LayoutKind.Explicit, Size = 0x10)]
         private struct RawIl2CppType
         {
             [FieldOffset(0x00)] public ulong Data;      // union (see above)
-            [FieldOffset(0x08)] public uint Attrs;     // field / param attribute flags
-            [FieldOffset(0x0C)] public byte TypeEnum;  // Il2CppTypeEnum value
+            [FieldOffset(0x08)] public ushort Attrs;    // field / param attribute flags (16 bits)
+            [FieldOffset(0x0A)] public byte TypeEnum;   // Il2CppTypeEnum value
+            [FieldOffset(0x0B)] public byte Flags;      // num_mods(5) + byref(1) + pinned(1)
         }
 
         // ── Il2CppTypeEnum → C# type name ────────────────────────────────────────
@@ -226,6 +232,14 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 typePtrToName.TryAdd(ptr, full);
             }
 
+            // Build a lookup for inflated generic parents.
+            // Generic type definitions in the TypeInfoTable have all field offsets = 0.
+            // To get real offsets, we walk from concrete (non-generic) children up the
+            // parent chain to find the inflated generic instance.
+            // Key = TypeInfoTable klassPtr of the generic definition,
+            // Value = inflated klass pointer from a child's parent chain.
+            var inflatedGenericLookup = BuildInflatedGenericLookup(classes);
+
             try
             {
                 using var sw = new StreamWriter(FullDumpFilePath, false, Encoding.UTF8, 1 << 16);
@@ -242,35 +256,62 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 {
                     string fullName = string.IsNullOrEmpty(ns) ? name : $"{ns}.{name}";
 
-                    sw.WriteLine($"// [{index}] {fullName}");
-                    sw.WriteLine($"//   Ptr        : 0x{klassPtr:X16}");
-
-                    var fields = ReadClassFieldsFull(klassPtr, typeIndexToName, typePtrToName);
-                    if (fields.Count > 0)
+                    // For generic definitions, try to use the inflated klass for field offsets.
+                    bool isGenericDef = name.Contains('`');
+                    ulong fieldKlassPtr = klassPtr;
+                    string inflatedNote = null;
+                    if (isGenericDef && inflatedGenericLookup.TryGetValue(klassPtr, out var inflated))
                     {
-                        sw.WriteLine($"//   Fields ({fields.Count}):");
-                        foreach (var (fieldName, offset, typeName) in fields.OrderBy(f => f.Offset))
-                        {
-                            if (offset >= 0)
-                                sw.WriteLine($"//     0x{(uint)offset:X4}  {fieldName,-40} : {typeName}");
-                            else
-                                sw.WriteLine($"//     static    {fieldName,-36} : {typeName}");
-                        }
+                        fieldKlassPtr = inflated;
+                        inflatedNote = $"inflated via 0x{inflated:X16}";
                     }
 
-                    var methods = ReadClassMethods(klassPtr, gaBase);
-                    if (methods.Count > 0)
+                    sw.WriteLine($"// [{index}] {fullName}");
+                    sw.WriteLine($"//   Ptr        : 0x{klassPtr:X16}");
+                    if (inflatedNote != null)
+                        sw.WriteLine($"//   Note       : {inflatedNote}");
+
+                    try
                     {
-                        sw.WriteLine($"//   Methods ({methods.Count}):");
-                        foreach (var (methodName, rva) in methods.OrderBy(m => m.Value))
-                            sw.WriteLine($"//     +0x{rva:X}  {methodName}");
+                        var fields = ReadClassFieldsFull(fieldKlassPtr, typeIndexToName, typePtrToName);
+                        if (fields.Count > 0)
+                        {
+                            sw.WriteLine($"//   Fields ({fields.Count}):");
+                            foreach (var (fieldName, offset, typeName) in fields.OrderBy(f => f.Offset))
+                            {
+                                if (offset >= 0)
+                                    sw.WriteLine($"//     0x{(uint)offset:X4}  {fieldName,-40} : {typeName}");
+                                else
+                                    sw.WriteLine($"//     static    {fieldName,-36} : {typeName}");
+                            }
+                        }
+
+                        var methods = ReadClassMethods(klassPtr, gaBase);
+                        if (methods.Count > 0)
+                        {
+                            sw.WriteLine($"//   Methods ({methods.Count}):");
+                            foreach (var (methodName, rva) in methods.OrderBy(m => m.Value))
+                                sw.WriteLine($"//     +0x{rva:X}  {methodName}");
+                        }
+                    }
+                    catch
+                    {
+                        sw.WriteLine($"//   <read error>");
                     }
 
                     sw.WriteLine();
                     processed++;
 
+                    // Throttle DMA: brief pause every 500 classes to avoid
+                    // overwhelming the native VmmScatter handle pool.
+                    if (processed % 500 == 0)
+                        Thread.Sleep(10);
+
                     if (processed % 5000 == 0)
+                    {
                         Log.WriteLine($"[Il2CppDumper] DumpAll: {processed}/{classes.Count} classes processed...");
+                        GC.Collect(0, GCCollectionMode.Default, false);
+                    }
                 }
 
                 Log.WriteLine($"[Il2CppDumper] DumpAll complete — {processed} classes written to: {FullDumpFilePath}");
@@ -279,6 +320,155 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             {
                 Log.WriteLine($"[Il2CppDumper] DumpAll write failed: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// For every generic type definition in the TypeInfoTable (name contains <c>`</c>),
+        /// scans non-generic classes to find one whose parent chain contains the generic
+        /// definition. Returns the *inflated* parent klass pointer (which has real field
+        /// offsets) keyed by the TypeInfoTable klass pointer of the generic definition.
+        /// <para>
+        /// Uses batched scatter reads (level-by-level) instead of individual DMA reads
+        /// to avoid overwhelming the DMA device with hundreds of thousands of calls.
+        /// </para>
+        /// </summary>
+        private static Dictionary<ulong, ulong> BuildInflatedGenericLookup(
+            List<(string Name, string Namespace, ulong KlassPtr, int Index)> classes)
+        {
+            var result = new Dictionary<ulong, ulong>();
+
+            // Collect all generic definition klass pointers by name.
+            var genericDefs = new Dictionary<string, ulong>(StringComparer.Ordinal);
+            foreach (var (name, _, ptr, _) in classes)
+            {
+                if (name.Contains('`'))
+                    genericDefs.TryAdd(name, ptr);
+            }
+
+            if (genericDefs.Count == 0)
+                return result;
+
+            // Build the working set: indices of non-generic classes and their current walk pointer.
+            var walkPtrs = new ulong[classes.Count];
+            var active = new List<int>(classes.Count);
+            for (int i = 0; i < classes.Count; i++)
+            {
+                if (!classes[i].Name.Contains('`'))
+                {
+                    walkPtrs[i] = classes[i].KlassPtr;
+                    active.Add(i);
+                }
+            }
+
+            const int MaxParentDepth = 8;
+            const int ScatterChunkSize = 4096; // max entries per scatter call
+            int unresolvedGenericCount = genericDefs.Count;
+
+            for (int depth = 0; depth < MaxParentDepth && active.Count > 0 && unresolvedGenericCount > 0; depth++)
+            {
+                var parentPtrs = new ulong[active.Count];
+
+                // Round 1: Scatter-read parent pointers in chunks.
+                for (int chunkStart = 0; chunkStart < active.Count; chunkStart += ScatterChunkSize)
+                {
+                    int chunkEnd = Math.Min(chunkStart + ScatterChunkSize, active.Count);
+                    int chunkLen = chunkEnd - chunkStart;
+                    var entries = new IScatterEntry[chunkLen];
+                    var typed = new ScatterReadEntry<ulong>[chunkLen];
+                    for (int j = 0; j < chunkLen; j++)
+                    {
+                        ulong addr = walkPtrs[active[chunkStart + j]] + Offsets.Il2CppClass.Parent;
+                        typed[j] = ScatterReadEntry<ulong>.Get(addr, 0);
+                        entries[j] = typed[j];
+                    }
+                    Memory.ReadScatter(entries, false);
+                    for (int j = 0; j < chunkLen; j++)
+                    {
+                        if (!typed[j].IsFailed && typed[j].Result.IsValidVirtualAddress())
+                            parentPtrs[chunkStart + j] = typed[j].Result;
+                    }
+                }
+
+                // Collect valid parents.
+                var validParentIndices = new List<int>(active.Count);
+                for (int j = 0; j < active.Count; j++)
+                {
+                    if (parentPtrs[j] != 0)
+                        validParentIndices.Add(j);
+                }
+                if (validParentIndices.Count == 0)
+                    break;
+
+                // Round 2: Scatter-read name pointers in chunks.
+                var namePtrs = new ulong[validParentIndices.Count];
+                for (int chunkStart = 0; chunkStart < validParentIndices.Count; chunkStart += ScatterChunkSize)
+                {
+                    int chunkEnd = Math.Min(chunkStart + ScatterChunkSize, validParentIndices.Count);
+                    int chunkLen = chunkEnd - chunkStart;
+                    var entries = new IScatterEntry[chunkLen];
+                    var typed = new ScatterReadEntry<ulong>[chunkLen];
+                    for (int k = 0; k < chunkLen; k++)
+                    {
+                        int j = validParentIndices[chunkStart + k];
+                        typed[k] = ScatterReadEntry<ulong>.Get(parentPtrs[j] + K_Name, 0);
+                        entries[k] = typed[k];
+                    }
+                    Memory.ReadScatter(entries, false);
+                    for (int k = 0; k < chunkLen; k++)
+                    {
+                        if (!typed[k].IsFailed && typed[k].Result.IsValidVirtualAddress())
+                            namePtrs[chunkStart + k] = typed[k].Result;
+                    }
+                }
+
+                // Round 3: Scatter-read name strings in chunks.
+                var nameStrings = new string[validParentIndices.Count];
+                for (int chunkStart = 0; chunkStart < validParentIndices.Count; chunkStart += ScatterChunkSize)
+                {
+                    int chunkEnd = Math.Min(chunkStart + ScatterChunkSize, validParentIndices.Count);
+                    int chunkLen = chunkEnd - chunkStart;
+                    var typed = new ScatterReadEntry<UTF8String>[chunkLen];
+                    var scatter = new List<IScatterEntry>(chunkLen);
+                    for (int k = 0; k < chunkLen; k++)
+                    {
+                        if (namePtrs[chunkStart + k] != 0)
+                        {
+                            typed[k] = ScatterReadEntry<UTF8String>.Get(namePtrs[chunkStart + k], MaxNameLen);
+                            scatter.Add(typed[k]);
+                        }
+                    }
+                    if (scatter.Count > 0)
+                        Memory.ReadScatter(scatter.ToArray(), false);
+                    for (int k = 0; k < chunkLen; k++)
+                    {
+                        if (typed[k] is not null && !typed[k].IsFailed)
+                            nameStrings[chunkStart + k] = (string)(UTF8String)typed[k].Result;
+                    }
+                }
+
+                // Process results and advance walk pointers.
+                var nextActive = new List<int>(validParentIndices.Count);
+                for (int k = 0; k < validParentIndices.Count; k++)
+                {
+                    int j = validParentIndices[k];
+                    int classIdx = active[j];
+
+                    string parentName = nameStrings[k];
+                    if (parentName != null && genericDefs.TryGetValue(parentName, out var defKlass))
+                    {
+                        if (result.TryAdd(defKlass, parentPtrs[j]))
+                            unresolvedGenericCount--;
+                    }
+
+                    walkPtrs[classIdx] = parentPtrs[j];
+                    nextActive.Add(classIdx);
+                }
+
+                active = nextActive;
+            }
+
+            Log.WriteLine($"[Il2CppDumper] DumpAll: Resolved {result.Count}/{genericDefs.Count} inflated generic classes via parent-chain walk.");
+            return result;
         }
     }
 }

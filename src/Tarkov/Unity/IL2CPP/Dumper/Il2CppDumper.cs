@@ -92,6 +92,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
         public static void Dump()
         {
+
             if (_dumped)
             {
                 Log.WriteLine("[Il2CppDumper] Already dumped this session — skipping.");
@@ -258,6 +259,47 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                         classesSkipped++;
                         continue;
                     }
+                }
+                else if (sc.ResolveViaChild is not null)
+                {
+                    // Generic parent resolution: find the concrete child class, then
+                    // walk Il2CppClass::parent until we find the target class name.
+                    if (!nameLookup.TryGetValue(sc.ResolveViaChild, out var childKlass))
+                    {
+                        Log.WriteLine($"[Il2CppDumper] SKIP '{sc.CsName}': child class '{sc.ResolveViaChild}' not found in type table.");
+                        classesSkipped++;
+                        continue;
+                    }
+
+                    klassPtr = 0;
+                    ulong walkPtr = childKlass;
+                    const int MaxParentDepth = 16;
+                    for (int depth = 0; depth < MaxParentDepth && walkPtr.IsValidVirtualAddress(); depth++)
+                    {
+                        ulong parentPtr = ReadPtr(walkPtr + Offsets.Il2CppClass.Parent);
+                        if (!parentPtr.IsValidVirtualAddress())
+                            break;
+
+                        ulong parentNamePtr = ReadPtr(parentPtr + K_Name);
+                        string parentName = ReadStr(parentNamePtr);
+
+                        if (parentName != null && parentName == sc.Il2CppName)
+                        {
+                            klassPtr = parentPtr;
+                            break;
+                        }
+
+                        walkPtr = parentPtr;
+                    }
+
+                    if (klassPtr == 0)
+                    {
+                        Log.WriteLine($"[Il2CppDumper] SKIP '{sc.CsName}': parent '{sc.Il2CppName}' not found in parent chain of '{sc.ResolveViaChild}'.");
+                        classesSkipped++;
+                        continue;
+                    }
+
+                    resolvedVia = $"child=\"{sc.ResolveViaChild}\"→parent=\"{sc.Il2CppName}\"";
                 }
                 else
                 {
@@ -685,6 +727,119 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 sb[i] = char.IsLetterOrDigit(c) || c == '_' ? c : '_';
             }
             return new string(sb);
+        }
+
+        /// <summary>
+        /// Diagnostic helper: reads the IL2CPP klass pointer from an object instance,
+        /// then walks the entire inheritance chain and logs every field (name + offset).
+        /// Call with the address of a managed object (e.g. a HealthController instance).
+        /// </summary>
+        public static void DumpClassFields(ulong objectAddress, string label = null)
+        {
+            try
+            {
+                if (!objectAddress.IsValidVirtualAddress())
+                {
+                    Log.WriteLine($"[Il2CppDumper] DumpClassFields: invalid object address 0x{objectAddress:X}");
+                    return;
+                }
+
+                // Il2CppObject layout: first 8 bytes = klass pointer
+                ulong klassPtr = ReadPtr(objectAddress);
+                if (!klassPtr.IsValidVirtualAddress())
+                {
+                    Log.WriteLine($"[Il2CppDumper] DumpClassFields: invalid klass pointer at 0x{objectAddress:X}");
+                    return;
+                }
+
+                // Read top-level class name for the header
+                ulong topNamePtr = ReadPtr(klassPtr + K_Name);
+                string topClassName = ReadStr(topNamePtr) ?? "<unknown>";
+                var tag = label ?? topClassName;
+
+                Log.WriteLine($"[Il2CppDumper] ── Fields of '{tag}' (full hierarchy) ──");
+
+                // Walk the parent chain: klass → parent → parent → ... → null/Il2CppObject
+                const int MaxDepth = 32; // safety limit
+                int depth = 0;
+                ulong currentKlass = klassPtr;
+
+                while (currentKlass.IsValidVirtualAddress() && depth < MaxDepth)
+                {
+                    depth++;
+                    DumpSingleClassFields(currentKlass);
+
+                    // Follow Il2CppClass::parent at offset 0x58
+                    currentKlass = ReadPtr(currentKlass + Offsets.Il2CppClass.Parent);
+                }
+
+                Log.WriteLine($"[Il2CppDumper] ── End of '{tag}' ({depth} class(es) in hierarchy) ──");
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[Il2CppDumper] DumpClassFields error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Dumps the fields declared on a single Il2CppClass (does NOT follow parent).
+        /// </summary>
+        private static void DumpSingleClassFields(ulong klassPtr)
+        {
+            // Read class name + namespace
+            ulong namePtr = ReadPtr(klassPtr + K_Name);
+            string className = ReadStr(namePtr) ?? "<unknown>";
+
+            ulong nsPtr = ReadPtr(klassPtr + 0x18);
+            string ns = ReadStr(nsPtr) ?? string.Empty;
+            string fullName = string.IsNullOrEmpty(ns) ? className : $"{ns}.{className}";
+
+            var fieldCount = Memory.ReadValue<ushort>(klassPtr + K_FieldCount, false);
+
+            Log.WriteLine($"[Il2CppDumper]   ┌ {fullName} (klass=0x{klassPtr:X}, {fieldCount} field(s))");
+
+            if (fieldCount == 0 || fieldCount > 4096)
+                return;
+
+            ulong fieldsBase = ReadPtr(klassPtr + K_Fields);
+            if (!fieldsBase.IsValidVirtualAddress())
+            {
+                Log.WriteLine($"[Il2CppDumper]   │  (fields pointer invalid)");
+                return;
+            }
+
+            RawFieldInfo[] rawFields;
+            try { rawFields = Memory.ReadArray<RawFieldInfo>(fieldsBase, fieldCount, false); }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[Il2CppDumper]   │  (failed to read field array: {ex.Message})");
+                return;
+            }
+
+            // Scatter read all field name strings
+            var nameEntries = new ScatterReadEntry<UTF8String>[rawFields.Length];
+            var scatter = new List<IScatterEntry>(rawFields.Length);
+
+            for (int i = 0; i < rawFields.Length; i++)
+            {
+                if (rawFields[i].NamePtr.IsValidVirtualAddress())
+                {
+                    nameEntries[i] = ScatterReadEntry<UTF8String>.Get(rawFields[i].NamePtr, MaxNameLen);
+                    scatter.Add(nameEntries[i]);
+                }
+            }
+
+            if (scatter.Count > 0)
+                Memory.ReadScatter(scatter.ToArray(), false);
+
+            for (int i = 0; i < rawFields.Length; i++)
+            {
+                string name = nameEntries[i] is not null && !nameEntries[i].IsFailed
+                    ? (string)(UTF8String)nameEntries[i].Result
+                    : "<unreadable>";
+
+                Log.WriteLine($"[Il2CppDumper]   │  [0x{rawFields[i].Offset:X}] {name}");
+            }
         }
 
     }

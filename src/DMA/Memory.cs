@@ -436,8 +436,12 @@ namespace eft_dma_radar.DMA
         {
             if (count == 0) return;
 
+            var vmm = _vmm;
+            if (vmm is null)
+                throw new ObjectDisposedException(nameof(Memory));
+
             var vmmFlags = ToVmmFlags(useCache);
-            using var scatter = new VmmScatter(_vmm, _pid, vmmFlags);
+            using var scatter = new VmmScatter(vmm, _pid, vmmFlags);
 
             for (int i = 0; i < count; i++)
             {

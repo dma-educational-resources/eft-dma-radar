@@ -470,6 +470,9 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// </summary>
         public override void OnRegRefresh(ScatterReadIndex index, IReadOnlySet<ulong> registered, bool? isActiveParam = null)
         {
+            if (!Memory.InRaid)
+                return;
+
             if (isActiveParam is not bool isActive)
                 isActive = registered.Contains(this);
 
@@ -649,6 +652,10 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             catch (ObjectDisposedException)
             {
                 throw;
+            }
+            catch (NullReferenceException)
+            {
+                // Suppressed — native VMM handles invalidated during shutdown
             }
             catch (Exception ex)
             {

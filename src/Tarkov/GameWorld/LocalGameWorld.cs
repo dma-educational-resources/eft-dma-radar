@@ -779,6 +779,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
             {
                 Dispose();
             }
+            catch (NullReferenceException)
+            {
+                Dispose(); // Native VMM handles invalidated (game process exited)
+            }
             catch (Exception ex)
             {
                 Log.WriteLine($"CRITICAL ERROR on Realtime Thread: {ex}");
@@ -843,6 +847,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
             {
                 throw;
             }
+            catch (NullReferenceException) when (_disposed)
+            {
+                // Scatter read NRE during shutdown — native VMM handles are stale
+            }
             catch (Exception ex)
             {
                 if (s_realtimeLoopExLimit.TryEnter())
@@ -882,6 +890,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
             {
             }
             catch (ObjectDisposedException)
+            {
+                Dispose();
+            }
+            catch (NullReferenceException)
             {
                 Dispose();
             }
@@ -1003,6 +1015,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
             {
                 throw;
             }
+            catch (NullReferenceException) when (_disposed)
+            {
+                // Scatter read NRE during shutdown — native VMM handles are stale
+            }
             catch (Exception ex)
             {
                 if (s_validateLoopExLimit.TryEnter())
@@ -1040,6 +1056,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
             {
             }
             catch (ObjectDisposedException)
+            {
+                Dispose();
+            }
+            catch (NullReferenceException)
             {
                 Dispose();
             }
@@ -1087,6 +1107,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
             {
                 Dispose();
             }
+            catch (NullReferenceException)
+            {
+                Dispose();
+            }
             catch (Exception ex)
             {
                 Log.WriteLine($"CRITICAL ERROR on FastWorker Thread: {ex}");
@@ -1119,6 +1143,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
             {
             }
             catch (ObjectDisposedException)
+            {
+                Dispose();
+            }
+            catch (NullReferenceException)
             {
                 Dispose();
             }
@@ -1210,6 +1238,9 @@ namespace eft_dma_radar.Tarkov.GameWorld
             bool alreadyDisposed = Interlocked.Exchange(ref _disposed, true);
             if (!alreadyDisposed)
             {
+                // Signal worker threads to stop immediately.
+                _cts.Cancel();
+
                 // Record this address so CreateGameInstance rejects the stale
                 // GameWorld that Unity keeps alive on the post-raid menu screen.
                 // Skip when the user explicitly requested a restart — the GameWorld
@@ -1218,6 +1249,17 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     Interlocked.Exchange(ref _lastDisposedBase, Base);
 
                 Log.WriteLine("[Raid] LocalGameWorld disposed — entering cooldown.");
+
+                // Wait for worker threads to finish so they don't read
+                // stale memory after cleanup completes.  Avoid joining the
+                // calling thread (a worker may call Dispose on error).
+                var caller = Thread.CurrentThread;
+                const int joinTimeout = 3000;
+                if (_t1 is not null && _t1 != caller) _t1.Join(joinTimeout);
+                if (_t2 is not null && _t2 != caller) _t2.Join(joinTimeout);
+                if (_t3 is not null && _t3 != caller) _t3.Join(joinTimeout);
+                if (_t4 is not null && _t4 != caller) _t4.Join(joinTimeout);
+                if (_t5 is not null && _t5 != caller) _t5.Join(joinTimeout);
 
                 _raidStarted = false;
 
@@ -1228,10 +1270,8 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
                 Il2CppClass.ForceReset();
 
-                // 10
                 RaidCooldown.BeginCooldown(12);
 
-                _cts.Cancel();
                 _cts.Dispose();
             }
         }

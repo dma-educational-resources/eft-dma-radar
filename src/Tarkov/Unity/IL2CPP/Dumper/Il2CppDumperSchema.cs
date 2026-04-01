@@ -31,9 +31,19 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             /// MDToken → TypeIndex: (mdToken &amp; 0x00FFFFFF) - 1
             /// </summary>
             public readonly uint? TypeIndex;
+            /// <summary>
+            /// When non-null, resolves the class by finding this concrete child class
+            /// in the type table and walking its Il2CppClass::parent chain until a
+            /// class whose name matches <see cref="Il2CppName"/> is found.
+            /// Required for generic type definitions (e.g. <c>BaseHealthController`1</c>)
+            /// whose TypeInfoTable entry has all field offsets set to 0.
+            /// The parent chain from a concrete child yields the inflated generic
+            /// instance with real offsets.
+            /// </summary>
+            public readonly string ResolveViaChild;
 
-            public SchemaClass(string il2cpp, string cs, bool isStatic, SchemaField[] fields, uint? typeIndex)
-            { Il2CppName = il2cpp; CsName = cs; IsStatic = isStatic; Fields = fields; TypeIndex = typeIndex; }
+            public SchemaClass(string il2cpp, string cs, bool isStatic, SchemaField[] fields, uint? typeIndex, string resolveViaChild = null)
+            { Il2CppName = il2cpp; CsName = cs; IsStatic = isStatic; Fields = fields; TypeIndex = typeIndex; ResolveViaChild = resolveViaChild; }
         }
 
         // Shorthand helpers
@@ -52,8 +62,14 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         /// Obtain via: (MDToken &amp; 0x00FFFFFF) - 1, or from Offsets.Special.
         /// Leave 0 to use name-based lookup (only reliable for non-obfuscated classes).
         /// </param>
-        private static SchemaClass C(string il2cpp, SchemaField[] f, string cs = null, bool s = false, uint ti = 0)
-            => new(il2cpp, cs ?? il2cpp, s, f, ti == 0 ? null : ti);
+        /// <param name="child">
+        /// Concrete child class name for resolving generic parent classes.
+        /// The dumper walks <c>Il2CppClass::parent</c> from this child until it
+        /// finds a class matching <paramref name="il2cpp"/>, yielding the inflated
+        /// generic instance with real field offsets.
+        /// </param>
+        private static SchemaClass C(string il2cpp, SchemaField[] f, string cs = null, bool s = false, uint ti = 0, string child = null)
+            => new(il2cpp, cs ?? il2cpp, s, f, ti == 0 ? null : ti, child);
 
         private static SchemaClass[] BuildSchema() =>
         [
@@ -176,7 +192,15 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 F("UnsharpRadiusBlur"), F("UnsharpBias"),
             ]),
 
-            // HealthController offsets are pinned as const in SDK.cs — no dynamic scan needed.
+            // BaseHealthController`1 → HealthController (Energy / Hydration pointers)
+            // Generic definition has 0 offsets — resolve via concrete child's parent chain.
+            C("BaseHealthController`1", [
+                F("_energy", "Energy"),
+                F("_hydration", "Hydration"),
+            ], cs: "HealthController", child: "ClientPlayerHealthController"),
+
+            // HealthValue (Value → ValueStruct offset)
+            C("HealthValue", [F("Value")]),
 
             // ExfiltrationController → ExfilController
             C("ExfiltrationController", [

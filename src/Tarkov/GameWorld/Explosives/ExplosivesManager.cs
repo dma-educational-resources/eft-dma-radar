@@ -115,6 +115,10 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             {
                 throw;
             }
+            catch (NullReferenceException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 Log.WriteLine($"[EXP-RTL] Refresh error: {ex}");
@@ -161,6 +165,11 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
                 _grenadesBase = 0x0;
                 throw;
             }
+            catch (NullReferenceException)
+            {
+                _grenadesBase = 0x0;
+                throw;
+            }
             catch (Exception ex)
             {
                 _grenadesBase = 0x0;
@@ -198,6 +207,10 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
                 }
             }
             catch (ObjectDisposedException)
+            {
+                throw;
+            }
+            catch (NullReferenceException)
             {
                 throw;
             }
@@ -249,6 +262,10 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
                 }
             }
             catch (ObjectDisposedException)
+            {
+                throw;
+            }
+            catch (NullReferenceException)
             {
                 throw;
             }

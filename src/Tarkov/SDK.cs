@@ -183,11 +183,12 @@ namespace SDK
             public static uint UnsharpRadiusBlur = 0x90;
             public static uint UnsharpBias = 0x94;
         }
-        //public static class HealthInfo
+        // Namespace: EFT.HealthSystem
+        // BaseHealthController<T> fields (parent of NetworkHealthController → ClientPlayerHealthController)
         public readonly partial struct HealthController
         {
-            public const uint Energy = 0x68;
-            public const uint Hydration = 0x70;
+            public static uint Energy = 0x68;     // _energy (HealthValue ptr)
+            public static uint Hydration = 0x70;   // _hydration (HealthValue ptr)
         }
         //public static class ExfiltrationController
         public readonly partial struct ExfilController
@@ -871,6 +872,7 @@ namespace SDK
         {
             public const uint Name = 0x10;
             public const uint Namespace = 0x18;
+            public const uint Parent = 0x58;    // Il2CppClass* parent
             public const uint Fields = 0x80;
             public const uint StaticFields = 0xB8;
             public const uint Methods = 0x98;

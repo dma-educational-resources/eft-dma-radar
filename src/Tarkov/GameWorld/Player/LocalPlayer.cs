@@ -6,6 +6,7 @@ using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Common.Unity.Collections;
 using System.Runtime.InteropServices;
 using eft_dma_radar.Tarkov.GameWorld.Explosives;
+using eft_dma_radar.Tarkov.Unity.IL2CPP;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer
 {
@@ -117,6 +118,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             try
             {
                 _healthController = Memory.ReadPtr(Base + Offsets.Player._healthController, false);
+
                 if (!_healthController.IsValidVirtualAddress())
                 {
                     Log.Write(AppLogLevel.Warning, "HealthController address invalid", "LocalPlayer");
