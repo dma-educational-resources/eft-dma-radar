@@ -1,28 +1,20 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
-		<TargetFramework>net10.0-windows7.0</TargetFramework>
 		<StartupObject>eft_dma_radar.Program</StartupObject>
 		<UseWPF>true</UseWPF>
+		<UseWindowsForms>true</UseWindowsForms>
 		<AssemblyName>eft-dma-radar</AssemblyName>
 		<RootNamespace>eft_dma_radar</RootNamespace>
-		<Version>$(VersionPrefix)</Version>
-		<LangVersion>latest</LangVersion>
 		<ApplicationIcon>lone-icon.ico</ApplicationIcon>
-		<ImplicitUsings>enable</ImplicitUsings>
-		<AnalysisLevel>latest</AnalysisLevel>
-		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-		<Nullable>warnings</Nullable>
-		<PlatformTarget>x64</PlatformTarget>
-		<UseWindowsForms>True</UseWindowsForms>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<AnalysisLevel>latest</AnalysisLevel>
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 		<EnableWindowsFormsHighDpiAutoResizing>true</EnableWindowsFormsHighDpiAutoResizing>
 		<ServerGarbageCollection>true</ServerGarbageCollection>
 		<ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
 		<RetainVMGarbageCollection>true</RetainVMGarbageCollection>
 		<DebugType>none</DebugType>
-		<Platforms>AnyCPU;x64</Platforms>
 	</PropertyGroup>
 
 	<!-- Native DLLs and Resources (vmm.dll, leechcore.dll etc. are now bundled by VmmSharpEx NuGet) -->
@@ -37,12 +29,14 @@
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
 	</ItemGroup>
-<ItemGroup>
-  <Content Include="..\Maps\**\*.*">
-    <Link>wwwroot\Maps\%(RecursiveDir)%(Filename)%(Extension)</Link>
-    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-  </Content>
-</ItemGroup>
+
+	<ItemGroup>
+		<Content Include="..\Maps\**\*.*">
+			<Link>wwwroot\Maps\%(RecursiveDir)%(Filename)%(Extension)</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+
 	<!-- Embedded Resources (from eft-dma-shared) -->
 	<ItemGroup>
 		<EmbeddedResource Include="..\resources\NeoSansStdRegular.otf" />
@@ -58,19 +52,20 @@
 		</Resource>
 	</ItemGroup>
 
-	<!-- NuGet Packages (combined from both projects) -->
+	<!-- NuGet Packages -->
 	<ItemGroup>
+		<PackageReference Include="Collections.Pooled.V2" Version="2.2.2" />
 		<PackageReference Include="HandyControls" Version="3.6.0" />
 		<PackageReference Include="HelixToolkit.Wpf" Version="2.27.0" />
+		<PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="9.0.6" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.6" />
 		<PackageReference Include="Open.Nat.imerzan" Version="2.2.0" />
 		<PackageReference Include="SkiaSharp" Version="3.119.2" />
 		<PackageReference Include="SkiaSharp.Views.WindowsForms" Version="3.119.2" />
 		<PackageReference Include="SkiaSharp.Views.WPF" Version="3.119.2" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.6" />
-		<PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="9.0.6" />
 		<PackageReference Include="Svg.Skia" Version="3.0.3" />
-		<PackageReference Include="Collections.Pooled.V2" Version="2.2.2" />
 		<PackageReference Include="System.Management" Version="9.0.0" />
+		<PackageReference Include="VmmSharpEx" Version="3.200.12" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -78,45 +73,28 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Content Include="..\resources\wwwroot\**\*">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	    <Link>wwwroot\%(RecursiveDir)%(Filename)%(Extension)</Link>
-	  </Content>
-	</ItemGroup>	
+		<Content Include="..\resources\wwwroot\**\*">
+			<Link>wwwroot\%(RecursiveDir)%(Filename)%(Extension)</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+
 	<Target Name="CopyNativeDLLs" AfterTargets="Build">
 		<ItemGroup>
 			<NativeLibs Include="$(OutputPath)runtimes\win-x64\native\*.dll" />
 		</ItemGroup>
 		<Copy SourceFiles="@(NativeLibs)" DestinationFolder="$(OutputPath)" />
+	</Target>
 
-		<!-- Copy System.Management DLL to the runtime-specific location -->
-		<ItemGroup>
-			<SystemManagementDll Include="$(NuGetPackageRoot)system.management\9.0.0\runtimes\win\lib\net9.0\System.Management.dll" />
-		</ItemGroup>
-		<Copy SourceFiles="@(SystemManagementDll)" DestinationFolder="$(OutputPath)runtimes\win\lib\net9.0\" Condition="Exists('$(NuGetPackageRoot)system.management\9.0.0\runtimes\win\lib\net9.0\System.Management.dll')" />
-	</Target>	
 	<ItemGroup>
-	  <Compile Remove="Common\**" />
-	  <EmbeddedResource Remove="Common\**" />
-	  <None Remove="Common\**" />
-	  <Page Remove="Common\**" />
+		<Compile Remove="Common\**" />
+		<EmbeddedResource Remove="Common\**" />
+		<None Remove="Common\**" />
+		<Page Remove="Common\**" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="VmmSharpEx" Version="3.200.12" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Misc\MessagePack\ESPServerMessagePack\" />
-	  <Folder Include="Tarkov\Unity\LowLevel\Hooks\" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <None Include="VmmSharpEx.Extensions\VmmSharpEx.Extensions.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <ProjectReference Include="..\lib\VmmSharpEx.Extensions\VmmSharpEx.Extensions.csproj" />
+		<ProjectReference Include="..\lib\VmmSharpEx.Extensions\VmmSharpEx.Extensions.csproj" />
 	</ItemGroup>
 
 </Project>

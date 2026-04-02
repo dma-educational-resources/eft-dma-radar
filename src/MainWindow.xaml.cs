@@ -31,6 +31,7 @@ using SkiaSharp;
 using SkiaSharp.Views.WPF;
 using System;
 using System.Linq;
+using System.Numerics;
 using System.Security.Authentication.ExtendedProtection;
 using System.Timers;
 using System.Windows;
@@ -110,9 +111,28 @@ namespace eft_dma_radar
         private const int MIN_PLAYERHISTORY_PANEL_WIDTH = 350;
         private const int MIN_PLAYERHISTORY_PANEL_HEIGHT = 130;
 
-        private readonly object _renderLock = new object();
-        private volatile bool _isRendering = false;
+        private int _isRenderingFlag;
         private volatile bool _uiInteractionActive = false;
+
+        // ---- Map cache ----
+        private SKSurface? _mapCacheSurface;
+        private SKRect _lastMapBounds;
+        private float _lastMapPlayerHeight;
+        private int _lastMapCacheWidth;
+        private int _lastMapCacheHeight;
+        private string? _lastCachedMapID;
+        private int _lastMapZoom;
+        private int _lastMapRotation;
+        private long _lastMapRebuildTick;
+        private const int MapRebuildMinIntervalMs = 16; // throttle map redraws to ~60 Hz
+
+        // ---- Reusable ping paint ----
+        private readonly SKPaint _pingPaint = new()
+        {
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 4,
+            IsAntialias = true
+        };
         private DispatcherTimer _uiActivityTimer = null!;
         private bool _lastInRaidState = false;
         private bool _wasQuestPlannerOpenBeforeRaid = false;
@@ -414,7 +434,54 @@ namespace eft_dma_radar
 
                     canvas.RotateDegrees(_rotationDegrees, centerX, centerY);
 
-                    map.Draw(canvas, localPlayer.Position.Y, mapParams.Bounds, mapCanvasBounds);
+                    // ---- Cached map rendering ----
+                    var playerHeight = localPlayer.Position.Y;
+                    int cacheW = (int)mapCanvasBounds.Width;
+                    int cacheH = (int)mapCanvasBounds.Height;
+
+                    bool needsMapRebuild =
+                        _mapCacheSurface is null ||
+                        _lastCachedMapID != mapID ||
+                        _lastMapZoom != _zoom ||
+                        _lastMapRotation != _rotationDegrees ||
+                        _lastMapCacheWidth != cacheW ||
+                        _lastMapCacheHeight != cacheH ||
+                        Math.Abs(_lastMapPlayerHeight - playerHeight) > 0.5f ||
+                        Math.Abs(_lastMapBounds.Left - mapParams.Bounds.Left) > 0.25f ||
+                        Math.Abs(_lastMapBounds.Top - mapParams.Bounds.Top) > 0.25f ||
+                        Math.Abs(_lastMapBounds.Width - mapParams.Bounds.Width) > 0.1f ||
+                        Math.Abs(_lastMapBounds.Height - mapParams.Bounds.Height) > 0.1f;
+
+                    long nowTick = Environment.TickCount64;
+
+                    if (needsMapRebuild && nowTick - _lastMapRebuildTick >= MapRebuildMinIntervalMs)
+                    {
+                        _lastMapRebuildTick = nowTick;
+                        _mapCacheSurface?.Dispose();
+
+                        var info = new SKImageInfo(cacheW, cacheH, SKColorType.Rgba8888, SKAlphaType.Premul);
+                        _mapCacheSurface = SKSurface.Create(info);
+
+                        if (_mapCacheSurface is not null)
+                        {
+                            var cacheCanvas = _mapCacheSurface.Canvas;
+                            cacheCanvas.Clear(SKColors.Transparent);
+                            map.Draw(cacheCanvas, playerHeight, mapParams.Bounds, mapCanvasBounds);
+                        }
+
+                        _lastCachedMapID = mapID;
+                        _lastMapZoom = _zoom;
+                        _lastMapRotation = _rotationDegrees;
+                        _lastMapCacheWidth = cacheW;
+                        _lastMapCacheHeight = cacheH;
+                        _lastMapPlayerHeight = playerHeight;
+                        _lastMapBounds = mapParams.Bounds;
+                    }
+
+                    if (_mapCacheSurface is not null)
+                        canvas.DrawSurface(_mapCacheSurface, 0, 0);
+                    else
+                        map.Draw(canvas, playerHeight, mapParams.Bounds, mapCanvasBounds);
 
                     SKPaints.UpdatePulsingAsteriskColor();
 
@@ -557,15 +624,14 @@ namespace eft_dma_radar
                          LootItem.ImportantLootSettings.Enabled ||
                          LootItem.QuestItemSettings.Enabled))
                     {
-                        var loot = lootSnapshot?
-                            .Where(x => x is not QuestItem)
-                            .Reverse()
-                            .ToList();
-
-                        if (loot is not null)
+                        if (lootSnapshot is not null)
                         {
-                            foreach (var item in loot)
+                            for (int i = lootSnapshot.Count - 1; i >= 0; i--)
                             {
+                                var item = lootSnapshot[i];
+                                if (item is QuestItem)
+                                    continue;
+
                                 if (!LootItem.CorpseSettings.Enabled && item is LootCorpse)
                                     continue;
 
@@ -582,13 +648,14 @@ namespace eft_dma_radar
                     {
                         if (LootItem.QuestItemSettings.Enabled)
                         {
-                            var questItems = lootSnapshot?
-                                .Where(x => x is QuestItem)
-                                .ToList();
-
-                            if (questItems is not null)
-                                foreach (var item in questItems)
-                                    item.Draw(canvas, mapParams, localPlayer);
+                            if (lootSnapshot is not null)
+                            {
+                                foreach (var item in lootSnapshot)
+                                {
+                                    if (item is QuestItem)
+                                        item.Draw(canvas, mapParams, localPlayer);
+                                }
+                            }
                         }
 
                         if (QuestManager.Settings.Enabled)
@@ -667,15 +734,8 @@ namespace eft_dma_radar
 
                             var center = ping.Position.ToMapPos(map.Config).ToZoomedPos(mapParams);
 
-                            using var paint = new SKPaint
-                            {
-                                Style = SKPaintStyle.Stroke,
-                                StrokeWidth = 4,
-                                Color = new SKColor(0, 255, 255, (byte)(alpha * 255)),
-                                IsAntialias = true
-                            };
-
-                            canvas.DrawCircle(center.X, center.Y, radius, paint);
+                            _pingPaint.Color = new SKColor(0, 255, 255, (byte)(alpha * 255));
+                            canvas.DrawCircle(center.X, center.Y, radius, _pingPaint);
                         }
                     }
 
@@ -1105,7 +1165,8 @@ namespace eft_dma_radar
 
         private void RenderTimer_Elapsed(object? sender, EventArgs e)
         {
-            if (_isRendering) return;
+            if (Interlocked.CompareExchange(ref _isRenderingFlag, 1, 0) != 0)
+                return;
 
             try
             {
@@ -1115,12 +1176,6 @@ namespace eft_dma_radar
 
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    lock (_renderLock)
-                    {
-                        if (_isRendering) return;
-                        _isRendering = true;
-                    }
-
                     try
                     {
                         UpdateQuestPlannerRaidState();
@@ -1128,14 +1183,14 @@ namespace eft_dma_radar
                     }
                     finally
                     {
-                        _isRendering = false;
+                        Interlocked.Exchange(ref _isRenderingFlag, 0);
                     }
                 }), priority);
             }
             catch (Exception ex)
             {
                 Log.WriteLine($"Render timer error: {ex.Message}");
-                _isRendering = false;
+                Interlocked.Exchange(ref _isRenderingFlag, 0);
             }
         }
 
@@ -1846,6 +1901,9 @@ namespace eft_dma_radar
                 }
 
                 _renderTimer.Dispose();
+                _mapCacheSurface?.Dispose();
+                _mapCacheSurface = null;
+                _pingPaint.Dispose();
 
                 Window = null;
 

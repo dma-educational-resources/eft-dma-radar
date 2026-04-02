@@ -1,12 +1,14 @@
-﻿using eft_dma_radar.UI.ESP;
-using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Common.DMA.ScatterAPI;
+﻿using eft_dma_radar.Common.DMA.ScatterAPI;
 using eft_dma_radar.Common.Misc;
 using eft_dma_radar.Common.Misc.Data;
 using eft_dma_radar.Common.Misc.Pools;
-using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Common.Unity.Collections;
+using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
+using eft_dma_radar.Tarkov.Unity.IL2CPP;
+using eft_dma_radar.UI.ESP;
+using eft_dma_radar.UI.Misc;
+using static SDK.Offsets;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 {
@@ -276,7 +278,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             private string _fireType;
             private string _ammo;
 
-            internal static bool DebugLogging = false;
+            internal static bool DebugLogging = true;
 
             private string _lastValidAmmo;
             private string _lastValidFireType;
@@ -353,6 +355,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 if (log)
                 {
                     string weaponClass    = ObjectClass.ReadName(hands.ItemAddr, useCache: false);
+                    Il2CppDumper.DumpClassFields(hands.ItemAddr, $"weaponClass ({weaponClass})");
                     string fireModeClass  = fireModePtr != 0 ? ObjectClass.ReadName(fireModePtr, useCache: false) : "null";
                     string magSlotClass   = magSlotPtr  != 0 ? ObjectClass.ReadName(magSlotPtr,  useCache: false) : "null";
                     Log.WriteLine($"[MagCheck] " + $"-- WeaponBase: 0x{hands.ItemAddr:X16}  class={weaponClass}");
