@@ -1,6 +1,5 @@
 ﻿#nullable enable
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 
@@ -13,10 +12,6 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 {
     public static class GameWorldExtensions
     {
-        // ?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è
-        // ENTRY POINT
-        // ?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è
-
         /// <summary>
         /// Cached GamePlayerOwner class pointer — resolved once from the TypeInfoTable.
         /// </summary>
@@ -32,7 +27,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
             Log.WriteLine("[IL2CPP] Resolving GameWorld");
 
-            // Phase 0: IL2CPP direct path via GamePlayerOwner (fastest — ~5 reads)
+            // Primary: IL2CPP direct path via GamePlayerOwner (fastest — ~5 reads)
             if (TryGetGameWorldViaIL2CPP(out var il2cppResult))
             {
                 map = il2cppResult!.Map;
@@ -40,49 +35,20 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 return il2cppResult.GameWorld;
             }
 
-            // Phase 1: TypeIndex scan (preferred, robust)
-            var phaseSw = Stopwatch.StartNew();
-            for (int i = 0; i < 3; i++)
+            // Fallback: GOM name-based scan
+            if (TryGOMScan(gomAddress, ct, out var gomResult))
             {
-                ct.ThrowIfCancellationRequested();
-
-                if (TryTypeIndexScan(gomAddress, ct, out var result))
-                {
-                    map = result!.Map;
-                    Log.WriteLine($"[IL2CPP] GameWorld found (TypeIndex) attempt {i + 1} in {totalSw.ElapsedMilliseconds}ms");
-                    return result.GameWorld;
-                }
-
-                Thread.Sleep(50);
+                map = gomResult!.Map;
+                Log.WriteLine($"[IL2CPP] GameWorld found (GOM) in {totalSw.ElapsedMilliseconds}ms");
+                return gomResult.GameWorld;
             }
-            Log.WriteLine($"[IL2CPP] Phase 1 (TypeIndex) failed after {phaseSw.ElapsedMilliseconds}ms");
 
-            // Phase 2: Name-based shallow scan (backup)
-            phaseSw.Restart();
-            for (int i = 0; i < 3; i++)
-            {
-                ct.ThrowIfCancellationRequested();
-
-                if (TryShallowScan(gomAddress, ct, out var result))
-                {
-                    map = result!.Map;
-                    Log.WriteLine($"[IL2CPP] GameWorld found (shallow) attempt {i + 1} in {totalSw.ElapsedMilliseconds}ms total (phase2: {phaseSw.ElapsedMilliseconds}ms)");
-                    return result.GameWorld;
-                }
-
-                Thread.Sleep(50);
-            }
-            Log.WriteLine($"[IL2CPP] Phase 2 (shallow) failed after {phaseSw.ElapsedMilliseconds}ms");
-
-            // Phase 3: Full legacy scan
-            phaseSw.Restart();
-            var gameWorld = FullScan(gomAddress, ct, out map);
-            Log.WriteLine($"[IL2CPP] GameWorld found (full scan) in {totalSw.ElapsedMilliseconds}ms total (phase3: {phaseSw.ElapsedMilliseconds}ms)");
-            return gameWorld;
+            Log.WriteLine($"[IL2CPP] GameWorld not found after {totalSw.ElapsedMilliseconds}ms");
+            throw new InvalidOperationException("GameWorld not found");
         }
 
         // ════════════════════════════════════════════════════════════════════
-        // PHASE 0 — IL2CPP DIRECT PATH (GamePlayerOwner → myPlayer → GameWorld)
+        // IL2CPP DIRECT PATH (GamePlayerOwner → myPlayer → GameWorld)
         // ════════════════════════════════════════════════════════════════════
 
         private static bool TryGetGameWorldViaIL2CPP(out GameWorldResult? result)
@@ -193,6 +159,12 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                     {
                         Log.WriteLine($"[IL2CPP] GamePlayerOwner found at TypeIndex {i}");
                         Offsets.Special.GamePlayerOwner_TypeIndex = (uint)i;
+
+                        // Persist the newly discovered TypeIndex to the cache so
+                        // subsequent startups use the fast path immediately.
+                        try { Il2CppDumper.SaveCache(); }
+                        catch { }
+
                         return ptr;
                     }
                 }
@@ -202,11 +174,11 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             return 0;
         }
 
-        // ?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è
-        // PHASE 1 ?? TYPE INDEX SCAN (NEW, CORRECT)
-        // ?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è
+        // ════════════════════════════════════════════════════════════════════
+        // GOM FALLBACK — Name-based scan
+        // ════════════════════════════════════════════════════════════════════
 
-        private static bool TryTypeIndexScan(
+        private static bool TryGOMScan(
             ulong gomAddress,
             CancellationToken ct,
             out GameWorldResult? result)
@@ -219,20 +191,16 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                 var gom = GameObjectManager.Get(gomAddress);
                 var current = Memory.ReadValue<LinkedListObject>(gom.ActiveNodes);
                 int nodesScanned = 0;
+                const int maxDepth = 10_000;
 
-                for (int i = 0; i < 5000; i++)
+                while (current.ThisObject.IsValidVirtualAddress() && nodesScanned < maxDepth)
                 {
                     ct.ThrowIfCancellationRequested();
-
-                    ulong go = current.ThisObject;
-                    if (!go.IsValidVirtualAddress())
-                        break;
-
                     nodesScanned++;
 
-                    if (TryParseGameWorldByTypeIndex(go) is GameWorldResult gw)
+                    if (TryParseGameWorldByName(ref current) is GameWorldResult gw)
                     {
-                        Log.WriteLine($"[IL2CPP] TypeIndex scan: found at node {nodesScanned} in {sw.ElapsedMilliseconds}ms");
+                        Log.WriteLine($"[IL2CPP] GOM scan: found at node {nodesScanned} in {sw.ElapsedMilliseconds}ms");
                         result = gw;
                         return true;
                     }
@@ -240,151 +208,17 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                     current = Memory.ReadValue<LinkedListObject>(current.NextObjectLink);
                 }
 
-                Log.WriteLine($"[IL2CPP] TypeIndex scan: exhausted {nodesScanned} nodes in {sw.ElapsedMilliseconds}ms");
+                Log.WriteLine($"[IL2CPP] GOM scan: exhausted {nodesScanned} nodes in {sw.ElapsedMilliseconds}ms");
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                Log.WriteLine($"[IL2CPP] TypeIndex scan: exception - {ex.Message}");
+                Log.WriteLine($"[IL2CPP] GOM scan: exception - {ex.Message}");
             }
 
             return false;
         }
 
-        private static GameWorldResult? TryParseGameWorldByTypeIndex(ulong gameObject)
-        {
-            try
-            {
-                ulong components = Memory.ReadValue<ulong>(
-                    gameObject + UnityOffsets.GameObject.ComponentsOffset);
-
-                if (!components.IsValidVirtualAddress())
-                    return null;
-
-                int count = Memory.ReadValue<int>(
-                    components + UnityOffsets.Il2CppArray.Length);
-
-                if (count <= 0 || count > 64)
-                    return null;
-
-                ulong data = components + UnityOffsets.Il2CppArray.Data;
-
-                for (int i = 0; i < count; i++)
-                {
-                    ulong component = Memory.ReadValue<ulong>(
-                        data + (ulong)(i * sizeof(ulong)));
-
-                    if (!component.IsValidVirtualAddress())
-                        continue;
-
-                    ulong gameWorld = Memory.ReadPtrChain(
-                        gameObject, UnityOffsets.GameWorldChain);
-
-                    if (!gameWorld.IsValidVirtualAddress())
-                        continue;
-
-                    if (TryResolveMap(gameWorld, out var map))
-                    {
-                        return new GameWorldResult
-                        {
-                            GameWorld = gameWorld,
-                            Map = map
-                        };
-                    }
-                }
-            }
-            catch { }
-
-            return null;
-        }
-
-        // ?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è
-        // PHASE 2 ?? NAME SHALLOW SCAN (UNCHANGED BACKUP)
-        // ?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è
-
-        private static bool TryShallowScan(
-            ulong gomAddress,
-            CancellationToken ct,
-            out GameWorldResult? result)
-        {
-            result = null;
-
-            try
-            {
-                var sw = Stopwatch.StartNew();
-                var gom = GameObjectManager.Get(gomAddress);
-                var current = Memory.ReadValue<LinkedListObject>(gom.ActiveNodes);
-                int nodesScanned = 0;
-
-                for (int i = 0; i < 5000; i++)
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    if (!current.ThisObject.IsValidVirtualAddress())
-                        break;
-
-                    nodesScanned++;
-
-                    if (ParseGameWorldByName(ref current) is GameWorldResult gw)
-                    {
-                        Log.WriteLine($"[IL2CPP] Shallow scan: found at node {nodesScanned} in {sw.ElapsedMilliseconds}ms");
-                        result = gw;
-                        return true;
-                    }
-
-                    current = Memory.ReadValue<LinkedListObject>(current.NextObjectLink);
-                }
-
-                Log.WriteLine($"[IL2CPP] Shallow scan: exhausted {nodesScanned} nodes in {sw.ElapsedMilliseconds}ms");
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                Log.WriteLine($"[IL2CPP] Shallow scan: exception - {ex.Message}");
-            }
-
-            return false;
-        }
-
-        // ?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è
-        // PHASE 3 ?? FULL LEGACY SCAN (UNCHANGED)
-        // ?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è
-
-        private static ulong FullScan(
-            ulong gomAddress,
-            CancellationToken ct,
-            out string? map)
-        {
-            map = null;
-            var sw = Stopwatch.StartNew();
-
-            var gom = GameObjectManager.Get(gomAddress);
-            var first = Memory.ReadValue<LinkedListObject>(gom.ActiveNodes);
-            var last = Memory.ReadValue<LinkedListObject>(gom.LastActiveNode);
-
-            var current = first;
-            int depth = 0;
-
-            while (current.ThisObject.IsValidVirtualAddress() && depth++ < 100_000)
-            {
-                ct.ThrowIfCancellationRequested();
-
-                if (ParseGameWorldByName(ref current) is GameWorldResult result)
-                {
-                    Log.WriteLine($"[IL2CPP] Full scan: found at node {depth} in {sw.ElapsedMilliseconds}ms");
-                    map = result.Map;
-                    return result.GameWorld;
-                }
-
-                if (current.ThisObject == last.ThisObject)
-                    break;
-
-                current = Memory.ReadValue<LinkedListObject>(current.NextObjectLink);
-            }
-
-            Log.WriteLine($"[IL2CPP] Full scan: exhausted {depth} nodes in {sw.ElapsedMilliseconds}ms");
-            throw new InvalidOperationException("GameWorld not found");
-        }
-
-        private static GameWorldResult? ParseGameWorldByName(ref LinkedListObject node)
+        private static GameWorldResult? TryParseGameWorldByName(ref LinkedListObject node)
         {
             try
             {
@@ -420,9 +254,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             return null;
         }
 
-        // ?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è
+        // ════════════════════════════════════════════════════════════════════
         // SHARED HELPERS
-        // ?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è?¡è
+        // ════════════════════════════════════════════════════════════════════
 
         private static bool TryResolveMap(ulong gameWorld, out string? map)
         {

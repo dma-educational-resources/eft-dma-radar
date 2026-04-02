@@ -94,7 +94,13 @@
 			<SystemManagementDll Include="$(NuGetPackageRoot)system.management\9.0.0\runtimes\win\lib\net9.0\System.Management.dll" />
 		</ItemGroup>
 		<Copy SourceFiles="@(SystemManagementDll)" DestinationFolder="$(OutputPath)runtimes\win\lib\net9.0\" Condition="Exists('$(NuGetPackageRoot)system.management\9.0.0\runtimes\win\lib\net9.0\System.Management.dll')" />
-	</Target>
+	</Target>	
+	<ItemGroup>
+	  <Compile Remove="Common\**" />
+	  <EmbeddedResource Remove="Common\**" />
+	  <None Remove="Common\**" />
+	  <Page Remove="Common\**" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="VmmSharpEx" Version="3.200.12" />

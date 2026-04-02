@@ -1,7 +1,6 @@
 ﻿
 using eft_dma_radar.Common.DMA.Features;
 using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 
 namespace eft_dma_radar.Tarkov.Features.MemoryWrites
@@ -17,15 +16,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
         {
             try
             {
-                var gomAddr = Memory.GOM;
-                if (!gomAddr.IsValidVirtualAddress())
-                    throw new InvalidOperationException("GOM not resolved");
-                var gom = GameObjectManager.Get(gomAddr);
-
-                // ? DO NOT USE GAMEOBJECT NAME
-                ulong tarkovApplication =
-                    gom.FindBehaviourByClassName("TarkovApplication");
-
+                ulong tarkovApplication = TarkovApplicationHelper.GetObjectClass();
                 tarkovApplication.ThrowIfInvalidVirtualAddress();
 
                 // Continue EXACTLY as before

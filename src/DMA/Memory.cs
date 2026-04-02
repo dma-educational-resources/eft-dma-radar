@@ -217,12 +217,36 @@ namespace eft_dma_radar.DMA
                     ResourceJanitor.Run();
                     LoadProcess();
 
-                    Log.WriteLine("[Startup] Process found, waiting for modules to load...");
-                    Thread.Sleep(5000);
-                    FullRefresh();
-                    refreshCooldown.Restart();
+                    // Try loading modules immediately — if the game was already
+                    // running they will be available right away.  Only sleep and
+                    // retry when the modules are not yet mapped (fresh launch).
+                    bool modulesReady = false;
+                    for (int attempt = 0; attempt < 10; attempt++)
+                    {
+                        try
+                        {
+                            if (attempt > 0)
+                            {
+                                FullRefresh();
+                                refreshCooldown.Restart();
+                            }
 
-                    LoadModules();
+                            LoadModules();
+                            modulesReady = true;
+                            break;
+                        }
+                        catch
+                        {
+                            if (attempt == 0)
+                                Log.WriteLine("[Startup] Process found, waiting for modules to load...");
+
+                            Thread.Sleep(1000);
+                        }
+                    }
+
+                    if (!modulesReady)
+                        throw new Exception("Modules failed to load after retries");
+
                     _starting = true;
 
                     IL2CPP.Il2CppDumper.Dump();

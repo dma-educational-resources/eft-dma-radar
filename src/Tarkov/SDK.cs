@@ -839,6 +839,7 @@ namespace SDK
             public static uint MatchingProgress_TypeIndex = 15331;
             public static uint MatchingProgressView_TypeIndex = 15334;
             public static uint GamePlayerOwner_TypeIndex = 0;
+            public static uint TarkovApplication_TypeIndex = 0;
         }
         // MatchingProgress — pure data model, instance fields
         public readonly partial struct MatchingProgress

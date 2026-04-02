@@ -421,11 +421,9 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         {
             try
             {
-                ulong gomAddr = Memory.GOM;
-                if (!gomAddr.IsValidVirtualAddress()) return null;
-                var gom = GameObjectManager.Get(gomAddr);
+                ulong app = TarkovApplicationHelper.GetObjectClass();
+                if (!app.IsValidVirtualAddress()) return null;
 
-                ulong app = gom.FindBehaviourByClassName("TarkovApplication");
                 ulong menuOp = Memory.ReadPtr(app + Offsets.TarkovApplication._menuOperation);
                 ulong ui = Memory.ReadPtr(menuOp + Offsets.MainMenuShowOperation._preloaderUI);
                 ulong txt = Memory.ReadPtr(ui + Offsets.PreloaderUI._sessionIdText);

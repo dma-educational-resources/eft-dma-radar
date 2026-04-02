@@ -408,12 +408,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         {
             try
             {
-                ulong gomAddr = Memory.GOM;
-                if (!gomAddr.IsValidVirtualAddress()) return null;
-                var gom = GameObjectManager.Get(gomAddr);
-
-                ulong app = gom.FindBehaviourByClassName("TarkovApplication");
-                app.ThrowIfInvalidVirtualAddress();
+                ulong app = TarkovApplicationHelper.GetObjectClass();
+                if (!app.IsValidVirtualAddress()) return null;
 
                 ulong menuOp = Memory.ReadPtr(app + Offsets.TarkovApplication._menuOperation);
                 ulong ui = Memory.ReadPtr(menuOp + 0x60);

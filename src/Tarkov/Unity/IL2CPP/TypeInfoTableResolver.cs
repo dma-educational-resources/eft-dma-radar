@@ -38,6 +38,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             ("MatchingProgress",      nameof(Offsets.Special.MatchingProgress_TypeIndex)),
             ("MatchingProgressView",  nameof(Offsets.Special.MatchingProgressView_TypeIndex)),
             ("GamePlayerOwner",       nameof(Offsets.Special.GamePlayerOwner_TypeIndex)),
+            ("TarkovApplication",     nameof(Offsets.Special.TarkovApplication_TypeIndex)),
         ];
 
         // ── State ────────────────────────────────────────────────────────────
@@ -292,5 +293,36 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
         internal static void DebugDumpResolverState(int classCount, int updated, int fallback, int skipped) =>
             Log.WriteBlock(BuildUserReportBox(classCount, updated, fallback, skipped));
+
+        // ── Public helpers for resolvers ─────────────────────────────────────
+
+        /// <summary>
+        /// Resolves an Il2CppClass pointer from the TypeInfoTable using a TypeIndex.
+        /// Returns a valid klass pointer, or 0 on failure.
+        /// Callers should cache the result.
+        /// </summary>
+        internal static ulong ResolveKlassByTypeIndex(uint typeIndex)
+        {
+            if (typeIndex == 0)
+                return 0;
+
+            var gaBase = Memory.GameAssemblyBase;
+            if (!gaBase.IsValidVirtualAddress() || Offsets.Special.TypeInfoTableRva == 0)
+                return 0;
+
+            ulong tablePtr;
+            try { tablePtr = Memory.ReadPtr(gaBase + Offsets.Special.TypeInfoTableRva, false); }
+            catch { return 0; }
+
+            if (!tablePtr.IsValidVirtualAddress())
+                return 0;
+
+            try
+            {
+                var ptr = Memory.ReadValue<ulong>(tablePtr + (ulong)typeIndex * 8);
+                return ptr.IsValidVirtualAddress() ? ptr : 0;
+            }
+            catch { return 0; }
+        }
     }
 }

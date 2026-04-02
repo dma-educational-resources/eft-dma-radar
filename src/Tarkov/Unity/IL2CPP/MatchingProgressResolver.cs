@@ -181,6 +181,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             });
         }
 
+        // ── Cached klass pointer for fast GOM scan ─────────────────────────
+        private static ulong _cachedMatchingProgressViewKlass;
+
         private static void HandleGomFailure()
         {
             _consecutiveGomFailures++;
@@ -190,7 +193,8 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
         /// <summary>
         /// Synchronous resolver. Returns the cached value on subsequent calls.
-        /// Walks the GOM by class name — same pattern as <c>AntiAfk.TarkovApplication</c>.
+        /// Primary: GOM scan by klass pointer (fast — avoids name string reads).
+        /// Fallback: GOM scan by class name.
         /// </summary>
         public static ulong GetMatchingProgress()
         {
@@ -204,20 +208,42 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                     return 0;
 
                 var gom = GameObjectManager.Get(gomAddr);
+                ulong viewObjectClass = 0;
 
-                // FindBehaviourByClassName returns the objectClass ptr of the first
-                // component whose IL2CPP class name matches — exactly like AntiAfk does
-                // for "TarkovApplication".
-                ulong viewObjectClass;
+                // Primary: klass-pointer-based GOM scan (saves ~2 DMA reads per component)
                 try
                 {
-                    viewObjectClass = gom.FindBehaviourByClassName("MatchingProgressView");
+                    var klassPtr = _cachedMatchingProgressViewKlass;
+                    if (!klassPtr.IsValidVirtualAddress())
+                    {
+                        klassPtr = Il2CppDumper.ResolveKlassByTypeIndex(
+                            Offsets.Special.MatchingProgressView_TypeIndex);
+                        if (klassPtr.IsValidVirtualAddress())
+                        {
+                            _cachedMatchingProgressViewKlass = klassPtr;
+                            Log.Write(AppLogLevel.Debug,
+                                $"MatchingProgressView klass resolved @ 0x{klassPtr:X}",
+                                "MatchingProgressResolver");
+                        }
+                    }
+
+                    if (klassPtr.IsValidVirtualAddress())
+                        viewObjectClass = gom.FindBehaviourByKlassPtr(klassPtr);
                 }
-                catch
+                catch { }
+
+                // Fallback: class name scan
+                if (!viewObjectClass.IsValidVirtualAddress())
                 {
-                    // Memory unreadable during GOM scan — treat same as "not found"
-                    HandleGomFailure();
-                    return 0;
+                    try
+                    {
+                        viewObjectClass = gom.FindBehaviourByClassName("MatchingProgressView");
+                    }
+                    catch
+                    {
+                        HandleGomFailure();
+                        return 0;
+                    }
                 }
 
                 if (!viewObjectClass.IsValidVirtualAddress())
@@ -226,7 +252,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                     return 0;
                 }
 
-                _consecutiveGomFailures = 0; // successful find — reset counter
+                _consecutiveGomFailures = 0;
 
                 Log.Write(AppLogLevel.Debug, $"MatchingProgressView objectClass @ 0x{viewObjectClass:X}", "MatchingProgressResolver");
 

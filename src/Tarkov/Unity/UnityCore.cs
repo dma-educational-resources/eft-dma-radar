@@ -139,6 +139,79 @@ namespace eft_dma_radar.Common.Unity
             var go = Memory.ReadValue<GameObject>(gameObjectPtr, useCache);
             return go.GetComponent(className, useCache);
         }
+
+        /// <summary>
+        /// Find component by matching the Il2CppClass (klass) pointer at offset 0x0
+        /// of the objectClass. Much faster than name-based lookup over DMA because
+        /// it avoids reading name strings (saves ~2 DMA reads per component check).
+        /// Returns the objectClass pointer of the matching component, or 0.
+        /// </summary>
+        public ulong GetComponentByKlassPtr(ulong klassPtr)
+        {
+            if (!Utils.IsValidVirtualAddress(klassPtr))
+                return 0;
+
+            var componentArr = Components;
+            if (!Utils.IsValidVirtualAddress(componentArr.ArrayBase) || componentArr.Size == 0)
+                return 0;
+
+            int count = (int)Math.Min(componentArr.Size, 0x400);
+            var entries = new ComponentArray.Entry[count];
+
+            try
+            {
+                Memory.ReadBuffer(componentArr.ArrayBase, entries.AsSpan());
+            }
+            catch
+            {
+                return 0;
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                var compPtr = entries[i].Component;
+                if (!Utils.IsValidVirtualAddress(compPtr))
+                    continue;
+
+                ulong objectClass;
+                try
+                {
+                    objectClass = Memory.ReadPtr(
+                        compPtr + UnityOffsets.Component.ObjectClassOffset, false);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (!Utils.IsValidVirtualAddress(objectClass))
+                    continue;
+
+                ulong klass;
+                try
+                {
+                    klass = Memory.ReadPtr(objectClass, false);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (klass == klassPtr)
+                    return objectClass;
+            }
+
+            return 0;
+        }
+
+        public static ulong GetComponentByKlassPtr(ulong gameObjectPtr, ulong klassPtr)
+        {
+            if (!Utils.IsValidVirtualAddress(gameObjectPtr) || !Utils.IsValidVirtualAddress(klassPtr))
+                return 0;
+
+            var go = Memory.ReadValue<GameObject>(gameObjectPtr, false);
+            return go.GetComponentByKlassPtr(klassPtr);
+        }
     }
     [StructLayout(LayoutKind.Explicit, Pack = 1)]
     public readonly struct MonoBehaviour // Behaviour : Component : EditorExtension : Object

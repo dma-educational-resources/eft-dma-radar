@@ -265,15 +265,14 @@ internal static class QuestPlannerWorker
 
     /// <summary>
     /// Resolves the player Profile pointer from TarkovApplication in the lobby.
-    /// Chain: GOM.FindBehaviourByClassName("TarkovApplication") -> _menuOperation (0x130) -> _profile (0x50)
+    /// Chain: TarkovApplicationHelper -> _menuOperation (0x130) -> _profile (0x50)
     /// Returns 0 on failure - never throws.
     /// </summary>
     private static ulong GetLobbyProfile()
     {
         try
         {
-            var gom = GameObjectManager.Get(Memory.GOM);
-            ulong app = gom.FindBehaviourByClassName("TarkovApplication");
+            ulong app = TarkovApplicationHelper.GetObjectClass();
             if (!app.IsValidVirtualAddress()) return 0;
             ulong menuOp = Memory.ReadPtr(app + Offsets.TarkovApplication._menuOperation);
             if (menuOp == 0) return 0;
