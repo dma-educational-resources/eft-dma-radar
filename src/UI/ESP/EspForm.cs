@@ -1409,8 +1409,12 @@ namespace eft_dma_radar.UI.ESP
 
             float distance = MathF.Sqrt(closestDistSq);
 
-            string closestText =
-                $"{observed.PlayerSide.GetDescription()[0]}:{observed.Name} ({distance:F0}m)";
+            string displayName = observed.Name;
+            string prefix = observed.PlayerSide == Enums.EPlayerSide.Usec ? "U:" : "B:";
+            if (observed.IsPmc && !displayName.StartsWith(prefix, StringComparison.Ordinal))
+                displayName = prefix + displayName;
+
+            string closestText = $"{displayName} ({distance:F0}m)";
 
             if (closestText != _lastClosestPlayerText)
             {
@@ -2733,7 +2737,11 @@ namespace eft_dma_radar.UI.ESP
                 return null;
 
             var distance = Vector3.Distance(localPlayer.Position, observedPlayer.Position);
-            var closestText = $"{observedPlayer.PlayerSide.GetDescription()[0]}:{observedPlayer.Name} ({distance:F0}m)";
+            string closestDisplayName = observedPlayer.Name;
+            string closestPrefix = observedPlayer.PlayerSide == Enums.EPlayerSide.Usec ? "U:" : "B:";
+            if (observedPlayer.IsPmc && !closestDisplayName.StartsWith(closestPrefix, StringComparison.Ordinal))
+                closestDisplayName = closestPrefix + closestDisplayName;
+            var closestText = $"{closestDisplayName} ({distance:F0}m)";
 
             if (observedPlayer.Profile?.Level is int levelResult)
                 closestText += $", L:{levelResult}";

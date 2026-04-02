@@ -1243,6 +1243,8 @@ namespace eft_dma_radar.Tarkov.GameWorld
             if (!Unsafe.IsNullRef(ref vm))
             {
                 _viewMatrix.Update(ref vm);
+                _jitterX = _viewMatrix.JitterX;
+                _jitterY = _viewMatrix.JitterY;
             }
         }
 

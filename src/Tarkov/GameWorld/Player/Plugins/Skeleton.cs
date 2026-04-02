@@ -462,6 +462,10 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             float x = Vector3.Dot(vm.Right, worldPos) + vm.M14;
             float y = Vector3.Dot(vm.Up, worldPos) + vm.M24;
 
+            // Remove TAA/DLSS jitter (x_clean = x + jx*w)
+            x += vm.JitterX * w;
+            y += vm.JitterY * w;
+
             float cx = vw / 2f;
             float cy = vh / 2f;
             scrPos = new SKPoint(cx * (1f + x / w), cy * (1f - y / w));

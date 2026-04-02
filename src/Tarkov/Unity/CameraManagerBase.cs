@@ -57,6 +57,8 @@ namespace eft_dma_radar.Common.Unity
 
         protected static float _fov;
         protected static float _aspect;
+        protected static float _jitterX;
+        protected static float _jitterY;
         protected static readonly ViewMatrix _viewMatrix = new();
 
         /// <summary>
@@ -125,6 +127,13 @@ namespace eft_dma_radar.Common.Unity
 
             float x = Vector3.Dot(_viewMatrix.Right, worldPos) + _viewMatrix.M14; // Transposed
             float y = Vector3.Dot(_viewMatrix.Up, worldPos) + _viewMatrix.M24; // Transposed
+
+            // ── TAA / DLSS jitter compensation ──────────────────────────────────
+            // The VP matrix includes per-frame projection jitter. The detected
+            // jitter values represent the jx/jy offsets in the projection matrix.
+            // Clip-space: x_jittered = x_clean - jx*w, so x_clean = x + jx*w.
+            x += _jitterX * w;
+            y += _jitterY * w;
 
             if (IsScoped)
             {
