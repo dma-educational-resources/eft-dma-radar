@@ -1,4 +1,4 @@
-๏ปฟusing System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -14,11 +14,11 @@ using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;
-using eft_dma_radar.Common.DMA;
-using eft_dma_radar.Common.DMA.ScatterAPI;
-using eft_dma_radar.Common.DMA.Features;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity;
+using eft_dma_radar.DMA;
+using eft_dma_radar.DMA.ScatterAPI;
+using eft_dma_radar.DMA.Features;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Web.ProfileApi;
 
@@ -137,7 +137,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         private static void Memory_GameStopped(object sender, EventArgs e)
         {
-            Interlocked.Exchange(ref _lastDisposedBase, 0); // Game process exited โ€” all addresses are invalid
+            Interlocked.Exchange(ref _lastDisposedBase, 0); // Game process exited — all addresses are invalid
             LevelSettings = 0;
             MatchingProgress = 0;
             LevelSettingsResolver.Reset();
@@ -280,7 +280,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
             Log.WriteLine($"[Raid] RegisteredPlayers validated: {playerCount} player(s)");
 
-            // Validate MainPlayer pointer is also ready โ€” it is read by RegisteredPlayers constructor
+            // Validate MainPlayer pointer is also ready — it is read by RegisteredPlayers constructor
             // and may still be zero/garbage while RegisteredPlayers is already populated.
             var mainPlayer = Memory.ReadPtr(Base + Offsets.ClientLocalGameWorld.MainPlayer, false);
             if (mainPlayer == 0 || !mainPlayer.IsValidVirtualAddress())
@@ -376,7 +376,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     if (instance.Base == Interlocked.Read(ref _lastDisposedBase))
                         throw new InvalidOperationException("GameWorld not found");
 
-                    // Accepted โ€” this is a genuinely new GameWorld instance.
+                    // Accepted — this is a genuinely new GameWorld instance.
                     Interlocked.Exchange(ref _lastDisposedBase, 0);
 
                     // Assign MatchingProgress from cache (may already be resolved)
@@ -386,7 +386,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                         Log.WriteLine($"[IL2CPP] MatchingProgress assigned @ 0x{mp:X}");
                     }
 
-                    // Matching phase is over โ€” stop the stage poller and freeze the timer
+                    // Matching phase is over — stop the stage poller and freeze the timer
                     MatchingProgressResolver.NotifyRaidStarted();
 
                     // Phase 2: Wait for raid to be ready, then initialize game data
@@ -435,9 +435,9 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 if (!localGameWorld.IsValidVirtualAddress())
                     throw new InvalidOperationException("Invalid LocalGameWorld address");
 
-                // ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ
+                // ?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่
                 // OFFLINE / ONLINE detection (cheap)
-                // ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ
+                // ?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่
                 try
                 {
                     ulong classNamePtr = Memory.ReadPtrChain(
@@ -459,9 +459,9 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     IsOffline = false;
                 }
 
-                // ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ
-                // LEVEL SETTINGS ยกยงC non-blocking
-                // ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ?ยกรจ
+                // ?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่
+                // LEVEL SETTINGS กงC non-blocking
+                // ?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่
                 try
                 {
                     // 1) Fast path: use cached value if we already resolved it
@@ -472,7 +472,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     }
                     else
                     {
-                        // 2) No cached value yet ยกยงC schedule a background resolve.
+                        // 2) No cached value yet กงC schedule a background resolve.
                         //    Do NOT block the game / raid init thread here.
                         LevelSettings = 0;
 
@@ -606,7 +606,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 Thread.Sleep(10); // short delay between attempts
             }
 
-            // Definitively over โ€” clean up once then signal
+            // Definitively over — clean up once then signal
             LevelSettings = 0;
             MatchingProgress = 0;
             LevelSettingsResolver.Reset();
@@ -635,7 +635,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 if (_rgtPlayers.GetPlayerCount() <= 0)
                     return false;
 
-                // 3) Map transition detection ยกยงC but not on every single call
+                // 3) Map transition detection กงC but not on every single call
                 if ((_mapCheckTick++ & 0x3F) == 0) // every 64 calls
                 {
                     var currentMapId = GetCurrentMapId();
@@ -849,7 +849,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             }
             catch (NullReferenceException) when (_disposed)
             {
-                // Scatter read NRE during shutdown โ€” native VMM handles are stale
+                // Scatter read NRE during shutdown — native VMM handles are stale
             }
             catch (Exception ex)
             {
@@ -1017,7 +1017,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             }
             catch (NullReferenceException) when (_disposed)
             {
-                // Scatter read NRE during shutdown โ€” native VMM handles are stale
+                // Scatter read NRE during shutdown — native VMM handles are stale
             }
             catch (Exception ex)
             {
@@ -1174,7 +1174,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             }
             catch
             {
-                // Back off 3s before next attempt โ€” Instance takes time to become available after raid start
+                // Back off 3s before next attempt — Instance takes time to become available after raid start
                 _cameraRetryAfter = Environment.TickCount64 + 3_000;
             }
         }
@@ -1243,12 +1243,12 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
                 // Record this address so CreateGameInstance rejects the stale
                 // GameWorld that Unity keeps alive on the post-raid menu screen.
-                // Skip when the user explicitly requested a restart โ€” the GameWorld
+                // Skip when the user explicitly requested a restart — the GameWorld
                 // is still live and should be re-detectable.
                 if (Interlocked.Exchange(ref _suppressStaleGuard, 0) == 0)
                     Interlocked.Exchange(ref _lastDisposedBase, Base);
 
-                Log.WriteLine("[Raid] LocalGameWorld disposed โ€” entering cooldown.");
+                Log.WriteLine("[Raid] LocalGameWorld disposed — entering cooldown.");
 
                 // Wait for worker threads to finish so they don't read
                 // stale memory after cleanup completes.  Avoid joining the

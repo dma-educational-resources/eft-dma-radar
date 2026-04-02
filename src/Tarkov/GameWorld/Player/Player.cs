@@ -8,16 +8,16 @@ using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;
-using eft_dma_radar.Common.DMA.ScatterAPI;
-using eft_dma_radar.Common.DMA.Features;
-using eft_dma_radar.Common.Maps;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Config;
-using eft_dma_radar.Common.Misc.Data;
-using eft_dma_radar.Common.Misc.Pools;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.Collections;
-using eft_dma_radar.Common.Unity.LowLevel;
+using eft_dma_radar.DMA.ScatterAPI;
+using eft_dma_radar.DMA.Features;
+using eft_dma_radar.UI.Radar.Maps;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Config;
+using eft_dma_radar.Misc.Data;
+using eft_dma_radar.Misc.Pools;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.Collections;
+using eft_dma_radar.Tarkov.Unity.LowLevel;
 using System;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer
@@ -843,7 +843,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             // Non-root bones: one AddEntry per bone, all registered before the single callback fires
             foreach (var tr in skeleton.BonesDirect)
             {
-                if (tr.Key == eft_dma_radar.Common.Unity.Bones.HumanBase)
+                if (tr.Key == eft_dma_radar.Tarkov.Unity.Bones.HumanBase)
                     continue;
                 round1.AddEntry<MemPointer>((int)(uint)tr.Key,
                     tr.Value.TransformInternal +
@@ -860,7 +860,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 // Non-root bones
                 foreach (var tr in skeleton.BonesDirect)
                 {
-                    if (tr.Key == eft_dma_radar.Common.Unity.Bones.HumanBase)
+                    if (tr.Key == eft_dma_radar.Tarkov.Unity.Bones.HumanBase)
                         continue;
                     if (x1.TryGetResult<MemPointer>((int)(uint)tr.Key, out var tra))
                         round2.AddEntry<MemPointer>((int)(uint)tr.Key, tra + UnityOffsets.TransformAccess.Vertices);
@@ -889,7 +889,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     // Non-root bones
                     foreach (var tr in skeleton.BonesDirect)
                     {
-                        if (tr.Key == eft_dma_radar.Common.Unity.Bones.HumanBase)
+                        if (tr.Key == eft_dma_radar.Tarkov.Unity.Bones.HumanBase)
                             continue;
                         if (x2.TryGetResult<MemPointer>((int)(uint)tr.Key, out var verticesPtr) &&
                             tr.Value.VerticesAddr != verticesPtr)

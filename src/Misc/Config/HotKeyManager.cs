@@ -1,6 +1,6 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
-namespace eft_dma_radar.Common.Misc.Data
+namespace eft_dma_radar.Misc.Data
 {
     public enum HotkeyMode
     {
@@ -39,7 +39,7 @@ namespace eft_dma_radar.Common.Misc.Data
     }
 }
 
-namespace eft_dma_radar.Common.Misc.Data.EFT
+namespace eft_dma_radar.Misc.Data.EFT
 {
     /// <summary>
     /// Wrapper for all configurable hotkey actions.
@@ -139,7 +139,7 @@ namespace eft_dma_radar.Common.Misc.Data.EFT
     }
 }
 
-namespace eft_dma_radar.Common.Misc.Data.Arena
+namespace eft_dma_radar.Misc.Data.Arena
 {
     /// <summary>
     /// Wrapper for all configurable hotkey actions.

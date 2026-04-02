@@ -1,4 +1,4 @@
-ï»¿global using eft_dma_radar;
+global using eft_dma_radar;
 global using eft_dma_radar.Common;
 global using eft_dma_radar.Misc;
 global using SDK;
@@ -26,11 +26,11 @@ using eft_dma_radar.Tarkov.Hideout;
 using eft_dma_radar.Tarkov.QuestPlanner;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Common.DMA.Features;
-using eft_dma_radar.Common.Maps;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Data;
-using eft_dma_radar.Common.UI;
+using eft_dma_radar.DMA.Features;
+using eft_dma_radar.UI.Radar.Maps;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Data;
+using eft_dma_radar.UI.Controls;
 using System.IO;
 using System.Runtime.Versioning;
 using System.Text.Json.Nodes;
@@ -40,7 +40,7 @@ using MessageBox = HandyControl.Controls.MessageBox;
 
 [assembly: AssemblyTitle(Program.Name)]
 [assembly: AssemblyProduct(Program.Name)]
-[assembly: AssemblyCopyright("BSD Zero Clause License Â©2025 lone-dma")]
+[assembly: AssemblyCopyright("BSD Zero Clause License ©2025 lone-dma")]
 [assembly: AssemblyDescription("Advanced DMA radar for Escape from Tarkov")]
 [assembly: AssemblyCompany("lone-dma")]
 [assembly: AssemblyConfiguration("")]
@@ -66,7 +66,7 @@ namespace eft_dma_radar
         public static Config Config { get; private set; }
 
         /// <summary>
-        /// Hideout stash manager â€” reads stash items and calculates sell values.
+        /// Hideout stash manager — reads stash items and calculates sell values.
         /// </summary>
         public static HideoutManager Hideout { get; } = new();
 

@@ -1,4 +1,4 @@
-﻿using eft_dma_radar.Common.Misc;
+using eft_dma_radar.Misc;
 
 namespace eft_dma_radar.UI.Misc
 {
@@ -42,7 +42,7 @@ namespace eft_dma_radar.UI.Misc
         /// <summary>Default typeface, 12pt. Used by PhysicsTextPaint.</summary>
         public static SKFont FontDefault12 { get; } = new() { Size = 12 };
 
-        // ── Mutable ESP fonts (rescaled by ScaleESPFonts) ──
+        // -- Mutable ESP fonts (rescaled by ScaleESPFonts) --
 
         /// <summary>Medium typeface, 12pt base. Most ESP text paints.</summary>
         public static SKFont ESPFontMedium12 { get; } = new(CustomFonts.SKFontFamilyMedium, 12) { Subpixel = true };
@@ -62,7 +62,7 @@ namespace eft_dma_radar.UI.Misc
         /// <summary>Italic typeface, 16pt base. Magazine info ESP text.</summary>
         public static SKFont ESPFontItalic16 { get; } = new(CustomFonts.SKFontFamilyItalic, 16) { Subpixel = true };
 
-        // ── Mutable Radar fonts (rescaled by GeneralSettings) ──
+        // -- Mutable Radar fonts (rescaled by GeneralSettings) --
 
         /// <summary>Regular typeface, 12pt base. Most radar text paints.</summary>
         public static SKFont RadarFontRegular12 { get; } = new(CustomFonts.SKFontFamilyRegular, 12) { Subpixel = true };

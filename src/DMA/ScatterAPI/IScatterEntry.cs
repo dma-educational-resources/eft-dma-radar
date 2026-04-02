@@ -1,7 +1,7 @@
-﻿using eft_dma_radar.Common.Misc.Pools;
+using eft_dma_radar.Misc.Pools;
 using VmmSharpEx.Scatter;
 
-namespace eft_dma_radar.Common.DMA.ScatterAPI
+namespace eft_dma_radar.DMA.ScatterAPI
 {
     public interface IScatterEntry : IPooledObject<IScatterEntry>
     {

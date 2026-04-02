@@ -1,4 +1,4 @@
-﻿using eft_dma_radar.Common.Misc.Data;
+using eft_dma_radar.Misc.Data;
 
 namespace eft_dma_radar.Tarkov.Loot
 {

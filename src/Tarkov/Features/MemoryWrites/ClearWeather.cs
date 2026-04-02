@@ -1,7 +1,7 @@
-﻿using eft_dma_radar.Common.DMA.ScatterAPI;
-using eft_dma_radar.Common.DMA.Features;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity;
+using eft_dma_radar.DMA.ScatterAPI;
+using eft_dma_radar.DMA.Features;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 
@@ -108,7 +108,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 if (!weatherDebug.IsValidVirtualAddress())
                     return 0x0;
 
-                // Optional sanity check ï¿½C do NOT throw, just bail if weird
+                // Optional sanity check �C do NOT throw, just bail if weird
                 try
                 {
                     var name = ObjectClass.ReadName(weatherDebug);

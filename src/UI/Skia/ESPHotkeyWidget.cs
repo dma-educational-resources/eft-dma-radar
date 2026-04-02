@@ -1,5 +1,5 @@
-﻿using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Data.EFT;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Data.EFT;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;

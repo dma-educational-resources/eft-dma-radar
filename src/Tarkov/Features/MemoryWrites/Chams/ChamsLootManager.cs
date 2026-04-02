@@ -1,7 +1,7 @@
-﻿using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.LowLevel;
-using eft_dma_radar.Common.Unity.LowLevel.Types;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.LowLevel;
+using eft_dma_radar.Tarkov.Unity.LowLevel.Types;
 using eft_dma_radar.Tarkov.Features.MemoryWrites.Chams;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.Tarkov.Loot;

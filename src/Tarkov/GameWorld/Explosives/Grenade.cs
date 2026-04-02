@@ -1,15 +1,15 @@
-ï»¿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
-using eft_dma_radar.Common.DMA.ScatterAPI;
+using eft_dma_radar.DMA.ScatterAPI;
 using eft_dma_radar.UI.ESP;
-using eft_dma_radar.Common.Maps;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Data;
+using eft_dma_radar.UI.Radar.Maps;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
-using eft_dma_radar.Common.Unity;
+using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.Misc;
 using SkiaSharp;
@@ -19,7 +19,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
     public sealed class Grenade : IExplosiveItem, IWorldEntity, IMapEntity, IESPEntity
     {
         private static void Log(string msg) =>
-            eft_dma_radar.Common.Misc.Log.WriteLine($"[GRENADE] {msg}");
+            eft_dma_radar.Misc.Log.WriteLine($"[GRENADE] {msg}");
 
         public static EntityTypeSettings Settings =>
             Program.Config.EntityTypeSettings.GetSettings("Grenade");
@@ -78,7 +78,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
         private bool _forceInactive;
 
         // -----------------------------------------------------
-        // Scatter IDs â€” unique per grenade instance
+        // Scatter IDs — unique per grenade instance
         // -----------------------------------------------------
         private static int _nextScatterBaseId = 100_000;
         private readonly int _scatterIdIsDead;
@@ -187,7 +187,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
         }
 
         // -----------------------------------------------------
-        // FAST PATH (scatter) â€” queue reads
+        // FAST PATH (scatter) — queue reads
         // -----------------------------------------------------
         public void QueueScatterReads(ScatterReadIndex idx)
         {
@@ -218,7 +218,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
         }
 
         // -----------------------------------------------------
-        // FAST PATH (scatter) â€” apply results
+        // FAST PATH (scatter) — apply results
         // -----------------------------------------------------
         public void OnRefresh(ScatterReadIndex idx)
         {

@@ -1,7 +1,7 @@
 #nullable enable
 
 using System.Reflection;
-using eft_dma_radar.Common.Misc;
+using eft_dma_radar.Misc;
 using SDK;
 
 namespace eft_dma_radar.Tarkov.Unity.IL2CPP

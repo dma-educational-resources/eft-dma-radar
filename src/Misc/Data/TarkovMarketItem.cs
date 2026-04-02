@@ -1,6 +1,6 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
-namespace eft_dma_radar.Common.Misc.Data
+namespace eft_dma_radar.Misc.Data
 {
     /// <summary>
     /// Class JSON Representation of Tarkov Market Data.

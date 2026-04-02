@@ -1,6 +1,6 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 
-namespace eft_dma_radar.Common.Unity
+namespace eft_dma_radar.Tarkov.Unity
 {
     /// <summary>
     /// Bones Index for Player Transforms.

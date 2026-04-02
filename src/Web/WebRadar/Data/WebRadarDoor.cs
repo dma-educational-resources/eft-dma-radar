@@ -1,5 +1,5 @@
 #nullable enable
-using eft_dma_radar.Common.Maps;
+using eft_dma_radar.UI.Radar.Maps;
 using eft_dma_radar.Tarkov.GameWorld.Interactables;
 using eft_dma_radar.UI.Misc;
 using MessagePack;

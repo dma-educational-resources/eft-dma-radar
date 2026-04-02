@@ -1,7 +1,7 @@
-ï»¿using eft_dma_radar.Common.DMA;
-using eft_dma_radar.Common.DMA.Features;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.DMA.ScatterAPI;
+using eft_dma_radar.DMA;
+using eft_dma_radar.DMA.Features;
+using eft_dma_radar.Misc;
+using eft_dma_radar.DMA.ScatterAPI;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 
 namespace eft_dma_radar.Tarkov.Features.MemoryWrites
@@ -35,7 +35,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 if (!valuePtr.IsValidVirtualAddress())
                     return;
 
-                // If Enabled Â¡Ãº set to 0, else Â¡Ãº restore default
+                // If Enabled ¡ú set to 0, else ¡ú restore default
                 float targetValue = Enabled ? DISABLED_VALUE : DEFAULT_VALUE;
 
                 writes.AddValueEntry(valuePtr + Offsets.BSGGameSettingValueClass.Value, targetValue);
@@ -43,7 +43,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 writes.Callbacks += () =>
                 {
                     _lastEnabledState = Enabled;
-                    Log.WriteLine($"[DisableHeadBobbing] {(Enabled ? "Enabled" : "Disabled")} Â¡Ãº {targetValue}");
+                    Log.WriteLine($"[DisableHeadBobbing] {(Enabled ? "Enabled" : "Disabled")} ¡ú {targetValue}");
                 };
             }
             catch (Exception ex)

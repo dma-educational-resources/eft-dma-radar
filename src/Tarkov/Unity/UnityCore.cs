@@ -1,13 +1,13 @@
-using eft_dma_radar.Common.DMA;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Pools;
+using eft_dma_radar.DMA;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Pools;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 using SkiaSharp;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace eft_dma_radar.Common.Unity
+namespace eft_dma_radar.Tarkov.Unity
 {
     public static class HashUtil
     {
@@ -114,7 +114,7 @@ namespace eft_dma_radar.Common.Unity
                 string name;
                 try
                 {
-                    name = eft_dma_radar.Common.Unity.ObjectClass.ReadName(objectClass, 128, useCache);
+                    name = eft_dma_radar.Tarkov.Unity.ObjectClass.ReadName(objectClass, 128, useCache);
                 }
                 catch
                 {

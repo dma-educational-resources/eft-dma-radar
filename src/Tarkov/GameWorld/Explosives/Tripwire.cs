@@ -1,13 +1,13 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
-using eft_dma_radar.Common.DMA.ScatterAPI;
+using eft_dma_radar.DMA.ScatterAPI;
 using eft_dma_radar.UI.ESP;
-using eft_dma_radar.Common.Maps;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Data;
+using eft_dma_radar.UI.Radar.Maps;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
-using eft_dma_radar.Common.Unity;
+using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using SDK;
 using static SDK.Offsets;
@@ -19,7 +19,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
     public sealed class Tripwire : IExplosiveItem, IWorldEntity, IMapEntity, IESPEntity
     {
         private static void Log(string msg) =>
-            eft_dma_radar.Common.Misc.Log.WriteLine($"[TRIPWIRE] {msg}");
+            eft_dma_radar.Misc.Log.WriteLine($"[TRIPWIRE] {msg}");
 
         public static implicit operator ulong(Tripwire x) => x.Addr;
 

@@ -1,11 +1,11 @@
-﻿using eft_dma_radar.UI.ESP;
-using eft_dma_radar.Common.Misc;
+using eft_dma_radar.UI.ESP;
+using eft_dma_radar.Misc;
 using SkiaSharp;
 using System.Drawing;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace eft_dma_radar.Common.Unity
+namespace eft_dma_radar.Tarkov.Unity
 {
     public abstract class CameraManagerBase
     {
@@ -57,9 +57,14 @@ namespace eft_dma_radar.Common.Unity
 
         protected static float _fov;
         protected static float _aspect;
+        protected static readonly ViewMatrix _viewMatrix = new();
+
+        /// <summary>
+        /// Per-frame TAA/DLSS jitter detected by the ViewMatrix high-pass filter.
+        /// Updated in the ViewMatrixCallback on the realtime thread.
+        /// </summary>
         protected static float _jitterX;
         protected static float _jitterY;
-        protected static readonly ViewMatrix _viewMatrix = new();
 
         /// <summary>
         /// Update the Viewport Dimensions for Camera Calculations.
@@ -128,10 +133,9 @@ namespace eft_dma_radar.Common.Unity
             float x = Vector3.Dot(_viewMatrix.Right, worldPos) + _viewMatrix.M14; // Transposed
             float y = Vector3.Dot(_viewMatrix.Up, worldPos) + _viewMatrix.M24; // Transposed
 
-            // ── TAA / DLSS jitter compensation ──────────────────────────────────
-            // The VP matrix includes per-frame projection jitter. The detected
-            // jitter values represent the jx/jy offsets in the projection matrix.
-            // Clip-space: x_jittered = x_clean - jx*w, so x_clean = x + jx*w.
+            // -- TAA / DLSS jitter compensation ----------------------------------
+            // Removes per-frame random projection jitter detected via temporal
+            // high-pass filtering of the VP matrix row dot products.
             x += _jitterX * w;
             y += _jitterY * w;
 
@@ -206,13 +210,13 @@ namespace eft_dma_radar.Common.Unity
             var right = new Vector3(cy, 0f, -sy);
             var up = new Vector3(-sy * sp, cp, -cy * sp);
 
-            // View matrix rows (transposed VP) — matching WorldToScreen convention:
+            // View matrix rows (transposed VP) � matching WorldToScreen convention:
             //   Translation row  = forward  (used for w depth)
             //   Right row        = right    (used for x)
             //   Up row           = up       (used for y)
-            //   M44 = -(forward · position)
-            //   M14 = -(right   · position)
-            //   M24 = -(up      · position)
+            //   M44 = -(forward � position)
+            //   M14 = -(right   � position)
+            //   M24 = -(up      � position)
             var vm = new ViewMatrix
             {
                 Translation = forward,

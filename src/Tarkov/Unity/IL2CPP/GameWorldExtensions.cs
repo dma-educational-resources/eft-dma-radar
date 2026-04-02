@@ -1,11 +1,11 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.Diagnostics;
 using System.Threading;
 
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Data;
-using eft_dma_radar.Common.Unity;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Data;
+using eft_dma_radar.Tarkov.Unity;
 using SDK;
 
 namespace eft_dma_radar.Tarkov.Unity.IL2CPP
@@ -13,7 +13,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
     public static class GameWorldExtensions
     {
         /// <summary>
-        /// Cached GamePlayerOwner class pointer — resolved once from the TypeInfoTable.
+        /// Cached GamePlayerOwner class pointer � resolved once from the TypeInfoTable.
         /// </summary>
         private static ulong _cachedGamePlayerOwnerKlass;
 
@@ -27,7 +27,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
             Log.WriteLine("[IL2CPP] Resolving GameWorld");
 
-            // Primary: IL2CPP direct path via GamePlayerOwner (fastest — ~5 reads)
+            // Primary: IL2CPP direct path via GamePlayerOwner (fastest � ~5 reads)
             if (TryGetGameWorldViaIL2CPP(out var il2cppResult))
             {
                 map = il2cppResult!.Map;
@@ -47,9 +47,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             throw new InvalidOperationException("GameWorld not found");
         }
 
-        // ════════════════════════════════════════════════════════════════════
-        // IL2CPP DIRECT PATH (GamePlayerOwner → myPlayer → GameWorld)
-        // ════════════════════════════════════════════════════════════════════
+        // --------------------------------------------------------------------
+        // IL2CPP DIRECT PATH (GamePlayerOwner ? myPlayer ? GameWorld)
+        // --------------------------------------------------------------------
 
         private static bool TryGetGameWorldViaIL2CPP(out GameWorldResult? result)
         {
@@ -174,9 +174,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             return 0;
         }
 
-        // ════════════════════════════════════════════════════════════════════
-        // GOM FALLBACK — Name-based scan
-        // ════════════════════════════════════════════════════════════════════
+        // --------------------------------------------------------------------
+        // GOM FALLBACK � Name-based scan
+        // --------------------------------------------------------------------
 
         private static bool TryGOMScan(
             ulong gomAddress,
@@ -254,9 +254,9 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             return null;
         }
 
-        // ════════════════════════════════════════════════════════════════════
+        // --------------------------------------------------------------------
         // SHARED HELPERS
-        // ════════════════════════════════════════════════════════════════════
+        // --------------------------------------------------------------------
 
         private static bool TryResolveMap(ulong gameWorld, out string? map)
         {

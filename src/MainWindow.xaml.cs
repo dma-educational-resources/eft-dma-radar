@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using eft_dma_radar.Tarkov;
 using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Tarkov.EFTPlayer;
@@ -17,12 +17,12 @@ using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;
 using eft_dma_radar.UI.SKWidgetControl;
-using eft_dma_radar.Common.DMA.Features;
-using eft_dma_radar.Common.Maps;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Data;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.LowLevel;
+using eft_dma_radar.DMA.Features;
+using eft_dma_radar.UI.Radar.Maps;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Data;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.LowLevel;
 using HandyControl.Controls;
 using HandyControl.Themes;
 using HandyControl.Tools;
@@ -115,7 +115,7 @@ namespace eft_dma_radar
         private volatile bool _uiInteractionActive = false;
 
         // ---- Map cache ----
-        private SKSurface? _mapCacheSurface;
+        private SKImage? _mapCacheImage;
         private SKRect _lastMapBounds;
         private float _lastMapPlayerHeight;
         private int _lastMapCacheWidth;
@@ -439,49 +439,58 @@ namespace eft_dma_radar
                     int cacheW = (int)mapCanvasBounds.Width;
                     int cacheH = (int)mapCanvasBounds.Height;
 
-                    bool needsMapRebuild =
-                        _mapCacheSurface is null ||
-                        _lastCachedMapID != mapID ||
-                        _lastMapZoom != _zoom ||
-                        _lastMapRotation != _rotationDegrees ||
-                        _lastMapCacheWidth != cacheW ||
-                        _lastMapCacheHeight != cacheH ||
-                        Math.Abs(_lastMapPlayerHeight - playerHeight) > 0.5f ||
-                        Math.Abs(_lastMapBounds.Left - mapParams.Bounds.Left) > 0.25f ||
-                        Math.Abs(_lastMapBounds.Top - mapParams.Bounds.Top) > 0.25f ||
-                        Math.Abs(_lastMapBounds.Width - mapParams.Bounds.Width) > 0.1f ||
-                        Math.Abs(_lastMapBounds.Height - mapParams.Bounds.Height) > 0.1f;
-
-                    long nowTick = Environment.TickCount64;
-
-                    if (needsMapRebuild && nowTick - _lastMapRebuildTick >= MapRebuildMinIntervalMs)
+                    if (cacheW > 0 && cacheH > 0)
                     {
-                        _lastMapRebuildTick = nowTick;
-                        _mapCacheSurface?.Dispose();
+                        bool needsMapRebuild =
+                            _mapCacheImage is null ||
+                            _lastCachedMapID != mapID ||
+                            _lastMapZoom != _zoom ||
+                            _lastMapRotation != _rotationDegrees ||
+                            _lastMapCacheWidth != cacheW ||
+                            _lastMapCacheHeight != cacheH ||
+                            Math.Abs(_lastMapPlayerHeight - playerHeight) > 0.5f ||
+                            Math.Abs(_lastMapBounds.Left - mapParams.Bounds.Left) > 0.25f ||
+                            Math.Abs(_lastMapBounds.Top - mapParams.Bounds.Top) > 0.25f ||
+                            Math.Abs(_lastMapBounds.Width - mapParams.Bounds.Width) > 0.1f ||
+                            Math.Abs(_lastMapBounds.Height - mapParams.Bounds.Height) > 0.1f;
 
-                        var info = new SKImageInfo(cacheW, cacheH, SKColorType.Rgba8888, SKAlphaType.Premul);
-                        _mapCacheSurface = SKSurface.Create(info);
+                        long nowTick = Environment.TickCount64;
 
-                        if (_mapCacheSurface is not null)
+                        if (needsMapRebuild && nowTick - _lastMapRebuildTick >= MapRebuildMinIntervalMs)
                         {
-                            var cacheCanvas = _mapCacheSurface.Canvas;
-                            cacheCanvas.Clear(SKColors.Transparent);
-                            map.Draw(cacheCanvas, playerHeight, mapParams.Bounds, mapCanvasBounds);
+                            _lastMapRebuildTick = nowTick;
+
+                            var info = new SKImageInfo(cacheW, cacheH, SKColorType.Rgba8888, SKAlphaType.Premul);
+                            using var cacheSurface = SKSurface.Create(info);
+
+                            if (cacheSurface is not null)
+                            {
+                                var cacheCanvas = cacheSurface.Canvas;
+                                cacheCanvas.Clear(SKColors.Transparent);
+                                map.Draw(cacheCanvas, playerHeight, mapParams.Bounds, mapCanvasBounds);
+
+                                _mapCacheImage?.Dispose();
+                                _mapCacheImage = cacheSurface.Snapshot();
+                            }
+
+                            _lastCachedMapID = mapID;
+                            _lastMapZoom = _zoom;
+                            _lastMapRotation = _rotationDegrees;
+                            _lastMapCacheWidth = cacheW;
+                            _lastMapCacheHeight = cacheH;
+                            _lastMapPlayerHeight = playerHeight;
+                            _lastMapBounds = mapParams.Bounds;
                         }
 
-                        _lastCachedMapID = mapID;
-                        _lastMapZoom = _zoom;
-                        _lastMapRotation = _rotationDegrees;
-                        _lastMapCacheWidth = cacheW;
-                        _lastMapCacheHeight = cacheH;
-                        _lastMapPlayerHeight = playerHeight;
-                        _lastMapBounds = mapParams.Bounds;
+                        if (_mapCacheImage is not null)
+                            canvas.DrawImage(_mapCacheImage, mapCanvasBounds);
+                        else
+                            map.Draw(canvas, playerHeight, mapParams.Bounds, mapCanvasBounds);
                     }
-
-                    if (_mapCacheSurface is not null)
-                        canvas.DrawSurface(_mapCacheSurface, 0, 0);
                     else
+                    {
                         map.Draw(canvas, playerHeight, mapParams.Bounds, mapCanvasBounds);
+                    }
 
                     SKPaints.UpdatePulsingAsteriskColor();
 
@@ -846,7 +855,7 @@ namespace eft_dma_radar
 
             if (TeammatesWorker.IsTeammate(player))
             {
-                // Removing teammate – restore handled by worker auto-flag
+                // Removing teammate � restore handled by worker auto-flag
                 TeammatesWorker.ForceRemove(player.VoipId);
             }
             else
@@ -1901,8 +1910,8 @@ namespace eft_dma_radar
                 }
 
                 _renderTimer.Dispose();
-                _mapCacheSurface?.Dispose();
-                _mapCacheSurface = null;
+                _mapCacheImage?.Dispose();
+                _mapCacheImage = null;
                 _pingPaint.Dispose();
 
                 Window = null;

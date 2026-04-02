@@ -1,4 +1,4 @@
-﻿using eft_dma_radar.Common.Misc;
+using eft_dma_radar.Misc;
 using SkiaSharp;
 using SkiaSharp.Views.WPF;
 using Svg.Skia;
@@ -6,7 +6,7 @@ using System.IO;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace eft_dma_radar.Common.Maps
+namespace eft_dma_radar.UI.Radar.Maps
 {
     /// <summary>
     /// SVG Map Implementation.
@@ -69,7 +69,7 @@ namespace eft_dma_radar.Common.Maps
                 if (layers.Count == 0)
                     throw new InvalidOperationException("No valid SVG map layers loaded.");
 
-                // Sort ONCE — base layer first, then height order
+                // Sort ONCE � base layer first, then height order
                 _layers = layers
                     .OrderBy(l => !l.IsBaseLayer)
                     .ThenBy(l => l.SortHeight)

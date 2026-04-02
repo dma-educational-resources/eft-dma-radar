@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Common.Unity
+namespace eft_dma_radar.Tarkov.Unity
 {
     /// <summary>
     /// Centralized IL2CPP Unity offsets (Dec 2025).

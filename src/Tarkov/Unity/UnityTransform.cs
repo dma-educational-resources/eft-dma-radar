@@ -1,10 +1,10 @@
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Pools;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Pools;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace eft_dma_radar.Common.Unity
+namespace eft_dma_radar.Tarkov.Unity
 {
     public sealed class UnityTransform
     {

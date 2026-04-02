@@ -1,7 +1,7 @@
-ï»¿using eft_dma_radar.Common.Misc;
+using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.EFTPlayer;
-using eft_dma_radar.Common.DMA.ScatterAPI;
-using eft_dma_radar.Common.Unity.Collections;
+using eft_dma_radar.DMA.ScatterAPI;
+using eft_dma_radar.Tarkov.Unity.Collections;
 using eft_dma_radar.Tarkov.Features.MemoryWrites.Patches;
 
 namespace eft_dma_radar.Tarkov.GameWorld
@@ -115,7 +115,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 UpdateExistingPlayers(registered);
                 HandleBtrStickiness();
                 // Clean up failed allocation tracking for addresses no longer in the game.
-                // Only run every 64 refreshes â€” entries are small and the list changes rarely.
+                // Only run every 64 refreshes — entries are small and the list changes rarely.
                 if ((_refreshTick++ & 0x3F) == 0)
                 {
                     foreach (var kvp in _failedAllocations)
@@ -197,12 +197,12 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
                 if (MapRotationNearlyEqual(currentRot, player.LastBtrMapRotation))
                 {
-                    // Rotation is stable â€” legit BTR passenger
+                    // Rotation is stable — legit BTR passenger
                     player.BtrStaticRotationTicks++;
                 }
                 else
                 {
-                    // Rotation changed â€” suspicious
+                    // Rotation changed — suspicious
                     player.BtrStaticRotationTicks = 0;
                 }
 
@@ -220,14 +220,14 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     {
                         if (s_btrFixLocalLimit.TryEnter())
                             Log.Write(AppLogLevel.Warning,
-                                "LocalPlayer stuck to BTR with rotating view â€” soft reset",
+                                "LocalPlayer stuck to BTR with rotating view — soft reset",
                                 "BTR FIX");
                     }
                     else
                     {
                         if (player.BtrFixLimit.TryEnter())
                             Log.Write(AppLogLevel.Warning,
-                                $"Stuck player {player.Name} rotating at BTR â€” soft reset",
+                                $"Stuck player {player.Name} rotating at BTR — soft reset",
                                 "BTR FIX");
                     }
 
@@ -310,11 +310,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
             if (!_players.TryGetValue(btrPlayerBase, out var existing))
                 return;
 
-            // ðŸš« NEVER convert real players into BTR operators
+            // ?? NEVER convert real players into BTR operators
             if (existing.IsHuman || existing is LocalPlayer)
                 return;
 
-            // ðŸš« Already a BTR
+            // ?? Already a BTR
             if (existing is BtrOperator)
                 return;
 

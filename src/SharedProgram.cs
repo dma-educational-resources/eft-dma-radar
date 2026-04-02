@@ -1,7 +1,7 @@
-﻿using eft_dma_radar.Misc;
+using eft_dma_radar.Misc;
 using System.Diagnostics;
-using eft_dma_radar.Common.Misc.Config;
-using eft_dma_radar.Common.Misc;
+using eft_dma_radar.Misc.Config;
+using eft_dma_radar.Misc;
 using System.Net;
 using System.IO;
 using System.Net.Http;
@@ -104,7 +104,7 @@ namespace eft_dma_radar
 
             Log.WriteLine($"[SystemRequirements] OS: {os.VersionString} \u2713");
 
-            // Soft check: physical RAM — recommend ≥ 8 GB
+            // Soft check: physical RAM � recommend = 8 GB
             try
             {
                 using var searcher = new ManagementObjectSearcher("SELECT TotalPhysicalMemory FROM Win32_ComputerSystem");
@@ -112,7 +112,7 @@ namespace eft_dma_radar
                 {
                     var totalGb = Convert.ToInt64(obj["TotalPhysicalMemory"]) / (1024.0 * 1024.0 * 1024.0);
                     if (totalGb < 8.0)
-                        Log.WriteLine($"[SystemRequirements] WARNING: {totalGb:F1} GB RAM detected — 8 GB or more is recommended for stable operation.");
+                        Log.WriteLine($"[SystemRequirements] WARNING: {totalGb:F1} GB RAM detected � 8 GB or more is recommended for stable operation.");
                     else
                         Log.WriteLine($"[SystemRequirements] RAM: {totalGb:F1} GB \u2713");
                     break;

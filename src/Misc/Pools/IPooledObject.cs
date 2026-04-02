@@ -1,8 +1,8 @@
-﻿using eft_dma_radar.Common.Misc;
+using eft_dma_radar.Misc;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 
-namespace eft_dma_radar.Common.Misc.Pools
+namespace eft_dma_radar.Misc.Pools
 {
     /// <summary>
     /// Interface devinces a class object that can be rented from an Object Pool for improved allocation performance.

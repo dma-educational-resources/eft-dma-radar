@@ -1,6 +1,6 @@
 #nullable enable
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.UI.ESP;
 using SkiaSharp;
 using System;
@@ -65,12 +65,12 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         {
             _player = player;
 
-            var tiRoot = Memory.ReadPtrChain(player.Base, getTransformChainFunc(eft_dma_radar.Common.Unity.Bones.HumanBase));
+            var tiRoot = Memory.ReadPtrChain(player.Base, getTransformChainFunc(eft_dma_radar.Tarkov.Unity.Bones.HumanBase));
             Root = new UnityTransform(tiRoot);
 
             var bones = new Dictionary<Bones, UnityTransform>(AllSkeletonBones.Length + 1)
             {
-                [eft_dma_radar.Common.Unity.Bones.HumanBase] = Root
+                [eft_dma_radar.Tarkov.Unity.Bones.HumanBase] = Root
             };
 
             foreach (var bone in AllSkeletonBones.Span)
@@ -141,7 +141,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         public bool UpdateESPBuffer()
         {
             // MidTorso is the anchor - if this fails and we have no cache, abort
-            if (!CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanSpine2].Position, out var midTorsoScreen, true, true))
+            if (!CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanSpine2].Position, out var midTorsoScreen, true, true))
             {
                 if (!_hasValidCache) return false;
                 midTorsoScreen = _lastMidTorso;
@@ -149,21 +149,21 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             else _lastMidTorso = midTorsoScreen;
 
             // For all other bones: use new position if valid, otherwise use cached
-            var headScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanHead].Position, out var h) ? (_lastHead = h) : _lastHead;
-            var neckScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanNeck].Position, out var n) ? (_lastNeck = n) : _lastNeck;
-            var leftCollarScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanLCollarbone].Position, out var lc) ? (_lastLeftCollar = lc) : _lastLeftCollar;
-            var rightCollarScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanRCollarbone].Position, out var rc) ? (_lastRightCollar = rc) : _lastRightCollar;
-            var leftHandScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanLPalm].Position, out var lh) ? (_lastLeftHand = lh) : _lastLeftHand;
-            var rightHandScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanRPalm].Position, out var rh) ? (_lastRightHand = rh) : _lastRightHand;
-            var upperTorsoScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanSpine3].Position, out var ut) ? (_lastUpperTorso = ut) : _lastUpperTorso;
-            var lowerTorsoScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanSpine1].Position, out var lt) ? (_lastLowerTorso = lt) : _lastLowerTorso;
-            var pelvisScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanPelvis].Position, out var p) ? (_lastPelvis = p) : _lastPelvis;
-            var leftFootScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanLFoot].Position, out var lf) ? (_lastLeftFoot = lf) : _lastLeftFoot;
-            var rightFootScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanRFoot].Position, out var rf) ? (_lastRightFoot = rf) : _lastRightFoot;
-            var leftKneeScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanLThigh2].Position, out var lk) ? (_lastLeftKnee = lk) : _lastLeftKnee;
-            var rightKneeScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanRThigh2].Position, out var rk) ? (_lastRightKnee = rk) : _lastRightKnee;
-            var leftElbowScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanLForearm2].Position, out var le) ? (_lastLeftElbow = le) : _lastLeftElbow;
-            var rightElbowScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanRForearm2].Position, out var re) ? (_lastRightElbow = re) : _lastRightElbow;
+            var headScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanHead].Position, out var h) ? (_lastHead = h) : _lastHead;
+            var neckScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanNeck].Position, out var n) ? (_lastNeck = n) : _lastNeck;
+            var leftCollarScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanLCollarbone].Position, out var lc) ? (_lastLeftCollar = lc) : _lastLeftCollar;
+            var rightCollarScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanRCollarbone].Position, out var rc) ? (_lastRightCollar = rc) : _lastRightCollar;
+            var leftHandScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanLPalm].Position, out var lh) ? (_lastLeftHand = lh) : _lastLeftHand;
+            var rightHandScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanRPalm].Position, out var rh) ? (_lastRightHand = rh) : _lastRightHand;
+            var upperTorsoScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanSpine3].Position, out var ut) ? (_lastUpperTorso = ut) : _lastUpperTorso;
+            var lowerTorsoScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanSpine1].Position, out var lt) ? (_lastLowerTorso = lt) : _lastLowerTorso;
+            var pelvisScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanPelvis].Position, out var p) ? (_lastPelvis = p) : _lastPelvis;
+            var leftFootScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanLFoot].Position, out var lf) ? (_lastLeftFoot = lf) : _lastLeftFoot;
+            var rightFootScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanRFoot].Position, out var rf) ? (_lastRightFoot = rf) : _lastRightFoot;
+            var leftKneeScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanLThigh2].Position, out var lk) ? (_lastLeftKnee = lk) : _lastLeftKnee;
+            var rightKneeScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanRThigh2].Position, out var rk) ? (_lastRightKnee = rk) : _lastRightKnee;
+            var leftElbowScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanLForearm2].Position, out var le) ? (_lastLeftElbow = le) : _lastLeftElbow;
+            var rightElbowScreen = CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanRForearm2].Position, out var re) ? (_lastRightElbow = re) : _lastRightElbow;
 
             _hasValidCache = true;
 
@@ -208,7 +208,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         public bool UpdateESPWidgetBuffer(float scaleX, float scaleY)
         {
             // Anchor bone
-            if (!CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanSpine2].Position, out var mid))
+            if (!CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanSpine2].Position, out var mid))
             {
                 if (!_hasValidCache || !IsValid(_lastMidTorso))
                     return false;
@@ -228,23 +228,23 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 return IsValid(cache) ? cache : mid;
             }
 
-            var head = Resolve(eft_dma_radar.Common.Unity.Bones.HumanHead, ref _lastHead);
-            var neck = Resolve(eft_dma_radar.Common.Unity.Bones.HumanNeck, ref _lastNeck);
-            var upper = Resolve(eft_dma_radar.Common.Unity.Bones.HumanSpine3, ref _lastUpperTorso);
-            var lower = Resolve(eft_dma_radar.Common.Unity.Bones.HumanSpine1, ref _lastLowerTorso);
-            var pelvis = Resolve(eft_dma_radar.Common.Unity.Bones.HumanPelvis, ref _lastPelvis);
+            var head = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanHead, ref _lastHead);
+            var neck = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanNeck, ref _lastNeck);
+            var upper = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanSpine3, ref _lastUpperTorso);
+            var lower = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanSpine1, ref _lastLowerTorso);
+            var pelvis = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanPelvis, ref _lastPelvis);
 
-            var lCollar = Resolve(eft_dma_radar.Common.Unity.Bones.HumanLCollarbone, ref _lastLeftCollar);
-            var rCollar = Resolve(eft_dma_radar.Common.Unity.Bones.HumanRCollarbone, ref _lastRightCollar);
-            var lElbow = Resolve(eft_dma_radar.Common.Unity.Bones.HumanLForearm2, ref _lastLeftElbow);
-            var rElbow = Resolve(eft_dma_radar.Common.Unity.Bones.HumanRForearm2, ref _lastRightElbow);
-            var lHand = Resolve(eft_dma_radar.Common.Unity.Bones.HumanLPalm, ref _lastLeftHand);
-            var rHand = Resolve(eft_dma_radar.Common.Unity.Bones.HumanRPalm, ref _lastRightHand);
+            var lCollar = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanLCollarbone, ref _lastLeftCollar);
+            var rCollar = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanRCollarbone, ref _lastRightCollar);
+            var lElbow = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanLForearm2, ref _lastLeftElbow);
+            var rElbow = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanRForearm2, ref _lastRightElbow);
+            var lHand = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanLPalm, ref _lastLeftHand);
+            var rHand = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanRPalm, ref _lastRightHand);
 
-            var lKnee = Resolve(eft_dma_radar.Common.Unity.Bones.HumanLThigh2, ref _lastLeftKnee);
-            var rKnee = Resolve(eft_dma_radar.Common.Unity.Bones.HumanRThigh2, ref _lastRightKnee);
-            var lFoot = Resolve(eft_dma_radar.Common.Unity.Bones.HumanLFoot, ref _lastLeftFoot);
-            var rFoot = Resolve(eft_dma_radar.Common.Unity.Bones.HumanRFoot, ref _lastRightFoot);
+            var lKnee = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanLThigh2, ref _lastLeftKnee);
+            var rKnee = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanRThigh2, ref _lastRightKnee);
+            var lFoot = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanLFoot, ref _lastLeftFoot);
+            var rFoot = Resolve(eft_dma_radar.Tarkov.Unity.Bones.HumanRFoot, ref _lastRightFoot);
 
             _hasValidCache = true;
 
@@ -281,49 +281,49 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 
         public enum SkeletonBones : uint
         {
-            Head = eft_dma_radar.Common.Unity.Bones.HumanHead,
-            Neck = eft_dma_radar.Common.Unity.Bones.HumanNeck,
-            UpperTorso = eft_dma_radar.Common.Unity.Bones.HumanSpine3,
-            MidTorso = eft_dma_radar.Common.Unity.Bones.HumanSpine2,
-            LowerTorso = eft_dma_radar.Common.Unity.Bones.HumanSpine1,
-            LeftShoulder = eft_dma_radar.Common.Unity.Bones.HumanLCollarbone,
-            RightShoulder = eft_dma_radar.Common.Unity.Bones.HumanRCollarbone,
-            LeftElbow = eft_dma_radar.Common.Unity.Bones.HumanLForearm2,
-            RightElbow = eft_dma_radar.Common.Unity.Bones.HumanRForearm2,
-            LeftHand = eft_dma_radar.Common.Unity.Bones.HumanLPalm,
-            RightHand = eft_dma_radar.Common.Unity.Bones.HumanRPalm,
-            Pelvis = eft_dma_radar.Common.Unity.Bones.HumanPelvis,
-            LeftKnee = eft_dma_radar.Common.Unity.Bones.HumanLThigh2,
-            RightKnee = eft_dma_radar.Common.Unity.Bones.HumanRThigh2,
-            LeftFoot = eft_dma_radar.Common.Unity.Bones.HumanLFoot,
-            RightFoot = eft_dma_radar.Common.Unity.Bones.HumanRFoot
+            Head = eft_dma_radar.Tarkov.Unity.Bones.HumanHead,
+            Neck = eft_dma_radar.Tarkov.Unity.Bones.HumanNeck,
+            UpperTorso = eft_dma_radar.Tarkov.Unity.Bones.HumanSpine3,
+            MidTorso = eft_dma_radar.Tarkov.Unity.Bones.HumanSpine2,
+            LowerTorso = eft_dma_radar.Tarkov.Unity.Bones.HumanSpine1,
+            LeftShoulder = eft_dma_radar.Tarkov.Unity.Bones.HumanLCollarbone,
+            RightShoulder = eft_dma_radar.Tarkov.Unity.Bones.HumanRCollarbone,
+            LeftElbow = eft_dma_radar.Tarkov.Unity.Bones.HumanLForearm2,
+            RightElbow = eft_dma_radar.Tarkov.Unity.Bones.HumanRForearm2,
+            LeftHand = eft_dma_radar.Tarkov.Unity.Bones.HumanLPalm,
+            RightHand = eft_dma_radar.Tarkov.Unity.Bones.HumanRPalm,
+            Pelvis = eft_dma_radar.Tarkov.Unity.Bones.HumanPelvis,
+            LeftKnee = eft_dma_radar.Tarkov.Unity.Bones.HumanLThigh2,
+            RightKnee = eft_dma_radar.Tarkov.Unity.Bones.HumanRThigh2,
+            LeftFoot = eft_dma_radar.Tarkov.Unity.Bones.HumanLFoot,
+            RightFoot = eft_dma_radar.Tarkov.Unity.Bones.HumanRFoot
         }
 
         public enum TorsoBones : uint
         {
-            Neck = eft_dma_radar.Common.Unity.Bones.HumanNeck,
-            UpperTorso = eft_dma_radar.Common.Unity.Bones.HumanSpine3,
-            MidTorso = eft_dma_radar.Common.Unity.Bones.HumanSpine2,
-            LowerTorso = eft_dma_radar.Common.Unity.Bones.HumanSpine1
+            Neck = eft_dma_radar.Tarkov.Unity.Bones.HumanNeck,
+            UpperTorso = eft_dma_radar.Tarkov.Unity.Bones.HumanSpine3,
+            MidTorso = eft_dma_radar.Tarkov.Unity.Bones.HumanSpine2,
+            LowerTorso = eft_dma_radar.Tarkov.Unity.Bones.HumanSpine1
         }
 
         public enum ArmsBones : uint
         {
-            LeftShoulder = eft_dma_radar.Common.Unity.Bones.HumanLCollarbone,
-            RightShoulder = eft_dma_radar.Common.Unity.Bones.HumanRCollarbone,
-            LeftElbow = eft_dma_radar.Common.Unity.Bones.HumanLForearm2,
-            RightElbow = eft_dma_radar.Common.Unity.Bones.HumanRForearm2,
-            LeftHand = eft_dma_radar.Common.Unity.Bones.HumanLPalm,
-            RightHand = eft_dma_radar.Common.Unity.Bones.HumanRPalm
+            LeftShoulder = eft_dma_radar.Tarkov.Unity.Bones.HumanLCollarbone,
+            RightShoulder = eft_dma_radar.Tarkov.Unity.Bones.HumanRCollarbone,
+            LeftElbow = eft_dma_radar.Tarkov.Unity.Bones.HumanLForearm2,
+            RightElbow = eft_dma_radar.Tarkov.Unity.Bones.HumanRForearm2,
+            LeftHand = eft_dma_radar.Tarkov.Unity.Bones.HumanLPalm,
+            RightHand = eft_dma_radar.Tarkov.Unity.Bones.HumanRPalm
         }
 
         public enum LegsBones : uint
         {
-            Pelvis = eft_dma_radar.Common.Unity.Bones.HumanPelvis,
-            LeftKnee = eft_dma_radar.Common.Unity.Bones.HumanLThigh2,
-            RightKnee = eft_dma_radar.Common.Unity.Bones.HumanRThigh2,
-            LeftFoot = eft_dma_radar.Common.Unity.Bones.HumanLFoot,
-            RightFoot = eft_dma_radar.Common.Unity.Bones.HumanRFoot
+            Pelvis = eft_dma_radar.Tarkov.Unity.Bones.HumanPelvis,
+            LeftKnee = eft_dma_radar.Tarkov.Unity.Bones.HumanLThigh2,
+            RightKnee = eft_dma_radar.Tarkov.Unity.Bones.HumanRThigh2,
+            LeftFoot = eft_dma_radar.Tarkov.Unity.Bones.HumanLFoot,
+            RightFoot = eft_dma_radar.Tarkov.Unity.Bones.HumanRFoot
         }
         /// <summary>
         /// Projects all skeleton bones through the current game camera and returns
@@ -338,31 +338,31 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             float vw = viewport.Width > 0 ? viewport.Width : 1f;
             float vh = viewport.Height > 0 ? viewport.Height : 1f;
 
-            var midPos = _bones[eft_dma_radar.Common.Unity.Bones.HumanSpine2].Position;
+            var midPos = _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanSpine2].Position;
             if (!CameraManagerBase.WorldToScreen(ref midPos, out var mid))
                 return null;
 
-            SKPoint Get(eft_dma_radar.Common.Unity.Bones b)
+            SKPoint Get(eft_dma_radar.Tarkov.Unity.Bones b)
             {
                 var p = _bones[b].Position;
                 return CameraManagerBase.WorldToScreen(ref p, out var s) ? s : mid;
             }
 
-            var head = Get(eft_dma_radar.Common.Unity.Bones.HumanHead);
-            var neck = Get(eft_dma_radar.Common.Unity.Bones.HumanNeck);
-            var upper = Get(eft_dma_radar.Common.Unity.Bones.HumanSpine3);
-            var lower = Get(eft_dma_radar.Common.Unity.Bones.HumanSpine1);
-            var pelvis = Get(eft_dma_radar.Common.Unity.Bones.HumanPelvis);
-            var lCollar = Get(eft_dma_radar.Common.Unity.Bones.HumanLCollarbone);
-            var rCollar = Get(eft_dma_radar.Common.Unity.Bones.HumanRCollarbone);
-            var lElbow = Get(eft_dma_radar.Common.Unity.Bones.HumanLForearm2);
-            var rElbow = Get(eft_dma_radar.Common.Unity.Bones.HumanRForearm2);
-            var lHand = Get(eft_dma_radar.Common.Unity.Bones.HumanLPalm);
-            var rHand = Get(eft_dma_radar.Common.Unity.Bones.HumanRPalm);
-            var lKnee = Get(eft_dma_radar.Common.Unity.Bones.HumanLThigh2);
-            var rKnee = Get(eft_dma_radar.Common.Unity.Bones.HumanRThigh2);
-            var lFoot = Get(eft_dma_radar.Common.Unity.Bones.HumanLFoot);
-            var rFoot = Get(eft_dma_radar.Common.Unity.Bones.HumanRFoot);
+            var head = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanHead);
+            var neck = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanNeck);
+            var upper = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanSpine3);
+            var lower = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanSpine1);
+            var pelvis = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanPelvis);
+            var lCollar = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanLCollarbone);
+            var rCollar = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanRCollarbone);
+            var lElbow = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanLForearm2);
+            var rElbow = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanRForearm2);
+            var lHand = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanLPalm);
+            var rHand = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanRPalm);
+            var lKnee = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanLThigh2);
+            var rKnee = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanRThigh2);
+            var lFoot = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanLFoot);
+            var rFoot = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanRFoot);
 
             var buf = new float[52];
             int i = 0;
@@ -400,30 +400,30 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             float vw = viewport.Width > 0 ? viewport.Width : 1f;
             float vh = viewport.Height > 0 ? viewport.Height : 1f;
 
-            if (!WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanSpine2].Position, vm, vw, vh, out var mid))
+            if (!WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanSpine2].Position, vm, vw, vh, out var mid))
                 return null;
 
-            SKPoint Get(eft_dma_radar.Common.Unity.Bones b)
+            SKPoint Get(eft_dma_radar.Tarkov.Unity.Bones b)
             {
                 var p = _bones[b].Position;
                 return WorldToScreen(ref p, vm, vw, vh, out var s) ? s : mid;
             }
 
-            var head = Get(eft_dma_radar.Common.Unity.Bones.HumanHead);
-            var neck = Get(eft_dma_radar.Common.Unity.Bones.HumanNeck);
-            var upper = Get(eft_dma_radar.Common.Unity.Bones.HumanSpine3);
-            var lower = Get(eft_dma_radar.Common.Unity.Bones.HumanSpine1);
-            var pelvis = Get(eft_dma_radar.Common.Unity.Bones.HumanPelvis);
-            var lCollar = Get(eft_dma_radar.Common.Unity.Bones.HumanLCollarbone);
-            var rCollar = Get(eft_dma_radar.Common.Unity.Bones.HumanRCollarbone);
-            var lElbow = Get(eft_dma_radar.Common.Unity.Bones.HumanLForearm2);
-            var rElbow = Get(eft_dma_radar.Common.Unity.Bones.HumanRForearm2);
-            var lHand = Get(eft_dma_radar.Common.Unity.Bones.HumanLPalm);
-            var rHand = Get(eft_dma_radar.Common.Unity.Bones.HumanRPalm);
-            var lKnee = Get(eft_dma_radar.Common.Unity.Bones.HumanLThigh2);
-            var rKnee = Get(eft_dma_radar.Common.Unity.Bones.HumanRThigh2);
-            var lFoot = Get(eft_dma_radar.Common.Unity.Bones.HumanLFoot);
-            var rFoot = Get(eft_dma_radar.Common.Unity.Bones.HumanRFoot);
+            var head = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanHead);
+            var neck = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanNeck);
+            var upper = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanSpine3);
+            var lower = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanSpine1);
+            var pelvis = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanPelvis);
+            var lCollar = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanLCollarbone);
+            var rCollar = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanRCollarbone);
+            var lElbow = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanLForearm2);
+            var rElbow = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanRForearm2);
+            var lHand = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanLPalm);
+            var rHand = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanRPalm);
+            var lKnee = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanLThigh2);
+            var rKnee = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanRThigh2);
+            var lFoot = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanLFoot);
+            var rFoot = Get(eft_dma_radar.Tarkov.Unity.Bones.HumanRFoot);
 
             var buf = new float[52];
             int i = 0;
@@ -462,7 +462,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             float x = Vector3.Dot(vm.Right, worldPos) + vm.M14;
             float y = Vector3.Dot(vm.Up, worldPos) + vm.M24;
 
-            // Remove TAA/DLSS jitter (x_clean = x + jx*w)
+            // Remove TAA/DLSS jitter (high-pass filtered)
             x += vm.JitterX * w;
             y += vm.JitterY * w;
 
@@ -476,7 +476,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         /// <returns>Box ESP Screen Coordinates.</returns>
         public SKRect? GetESPBox(SKPoint baseScreen)
         {
-            if (!CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Common.Unity.Bones.HumanHead].Position, out var topScreen, true, true))
+            if (!CameraManagerBase.WorldToScreen(ref _bones[eft_dma_radar.Tarkov.Unity.Bones.HumanHead].Position, out var topScreen, true, true))
                 return null;
 
             float height = Math.Abs(topScreen.Y - baseScreen.Y);
@@ -502,7 +502,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 
             var transform = new UnityTransform(_bones[bone].TransformInternal, lastValidPosition);
             _bones[bone] = transform;
-            if (bone is eft_dma_radar.Common.Unity.Bones.HumanBase)
+            if (bone is eft_dma_radar.Tarkov.Unity.Bones.HumanBase)
                 Root = transform;
         }
         /// <summary>
@@ -535,7 +535,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             Array.Clear(ESPBuffer, 0, ESPBuffer.Length);
 
             // Rebuild all transforms (preserve last valid positions)
-            ResetTransform(eft_dma_radar.Common.Unity.Bones.HumanBase);
+            ResetTransform(eft_dma_radar.Tarkov.Unity.Bones.HumanBase);
             foreach (var bone in AllSkeletonBones.Span)
             {
                 ResetTransform(bone);

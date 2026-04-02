@@ -1,10 +1,10 @@
-ï»¿#nullable enable
-using eft_dma_radar.Common.DMA.ScatterAPI;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.Collections;
-using eft_dma_radar.Common.Unity.LowLevel;
-using eft_dma_radar.Common.Unity.LowLevel.Types;
+#nullable enable
+using eft_dma_radar.DMA.ScatterAPI;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.Collections;
+using eft_dma_radar.Tarkov.Unity.LowLevel;
+using eft_dma_radar.Tarkov.Unity.LowLevel.Types;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.Features.MemoryWrites.Chams;
 using eft_dma_radar.Tarkov.GameWorld;
@@ -35,7 +35,7 @@ namespace eft_dma_radar.Tarkov.Features
         private static ChamsConfig ChamsConfig => Config.ChamsConfig;
 
         // Toggle: Config.Debug?.PlayerChams == true
-        // If you donÂ¡Â¯t have Config.Debug, just hard-force this to true temporarily.
+        // If you don¡¯t have Config.Debug, just hard-force this to true temporarily.
         private static bool DebugChams = false;
 
         // Avoid log spam from huge renderer sets

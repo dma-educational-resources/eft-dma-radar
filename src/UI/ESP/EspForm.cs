@@ -1,4 +1,4 @@
-ï»¿using eft_dma_radar.Tarkov.EFTPlayer;
+using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.Tarkov.Features.MemoryWrites.Patches;
@@ -13,11 +13,11 @@ using eft_dma_radar.UI.SKWidgetControl;
 using RectFSer = eft_dma_radar.UI.Misc.RectFSer;
 using Switch = eft_dma_radar.Tarkov.GameWorld.Exits.Switch;
 using System.ComponentModel;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.DMA.Features;
-using eft_dma_radar.Common.Misc.Data;
-using eft_dma_radar.Common.Maps;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.DMA.Features;
+using eft_dma_radar.Misc.Data;
+using eft_dma_radar.UI.Radar.Maps;
 using eft_dma_radar.UI.ESP.eft_dma_radar.UI.ESP;
 
 namespace eft_dma_radar.UI.ESP
@@ -1785,7 +1785,7 @@ namespace eft_dma_radar.UI.ESP
 
         #endregion
 
-        #region Mini Radar (Optimized â€“ Layer-Stable & Throttled)
+        #region Mini Radar (Optimized – Layer-Stable & Throttled)
 
         private static readonly SKPaint _radarBgPaint =
             new SKPaint { Color = new SKColor(0, 0, 0, 180) };
@@ -1857,7 +1857,7 @@ namespace eft_dma_radar.UI.ESP
             var mapParams = map.GetParametersE(radarSize, _radarZoom, ref center);
 
             // ------------------------------------------------------------
-            // MAP CACHE â€” STABLE & FLOAT-SAFE
+            // MAP CACHE — STABLE & FLOAT-SAFE
             // ------------------------------------------------------------
 
             long now = Environment.TickCount64;

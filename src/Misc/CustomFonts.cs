@@ -1,8 +1,8 @@
-﻿using SkiaSharp;
+using SkiaSharp;
 using System.IO;
 using System.Reflection;
 
-namespace eft_dma_radar.Common.Misc
+namespace eft_dma_radar.Misc
 {
     public static class CustomFonts
     {

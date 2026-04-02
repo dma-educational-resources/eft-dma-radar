@@ -1,7 +1,7 @@
-using eft_dma_radar.Common.DMA;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Data;
-using eft_dma_radar.Common.Unity;
+using eft_dma_radar.DMA;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Data;
+using eft_dma_radar.Tarkov.Unity;
 
 namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 {

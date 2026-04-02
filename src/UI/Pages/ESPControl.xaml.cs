@@ -1,8 +1,8 @@
-﻿using eft_dma_radar.UI.ESP;
-using eft_dma_radar.Common.DMA.Features;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.LowLevel.Types;
+using eft_dma_radar.UI.ESP;
+using eft_dma_radar.DMA.Features;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.LowLevel.Types;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;

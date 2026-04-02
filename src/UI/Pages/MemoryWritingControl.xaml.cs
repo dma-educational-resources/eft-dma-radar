@@ -1,8 +1,8 @@
-﻿using eft_dma_radar.Common.DMA;
-using eft_dma_radar.Common.DMA.Features;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.LowLevel;
+using eft_dma_radar.DMA;
+using eft_dma_radar.DMA.Features;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.LowLevel;
 
 using eft_dma_radar.Tarkov;
 using eft_dma_radar.Tarkov.Features;
@@ -1247,14 +1247,14 @@ namespace eft_dma_radar.UI.Pages
                         return MemoryWritingDecision.KeepCurrent;
 
                     var basicResult = MessageBox.Show(
-                        "⚠️ MEMORY WRITING DETECTED ⚠️\n\n" +
+                        "?? MEMORY WRITING DETECTED ??\n\n" +
                         "The configuration you're importing has Memory Writing features enabled.\n\n" +
                         "Memory writing features include:\n" +
-                        "• Aimbot, No Recoil, Infinite Stamina\n" +
-                        "• Movement modifications (Speed, No Inertia, etc.)\n" +
-                        "• Visual modifications (Night Vision, etc.)\n" +
-                        "• And other game modifications\n\n" +
-                        "⚠️ WARNING: These features carry increased detection risk!\n\n" +
+                        "� Aimbot, No Recoil, Infinite Stamina\n" +
+                        "� Movement modifications (Speed, No Inertia, etc.)\n" +
+                        "� Visual modifications (Night Vision, etc.)\n" +
+                        "� And other game modifications\n\n" +
+                        "?? WARNING: These features carry increased detection risk!\n\n" +
                         "Do you want to enable Memory Writing features?",
                         "Memory Writing Configuration",
                         MessageBoxButton.YesNo,
@@ -1307,14 +1307,14 @@ namespace eft_dma_radar.UI.Pages
             return Dispatcher.Invoke(() =>
             {
                 var result = MessageBox.Show(
-                    "⚠️ ENABLING MEMORY WRITING ⚠️\n\n" +
+                    "?? ENABLING MEMORY WRITING ??\n\n" +
                     "You are about to enable Memory Writing features.\n\n" +
                     "Memory writing features include:\n" +
-                    "• Aimbot, No Recoil, Infinite Stamina\n" +
-                    "• Movement modifications (Speed, No Inertia, etc.)\n" +
-                    "• Visual modifications (Night Vision, etc.)\n" +
-                    "• And other game modifications\n\n" +
-                    "⚠️ WARNING: These features carry increased detection risk!\n\n" +
+                    "� Aimbot, No Recoil, Infinite Stamina\n" +
+                    "� Movement modifications (Speed, No Inertia, etc.)\n" +
+                    "� Visual modifications (Night Vision, etc.)\n" +
+                    "� And other game modifications\n\n" +
+                    "?? WARNING: These features carry increased detection risk!\n\n" +
                     "Are you sure you want to enable Memory Writing?",
                     "Memory Writing Warning",
                     MessageBoxButton.YesNo,

@@ -1,5 +1,5 @@
-﻿#nullable enable
-using eft_dma_radar.Common.Misc.Data;
+#nullable enable
+using eft_dma_radar.Misc.Data;
 using eft_dma_radar.UI.Misc;
 using System;
 using System.Collections.Generic;
@@ -330,7 +330,7 @@ namespace eft_dma_radar.UI.Pages
                     break;
             }
 
-            var btn = new Button { Content = "Open…", Height = 26, MinWidth = 72, Margin = new Thickness(0, 2, 0, 0) };
+            var btn = new Button { Content = "Open�", Height = 26, MinWidth = 72, Margin = new Thickness(0, 2, 0, 0) };
             btn.Click += async (_, __) =>
             {
                 var host = Window.GetWindow(btn);

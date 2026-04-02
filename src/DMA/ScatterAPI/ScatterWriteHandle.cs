@@ -1,8 +1,8 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using VmmSharpEx.Options;
 using VmmSharpEx.Scatter;
 
-namespace eft_dma_radar.Common.DMA.ScatterAPI
+namespace eft_dma_radar.DMA.ScatterAPI
 {
     /// <summary>
     /// Wraps Memory Writing functionality via VmmSharpEx Scatter API.

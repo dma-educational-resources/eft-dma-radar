@@ -1,9 +1,9 @@
-﻿using System.IO;
+using System.IO;
 using System.Text;
-using eft_dma_radar.Common.DMA;
-using eft_dma_radar.Common.Misc;
+using eft_dma_radar.DMA;
+using eft_dma_radar.Misc;
 
-namespace eft_dma_radar.Common.Unity.LowLevel.Types
+namespace eft_dma_radar.Tarkov.Unity.LowLevel.Types
 {
     public sealed class RemoteBytes : IDisposable
     {

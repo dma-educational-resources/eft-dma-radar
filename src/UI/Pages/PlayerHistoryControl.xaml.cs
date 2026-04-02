@@ -1,7 +1,7 @@
-﻿using eft_dma_radar.Tarkov.EFTPlayer;
+using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity.LowLevel;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Tarkov.Unity.LowLevel;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -262,7 +262,7 @@ namespace eft_dma_radar.UI.Pages
                 {
                     if (string.IsNullOrEmpty(selectedEntry.ID))
                     {
-                        NotificationsShared.Warning($"Cannot add '{selectedEntry.Name}' — Account ID not yet resolved. Try again after a dogtag has been read.");
+                        NotificationsShared.Warning($"Cannot add '{selectedEntry.Name}' � Account ID not yet resolved. Try again after a dogtag has been read.");
                         return;
                     }
 

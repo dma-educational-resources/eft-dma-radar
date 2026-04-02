@@ -1,6 +1,6 @@
-﻿#nullable enable
+#nullable enable
 using eft_dma_radar.Tarkov.API;
-using eft_dma_radar.Common.Misc.Data;
+using eft_dma_radar.Misc.Data;
 using HandyControl.Tools.Extension;
 using System.Threading;
 using eft_dma_radar.Web.ProfileApi;
@@ -16,7 +16,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         }
 
         /// <summary>
-        /// Resolves the account ID from the API cache (via ProfileID → API lookup).
+        /// Resolves the account ID from the API cache (via ProfileID ? API lookup).
         /// </summary>
         private string? ResolvedAccountID
         {
@@ -38,7 +38,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         /// <summary> Is the player flagged as streamer (from eft-api.tech top-level). </summary>
         public bool IsStreamer => Meta?.IsStreamer ?? false;
 
-        /// <summary> Human-readable last updated from eft-api.tech if available, else relative “time ago”. </summary>
+        /// <summary> Human-readable last updated from eft-api.tech if available, else relative �time ago�. </summary>
         public string LastUpdatedReadable
         {
             get

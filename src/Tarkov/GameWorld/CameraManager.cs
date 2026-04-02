@@ -1,4 +1,4 @@
-﻿/*
+/*
  * XM EFT DMA Radar
  * Brought to you by XM (XM DMA)
  * 
@@ -14,14 +14,14 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using eft_dma_radar.Common.DMA.ScatterAPI;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.Collections;
+using eft_dma_radar.DMA.ScatterAPI;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.Collections;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
-using static eft_dma_radar.Common.Unity.UnityOffsets;
-using ObjectClass = eft_dma_radar.Common.Unity.ObjectClass;
+using static eft_dma_radar.Tarkov.Unity.UnityOffsets;
+using ObjectClass = eft_dma_radar.Tarkov.Unity.ObjectClass;
 using SDK;
 
 namespace eft_dma_radar.Tarkov.GameWorld
@@ -39,7 +39,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
         private static bool _staticInitDone;
         private static bool _debugDumpDone;
 
-        // ── Camera offset cache ─────────────────────────────────────────────────
+        // -- Camera offset cache -------------------------------------------------
 
         private static readonly string CameraCacheFilePath =
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -102,7 +102,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
         /// Tries to restore AllCameras address and Camera struct offsets from a
         /// cached file (validated by PE fingerprint), falling back to signature
         /// scans on UnityPlayer.dll if the cache is absent or stale.
-        /// Does NOT attempt to find CameraManager.Instance — that is a per-raid
+        /// Does NOT attempt to find CameraManager.Instance � that is a per-raid
         /// operation performed in the constructor.
         /// </summary>
         public static void Initialize()
@@ -132,7 +132,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             }
         }
 
-        // ── Camera offset cache persistence ─────────────────────────────────────
+        // -- Camera offset cache persistence -------------------------------------
 
         /// <summary>
         /// Tries to restore AllCameras address and Camera struct offsets from the
@@ -159,10 +159,10 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 if (cache is null)
                     return false;
 
-                // Old files or PE mismatch → stale.
+                // Old files or PE mismatch ? stale.
                 if (cache.UnityPlayerTimestamp != timestamp || cache.UnityPlayerSizeOfImage != sizeOfImage)
                 {
-                    Log.Write(AppLogLevel.Info, "Camera cache PE mismatch — will sig-scan.", "CameraManager");
+                    Log.Write(AppLogLevel.Info, "Camera cache PE mismatch � will sig-scan.", "CameraManager");
                     return false;
                 }
 
@@ -173,7 +173,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 ulong resolvedAddr = unityBase + cache.AllCamerasRva;
                 if (!ValidateAllCamerasAddr(resolvedAddr))
                 {
-                    Log.Write(AppLogLevel.Warning, "Camera cache AllCameras validation failed — will sig-scan.", "CameraManager");
+                    Log.Write(AppLogLevel.Warning, "Camera cache AllCameras validation failed � will sig-scan.", "CameraManager");
                     return false;
                 }
 
@@ -222,7 +222,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 var json = JsonSerializer.Serialize(cache, _jsonOpts);
                 Directory.CreateDirectory(Path.GetDirectoryName(CameraCacheFilePath)!);
                 File.WriteAllText(CameraCacheFilePath, json);
-                Log.Write(AppLogLevel.Info, $"Camera cache saved → {CameraCacheFilePath}", "CameraManager");
+                Log.Write(AppLogLevel.Info, $"Camera cache saved ? {CameraCacheFilePath}", "CameraManager");
             }
             catch (Exception ex)
             {
@@ -272,7 +272,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     Log.Write(AppLogLevel.Info, "Using CameraManager.Instance cameras.", "CameraManager");
                     return true;
                 }
-                Log.Write(AppLogLevel.Warning, "Instance found but camera fields unreadable — falling back to AllCameras.", "CameraManager");
+                Log.Write(AppLogLevel.Warning, "Instance found but camera fields unreadable � falling back to AllCameras.", "CameraManager");
             }
 
             // 2) Backup: Unity AllCameras + name-based search
@@ -412,7 +412,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
         }
 
         /// <summary>
-        /// Scan AllCameras list for “FPS Camera” / “Optic Camera” style names.
+        /// Scan AllCameras list for �FPS Camera� / �Optic Camera� style names.
         /// </summary>
         private static void FindCamerasByName(ulong itemsPtr, int count, out ulong fpsCamera, out ulong opticCamera)
         {
@@ -501,7 +501,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         /// <summary>
         /// Candidate signatures for locating the AllCameras global in UnityPlayer.dll.
-        /// All reference the global via mov/lea reg,[rip+rel32] — rel32 at offset 3, instruction ends at 7.
+        /// All reference the global via mov/lea reg,[rip+rel32] � rel32 at offset 3, instruction ends at 7.
         /// Ordered by uniqueness (most distinctive first).
         /// </summary>
         private static readonly (string Sig, int RelOffset, int InstrLen, string Desc)[] AllCamerasSigs =
@@ -565,7 +565,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             var fallbackAddr = unityBase + ModuleBase.AllCameras;
             if (fallbackAddr.IsValidVirtualAddress())
             {
-                Log.Write(AppLogLevel.Warning, "AllCameras sig scan missed — using hardcoded fallback.", "CameraManager");
+                Log.Write(AppLogLevel.Warning, "AllCameras sig scan missed � using hardcoded fallback.", "CameraManager");
                 return fallbackAddr;
             }
 
@@ -584,7 +584,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             var unityBase = Memory.UnityBase;
             if (!unityBase.IsValidVirtualAddress())
             {
-                Log.WriteLine("[CameraManager] DEBUG: Unity base not loaded — skipping sig audit.");
+                Log.WriteLine("[CameraManager] DEBUG: Unity base not loaded � skipping sig audit.");
                 return;
             }
 
@@ -602,7 +602,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     var sigAddr = Memory.FindSignature(sig, "UnityPlayer.dll");
                     if (sigAddr == 0)
                     {
-                        bodyLines.Add($"[{idx}] MISS — {desc}");
+                        bodyLines.Add($"[{idx}] MISS � {desc}");
                         continue;
                     }
 
@@ -632,11 +632,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
                         }
                     }
 
-                    bodyLines.Add($"[{idx}] {status} — {desc} (UP+0x{sigAddr - unityBase:X})");
+                    bodyLines.Add($"[{idx}] {status} � {desc} (UP+0x{sigAddr - unityBase:X})");
                 }
                 catch (Exception ex)
                 {
-                    bodyLines.Add($"[{idx}] ERROR {ex.Message} — {desc}");
+                    bodyLines.Add($"[{idx}] ERROR {ex.Message} � {desc}");
                 }
             }
 
@@ -645,9 +645,9 @@ namespace eft_dma_radar.Tarkov.GameWorld
             DebugTestCameraOffsetSigs(bodyLines, "FOV", FovSigs, UnityOffsets.Camera.FOV, unityBase);
             DebugTestCameraOffsetSigs(bodyLines, "AspectRatio", AspectRatioSigs, UnityOffsets.Camera.AspectRatio, unityBase);
 
-            // Auto-size: W = inner width between │ and │ (or ┌ and ┐)
+            // Auto-size: W = inner width between � and � (or + and +)
             const string title = "Signature Health Audit";
-            int W = title.Length + 4; // "─ title ─" minimum
+            int W = title.Length + 4; // "- title -" minimum
             foreach (var line in bodyLines)
                 if (line.Length + 2 > W) // " content " padding
                     W = line.Length + 2;
@@ -657,23 +657,23 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 int dashTotal = W - title.Length - 2; // 2 spaces around title
                 int dashLeft = dashTotal / 2;
                 int dashRight = dashTotal - dashLeft;
-                lines.Add($"{tag} ┌{new string('─', dashLeft)} {title} {new string('─', dashRight)}┐");
+                lines.Add($"{tag} +{new string('-', dashLeft)} {title} {new string('-', dashRight)}+");
             }
             foreach (var body in bodyLines)
             {
                 if (body.StartsWith('['))
                 {
-                    lines.Add($"{tag} │ {body.PadRight(W - 1)}│");
+                    lines.Add($"{tag} � {body.PadRight(W - 1)}�");
                 }
                 else
                 {
                     int pad = W - body.Length;
                     int left = pad / 2;
                     int right = pad - left;
-                    lines.Add($"{tag} │{new string(' ', left)}{body}{new string(' ', right)}│");
+                    lines.Add($"{tag} �{new string(' ', left)}{body}{new string(' ', right)}�");
                 }
             }
-            lines.Add($"{tag} └{new string('─', W)}┘");
+            lines.Add($"{tag} +{new string('-', W)}+");
 
 #if DEBUG
             _sigAuditLines = lines;
@@ -729,7 +729,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     var sigAddr = Memory.FindSignature(entry.Sig, "UnityPlayer.dll");
                     if (sigAddr == 0)
                     {
-                        bodyLines.Add($"[{idx}] MISS — {entry.Desc}");
+                        bodyLines.Add($"[{idx}] MISS � {entry.Desc}");
                         continue;
                     }
 
@@ -740,11 +740,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     {
                         int callRel32 = Memory.ReadValue<int>(sigAddr + (ulong)entry.OffsetPos + 1, false);
                         ulong callTarget = sigAddr + 5 + (ulong)(long)callRel32;
-                        matchInfo += $" → UP+0x{callTarget - unityBase:X}";
+                        matchInfo += $" ? UP+0x{callTarget - unityBase:X}";
 
                         if (!callTarget.IsValidVirtualAddress())
                         {
-                            bodyLines.Add($"[{idx}] BAD CALL TARGET — {entry.Desc} ({matchInfo})");
+                            bodyLines.Add($"[{idx}] BAD CALL TARGET � {entry.Desc} ({matchInfo})");
                             continue;
                         }
 
@@ -774,11 +774,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
                         _ => $"BAD offset=0x{offset:X}",
                     };
 
-                    bodyLines.Add($"[{idx}] {status} — {entry.Desc} ({matchInfo})");
+                    bodyLines.Add($"[{idx}] {status} � {entry.Desc} ({matchInfo})");
                 }
                 catch (Exception ex)
                 {
-                    bodyLines.Add($"[{idx}] ERROR {ex.Message} — {entry.Desc}");
+                    bodyLines.Add($"[{idx}] ERROR {ex.Message} � {entry.Desc}");
                 }
             }
         }
@@ -825,15 +825,15 @@ namespace eft_dma_radar.Tarkov.GameWorld
             var gaBase = Memory.GameAssemblyBase;
             var unityBase = Memory.UnityBase;
 
-            string Row(string text) => $"║  {text.PadRight(W - 2)}║";
+            string Row(string text) => $"�  {text.PadRight(W - 2)}�";
             string Header(string text)
             {
                 int pad = W - text.Length;
                 int left = pad / 2;
                 int right = pad - left;
-                return $"║{new string(' ', left)}{text}{new string(' ', right)}║";
+                return $"�{new string(' ', left)}{text}{new string(' ', right)}�";
             }
-            string Sep(string label) => $"╠── {label} {"".PadRight(W - 4 - label.Length, '─')}╣";
+            string Sep(string label) => $"�-- {label} {"".PadRight(W - 4 - label.Length, '-')}�";
 
             var lines = new List<string>();
 
@@ -846,9 +846,9 @@ namespace eft_dma_radar.Tarkov.GameWorld
             }
 #endif
 
-            lines.Add($"{tag} ╔{new string('═', W)}╗");
-            lines.Add($"{tag} {Header("Camera Manager — Debug State")}");
-            lines.Add($"{tag} ╠{new string('═', W)}╣");
+            lines.Add($"{tag} +{new string('-', W)}+");
+            lines.Add($"{tag} {Header("Camera Manager � Debug State")}");
+            lines.Add($"{tag} �{new string('-', W)}�");
             lines.Add($"{tag} {Row($"GameAssembly Base:  {FormatPtr(gaBase)}")}");
             lines.Add($"{tag} {Row($"UnityPlayer Base:   {FormatPtr(unityBase)}")}");
             lines.Add($"{tag} {Sep("Resolved Pointers")}");
@@ -870,7 +870,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             lines.Add($"{tag} {Row($"FOV:          {_cachedFovValidSigs}/{FovSigs.Length} sigs valid")}");
             lines.Add($"{tag} {Row($"AspectRatio:  {_cachedAspectRatioValidSigs}/{AspectRatioSigs.Length} sigs valid")}");
 #endif
-            lines.Add($"{tag} ╚{new string('═', W)}╝");
+            lines.Add($"{tag} +{new string('-', W)}+");
 
             Log.WriteBlock(lines); // Block output kept as-is for formatted box drawing
         }
@@ -883,8 +883,8 @@ namespace eft_dma_radar.Tarkov.GameWorld
         /// <summary>
         /// Camera getter signature entry.
         /// Two resolution strategies:
-        ///   Direct  — the sig matches the getter itself; read displacement at OffsetPos.
-        ///   Indirect — the sig matches a call-site (E8 rel32); resolve the call target first,
+        ///   Direct  � the sig matches the getter itself; read displacement at OffsetPos.
+        ///   Indirect � the sig matches a call-site (E8 rel32); resolve the call target first,
         ///              then read the displacement from the target function body.
         /// </summary>
         private readonly record struct CameraOffsetSig(
@@ -902,7 +902,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
         /// </summary>
         private static readonly CameraOffsetSig[] ViewMatrixSigs =
         [
-            // IDA call-site at 0xC37468: call sub_1800A4690 → target is lea rax,[rcx+128h]; ret
+            // IDA call-site at 0xC37468: call sub_1800A4690 ? target is lea rax,[rcx+128h]; ret
             // Sig matches the call + post-call context; E8 rel32 at offset 0, target body: 48 8D 81 XX XX XX XX C3
             new("E8 ? ? ? ? 48 3B 58 ? 0F 83 ? ? ? ? ? ? ? 48 8D 0C 5D ? ? ? ? 48 03 CB ? ? ? ? E8 ? ? ? ? 4C 8B C7 49 FF C0 ? ? ? ? ? 75",
                 0, 4, IsCallSite: true, TargetBodyDispOffset: 3, TargetBodyDispSize: 4,
@@ -911,7 +911,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         private static readonly CameraOffsetSig[] FovSigs =
         [
-            // IDA sub_1807D3670: cmp dword ptr [rcx+53Ch],2; jnz → movss xmm0,[rcx+928h]; ret / movss xmm0,[rcx+1A8h]; ret
+            // IDA sub_1807D3670: cmp dword ptr [rcx+53Ch],2; jnz ? movss xmm0,[rcx+928h]; ret / movss xmm0,[rcx+1A8h]; ret
             // Full function: 83 B9 [3C050000] 02 75 ? F3 0F 10 81 [28090000] C3 F3 0F 10 81 [A8010000] C3
             // We wildcard the cmp displacement, jnz offset, and alternate-path displacement; extract FOV disp at the final movss.
             new("83 B9 ? ? ? ? 02 75 ? F3 0F 10 81 ? ? ? ? C3 F3 0F 10 81 ? ? ? ? C3", 22, 4, IsCallSite: false, 0, 0,
@@ -920,7 +920,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         private static readonly CameraOffsetSig[] AspectRatioSigs =
         [
-            // IDA call-site at 0x2EBF21: call sub_18013EE70 → target is movss xmm0,[rcx+518h]; ret
+            // IDA call-site at 0x2EBF21: call sub_18013EE70 ? target is movss xmm0,[rcx+518h]; ret
             // Post-call context: mulss xmm8,[rip+?]; mulss xmm0,xmm6
             new("E8 ? ? ? ? F3 44 0F 59 05 ? ? ? ? F3 0F 59 C6",
                 0, 4, IsCallSite: true, TargetBodyDispOffset: 4, TargetBodyDispSize: 4,
@@ -947,27 +947,27 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         /// <summary>
         /// Resolves a Camera struct field offset via sig scan and applies it.
-        /// Logs only on change or failure — confirmed matches are silent.
+        /// Logs only on change or failure � confirmed matches are silent.
         /// </summary>
         private static void ApplyCameraOffset(CameraOffsetSig[] sigs, string fieldName, ulong unityBase, ref uint target)
         {
             var resolved = TryResolveCameraOffset(sigs, fieldName, unityBase);
             if (resolved.HasValue && resolved.Value != target)
             {
-                Log.Write(AppLogLevel.Info, $"Camera.{fieldName} UPDATED: 0x{target:X} → 0x{resolved.Value:X}", "CameraManager");
+                Log.Write(AppLogLevel.Info, $"Camera.{fieldName} UPDATED: 0x{target:X} ? 0x{resolved.Value:X}", "CameraManager");
                 target = resolved.Value;
             }
             else if (!resolved.HasValue)
             {
-                Log.Write(AppLogLevel.Warning, $"Camera.{fieldName} sig scan FAILED — using hardcoded 0x{target:X}", "CameraManager");
+                Log.Write(AppLogLevel.Warning, $"Camera.{fieldName} sig scan FAILED � using hardcoded 0x{target:X}", "CameraManager");
             }
         }
 
         /// <summary>
         /// Tries each signature to extract a Camera struct field offset from UnityPlayer.dll.
         /// Supports two strategies:
-        ///   Direct  — displacement is read directly from the sig match.
-        ///   Indirect (call-site) — resolves E8 rel32 call target, then reads displacement from the target function body.
+        ///   Direct  � displacement is read directly from the sig match.
+        ///   Indirect (call-site) � resolves E8 rel32 call target, then reads displacement from the target function body.
         /// Returns the displacement value if found, or null if all signatures failed.
         /// </summary>
         private static uint? TryResolveCameraOffset(CameraOffsetSig[] sigs, string fieldName, ulong unityBase)
@@ -1053,7 +1053,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     return 0;
                 }
 
-                // Pattern 1: lea rcx, [rip+offset] → class metadata
+                // Pattern 1: lea rcx, [rip+offset] ? class metadata
                 for (int i = 0; i < methodBytes.Length - 7; i++)
                 {
                     if (methodBytes[i] == 0x48 && methodBytes[i + 1] == 0x8D && methodBytes[i + 2] == 0x0D)
@@ -1088,7 +1088,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     }
                 }
 
-                // Pattern 2: mov rax, [rip+offset] → direct static field
+                // Pattern 2: mov rax, [rip+offset] ? direct static field
                 for (int i = 32; i < methodBytes.Length - 7; i++)
                 {
                     if (methodBytes[i] == 0x48 && methodBytes[i + 1] == 0x8B && methodBytes[i + 2] == 0x05)
@@ -1156,7 +1156,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
         /// <summary>
         /// Checks if we are actually scoped using the optic's SightComponent zoom level.
-        /// NOTE: no longer gates on a fragile OpticCameraActive flag – as long as the
+        /// NOTE: no longer gates on a fragile OpticCameraActive flag � as long as the
         /// optic chain + zoom is valid, we consider ourselves scoped.
         /// </summary>
         private bool CheckIfScoped(LocalPlayer localPlayer)
@@ -1206,7 +1206,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
             IsADS = localPlayer?.CheckIfADS() ?? false;
             IsScoped = IsADS && CheckIfScoped(localPlayer!);
 
-            // Choose camera: scoped → optic, otherwise → FPS
+            // Choose camera: scoped ? optic, otherwise ? FPS
             ulong camera = (IsADS && IsScoped && OpticCamera.IsValidVirtualAddress())
                 ? OpticCamera
                 : FPSCamera;

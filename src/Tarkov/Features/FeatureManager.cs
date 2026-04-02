@@ -1,11 +1,11 @@
-﻿#pragma warning disable CS0162 // Unreachable code detected (HARD_DISABLE_ALL_MEMWRITES const)
-using eft_dma_radar.Common.Misc;
+#pragma warning disable CS0162 // Unreachable code detected (HARD_DISABLE_ALL_MEMWRITES const)
+using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.Tarkov.GameWorld;
 
-using eft_dma_radar.Common.DMA;
-using eft_dma_radar.Common.DMA.ScatterAPI;
-using eft_dma_radar.Common.DMA.Features;
+using eft_dma_radar.DMA;
+using eft_dma_radar.DMA.ScatterAPI;
+using eft_dma_radar.DMA.Features;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.Tarkov.EFTPlayer;
 
@@ -76,7 +76,7 @@ namespace eft_dma_radar.Tarkov.Features
                         continue;
                     }
 
-                    // Main memwrite loop – checked again inside ExecuteMemWrites.
+                    // Main memwrite loop � checked again inside ExecuteMemWrites.
                     while (MemWrites.Enabled && Memory.Ready)
                     {
                         var memWrites = IFeature.AllFeatures
@@ -143,13 +143,13 @@ namespace eft_dma_radar.Tarkov.Features
                     catch (Exception ex)
                     {
                         Log.WriteLine($"[FeatureManager] Feature {feature.GetType().Name} threw: {ex}");
-                        // Don’t kill the batch because one feature is buggy
+                        // Don�t kill the batch because one feature is buggy
                     }
                 }
 
-                // ─────────────────────────────────────────────
+                // ---------------------------------------------
                 // FINAL SAFETY GATE (non-blocking)
-                // ─────────────────────────────────────────────
+                // ---------------------------------------------
 
                 if (!MemWrites.Enabled)
                     return;
@@ -157,7 +157,7 @@ namespace eft_dma_radar.Tarkov.Features
                 bool safeToWrite;
                 try
                 {
-                    // Soft safety: only write if we’re in raid AND game says it's safe
+                    // Soft safety: only write if we�re in raid AND game says it's safe
                     safeToWrite = Memory.InRaid && game.IsSafeToWriteMem;
                 }
                 catch (Exception ex)

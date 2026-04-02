@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
-namespace eft_dma_radar.Common.Misc
+namespace eft_dma_radar.Misc
 {
     /// <summary>
     /// Zero-allocation, Stopwatch-based rate limiter.

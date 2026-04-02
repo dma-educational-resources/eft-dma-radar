@@ -1,17 +1,17 @@
-﻿#nullable enable
+#nullable enable
 #pragma warning disable CS0162 // Unreachable code detected (DEBUG_QUEST_CONDITIONS const)
 using eft_dma_radar;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;
-using eft_dma_radar.Common.Maps;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Data;
-using eft_dma_radar.Common.Misc.Data.TarkovMarket;
+using eft_dma_radar.UI.Radar.Maps;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Data;
+using eft_dma_radar.Misc.Data.TarkovMarket;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.Collections;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.Collections;
 using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Security.AccessControl;

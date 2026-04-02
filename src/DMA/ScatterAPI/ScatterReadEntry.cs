@@ -1,11 +1,11 @@
-﻿using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Pools;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Pools;
 using System.Runtime.CompilerServices;
 using System.Text;
 using VmmSharpEx.Scatter;
-using static eft_dma_radar.Common.Unity.UnityTransform;
+using static eft_dma_radar.Tarkov.Unity.UnityTransform;
 
-namespace eft_dma_radar.Common.DMA.ScatterAPI
+namespace eft_dma_radar.DMA.ScatterAPI
 {
     public sealed class ScatterReadEntry<T> : IScatterEntry, IPooledObject<ScatterReadEntry<T>>
     {
@@ -77,7 +77,7 @@ namespace eft_dma_radar.Common.DMA.ScatterAPI
                 IsFailed = true;
             }
 
-            // 🔥 VERY IMPORTANT — notify IL2CPP loader
+            // ?? VERY IMPORTANT � notify IL2CPP loader
             ActionOnComplete?.Invoke(this);
         }
 

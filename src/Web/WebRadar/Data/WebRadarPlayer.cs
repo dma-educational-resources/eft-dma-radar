@@ -1,6 +1,6 @@
-﻿#nullable enable
-using eft_dma_radar.Common.Maps;
-using eft_dma_radar.Common.Unity;
+#nullable enable
+using eft_dma_radar.UI.Radar.Maps;
+using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.Loot;
@@ -181,7 +181,7 @@ namespace eft_dma_radar.Tarkov.WebRadar.Data
             if (skeleton?.HasValidPosition != true) return null;
             var bones = skeleton.Bones;
             var mid = bones[Bones.HumanSpine2].Position;
-            var buf = new float[48]; // 16 bones × 3 floats
+            var buf = new float[48]; // 16 bones � 3 floats
             int i = 0;
             foreach (var b in _boneOrder)
             {

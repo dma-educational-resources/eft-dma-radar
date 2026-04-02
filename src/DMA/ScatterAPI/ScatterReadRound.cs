@@ -1,8 +1,8 @@
-﻿using eft_dma_radar.Common.DMA;
-using eft_dma_radar.Common.Misc.Pools;
+using eft_dma_radar.DMA;
+using eft_dma_radar.Misc.Pools;
 using System.Buffers;
 
-namespace eft_dma_radar.Common.DMA.ScatterAPI
+namespace eft_dma_radar.DMA.ScatterAPI
 {
     /// <summary>
     /// Defines a Scatter Read Round. Each round will execute a single scatter read. If you have reads that

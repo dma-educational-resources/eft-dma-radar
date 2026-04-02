@@ -1,11 +1,10 @@
 ﻿using System.Numerics;
-using System.Runtime.InteropServices;
 
 namespace eft_dma_radar.UI.ESP
 {
     /// <summary>
     /// Defines a transposed Matrix4x4 for ESP Operations (only contains necessary fields).
-    /// Includes TAA/DLSS/FSR jitter detection via VP matrix row orthogonality.
+    /// Includes TAA/DLSS/FSR jitter compensation via temporal high-pass filtering.
     /// </summary>
     public sealed class ViewMatrix
     {
@@ -23,6 +22,19 @@ namespace eft_dma_radar.UI.ESP
         /// </summary>
         public float JitterX;
         public float JitterY;
+
+        // Temporal high-pass filter state.
+        // The raw dot product ratio captures jitter + a slowly varying baseline
+        // (caused by the projection scaling making VP rows not perfectly orthogonal).
+        // An EMA tracks the slow baseline; subtracting it isolates the fast random jitter.
+        private float _baselineX;
+        private float _baselineY;
+        private bool _baselineInit;
+
+        // EMA alpha: 0.01 = very slow adaptation (~100 frame time constant).
+        // Must be slow enough that per-frame jitter averages out,
+        // but fast enough to track camera rotation changes.
+        private const float BaselineAlpha = 0.01f;
 
         public ViewMatrix() { }
 
@@ -42,35 +54,43 @@ namespace eft_dma_radar.UI.ESP
             Up.Y = matrix.M22;
             Up.Z = matrix.M32;
 
-            // ── Detect TAA / DLSS jitter ────────────────────────────────────────
-            // The effective VP matrix A = matrix^T (Unity stores column-major).
-            // A = P × V where P is the (possibly jittered) projection matrix.
+            // ── Detect TAA / DLSS jitter via temporal high-pass filter ───────────
             //
-            // A_row4's 3D part = -forward (camera forward direction, jitter-free).
-            // A_row1's 3D part = P[1,1]*right + jx*(-forward)
-            // A_row2's 3D part = P[2,2]*up    + jy*(-forward)
+            // The 3D parts of VP rows encode camera orientation + projection:
+            //   A_row1_3D = P[1,1]*right + jx*forward   (right/forward = view basis)
+            //   A_row4_3D = -forward                     (jitter-free)
             //
-            // The VIEW matrix's right/up/forward are orthonormal in 3D:
-            //   dot(right, forward) = 0,  dot(up, forward) = 0
+            // Raw ratio: R = -dot3(A_row1, A_row4) / |A_row4|²  ≈  jx + baseline
             //
-            // Therefore (using only the 3D spatial components — the 4th component
-            // includes camera-position-dependent translation that breaks 4D
-            // orthogonality and would cause false zoom/shift artifacts):
+            // The baseline is the slowly-varying component from projection scaling
+            // and any game-specific camera transforms. The jitter is the fast-varying
+            // random component that changes every frame.
             //
-            //   dot3(A_row1, A_row4) = -jx * |forward|² = -jx * |A_row4_3D|²
-            //   jx = -dot3(A_row1, A_row4) / |A_row4_3D|²
-            //   jy = -dot3(A_row2, A_row4) / |A_row4_3D|²
-            //
-            // Uses Vector3 fields directly (they hold the 3D spatial parts).
+            // High-pass filter: track baseline with a slow EMA, subtract it.
+            //   baseline = lerp(baseline, raw, alpha)     (slow EMA)
+            //   jitter   = raw - baseline                 (high-pass residual)
             float fwdLenSq = Translation.LengthSquared();
 
             if (fwdLenSq > 1e-12f)
             {
-                float dot1Fwd = Vector3.Dot(Right, Translation);
-                float dot2Fwd = Vector3.Dot(Up, Translation);
+                float rawX = -Vector3.Dot(Right, Translation) / fwdLenSq;
+                float rawY = -Vector3.Dot(Up, Translation) / fwdLenSq;
 
-                JitterX = -dot1Fwd / fwdLenSq;
-                JitterY = -dot2Fwd / fwdLenSq;
+                if (!_baselineInit)
+                {
+                    _baselineX = rawX;
+                    _baselineY = rawY;
+                    _baselineInit = true;
+                    JitterX = 0f;
+                    JitterY = 0f;
+                }
+                else
+                {
+                    _baselineX += BaselineAlpha * (rawX - _baselineX);
+                    _baselineY += BaselineAlpha * (rawY - _baselineY);
+                    JitterX = rawX - _baselineX;
+                    JitterY = rawY - _baselineY;
+                }
             }
             else
             {

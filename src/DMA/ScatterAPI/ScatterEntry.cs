@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Common.DMA.ScatterAPI
+namespace eft_dma_radar.DMA.ScatterAPI
 {
     public static class ScatterEntry
     {

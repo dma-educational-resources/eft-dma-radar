@@ -1,5 +1,5 @@
-﻿using eft_dma_radar.Common.Misc.Data.TarkovMarket;
-using eft_dma_radar.Common.UI;
+using eft_dma_radar.Misc.Data.TarkovMarket;
+using eft_dma_radar.UI.Controls;
 using System.Collections.Frozen;
 using System.IO;
 using System.Reflection;
@@ -7,7 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace eft_dma_radar.Common.Misc.Data
+namespace eft_dma_radar.Misc.Data
 {
     public static class EftDataManager
     {
@@ -38,7 +38,7 @@ namespace eft_dma_radar.Common.Misc.Data
         public static FrozenDictionary<string, MapElement> MapData { get; private set; }
 
         /// <summary>
-        /// Trader lookup — BSG trader id mapped to display name.
+        /// Trader lookup � BSG trader id mapped to display name.
         /// </summary>
         public static FrozenDictionary<string, string> AllTraders { get; private set; }
 

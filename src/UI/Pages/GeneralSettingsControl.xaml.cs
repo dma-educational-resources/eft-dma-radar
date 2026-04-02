@@ -1,4 +1,4 @@
-﻿using eft_dma_radar.Tarkov;
+using eft_dma_radar.Tarkov;
 using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.Features;
@@ -15,15 +15,15 @@ using eft_dma_radar.Tarkov.WebRadar;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.SKWidgetControl;
-using eft_dma_radar.Common.DMA.Features;
-using eft_dma_radar.Common.Maps;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Config;
-using eft_dma_radar.Common.Misc.Data;
-using eft_dma_radar.Common.Misc.Data.EFT;
+using eft_dma_radar.DMA.Features;
+using eft_dma_radar.UI.Radar.Maps;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Config;
+using eft_dma_radar.Misc.Data;
+using eft_dma_radar.Misc.Data.EFT;
 using eft_dma_radar.UI.Controls;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.LowLevel;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.LowLevel;
 using HandyControl.Controls;
 using HandyControl.Data;
 using HandyControl.Themes;
@@ -101,7 +101,7 @@ namespace eft_dma_radar.UI.Pages
 
         private static MainWindow MainWindowInstance => MainWindow.Window;
 
-        // ── Font picker ───────────────────────────────────────────────────────
+        // -- Font picker -------------------------------------------------------
         private static readonly string FontFolder =
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fonts");
 
@@ -259,16 +259,16 @@ namespace eft_dma_radar.UI.Pages
 
                 var warningResult = MessageBox.Show(
                         "WARNING: Importing a configuration will replace current settings including:\n\n" +
-                        "Ã¯Â¿? General settings & UI preferences\n" +
-                        "Ã¯Â¿? Player/Entity display settings\n" +
-                        "Ã¯Â¿? Color configurations\n" +
-                        "Ã¯Â¿? Hotkey assignments\n" +
-                        "Ã¯Â¿? ESP configurations\n" +
-                        "Ã¯Â¿? Panel and toolbar positions\n" +
-                        "Ã¯Â¿? Memory writing settings\n" +
-                        "Ã¯Â¿? Loot settings\n" +
-                        "Ã¯Â¿? Quest helper settings\n" +
-                        "Ã¯Â¿? Container settings\n\n" +
+                        "ï¿? General settings & UI preferences\n" +
+                        "ï¿? Player/Entity display settings\n" +
+                        "ï¿? Color configurations\n" +
+                        "ï¿? Hotkey assignments\n" +
+                        "ï¿? ESP configurations\n" +
+                        "ï¿? Panel and toolbar positions\n" +
+                        "ï¿? Memory writing settings\n" +
+                        "ï¿? Loot settings\n" +
+                        "ï¿? Quest helper settings\n" +
+                        "ï¿? Container settings\n\n" +
                         "NOTE: Cache & Web Radar data will not be preserved.\n\n" +
                         "This action cannot be undone. Continue?",
                         "Import Configuration Warning",
@@ -1404,7 +1404,7 @@ namespace eft_dma_radar.UI.Pages
             if (hasKey)
             {
                 txtApiStatus.Text = $"API key loaded successfully";
-                btnCreateApiFile.Content = "Edit API FileÃ¯Â¿?";
+                btnCreateApiFile.Content = "Edit API Fileï¿?";
                 btnCreateApiFile.ToolTip = "Replace the stored API key";
                 btnClearApiFile.IsEnabled = true;
                 btnOpenApiFolder.IsEnabled = true;
@@ -1412,7 +1412,7 @@ namespace eft_dma_radar.UI.Pages
             else
             {
                 txtApiStatus.Text = "No API key saved.";
-                btnCreateApiFile.Content = "Create API FileÃ¯Â¿?";
+                btnCreateApiFile.Content = "Create API Fileï¿?";
                 btnCreateApiFile.ToolTip = "Create and store an API key securely";
                 btnClearApiFile.IsEnabled = false;
                 btnOpenApiFolder.IsEnabled = false;
@@ -1961,7 +1961,7 @@ namespace eft_dma_radar.UI.Pages
             foreach (var f in fonts)
                 cmbFontSelector.Items.Add(Path.GetFileNameWithoutExtension(f));
 
-            // Find index — Default (0) if no saved font
+            // Find index � Default (0) if no saved font
             var target = selectName ?? Config.FontName;
             int idx = 0;
             if (!string.IsNullOrEmpty(target))
@@ -2071,7 +2071,7 @@ namespace eft_dma_radar.UI.Pages
                 ResetToDefaultFont();
             }
 
-            // Remove from the dropdown only — do NOT delete the file from disk
+            // Remove from the dropdown only � do NOT delete the file from disk
             for (int i = 0; i < cmbFontSelector.Items.Count; i++)
             {
                 if (string.Equals(cmbFontSelector.Items[i]?.ToString(), fontName, StringComparison.OrdinalIgnoreCase))
@@ -2917,10 +2917,10 @@ namespace eft_dma_radar.UI.Pages
                 //case nameof(HotkeyConfig.TestAction2):
                 // try
                 // {
-                //     var from = Memory.LocalPlayer.Skeleton.Bones[eft_dma_radar.Common.Unity.Bones.HumanHead].Position;
+                //     var from = Memory.LocalPlayer.Skeleton.Bones[eft_dma_radar.Tarkov.Unity.Bones.HumanHead].Position;
                 //     foreach (var player in Memory.Players)
                 //     {
-                //         var to = player.Skeleton.Bones[eft_dma_radar.Common.Unity.Bones.HumanHead].Position;
+                //         var to = player.Skeleton.Bones[eft_dma_radar.Tarkov.Unity.Bones.HumanHead].Position;
                 //         bool visible = PhysXManager.IsVisible(from, to);
                 //         if (visible)
                 //             NotificationsShared.Info($"Player {player.Name} is visible from the local player's head.");
@@ -3618,16 +3618,16 @@ namespace eft_dma_radar.UI.Pages
 
                 var confirm = MessageBox.Show(
                     "WARNING: Importing a configuration will replace current settings including:\n\n" +
-                    "Ã¯Â¿? General settings & UI preferences\n" +
-                    "Ã¯Â¿? Player/Entity display settings\n" +
-                    "Ã¯Â¿? Color configurations\n" +
-                    "Ã¯Â¿? Hotkey assignments\n" +
-                    "Ã¯Â¿? ESP configurations\n" +
-                    "Ã¯Â¿? Panel and toolbar positions\n" +
-                    "Ã¯Â¿? Memory writing settings\n" +
-                    "Ã¯Â¿? Loot settings\n" +
-                    "Ã¯Â¿? Quest helper settings\n" +
-                    "Ã¯Â¿? Container settings\n\n" +
+                    "ï¿? General settings & UI preferences\n" +
+                    "ï¿? Player/Entity display settings\n" +
+                    "ï¿? Color configurations\n" +
+                    "ï¿? Hotkey assignments\n" +
+                    "ï¿? ESP configurations\n" +
+                    "ï¿? Panel and toolbar positions\n" +
+                    "ï¿? Memory writing settings\n" +
+                    "ï¿? Loot settings\n" +
+                    "ï¿? Quest helper settings\n" +
+                    "ï¿? Container settings\n\n" +
                     "NOTE: Cache data will not be preserved.\n\n" +
                     "This action cannot be undone. Continue?",
                     "Import Configuration Warning",

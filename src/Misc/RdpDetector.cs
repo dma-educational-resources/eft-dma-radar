@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace eft_dma_radar.Common.Misc
+namespace eft_dma_radar.Misc
 {
     /// <summary>
     /// Detects whether the current process is running inside a Remote Desktop (RDP / TerminalServices) session.

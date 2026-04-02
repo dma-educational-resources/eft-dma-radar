@@ -1,5 +1,5 @@
-﻿using eft_dma_radar.Tarkov.EFTPlayer;
-using eft_dma_radar.Common.Unity;
+using eft_dma_radar.Tarkov.EFTPlayer;
+using eft_dma_radar.Tarkov.Unity;
 
 namespace eft_dma_radar.UI.ESP
 {

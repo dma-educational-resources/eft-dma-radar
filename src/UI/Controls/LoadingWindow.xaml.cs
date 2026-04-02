@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Threading;
@@ -6,7 +6,7 @@ using System.Windows;
 using System.Windows.Navigation;
 using MessageBox = eft_dma_radar.UI.Controls.MessageBox;
 
-namespace eft_dma_radar.Common.UI
+namespace eft_dma_radar.UI.Controls
 {
     public partial class LoadingWindow : Window
     {

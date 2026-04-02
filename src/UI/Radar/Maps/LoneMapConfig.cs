@@ -1,8 +1,8 @@
-﻿using eft_dma_radar.Common.Misc.Data;
+using eft_dma_radar.Misc.Data;
 using SkiaSharp;
 using System.Text.Json.Serialization;
 
-namespace eft_dma_radar.Common.Maps
+namespace eft_dma_radar.UI.Radar.Maps
 {
     /// <summary>
     /// Defines a .JSON Map Config File

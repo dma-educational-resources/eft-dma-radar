@@ -1,9 +1,9 @@
-﻿using eft_dma_radar.Common.DMA.Features;
-using eft_dma_radar.Common.DMA.ScatterAPI;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Data;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.Collections;
+using eft_dma_radar.DMA.Features;
+using eft_dma_radar.DMA.ScatterAPI;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Data;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.Collections;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections;
 using eft_dma_radar.Tarkov.Features.MemoryWrites.Patches;
@@ -99,7 +99,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         private static int _usecCounter = 0;
         private static int _bearCounter = 0;
 
-        // Key: Player.Base (ulong) → assigned index
+        // Key: Player.Base (ulong) ? assigned index
         private static readonly Dictionary<ulong, int> _pmcIndex = [];
         private static readonly Lock _pmcLock = new();
         private int GetOrAssignPmcIndex(bool isUsec)
@@ -655,7 +655,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             }
             catch (NullReferenceException)
             {
-                // Suppressed — native VMM handles invalidated during shutdown
+                // Suppressed � native VMM handles invalidated during shutdown
             }
             catch (Exception ex)
             {

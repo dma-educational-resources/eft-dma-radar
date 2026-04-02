@@ -1,7 +1,7 @@
-﻿using Mem = eft_dma_radar.DMA.Memory;
+using Mem = eft_dma_radar.DMA.Memory;
 using Collections.Pooled;
 
-namespace eft_dma_radar.Common.Unity.Collections
+namespace eft_dma_radar.Tarkov.Unity.Collections
 {
     /// <summary>
     /// DMA Wrapper for a C# HashSet

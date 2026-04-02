@@ -1,9 +1,9 @@
-ï»¿using eft_dma_radar.Common.DMA.ScatterAPI;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Data;
-using eft_dma_radar.Common.Misc.Pools;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.Collections;
+using eft_dma_radar.DMA.ScatterAPI;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Data;
+using eft_dma_radar.Misc.Pools;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.Collections;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 using eft_dma_radar.UI.ESP;
@@ -61,7 +61,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             if (fireport == null)
                 return;
 
-            // HARD VALIDATION Â¡Âª prevents poison scatter entries
+            // HARD VALIDATION ¡ª prevents poison scatter entries
             if (!fireport.VerticesAddr.IsValidVirtualAddress() ||
                 fireport.Index < 0 ||
                 fireport.Index > 128)
@@ -173,7 +173,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                     }
                     else
                     {
-                        // FAST PATH Â¡Âª direct read for immediate visual update
+                        // FAST PATH ¡ª direct read for immediate visual update
                         try
                         {
                             if (FireportTransform is null)
@@ -198,7 +198,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                         }
                         catch
                         {
-                            // ignore Â¡Âª scatter may still succeed
+                            // ignore ¡ª scatter may still succeed
                         }
                     }
                 }
@@ -278,7 +278,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             private string _fireType;
             private string _ammo;
 
-            internal static bool DebugLogging = true;
+            internal static bool DebugLogging = false;
 
             private string _lastValidAmmo;
             private string _lastValidFireType;
@@ -355,7 +355,6 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 if (log)
                 {
                     string weaponClass    = ObjectClass.ReadName(hands.ItemAddr, useCache: false);
-                    Il2CppDumper.DumpClassFields(hands.ItemAddr, $"weaponClass ({weaponClass})");
                     string fireModeClass  = fireModePtr != 0 ? ObjectClass.ReadName(fireModePtr, useCache: false) : "null";
                     string magSlotClass   = magSlotPtr  != 0 ? ObjectClass.ReadName(magSlotPtr,  useCache: false) : "null";
                     Log.WriteLine($"[MagCheck] " + $"-- WeaponBase: 0x{hands.ItemAddr:X16}  class={weaponClass}");
@@ -389,7 +388,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 }
                 catch
                 {
-                    // No round in chamber â€“ try to get ammo name from the magazine stack instead.
+                    // No round in chamber – try to get ammo name from the magazine stack instead.
                     try
                     {
                         var ammoTemplate_ = GetAmmoTemplateFromWeapon(hands.ItemAddr);
@@ -441,12 +440,12 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                             Log.WriteLine($"[MagCheck] " + $"  MagChambers: 0x{magItem:X16} +0x{Offsets.LootItemMod.Slots:X3} ? ptr=0x{magChambersPtr:X16}  count={magChambers.Count}  class={magChambersClass}");
                         }
 
-                        if (magChambers.Count > 0 || ammoInChamber is null) // Revolvers, etc.
+                        if (magChambers.Count > 0) // Revolvers, etc.
                         {
                             int loaded = magChambers.Count(x => x.HasBullet());
                             maxCount += magChambers.Count;
                             currentCount += loaded;
-                            ammoInChamber = GetLoadedAmmoName(magChambers.FirstOrDefault(x => x.HasBullet()), log);
+                            ammoInChamber ??= GetLoadedAmmoName(magChambers.FirstOrDefault(x => x.HasBullet()), log);
                             if (log)
                                 Log.WriteLine($"[MagCheck] " + $"  Revolver path: magChambers={magChambers.Count} loaded={loaded} ammo={ammoInChamber ?? "null"}");
                         }
@@ -462,7 +461,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                             if (!cartridges.IsValidVirtualAddress())
                             {
                                 if (log)
-                                    Log.WriteLine($"[MagCheck] " + "  Cartridges INVALID â€” skipping regular mag path");
+                                    Log.WriteLine($"[MagCheck] " + "  Cartridges INVALID — skipping regular mag path");
                             }
                             else
                             {
@@ -478,7 +477,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                                     if (!magStackPtr.IsValidVirtualAddress())
                                     {
                                         if (log)
-                                            Log.WriteLine($"[MagCheck] " + "  MagStack INVALID â€” skipping");
+                                            Log.WriteLine($"[MagCheck] " + "  MagStack INVALID — skipping");
                                     }
                                     else
                                     {

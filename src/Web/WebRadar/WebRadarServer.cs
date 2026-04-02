@@ -1,10 +1,10 @@
-﻿#nullable enable
+#nullable enable
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 
 using eft_dma_radar.Tarkov.WebRadar.Data;
-using eft_dma_radar.Common.Misc;
+using eft_dma_radar.Misc;
 
 using Open.Nat;
 
@@ -13,7 +13,7 @@ using System.Net.Sockets;
 using System.Diagnostics;
 using System.Text;
 using System.Net.Http;
-using eft_dma_radar.Common.Maps;
+using eft_dma_radar.UI.Radar.Maps;
 using Microsoft.Extensions.Logging;
 using System.IO;
 using eft_dma_radar.Tarkov.GameWorld.Exits;
@@ -272,12 +272,12 @@ namespace eft_dma_radar.Tarkov.WebRadar
                     var exitManager = Memory.Game?.Exits;
 
                     _latest.Exfils = exitManager?
-                        .OfType<eft_dma_radar.Tarkov.GameWorld.Exits.Exfil>() // 👈 important
+                        .OfType<eft_dma_radar.Tarkov.GameWorld.Exits.Exfil>() // ?? important
                         .Select(WebRadarExfil.CreateFromExfil)
                         .ToArray();
 
                     _latest.Transits = exitManager?
-                        .OfType<eft_dma_radar.Tarkov.GameWorld.Exits.TransitPoint>() // 👈 important
+                        .OfType<eft_dma_radar.Tarkov.GameWorld.Exits.TransitPoint>() // ?? important
                         .Select(WebRadarTransit.CreateFromTransit)
                         .ToArray();
 

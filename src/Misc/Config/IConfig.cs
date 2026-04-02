@@ -1,7 +1,7 @@
-﻿using eft_dma_radar.Common.Unity.LowLevel;
+using eft_dma_radar.Tarkov.Unity.LowLevel;
 using eft_dma_radar.Tarkov.Features.MemoryWrites.Chams;
 
-namespace eft_dma_radar.Common.Misc.Config
+namespace eft_dma_radar.Misc.Config
 {
     public interface IConfig
     {

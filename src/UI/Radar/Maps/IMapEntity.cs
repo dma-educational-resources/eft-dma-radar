@@ -1,8 +1,8 @@
-﻿using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
-using eft_dma_radar.Common.Unity;
+using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
+using eft_dma_radar.Tarkov.Unity;
 using SkiaSharp;
 
-namespace eft_dma_radar.Common.Maps
+namespace eft_dma_radar.UI.Radar.Maps
 {
     /// <summary>
     /// Defines an entity that can be drawn on the 2D Radar Map.

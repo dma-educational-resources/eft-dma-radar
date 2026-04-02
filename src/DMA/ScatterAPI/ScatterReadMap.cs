@@ -1,6 +1,6 @@
-﻿using eft_dma_radar.Common.Misc.Pools;
+using eft_dma_radar.Misc.Pools;
 
-namespace eft_dma_radar.Common.DMA.ScatterAPI
+namespace eft_dma_radar.DMA.ScatterAPI
 {
     /// <summary>
     /// Provides mapping for a Scatter Read Operation. May contain multiple Scatter Read Rounds.

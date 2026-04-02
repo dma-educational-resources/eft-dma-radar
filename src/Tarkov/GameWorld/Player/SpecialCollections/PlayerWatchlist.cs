@@ -1,5 +1,5 @@
-﻿using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Common.Misc;
+using eft_dma_radar.UI.Misc;
+using eft_dma_radar.Misc;
 using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 using System;
 using System.Collections.Generic;

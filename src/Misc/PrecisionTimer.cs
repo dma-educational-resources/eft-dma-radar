@@ -1,6 +1,6 @@
-﻿using System.Runtime.Intrinsics.X86;
+using System.Runtime.Intrinsics.X86;
 
-namespace eft_dma_radar.Common.Misc
+namespace eft_dma_radar.Misc
 {
     /// <summary>
     /// Provides a High Precision Timer mechanism that resolves to 100-nanosecond periods.
@@ -33,7 +33,7 @@ namespace eft_dma_radar.Common.Misc
         public PrecisionTimer()
         {
             // _timer is already initialised by the field initialiser (= new()).
-            // Do NOT assign _timer again here — doing so would abandon and leak
+            // Do NOT assign _timer again here � doing so would abandon and leak
             // the WaitTimerHandle (kernel waitable-timer object) that the field
             // initialiser just created.
         }

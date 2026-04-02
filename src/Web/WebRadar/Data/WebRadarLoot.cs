@@ -1,4 +1,4 @@
-﻿using eft_dma_radar.Common.Maps;
+using eft_dma_radar.UI.Radar.Maps;
 using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
 using MessagePack;

@@ -1,7 +1,7 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
 
-namespace eft_dma_radar.Common.Unity.LowLevel
+namespace eft_dma_radar.Tarkov.Unity.LowLevel
 {
     /// <summary>
     /// Contains Cache Data for Unity Low Level API.

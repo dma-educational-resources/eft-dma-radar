@@ -1,12 +1,12 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using eft_dma_radar.Common.DMA.ScatterAPI;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity.Collections;
+using eft_dma_radar.DMA.ScatterAPI;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Tarkov.Unity.Collections;
 
 namespace eft_dma_radar.Tarkov.GameWorld.Explosives
 {
@@ -36,9 +36,9 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
                 // NOTE: comment out later if too spammy
                 // Log.WriteLine($"[EXP-RTL] Refresh start. Count={_explosives.Count}");
 
-                // ─────────────────────────────────────────────────────
+                // -----------------------------------------------------
                 // 1) Fast path: update ALL existing explosives with scatter
-                // ─────────────────────────────────────────────────────
+                // -----------------------------------------------------
                 if (!_explosives.IsEmpty)
                 {
                     using var map = ScatterReadMap.Get();
@@ -50,7 +50,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
                     {
                         try
                         {
-                            // 🔥 Always let the explosive decide what to queue.
+                            // ?? Always let the explosive decide what to queue.
                             // Grenade/Tripwire already check IsActive internally if they want.
                             explosive.QueueScatterReads(idx);
                         }
@@ -101,10 +101,10 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
                         _explosives.TryRemove(key, out _);
                 }
 
-                // ─────────────────────────────────────────────────────
+                // -----------------------------------------------------
                 // 2) Discovery path: find NEW explosives
                 //    (still uses direct DMA, but this is cheap & infrequent)
-                // ─────────────────────────────────────────────────────
+                // -----------------------------------------------------
                 GetGrenades();
                 GetTripwires();
                 GetMortarProjectiles();
@@ -125,9 +125,9 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             }
         }
 
-        // ─────────────────────────────────────────────────────────
+        // ---------------------------------------------------------
         // GRENADE DISCOVERY (uses MemList; per-frame updates use scatter)
-        // ─────────────────────────────────────────────────────────
+        // ---------------------------------------------------------
         private void GetGrenades()
         {
             try
@@ -177,9 +177,9 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             }
         }
 
-        // ─────────────────────────────────────────────────────────
+        // ---------------------------------------------------------
         // TRIPWIRE DISCOVERY (synchronizable objects)
-        // ─────────────────────────────────────────────────────────
+        // ---------------------------------------------------------
         private void GetTripwires()
         {
             try
@@ -220,10 +220,10 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             }
         }
 
-        // ─────────────────────────────────────────────────────────
+        // ---------------------------------------------------------
         // MORTAR PROJECTILES DISCOVERY
         // (per-frame updates can later be moved to scatter like grenades)
-        // ─────────────────────────────────────────────────────────
+        // ---------------------------------------------------------
         private void GetMortarProjectiles()
         {
             try

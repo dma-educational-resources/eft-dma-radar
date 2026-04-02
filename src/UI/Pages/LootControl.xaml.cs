@@ -1,12 +1,12 @@
-﻿using eft_dma_radar.Tarkov.Features;
+using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.Tarkov.Features.MemoryWrites.Patches;
 using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.LootFilters;
 using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Common.DMA.Features;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Misc.Data;
+using eft_dma_radar.DMA.Features;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Misc.Data;
 using HandyControl.Controls;
 using System;
 using System.Collections.ObjectModel;

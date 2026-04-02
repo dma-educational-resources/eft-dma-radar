@@ -1,9 +1,9 @@
-﻿using SkiaSharp;
+using SkiaSharp;
 using SkiaSharp.Views.Desktop;
 using SkiaSharp.Views.WPF;
 using System.Numerics;
 
-namespace eft_dma_radar.Common.Maps
+namespace eft_dma_radar.UI.Radar.Maps
 {
     public interface IXMMap : IDisposable
     {

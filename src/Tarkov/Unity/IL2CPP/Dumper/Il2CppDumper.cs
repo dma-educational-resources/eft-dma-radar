@@ -2,8 +2,8 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
-using eft_dma_radar.Common.DMA.ScatterAPI;
-using eft_dma_radar.Common.Misc;
+using eft_dma_radar.DMA.ScatterAPI;
+using eft_dma_radar.Misc;
 using eft_dma_radar.Misc;
 using SDK;
 

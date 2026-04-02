@@ -1,11 +1,11 @@
-﻿using System.Collections.Frozen;
-using eft_dma_radar.Common.Misc;
+using System.Collections.Frozen;
+using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.EFTPlayer;
 
-using eft_dma_radar.Common.DMA.ScatterAPI;
-using eft_dma_radar.Common.Misc.Data;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.Collections;
+using eft_dma_radar.DMA.ScatterAPI;
+using eft_dma_radar.Misc.Data;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.Collections;
 using eft_dma_radar.UI.Pages;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.Tarkov.Features;
@@ -181,8 +181,8 @@ namespace eft_dma_radar.Tarkov.Loot
                 var lootBase = lootList[i];
 
                 // ROUND 1: Get MonoBehaviour and start of class name chain
-                round1[i].AddEntry<MemPointer>(0, lootBase + MONOBEHAVIOUR_OFFSET);  // 0x10 → MonoBehaviour
-                round1[i].AddEntry<MemPointer>(1, lootBase + CLASS_NAME_CHAIN[0]);   // 0x0 → C1 for class name
+                round1[i].AddEntry<MemPointer>(0, lootBase + MONOBEHAVIOUR_OFFSET);  // 0x10 ? MonoBehaviour
+                round1[i].AddEntry<MemPointer>(1, lootBase + CLASS_NAME_CHAIN[0]);   // 0x0 ? C1 for class name
 
                 round1[i].Callbacks += x1 =>
                 {
@@ -190,9 +190,9 @@ namespace eft_dma_radar.Tarkov.Loot
                         x1.TryGetResult<MemPointer>(1, out var c1))
                     {
                         // ROUND 2: Get InteractiveClass, GameObject, and continue class name chain
-                        round2[i].AddEntry<MemPointer>(2, monoBehaviour + COMPONENT_OBJECTCLASS);  // 0x30 → InteractiveClass
-                        round2[i].AddEntry<MemPointer>(3, monoBehaviour + COMPONENT_GAMEOBJECT);   // 0x58 → GameObject
-                        round2[i].AddEntry<MemPointer>(4, c1 + CLASS_NAME_CHAIN[1]);               // 0x10 → ClassNamePtr
+                        round2[i].AddEntry<MemPointer>(2, monoBehaviour + COMPONENT_OBJECTCLASS);  // 0x30 ? InteractiveClass
+                        round2[i].AddEntry<MemPointer>(3, monoBehaviour + COMPONENT_GAMEOBJECT);   // 0x58 ? GameObject
+                        round2[i].AddEntry<MemPointer>(4, c1 + CLASS_NAME_CHAIN[1]);               // 0x10 ? ClassNamePtr
 
                         round2[i].Callbacks += x2 =>
                         {
@@ -201,8 +201,8 @@ namespace eft_dma_radar.Tarkov.Loot
                                 x2.TryGetResult<MemPointer>(4, out var classNamePtr))
                             {
                                 // ROUND 3: Get Components array, GameObject name
-                                round3[i].AddEntry<MemPointer>(5, gameObject + GAMEOBJECT_COMPONENTS);  // 0x58 → Components
-                                round3[i].AddEntry<MemPointer>(6, gameObject + GAMEOBJECT_NAME);        // 0x88 → Name pointer
+                                round3[i].AddEntry<MemPointer>(5, gameObject + GAMEOBJECT_COMPONENTS);  // 0x58 ? Components
+                                round3[i].AddEntry<MemPointer>(6, gameObject + GAMEOBJECT_NAME);        // 0x88 ? Name pointer
 
                                 round3[i].Callbacks += x3 =>
                                 {
@@ -212,7 +212,7 @@ namespace eft_dma_radar.Tarkov.Loot
                                         // ROUND 4: Get class name string, object name string, and first transform entry
                                         round4[i].AddEntry<UTF8String>(7, classNamePtr, 64);                  // ClassName
                                         round4[i].AddEntry<UTF8String>(8, pGameObjectName, 64);               // ObjectName
-                                        round4[i].AddEntry<MemPointer>(9, components + COMPONENTARRAY_ITEMS); // 0x8 → T1 (first transform component)
+                                        round4[i].AddEntry<MemPointer>(9, components + COMPONENTARRAY_ITEMS); // 0x8 ? T1 (first transform component)
 
                                         round4[i].Callbacks += x4 =>
                                         {
@@ -221,14 +221,14 @@ namespace eft_dma_radar.Tarkov.Loot
                                                 x4.TryGetResult<MemPointer>(9, out var t1))
                                             {
                                                 // ROUND 5: Dereference T1 + 0x30 to get T2
-                                                round5[i].AddEntry<MemPointer>(10, t1 + TRANSFORM_OBJECTCLASS); // 0x30 → T2
+                                                round5[i].AddEntry<MemPointer>(10, t1 + TRANSFORM_OBJECTCLASS); // 0x30 ? T2
 
                                                 round5[i].Callbacks += x5 =>
                                                 {
                                                     if (x5.TryGetResult<MemPointer>(10, out var t2))
                                                     {
                                                         // ROUND 6: Final dereference T2 + 0x10 to get TransformInternal
-                                                        round6[i].AddEntry<MemPointer>(11, t2 + TRANSFORM_INTERNAL); // 0x10 → TransformInternal
+                                                        round6[i].AddEntry<MemPointer>(11, t2 + TRANSFORM_INTERNAL); // 0x10 ? TransformInternal
 
                                                         round6[i].Callbacks += x6 =>
                                                         {

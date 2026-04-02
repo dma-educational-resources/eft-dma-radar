@@ -1,10 +1,10 @@
-﻿using System.Collections.Frozen;
+using System.Collections.Frozen;
 using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Common.Misc.Data;
-using eft_dma_radar.Common.Unity.Collections;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity;
+using eft_dma_radar.Misc.Data;
+using eft_dma_radar.Tarkov.Unity.Collections;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Web.ProfileApi;
 
@@ -87,7 +87,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             }
             catch
             {
-                // NON-FATAL — skip this frame
+                // NON-FATAL � skip this frame
             }
         }
         private bool TryBuildSlots()
@@ -134,7 +134,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             return _slots.Count > 0;
         }
 
-        // ─────────────────────────────────────────────
+        // ---------------------------------------------
 
         private void BuildGear()
         {
@@ -202,7 +202,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             HasUBGL = hasUBGL;
         }
         // ============================================================
-        // ALIVE DOGTAG → PROFILE ID RESOLUTION
+        // ALIVE DOGTAG ? PROFILE ID RESOLUTION
         // ============================================================
 
         private static void TryResolveAliveDogtagProfileId(Player player, ulong slotsPtr)
@@ -257,14 +257,14 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 if (string.IsNullOrWhiteSpace(profileId))
                     return;
 
-                // ✅ SET PROFILE ID ONCE
+                // ? SET PROFILE ID ONCE
                 player.ProfileID = profileId;
 
                 Log.WriteLine(
                     $"[GearManager] Resolved ProfileID for {player}: {profileId}");
 
                 // Register this profileId in the local database. AccountId is not
-                // available from the player's own dogtag — it will be filled in if
+                // available from the player's own dogtag � it will be filled in if
                 // they appear as a killer on a corpse dogtag in this or a future raid.
                 DogtagDatabase.TryAddOrUpdate(profileId, null, null);
 

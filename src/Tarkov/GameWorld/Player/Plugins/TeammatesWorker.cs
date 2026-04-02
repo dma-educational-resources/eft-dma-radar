@@ -1,4 +1,4 @@
-ï»¿/*
+/*
  * Lone EFT DMA Radar
  * MIT License
  *
@@ -17,10 +17,10 @@ using System.Collections.Concurrent;
 using System.Numerics;
 using System.Text.Json;
 using System.IO;
-using eft_dma_radar.Common.DMA;
-using eft_dma_radar.Common.Misc;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.Collections;
+using eft_dma_radar.DMA;
+using eft_dma_radar.Misc;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.Collections;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
@@ -139,7 +139,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             if (string.IsNullOrWhiteSpace(sessionId))
             {
                 Log.WriteLine(
-                    "[TeammatesWorker] SessionID invalid but in raid Â¨C preserving list");
+                    "[TeammatesWorker] SessionID invalid but in raid ¨C preserving list");
                 return;
             }
 
@@ -174,7 +174,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 
             ResetState();
             Log.WriteLine(
-                "[TeammatesWorker] Raid ended Â¨C cleared Teammates.json");
+                "[TeammatesWorker] Raid ended ¨C cleared Teammates.json");
         }
 
         private static void ResetState()
@@ -306,7 +306,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 if (p == null || p.VoipId <= 0)
                     continue;
 
-                // CASE 1: Latched teammate Â¡Ãº force Teammate
+                // CASE 1: Latched teammate ¡ú force Teammate
                 if (_teammates.TryGetValue(p.VoipId, out var entry))
                 {
                     if (p.Type != PlayerType.Teammate)
@@ -316,7 +316,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                     continue;
                 }
 
-                // CASE 2: Previously latched but now removed Â¡Ãº restore
+                // CASE 2: Previously latched but now removed ¡ú restore
                 if (p.Type == PlayerType.Teammate)
                 {
                     RestoreOriginalType(p);

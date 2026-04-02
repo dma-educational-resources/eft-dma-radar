@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.IO;
 using System.Net.Http;
@@ -7,7 +7,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using SkiaSharp;
-using eft_dma_radar.Common.Misc;
+using eft_dma_radar.Misc;
 using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
 
@@ -77,7 +77,7 @@ namespace eft_dma_radar.Converters
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                // Icon not available on CDN — skip silently
+                // Icon not available on CDN � skip silently
             }
             catch (Exception ex)
             {

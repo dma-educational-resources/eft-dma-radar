@@ -1,6 +1,6 @@
 
 
-using eft_dma_radar.Common.DMA.Features;
+using eft_dma_radar.DMA.Features;
 
 namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 {

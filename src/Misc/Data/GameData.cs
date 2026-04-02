@@ -1,8 +1,8 @@
-﻿using OpenTK.Graphics.OpenGL;
+using OpenTK.Graphics.OpenGL;
 using System.Collections.Frozen;
 using System.Numerics;
 
-namespace eft_dma_radar.Common.Misc.Data
+namespace eft_dma_radar.Misc.Data
 {
     /// <summary>
     /// Contains Static Game Data.

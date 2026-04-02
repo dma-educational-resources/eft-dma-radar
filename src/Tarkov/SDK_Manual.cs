@@ -1,5 +1,5 @@
-﻿using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.Collections;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.Collections;
 
 namespace SDK
 {
@@ -57,7 +57,7 @@ namespace SDK
 
         public readonly partial struct TaskConditionCounter
         {
-            public const uint Value = 0x40; // Int32 — _value field (DEC 1)
+            public const uint Value = 0x40; // Int32 � _value field (DEC 1)
         }
 
     }

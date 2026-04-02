@@ -1,20 +1,20 @@
-﻿#pragma warning disable CS0162 // Unreachable code detected (SILENT_AIM_DRY_RUN const)
+#pragma warning disable CS0162 // Unreachable code detected (SILENT_AIM_DRY_RUN const)
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Common.DMA;
+using eft_dma_radar.DMA;
 using eft_dma_radar.UI.ESP;
-using eft_dma_radar.Common.DMA.Features;
-using eft_dma_radar.Common.Misc;
+using eft_dma_radar.DMA.Features;
+using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.Features.Ballistics;
-using eft_dma_radar.Common.Unity;
-using eft_dma_radar.Common.Unity.Collections;
+using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.Unity.Collections;
 using System.Windows;
 using eft_dma_radar.UI.Pages;
 using Application = System.Windows.Application;
-using eft_dma_radar.Common.Unity.LowLevel;
-using eft_dma_radar.Common.DMA.ScatterAPI;
+using eft_dma_radar.Tarkov.Unity.LowLevel;
+using eft_dma_radar.DMA.ScatterAPI;
 
 namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 {
@@ -1209,7 +1209,7 @@ namespace eft_dma_radar.Tarkov.Features.MemoryWrites
                 }
                 catch
                 {
-                    // ignore, we’ll just fall back later
+                    // ignore, we�ll just fall back later
                 }
 
                 try

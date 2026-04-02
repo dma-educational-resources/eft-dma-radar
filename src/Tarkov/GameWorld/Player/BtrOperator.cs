@@ -1,8 +1,8 @@
 using System.Numerics;
-using eft_dma_radar.Common.DMA.ScatterAPI;
-using eft_dma_radar.Common.Maps;
+using eft_dma_radar.DMA.ScatterAPI;
+using eft_dma_radar.UI.Radar.Maps;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
-using eft_dma_radar.Common.Unity;
+using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using SkiaSharp;

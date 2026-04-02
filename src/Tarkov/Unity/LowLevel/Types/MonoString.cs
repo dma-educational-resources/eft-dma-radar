@@ -1,7 +1,7 @@
-﻿using System.Buffers.Binary;
+using System.Buffers.Binary;
 using System.Text;
 
-namespace eft_dma_radar.Common.Unity.LowLevel.Types
+namespace eft_dma_radar.Tarkov.Unity.LowLevel.Types
 {
     public sealed class MonoString : IMonoType
     {

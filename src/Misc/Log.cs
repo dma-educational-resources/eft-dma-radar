@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace eft_dma_radar.Common.Misc
+namespace eft_dma_radar.Misc
 {
     /// <summary>
     /// Log severity level.
