@@ -25,7 +25,7 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             map = null;
             var totalSw = Stopwatch.StartNew();
 
-            Log.WriteLine("[IL2CPP] Resolving GameWorld");
+            Log.WriteRateLimited(AppLogLevel.Info, "ResolveGameWorld", TimeSpan.FromSeconds(30), "Resolving GameWorld", "IL2CPP");
 
             // Primary: IL2CPP direct path via GamePlayerOwner (fastest — ~5 reads)
             if (TryGetGameWorldViaIL2CPP(out var il2cppResult))

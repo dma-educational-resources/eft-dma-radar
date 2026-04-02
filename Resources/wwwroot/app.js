@@ -221,6 +221,12 @@ const defaults = {
 
   lootSize: 3,
 
+  showContainers: false,
+  showContainerName: true,
+  containerDist: 0,
+  containerColor: "#a78bfa",
+  containerSelection: [],
+
   lootFiltersEnabled: false,
   lootGroups: [],
 
@@ -246,6 +252,11 @@ const defaults = {
   aimviewShowTeammate: true,
   aimviewZoomWithPlayer: true,
 
+  aimviewShowLoot: false,
+  aimviewLootDist: 50,
+  aimviewShowContainers: false,
+  aimviewContainerDist: 50,
+
   lootWidgetSearch: "",
   playersWidgetOnlyPMCs: false,
 
@@ -268,7 +279,11 @@ const defaults = {
 
     basicLoot: "#fbbf24",
     importantLoot: "#ef4444",
-  }
+  },
+
+  showMarkers: true,
+  markerColor: "#f472b6",
+  mapMarkers: {},
 };
 
 let state = deepClone(defaults);
@@ -332,6 +347,17 @@ function mergeState(parsed){
 
   out.corpseMinValue = Math.max(0, Number(out.corpseMinValue) || 0);
 
+  out.containerDist = Math.max(0, Math.min(500, Number(out.containerDist) || 0));
+
+  if(!Array.isArray(out.containerSelection)) out.containerSelection = [];
+  out.containerSelection = out.containerSelection.filter(x => typeof x === "string" && x.length > 0);
+
+  if(!out.mapMarkers || typeof out.mapMarkers !== "object" || Array.isArray(out.mapMarkers)) out.mapMarkers = {};
+  for(const [mapId, arr] of Object.entries(out.mapMarkers)){
+    if(!Array.isArray(arr)){ delete out.mapMarkers[mapId]; continue; }
+    out.mapMarkers[mapId] = arr.filter(m => m && typeof m === "object" && Number.isFinite(m.mx) && Number.isFinite(m.my));
+  }
+
   if(typeof out.centerTarget !== "string" || !out.centerTarget) out.centerTarget = "local";
 
   out.zoom = clamp(Number(out.zoom) || 1, ZOOM_MIN, ZOOM_MAX);
@@ -368,6 +394,7 @@ async function initState(){
   rebuildLootFilterIndex();
   updateLootFilterBadges();
   updateCenterTargetSelect();
+  initMarkerCounter();
   startPolling();
 }
 initState();
@@ -399,6 +426,7 @@ async function resetSettings(){
   rebuildLootFilterIndex();
   updateLootFilterBadges();
   updateCenterTargetSelect();
+  initMarkerCounter();
   saveSettings();
   hideTooltip();
 }
@@ -458,6 +486,23 @@ const inputs = {
   lootFiltersEnabled: $("lootFiltersEnabled"),
   showLootWidget: $("showLootWidget"),
 
+  showContainers: $("showContainers"),
+  showContainerName: $("showContainerName"),
+  containerDist: $("containerDist"),
+  containerDistText: $("containerDistText"),
+  containerColor: $("containerColor"),
+  containerSelectAll: $("containerSelectAll"),
+  containerDeselectAll: $("containerDeselectAll"),
+  containerSelBadge: $("containerSelBadge"),
+  containerTypeList: $("containerTypeList"),
+
+  aimviewShowLoot: $("aimviewShowLoot"),
+  aimviewLootDist: $("aimviewLootDist"),
+  aimviewLootDistText: $("aimviewLootDistText"),
+  aimviewShowContainers: $("aimviewShowContainers"),
+  aimviewContainerDist: $("aimviewContainerDist"),
+  aimviewContainerDistText: $("aimviewContainerDistText"),
+
   localColor: $("localColor"),
   teammateColor: $("teammateColor"),
   usecColor: $("usecColor"),
@@ -477,6 +522,11 @@ const inputs = {
   extractColor: $("extractColor"),
   transitColor: $("transitColor"),
   poiStatus: $("poiStatus"),
+
+  showMarkers: $("showMarkers"),
+  markerColor: $("markerColor"),
+  clearAllMarkers: $("clearAllMarkers"),
+  markerCountBadge: $("markerCountBadge"),
 
   resetSettings: $("resetSettings"),
 };
@@ -635,6 +685,45 @@ function bindAllInputs(){
 
   onBool("showLootWidget", inputs.showLootWidget, applyWidgetsFromState);
 
+  if(inputs.showContainers){ inputs.showContainers.checked = !!state.showContainers; onBool("showContainers", inputs.showContainers); }
+  if(inputs.showContainerName){ inputs.showContainerName.checked = !!state.showContainerName; onBool("showContainerName", inputs.showContainerName); }
+  if(inputs.containerDist){
+    inputs.containerDist.value = String(state.containerDist);
+    if(inputs.containerDistText) inputs.containerDistText.textContent = state.containerDist > 0 ? state.containerDist + "m" : "\u221e";
+    inputs.containerDist.oninput = () => {
+      state.containerDist = Math.max(0, Math.min(500, Number(inputs.containerDist.value) || 0));
+      if(inputs.containerDistText) inputs.containerDistText.textContent = state.containerDist > 0 ? state.containerDist + "m" : "\u221e";
+      saveSettings();
+    };
+  }
+  if(inputs.containerColor){
+    inputs.containerColor.value = state.containerColor || defaults.containerColor;
+    inputs.containerColor.oninput = () => { state.containerColor = inputs.containerColor.value; saveSettings(); };
+  }
+  containerSelSet = new Set(state.containerSelection);
+  renderContainerTypeList();
+
+  if(inputs.aimviewShowLoot){ inputs.aimviewShowLoot.checked = !!state.aimviewShowLoot; onBool("aimviewShowLoot", inputs.aimviewShowLoot); }
+  if(inputs.aimviewLootDist){
+    inputs.aimviewLootDist.value = String(state.aimviewLootDist);
+    if(inputs.aimviewLootDistText) inputs.aimviewLootDistText.textContent = state.aimviewLootDist + "m";
+    inputs.aimviewLootDist.oninput = () => {
+      state.aimviewLootDist = Math.max(1, Math.min(500, Number(inputs.aimviewLootDist.value) || 50));
+      if(inputs.aimviewLootDistText) inputs.aimviewLootDistText.textContent = state.aimviewLootDist + "m";
+      saveSettings();
+    };
+  }
+  if(inputs.aimviewShowContainers){ inputs.aimviewShowContainers.checked = !!state.aimviewShowContainers; onBool("aimviewShowContainers", inputs.aimviewShowContainers); }
+  if(inputs.aimviewContainerDist){
+    inputs.aimviewContainerDist.value = String(state.aimviewContainerDist);
+    if(inputs.aimviewContainerDistText) inputs.aimviewContainerDistText.textContent = state.aimviewContainerDist + "m";
+    inputs.aimviewContainerDist.oninput = () => {
+      state.aimviewContainerDist = Math.max(1, Math.min(500, Number(inputs.aimviewContainerDist.value) || 50));
+      if(inputs.aimviewContainerDistText) inputs.aimviewContainerDistText.textContent = state.aimviewContainerDist + "m";
+      saveSettings();
+    };
+  }
+
   onBool("showExtracts", inputs.showExtracts);
   onBool("showTransits", inputs.showTransits);
   onBool("showPoiNames", inputs.showPoiNames);
@@ -674,6 +763,14 @@ function bindAllInputs(){
     saveSettings();
     hideTooltip();
   };
+
+  if(inputs.showMarkers){ inputs.showMarkers.checked = !!state.showMarkers; onBool("showMarkers", inputs.showMarkers); }
+  if(inputs.markerColor){
+    inputs.markerColor.value = state.markerColor || defaults.markerColor;
+    inputs.markerColor.oninput = () => { state.markerColor = inputs.markerColor.value; saveSettings(); };
+  }
+  if(inputs.clearAllMarkers) inputs.clearAllMarkers.onclick = clearAllMarkersForMap;
+  updateMarkerCountBadge();
 
   inputs.resetSettings.onclick = () => resetSettings();
 }
@@ -1074,8 +1171,91 @@ async function loadDefaultData(){
 
   if(lootDbStatus) lootDbStatus.textContent = getItemDbStatusText();
   if(!lootFilterModal.classList.contains("hidden")) renderLootFilterModal();
+  buildContainerTypeList();
 }
 loadDefaultData();
+
+/* =========================
+   CONTAINER TYPE SELECTION
+========================= */
+let containerTypes = [];
+let containerSelSet = new Set();
+
+function buildContainerTypeList(){
+  containerTypes = [];
+  if(!itemDbReady) return;
+
+  const seen = new Set();
+  for(const rec of itemDb.list){
+    if(!Array.isArray(rec.categories) || !rec.categories.includes("Static Container")) continue;
+    if(seen.has(rec.id)) continue;
+    seen.add(rec.id);
+    containerTypes.push({ id: rec.id, shortName: rec.shortName || rec.name || rec.id });
+  }
+  containerTypes.sort((a, b) => a.shortName.localeCompare(b.shortName));
+
+  containerSelSet = new Set(state.containerSelection);
+  renderContainerTypeList();
+}
+
+function renderContainerTypeList(){
+  const el = inputs.containerTypeList;
+  if(!el) return;
+  el.innerHTML = "";
+
+  if(containerTypes.length === 0){
+    el.innerHTML = '<span class="mono" style="font-size:11px;color:var(--muted);">loading item db\u2026</span>';
+    updateContainerSelBadge();
+    return;
+  }
+
+  for(const ct of containerTypes){
+    const lbl = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = containerSelSet.has(ct.id);
+    cb.dataset.cid = ct.id;
+    cb.onchange = () => {
+      if(cb.checked) containerSelSet.add(ct.id);
+      else containerSelSet.delete(ct.id);
+      syncContainerSelToState();
+    };
+    const span = document.createElement("span");
+    span.textContent = ct.shortName;
+    lbl.appendChild(cb);
+    lbl.appendChild(span);
+    el.appendChild(lbl);
+  }
+
+  updateContainerSelBadge();
+}
+
+function syncContainerSelToState(){
+  state.containerSelection = [...containerSelSet];
+  updateContainerSelBadge();
+  saveSettings();
+}
+
+function updateContainerSelBadge(){
+  if(inputs.containerSelBadge){
+    inputs.containerSelBadge.textContent = containerSelSet.size + " / " + containerTypes.length;
+  }
+}
+
+function containerSelectAllFn(){
+  for(const ct of containerTypes) containerSelSet.add(ct.id);
+  syncContainerSelToState();
+  renderContainerTypeList();
+}
+
+function containerDeselectAllFn(){
+  containerSelSet.clear();
+  syncContainerSelToState();
+  renderContainerTypeList();
+}
+
+if(inputs.containerSelectAll) inputs.containerSelectAll.onclick = containerSelectAllFn;
+if(inputs.containerDeselectAll) inputs.containerDeselectAll.onclick = containerDeselectAllFn;
 
 /* =========================
    SEARCH
@@ -2067,7 +2247,7 @@ function aimviewPlayerPassesTypeFilter(p){
   }
 }
 
-function drawAimview(players){
+function drawAimview(players, loot, containers){
   if(!state.showAimview || !aimviewCtx || !aimviewCanvas) return;
   if(aimviewWidget && (aimviewWidget.classList.contains("hidden") || aimviewWidget.classList.contains("minimized"))) return;
 
@@ -2087,29 +2267,88 @@ function drawAimview(players){
 
   const centeredIsLocal = !!(centered.isLocal || centered.IsLocal);
 
-  // Synthetic view matrix — used when centered player is not local
   const cpx = Number(centered.worldX ?? centered.WorldX ?? 0);
   const cpy = Number(centered.worldY ?? centered.WorldY ?? 0);
   const cpz = Number(centered.worldZ ?? centered.WorldZ ?? 0);
-  // Yaw from WebRadarPlayer comes as MapRotation (yaw-90), raw Rotation.X is what we need.
-  // Rotation.X is serialized as the Yaw field (degrees, 0-360 already corrected for map).
-  // We need raw EFT yaw = MapRotation + 90.
   const centeredYaw   = (Number(centered.yaw ?? centered.Yaw ?? 0) + 90);
   const centeredPitch = Number(centered.pitch ?? centered.Pitch ?? 0);
   const synthVm = buildAimviewMatrix(cpx, cpy, cpz, centeredYaw, centeredPitch);
 
   const cx = cpx, cy = cpy, cz = cpz;
 
-  // Compute focal length from configured FOV, then apply player zoom if enabled
   const fovRad = (state.aimviewFov || 90) * Math.PI / 180;
   let focalLen = halfW / Math.tan(fovRad / 2);
   if(state.aimviewZoomWithPlayer && !centeredIsLocal){
     const zl = Number(centered.zoomLevel ?? centered.ZoomLevel ?? 1) || 1;
-    if(zl > 1) focalLen *= zl;  // zoom synthetic projection via focal length
+    if(zl > 1) focalLen *= zl;
   }
 
   const maxDist = Number(state.aimviewMaxDist) || 0;
 
+  // --- Draw loot in aimview ---
+  if(state.aimviewShowLoot && Array.isArray(loot)){
+    const lootMaxDist = Number(state.aimviewLootDist) || 50;
+    for(const l of loot){
+      const lwx = Number(l?.worldX ?? l?.WorldX ?? NaN);
+      const lwy = Number(l?.worldY ?? l?.WorldY ?? NaN);
+      const lwz = Number(l?.worldZ ?? l?.WorldZ ?? NaN);
+      if(!Number.isFinite(lwx) || !Number.isFinite(lwy) || !Number.isFinite(lwz)) continue;
+
+      const dist = Math.sqrt((lwx-cx)**2 + (lwy-cy)**2 + (lwz-cz)**2);
+      if(dist > lootMaxDist) continue;
+
+      const pt = w2sSynth(lwx, lwy, lwz, synthVm, halfW, halfH, focalLen);
+      if(!pt) continue;
+
+      const boxS = 3;
+      aimviewCtx.fillStyle = "#fbbf24";
+      aimviewCtx.fillRect(pt.px - boxS, pt.py - boxS, boxS * 2, boxS * 2);
+
+      const name = String(l?.shortName ?? l?.ShortName ?? "");
+      const label = name ? name + " (" + dist.toFixed(1) + "m)" : dist.toFixed(1) + "m";
+      aimviewCtx.fillStyle = "rgba(251,191,36,0.9)";
+      aimviewCtx.font = "9px monospace";
+      aimviewCtx.textAlign = "center";
+      aimviewCtx.textBaseline = "bottom";
+      aimviewCtx.fillText(label, pt.px, pt.py - boxS - 2);
+    }
+  }
+
+  // --- Draw containers in aimview ---
+  if(state.aimviewShowContainers && Array.isArray(containers)){
+    const contMaxDist = Number(state.aimviewContainerDist) || 50;
+    for(const c of containers){
+      if(c?.searched || c?.Searched) continue;
+
+      const cid = String(c?.containerId ?? c?.ContainerId ?? "");
+      if(cid && containerSelSet.size > 0 && !containerSelSet.has(cid)) continue;
+
+      const cwx = Number(c?.worldX ?? c?.WorldX ?? NaN);
+      const cwy = Number(c?.worldY ?? c?.WorldY ?? NaN);
+      const cwz = Number(c?.worldZ ?? c?.WorldZ ?? NaN);
+      if(!Number.isFinite(cwx) || !Number.isFinite(cwy) || !Number.isFinite(cwz)) continue;
+
+      const dist = Math.sqrt((cwx-cx)**2 + (cwy-cy)**2 + (cwz-cz)**2);
+      if(dist > contMaxDist) continue;
+
+      const pt = w2sSynth(cwx, cwy, cwz, synthVm, halfW, halfH, focalLen);
+      if(!pt) continue;
+
+      const boxS = 3;
+      aimviewCtx.fillStyle = "#a78bfa";
+      aimviewCtx.fillRect(pt.px - boxS, pt.py - boxS, boxS * 2, boxS * 2);
+
+      const name = String(c?.name ?? c?.Name ?? "Container");
+      const label = name + " (" + dist.toFixed(1) + "m)";
+      aimviewCtx.fillStyle = "rgba(167,139,250,0.9)";
+      aimviewCtx.font = "9px monospace";
+      aimviewCtx.textAlign = "center";
+      aimviewCtx.textBaseline = "bottom";
+      aimviewCtx.fillText(label, pt.px, pt.py - boxS - 2);
+    }
+  }
+
+  // --- Draw players in aimview ---
   for(const p of players){
     if(!p || p === centered) continue;
     if(p?.isAlive === false || p?.IsAlive === false) continue;
@@ -2403,6 +2642,19 @@ function buildPoiTooltip(p){
   `;
 }
 
+function buildContainerTooltip(c){
+  const name = String(c?.name ?? c?.Name ?? "Container");
+  const searched = !!(c?.searched || c?.Searched);
+  const col = state.containerColor || "#a78bfa";
+  return `
+    <div class="t-title">
+      <span class="t-dot" style="background:${escapeHtml(col)}"></span>
+      <span>${escapeHtml(name)}</span>
+    </div>
+    <div class="t-sub mono">container${searched ? " | searched" : ""}</div>
+  `;
+}
+
 function updateHover(){
   if(dragging || !lastMouse.inside){
     hideTooltip();
@@ -2415,6 +2667,8 @@ function updateHover(){
   const html =
     (h.kind === "player") ? buildPlayerTooltip(h.data) :
     (h.kind === "loot") ? buildLootTooltip(h.data) :
+    (h.kind === "container") ? buildContainerTooltip(h.data) :
+    (h.kind === "marker") ? buildMarkerTooltip(h.data) :
     buildPoiTooltip(h.data);
 
   showTooltip(html, lastMouse.vx, lastMouse.vy);
@@ -2474,6 +2728,142 @@ function drawPing(mapRect, cx, cy, rotRad){
     ctx.fillText(ping.label, s.px, s.py - (r + 6));
   }
   ctx.restore();
+}
+
+/* =========================
+   MAP MARKERS
+========================= */
+let lastFrameAnchor = null;
+let lastFrameMapRect = null;
+let _markerCounter = 0;
+
+function initMarkerCounter(){
+  let maxNum = 0;
+  for(const arr of Object.values(state.mapMarkers || {})){
+    if(!Array.isArray(arr)) continue;
+    for(const m of arr){
+      const n = parseInt(m?.label, 10);
+      if(Number.isFinite(n) && n > maxNum) maxNum = n;
+    }
+  }
+  _markerCounter = maxNum;
+}
+
+function getMarkersForMap(mapId){
+  if(!mapId) return [];
+  if(!state.mapMarkers[mapId]) state.mapMarkers[mapId] = [];
+  return state.mapMarkers[mapId];
+}
+
+function addMarker(mapId, mx, my){
+  if(!mapId) return;
+  if(!state.mapMarkers[mapId]) state.mapMarkers[mapId] = [];
+  _markerCounter++;
+  const marker = {
+    id: "m_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    mx: Number(mx),
+    my: Number(my),
+    label: String(_markerCounter),
+    color: state.markerColor || "#f472b6",
+    ts: Date.now()
+  };
+  state.mapMarkers[mapId].push(marker);
+  updateMarkerCountBadge();
+  saveSettings();
+  return marker;
+}
+
+function removeMarkerNear(mapId, mx, my, threshold){
+  const arr = getMarkersForMap(mapId);
+  if(arr.length === 0) return false;
+  let bestIdx = -1;
+  let bestDist = Infinity;
+  for(let i = 0; i < arr.length; i++){
+    const dx = arr[i].mx - mx;
+    const dy = arr[i].my - my;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if(d < bestDist){ bestDist = d; bestIdx = i; }
+  }
+  if(bestIdx >= 0 && bestDist <= threshold){
+    arr.splice(bestIdx, 1);
+    updateMarkerCountBadge();
+    saveSettings();
+    return true;
+  }
+  return false;
+}
+
+function clearAllMarkersForMap(){
+  const mapId = lastMapId || pickMapId();
+  if(mapId && state.mapMarkers[mapId]){
+    state.mapMarkers[mapId] = [];
+  }
+  updateMarkerCountBadge();
+  saveSettings();
+}
+
+function updateMarkerCountBadge(){
+  if(!inputs.markerCountBadge) return;
+  const mapId = lastMapId || pickMapId();
+  const count = mapId && state.mapMarkers[mapId] ? state.mapMarkers[mapId].length : 0;
+  inputs.markerCountBadge.textContent = String(count);
+}
+
+function drawMarkers(mapRect, cx, cy, rotRad, hits){
+  if(!state.showMarkers) return;
+  const mapId = lastMapId;
+  const markers = mapId ? (state.mapMarkers[mapId] || []) : [];
+  if(markers.length === 0) return;
+
+  ctx.save();
+  ctx.font = "bold 11px system-ui";
+  ctx.textAlign = "center";
+  ctx.shadowColor = "rgba(0,0,0,.8)";
+  ctx.shadowBlur = 6;
+
+  for(const m of markers){
+    const s = mapXYToScreen(m.mx, m.my, mapRect, cx, cy, rotRad);
+    const px = s.px, py = s.py;
+    const col = m.color || state.markerColor || "#f472b6";
+    const sz = 7;
+
+    // diamond shape
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(px, py - sz);
+    ctx.lineTo(px + sz * 0.7, py);
+    ctx.lineTo(px, py + sz);
+    ctx.lineTo(px - sz * 0.7, py);
+    ctx.closePath();
+    ctx.fill();
+
+    // outline
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // label above
+    if(m.label){
+      ctx.fillStyle = "#e5e7eb";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(m.label, px, py - sz - 3);
+    }
+
+    hits.push({ kind:"marker", px, py, r: Math.max(12, sz * 2), data: m });
+  }
+  ctx.restore();
+}
+
+function buildMarkerTooltip(m){
+  const col = m?.color || state.markerColor || "#f472b6";
+  const label = m?.label || "Marker";
+  return `
+    <div class="t-title">
+      <span class="t-dot" style="background:${escapeHtml(col)}"></span>
+      <span>Marker ${escapeHtml(label)}</span>
+    </div>
+    <div class="t-sub mono">right-click or double-click to remove</div>
+  `;
 }
 
 /* =========================
@@ -2677,6 +3067,79 @@ function drawLoot(loot, map, cx, cy, rotRad, mapRect, hits){
 
     if(doLabel){
       const label = buildLootLabel(l);
+      if(label){
+        ctx.fillStyle = "#e5e7eb";
+        ctx.fillText(label, px + size + 4, py);
+      }
+    }
+  }
+
+  if(doLabel) ctx.restore();
+}
+
+function drawContainers(containers, map, cx, cy, rotRad, mapRect, hits){
+  if(!Array.isArray(containers) || containers.length === 0) return;
+  if(containerSelSet.size === 0) return;
+
+  const col = state.containerColor || "#a78bfa";
+  const maxDist = Number(state.containerDist) || 0;
+  const showName = !!state.showContainerName;
+  const size = Number(state.lootSize) || 3;
+
+  const cp = lastCenteredPlayer;
+  const cpwx = cp ? Number(cp.worldX ?? cp.WorldX ?? NaN) : NaN;
+  const cpwy = cp ? Number(cp.worldY ?? cp.WorldY ?? NaN) : NaN;
+  const cpwz = cp ? Number(cp.worldZ ?? cp.WorldZ ?? NaN) : NaN;
+  const haveDist = Number.isFinite(cpwx) && Number.isFinite(cpwy) && Number.isFinite(cpwz);
+
+  const doLabel = showName || (haveDist && maxDist > 0);
+  if(doLabel){
+    ctx.save();
+    ctx.font = "11px system-ui";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(0,0,0,.85)";
+    ctx.shadowBlur = 6;
+  }
+
+  for(const c of containers){
+    if(c?.searched || c?.Searched) continue;
+
+    const cid = String(c?.containerId ?? c?.ContainerId ?? "");
+    if(cid && !containerSelSet.has(cid)) continue;
+
+    let dist = null;
+    if(haveDist){
+      const cwx = Number(c?.worldX ?? c?.WorldX ?? NaN);
+      const cwy = Number(c?.worldY ?? c?.WorldY ?? NaN);
+      const cwz = Number(c?.worldZ ?? c?.WorldZ ?? NaN);
+      if(Number.isFinite(cwx) && Number.isFinite(cwy) && Number.isFinite(cwz)){
+        dist = Math.sqrt((cwx-cpwx)**2 + (cwy-cpwy)**2 + (cwz-cpwz)**2);
+        if(maxDist > 0 && dist > maxDist) continue;
+      }
+    }
+
+    const mx = Number(c?.X ?? c?.x ?? NaN);
+    const my = Number(c?.Y ?? c?.y ?? NaN);
+    if(!Number.isFinite(mx) || !Number.isFinite(my)) continue;
+
+    const s = mapXYToScreen(mx, my, mapRect, cx, cy, rotRad);
+    const px = s.px, py = s.py;
+
+    hits.push({ kind:"container", px, py, r: Math.max(10, size * 3), data: c });
+
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(px, py, size, 0, Math.PI * 2);
+    ctx.fill();
+
+    if(doLabel){
+      const nm = showName ? String(c?.name ?? c?.Name ?? "Container") : "";
+      const distStr = (dist != null) ? Math.round(dist) + "m" : "";
+      let label = "";
+      if(nm && distStr) label = nm + " (" + distStr + ")";
+      else if(nm) label = nm;
+      else if(distStr) label = distStr;
       if(label){
         ctx.fillStyle = "#e5e7eb";
         ctx.fillText(label, px + size + 4, py);
@@ -2920,6 +3383,7 @@ let dragStart = null;
 
 canvas.addEventListener("pointerdown", (e) => {
   if(e.pointerType !== "mouse") return;
+  if(e.button !== 0) return; // only left-click starts drag
   if(!state.freeMode) return;
 
   dragging = true;
@@ -2955,6 +3419,41 @@ canvas.addEventListener("wheel", (e) => {
   if(inputs.zoom) inputs.zoom.value = String(state.zoom);
   saveSettings();
 }, { passive:false });
+
+/* =========================
+   MAP MARKER RIGHT-CLICK
+========================= */
+function handleMarkerPlace(clientX, clientY){
+  if(!lastMapId || !lastFrameAnchor || !lastFrameMapRect) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const sx = clientX - rect.left;
+  const sy = clientY - rect.top;
+
+  const { cx, cy } = getViewportCenter();
+  const mapPt = screenToMap(sx, sy, cx, cy, lastFrameAnchor, state.zoom, lastRotRad);
+
+  // Check if near an existing marker — remove it
+  const removeThreshold = 15 / state.zoom;
+  if(removeMarkerNear(lastMapId, mapPt.x, mapPt.y, removeThreshold)){
+    return;
+  }
+
+  // Place new marker
+  addMarker(lastMapId, mapPt.x, mapPt.y);
+}
+
+// Right-click (desktop)
+canvas.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  handleMarkerPlace(e.clientX, e.clientY);
+});
+
+// Double-click / double-tap (universal — works on mobile too)
+canvas.addEventListener("dblclick", (e) => {
+  e.preventDefault();
+  handleMarkerPlace(e.clientX, e.clientY);
+});
 
 /* =========================
    WIDGET LISTS + PING FIX
@@ -3152,6 +3651,7 @@ function frame(){
   const map = radarData?.map || null;
   const players = Array.isArray(radarData?.players) ? radarData.players : [];
   const loot = Array.isArray(radarData?.loot) ? radarData.loot : [];
+  const containers = Array.isArray(radarData?.containers) ? radarData.containers : [];
 
   const inRaid = !!(radarData?.inRaid ?? radarData?.inGame);
 
@@ -3213,15 +3713,21 @@ function frame(){
   const mapRect = getMapScreenRectAnchored(map, cx, cy, state.zoom, anchor);
   if(!mapRect) return;
 
+  // cache frame state for coordinate inverse (used by marker right-click)
+  lastFrameAnchor = anchor;
+  lastFrameMapRect = mapRect;
+
   // draws
   if(state.showGroups) drawGroupConnectors(players, map, cx, cy, lastRotRad, mapRect);
   if(state.showLoot) drawLoot(loot, map, cx, cy, lastRotRad, mapRect, hitList);
+  if(state.showContainers) drawContainers(containers, map, cx, cy, lastRotRad, mapRect, hitList);
   if(state.showPlayers) drawPlayers(players, map, cx, cy, lastRotRad, mapRect, readWorldY(lastCenteredPlayer), hitList);
   drawPois(map, cx, cy, lastRotRad, mapRect, hitList);
 
+  drawMarkers(mapRect, cx, cy, lastRotRad, hitList);
   drawPing(mapRect, cx, cy, lastRotRad);
 
-  drawAimview(players);
+  drawAimview(players, loot, containers);
 
   // tooltip
   updateHover();

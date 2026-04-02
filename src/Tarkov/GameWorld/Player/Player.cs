@@ -874,15 +874,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                         skeleton.Root.VerticesAddr != rootVerticesPtr)
                     {
                         _verticesCount = 0;
-                        try
-                        {
-                            foreach (var bone in skeleton.BonesDirect.Keys)
-                                skeleton.ResetTransform(bone);
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.WriteLine($"ERROR rebuilding skeleton for '{Name}': {ex}");
-                        }
+                        foreach (var bone in skeleton.BonesDirect.Keys)
+                            skeleton.ResetTransform(bone);
                         return; // Root changed → all bones already reset, skip per-bone check
                     }
 

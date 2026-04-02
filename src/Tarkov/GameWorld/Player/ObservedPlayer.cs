@@ -298,24 +298,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 }
                 else
                 {
-                    string nickname = null;
-                    try
-                    {
-                        var nickPtr = Memory.ReadPtr(this + Offsets.ObservedPlayerView.NickName);
-                        if (nickPtr != 0)
-                            nickname = Memory.ReadUnityString(nickPtr);
-                    }
-                    catch { }
-
-                    if (!string.IsNullOrWhiteSpace(nickname))
-                    {
-                        Name = nickname;
-                    }
-                    else
-                    {
-                        int pscavNumber = Interlocked.Increment(ref _playerScavNumber);
-                        Name = $"PScav{pscavNumber}";
-                    }
+                    int pscavNumber = Interlocked.Increment(ref _playerScavNumber);
+                    Name = $"PScav{pscavNumber}";
 
                     Type = GroupID != -1 && GroupID == localPlayer.GroupID
                         ? PlayerType.Teammate
@@ -329,27 +313,10 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     NetworkGroupID != -1 &&
                     NetworkGroupID == localPlayer.NetworkGroupID;
 
-                // Try to read the actual nickname from memory
-                string nickname = null;
-                try
-                {
-                    var nickPtr = Memory.ReadPtr(this + Offsets.ObservedPlayerView.NickName);
-                    if (nickPtr != 0)
-                        nickname = Memory.ReadUnityString(nickPtr);
-                }
-                catch { }
-
-                if (!string.IsNullOrWhiteSpace(nickname))
-                {
-                    Name = nickname;
-                }
-                else
-                {
-                    int pmcIndex = GetOrAssignPmcIndex(PlayerSide == EPlayerSide.Usec);
-                    Name = PlayerSide == EPlayerSide.Usec
-                        ? $"U:PMC{pmcIndex}"
-                        : $"B:PMC{pmcIndex}";
-                }
+                int pmcIndex = GetOrAssignPmcIndex(PlayerSide == EPlayerSide.Usec);
+                Name = PlayerSide == EPlayerSide.Usec
+                    ? $"U:PMC{pmcIndex}"
+                    : $"B:PMC{pmcIndex}";
 
                 Type = isTeammate
                     ? PlayerType.Teammate
@@ -497,55 +464,46 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             if (IsAI)
                 return;
 
-            if (!_identityApplied)
+            if (!_identityApplied && !string.IsNullOrEmpty(ProfileID))
             {
-                try
+                // 1. Try PlayerList.json identity (populated via UpdateIdentity from corpse dogtags)
+                if (PlayerListWorker.TryGetIdentity(
+                        ProfileID,
+                        out var plNickname,
+                        out var plAccountId))
                 {
-                    var nickPtr = Memory.ReadPtr(this + Offsets.ObservedPlayerView.NickName);
-                    if (nickPtr != 0)
+                    if (!string.IsNullOrWhiteSpace(plNickname))
                     {
-                        var nickname = Memory.ReadUnityString(nickPtr);
-                        if (!string.IsNullOrWhiteSpace(nickname))
-                        {
-                            Name = nickname;
-                            _identityApplied = true;
-                            PlayerHistory.AddOrUpdate(this);
-                        }
-                    }
-                }
-                catch { }
-
-                // Try PlayerList.json identity
-                if (!_identityApplied && !string.IsNullOrEmpty(ProfileID))
-                {
-                    if (PlayerListWorker.TryGetIdentity(
-                            ProfileID,
-                            out var plNickname,
-                            out var plAccountId))
-                    {
-                        if (!string.IsNullOrWhiteSpace(plNickname))
-                            Name = plNickname;
-
-                        if (!string.IsNullOrWhiteSpace(plAccountId))
-                            AccountID = plAccountId;
-
+                        Name = plNickname;
                         _identityApplied = true;
                         PlayerHistory.AddOrUpdate(this);
-
-                        Log.WriteLine(
-                            $"[ObservedPlayer] Identity applied from PlayerList.json: {Name} ({AccountID})");
                     }
-                    else
+
+                    if (!string.IsNullOrWhiteSpace(plAccountId))
+                        AccountID = plAccountId;
+                }
+
+                // 2. Fallback: dogtag cache (seeded from corpse dogtag reads)
+                if (!_identityApplied)
+                {
+                    var cached = PlayerLookupApiClient.TryGetCached(ProfileID);
+                    if (!string.IsNullOrEmpty(cached?.Nickname))
                     {
-                        // Fallback: use the nickname stored in the local dogtag database if the
-                        // in-game name is not yet available. Don't set _identityApplied so the
-                        // real in-game name still takes over as soon as the game provides it.
-                        var cached = PlayerLookupApiClient.TryGetCached(ProfileID);
-                        if (!string.IsNullOrEmpty(cached?.Nickname))
-                        {
-                            Name = cached.Nickname;
-                            PlayerHistory.AddOrUpdate(this);
-                        }
+                        Name = cached.Nickname;
+                        _identityApplied = true;
+                        PlayerHistory.AddOrUpdate(this);
+                    }
+                }
+
+                // 3. Fallback: Tarkov.Dev profile nickname (fetched via EFTProfileService)
+                if (!_identityApplied)
+                {
+                    var profileNickname = Profile?.Nickname;
+                    if (!string.IsNullOrEmpty(profileNickname))
+                    {
+                        Name = profileNickname;
+                        _identityApplied = true;
+                        PlayerHistory.AddOrUpdate(this);
                     }
                 }
             }

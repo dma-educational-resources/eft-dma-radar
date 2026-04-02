@@ -22,6 +22,11 @@ namespace eft_dma_radar.Tarkov.WebRadar.Data
 
         [Key(8)] public string BsgId { get; set; }
 
+        // World-space position (for aimview / distance calculations)
+        [Key(9)] public float WorldX { get; set; }
+        [Key(10)] public float WorldY { get; set; }
+        [Key(11)] public float WorldZ { get; set; }
+
         public static WebRadarLoot CreateFromLoot(LootItem loot)
         {
             var p = loot.Position;
@@ -39,7 +44,11 @@ namespace eft_dma_radar.Tarkov.WebRadar.Data
                 IsMeds = loot.IsMeds,
                 IsFood = loot.IsFood,
                 IsBackpack = loot.IsBackpack,
-                BsgId = loot.ID
+                BsgId = loot.ID,
+
+                WorldX = p.X,
+                WorldY = p.Y,
+                WorldZ = p.Z
             };
         }
     }

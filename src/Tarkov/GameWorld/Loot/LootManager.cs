@@ -482,6 +482,13 @@ namespace eft_dma_radar.Tarkov.Loot
                     // Seed both victim and killer so stats can be fetched for either side.
                     PlayerLookupApiClient.SeedFromDogtag(victimProfileId, victimAccountId, victimName);
 
+                    // Push victim identity into PlayerListWorker so that any alive player
+                    // with a matching profileId can resolve their name via TryGetIdentity.
+                    PlayerListWorker.UpdateIdentity(
+                        profileId: victimProfileId,
+                        nickname: victimName,
+                        accountId: victimAccountId);
+
                     lock (_sync)
                     {
                         if (!_loggedProfileIds.Add(victimProfileId))

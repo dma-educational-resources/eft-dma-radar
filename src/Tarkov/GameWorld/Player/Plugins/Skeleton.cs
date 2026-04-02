@@ -500,10 +500,17 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             var oldTransform = _bones[bone];
             var lastValidPosition = oldTransform.HasValidPosition ? oldTransform.Position : (Vector3?)null;
 
-            var transform = new UnityTransform(_bones[bone].TransformInternal, lastValidPosition);
-            _bones[bone] = transform;
-            if (bone is eft_dma_radar.Tarkov.Unity.Bones.HumanBase)
-                Root = transform;
+            try
+            {
+                var transform = new UnityTransform(_bones[bone].TransformInternal, lastValidPosition);
+                _bones[bone] = transform;
+                if (bone is eft_dma_radar.Tarkov.Unity.Bones.HumanBase)
+                    Root = transform;
+            }
+            catch
+            {
+                // Transform data is stale/transitioning — keep old transform with its last valid position.
+            }
         }
         /// <summary>
         /// Clears cached ESP screen positions and rebuilds transforms.

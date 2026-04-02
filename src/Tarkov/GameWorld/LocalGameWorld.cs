@@ -401,7 +401,9 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 }
                 catch (Exception ex)
                 {
-                    Log.WriteLine($"ERROR Instantiating Game Instance: {ex.InnerException?.Message ?? ex.Message}");
+                    var msg = ex.InnerException?.Message ?? ex.Message;
+                    if (Log.TryThrottle("CreateGameInstance", TimeSpan.FromSeconds(30)))
+                        Log.WriteLine($"ERROR Instantiating Game Instance: {msg}");
                 }
                 finally
                 {

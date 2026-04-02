@@ -4,6 +4,9 @@
   <meta charset="utf-8" />
   <title>XM WebRadar</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="pragma" content="no-cache" />
+  <meta http-equiv="expires" content="0" />
   <link rel="stylesheet" href="app.css" />
 </head>
 
@@ -100,6 +103,16 @@
         <label class="atf"><input type="checkbox" id="aimviewShowRaider"> Raider</label>
         <label class="atf"><input type="checkbox" id="aimviewShowTeammate"> Team</label>
       </div>
+      <label class="atf"><input type="checkbox" id="aimviewShowLoot"> Aimview Loot</label>
+      <label>
+        Loot Dist <span class="mono" id="aimviewLootDistText">50m</span>
+        <input type="range" id="aimviewLootDist" min="1" max="500" step="1">
+      </label>
+      <label class="atf"><input type="checkbox" id="aimviewShowContainers"> Aimview Containers</label>
+      <label>
+        Container Dist <span class="mono" id="aimviewContainerDistText">50m</span>
+        <input type="range" id="aimviewContainerDist" min="1" max="500" step="1">
+      </label>
     </div>
 
     <div class="section">
@@ -154,6 +167,24 @@
         </label>
       </div>
     </div>
+
+    <div class="section">
+      <h3>Containers</h3>
+      <label>Show Containers <input type="checkbox" id="showContainers"></label>
+      <label>Show Name <input type="checkbox" id="showContainerName"></label>
+      <label>
+        Max Distance <span class="mono" id="containerDistText">&#8734;</span>
+        <input type="range" id="containerDist" min="0" max="500" step="1">
+      </label>
+      <label style="margin:0;">Container Color <input type="color" id="containerColor"></label>
+
+      <div class="row" style="margin-top:8px;gap:6px;">
+        <button class="small" id="containerSelectAll">Select All</button>
+        <button class="small" id="containerDeselectAll">Deselect All</button>
+        <span class="badge mono" id="containerSelBadge">0 / 0</span>
+      </div>
+      <div id="containerTypeList" class="container-type-list"></div>
+    </div>
   </div>
 
   <div class="tab-content" id="general">
@@ -186,6 +217,19 @@
       <div class="row">
         <button class="small" id="centerOnLocal">Center on Local</button>
         <span class="badge mono" id="modeBadge">follow</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Map Markers</h3>
+      <label>Show Markers <input type="checkbox" id="showMarkers"></label>
+      <label style="margin:0;">Marker Color <input type="color" id="markerColor"></label>
+      <div class="row" style="margin-top:6px;gap:6px;">
+        <button class="small" id="clearAllMarkers">Clear All</button>
+        <span class="badge mono" id="markerCountBadge">0</span>
+      </div>
+      <div class="mono" style="font-size:11px;color:var(--muted);margin-top:4px;">
+        Right-click or double-click to place/remove
       </div>
     </div>
 

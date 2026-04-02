@@ -91,7 +91,15 @@ namespace eft_dma_radar.Tarkov.WebRadar
             _host.UseStaticFiles(new StaticFileOptions
             {
                 FileProvider = new PhysicalFileProvider(wwwroot),
-                RequestPath = ""
+                RequestPath = "",
+                OnPrepareResponse = ctx =>
+                {
+                    // Prevent aggressive browser caching of HTML/CSS/JS so
+                    // users always get the latest UI after an update.
+                    ctx.Context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+                    ctx.Context.Response.Headers.Pragma = "no-cache";
+                    ctx.Context.Response.Headers.Expires = "0";
+                }
             });
 
             _host.MapGet("/api/radar", () => Results.Json(_latest));
@@ -294,6 +302,13 @@ namespace eft_dma_radar.Tarkov.WebRadar
                     // =========================
                     _latest.Loot = Memory.Loot?.UnfilteredLoot?
                         .Select(WebRadarLoot.CreateFromLoot)
+                        .ToArray();
+
+                    // =========================
+                    // CONTAINERS
+                    // =========================
+                    _latest.Containers = Memory.Loot?.StaticLootContainers?
+                        .Select(WebRadarContainer.CreateFromContainer)
                         .ToArray();
 
                     // =========================

@@ -308,6 +308,25 @@ button.small:hover{ background: rgba(255,255,255,.10); }
   user-select: none;
 }
 
+.container-type-list{
+  max-height: 180px;
+  overflow-y: auto;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.container-type-list label{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 0;
+}
+
 .widget .w-toprow{
   display:flex;
   align-items:center;

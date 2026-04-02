@@ -9,6 +9,7 @@
 
         public IEnumerable<WebRadarPlayer> Players { get; set; }
         public IEnumerable<WebRadarLoot> Loot { get; set; }
+        public IEnumerable<WebRadarContainer> Containers { get; set; }
         public IEnumerable<WebRadarDoor> Doors { get; set; }
         public IEnumerable<WebRadarExfil> Exfils { get; set; }
         public IEnumerable<WebRadarTransit> Transits { get; set; }
