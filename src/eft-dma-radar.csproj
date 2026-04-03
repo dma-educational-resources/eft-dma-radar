@@ -66,6 +66,7 @@
 		<PackageReference Include="Svg.Skia" Version="3.0.3" />
 		<PackageReference Include="System.Management" Version="9.0.0" />
 		<PackageReference Include="VmmSharpEx" Version="3.200.12" />
+		<PackageReference Include="Velopack" Version="0.0.1298" />
 	</ItemGroup>
 
 	<ItemGroup>

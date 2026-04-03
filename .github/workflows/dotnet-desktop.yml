@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - beta
+      - main
     paths:
       - 'resources/**'
       - 'src/**'
@@ -28,22 +29,83 @@ jobs:
       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 
     steps:
-      - name: Send Discord Webhook
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Get version info
+        uses: dotnet/nbgv@master
+        id: nbgv
+
+      - name: Determine release channel
+        id: channel
+        shell: pwsh
+        run: |
+          $branch = "${{ github.ref_name }}"
+          $baseVersion = "${{ steps.nbgv.outputs.SemVer2 }}"
+
+          if ($branch -eq "beta") {
+            $version = "$baseVersion-beta"
+            $tag = "v$baseVersion-beta"
+            $releaseName = "EFT $baseVersion-beta (Pre-release)"
+            $prerelease = "true"
+            $channel = "beta"
+            $emoji = "🧪"
+            $color = "16766720"
+          } else {
+            $version = "$baseVersion"
+            $tag = "v$baseVersion"
+            $releaseName = "EFT $baseVersion"
+            $prerelease = "false"
+            $channel = "stable"
+            $emoji = "🚀"
+            $color = "5763719"
+          }
+
+          "VERSION=$version" >> $env:GITHUB_OUTPUT
+          "TAG=$tag" >> $env:GITHUB_OUTPUT
+          "RELEASE_NAME=$releaseName" >> $env:GITHUB_OUTPUT
+          "PRERELEASE=$prerelease" >> $env:GITHUB_OUTPUT
+          "CHANNEL=$channel" >> $env:GITHUB_OUTPUT
+          "EMOJI=$emoji" >> $env:GITHUB_OUTPUT
+          "COLOR=$color" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Branch: $branch"
+          Write-Host "Version: $version"
+          Write-Host "Channel: $channel"
+          Write-Host "Pre-release: $prerelease"
+
+      - name: Send Discord Webhook (Build Started)
         if: env.DISCORD_WEBHOOK != ''
         shell: pwsh
         env:
           REPO: ${{ github.repository }}
           JOB_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          CHANNEL: ${{ steps.channel.outputs.CHANNEL }}
+          VERSION: ${{ steps.channel.outputs.VERSION }}
+          EMOJI: ${{ steps.channel.outputs.EMOJI }}
+          COLOR: ${{ steps.channel.outputs.COLOR }}
         run: |
           $payload = @{
             username = "GitHub Actions"
             embeds = @(
               @{
-                title = "$env:REPO"
-                description = "🚀 Build started"
-                color = 5814783
+                title = "$env:EMOJI $env:REPO"
+                description = "Build started — **$($env:CHANNEL.ToUpper())** channel"
+                color = [int]$env:COLOR
                 fields = @(
+                  @{
+                    name  = "Version"
+                    value = "``$env:VERSION``"
+                    inline = $true
+                  },
+                  @{
+                    name  = "Channel"
+                    value = $env:CHANNEL
+                    inline = $true
+                  },
                   @{
                     name  = "Commit"
                     value = $env:COMMIT_MESSAGE
@@ -57,15 +119,6 @@ jobs:
             )
           } | ConvertTo-Json -Depth 5
           Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK -Method Post -ContentType "application/json" -Body $payload
-
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Get version info
-        uses: dotnet/nbgv@master
-        id: nbgv
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
@@ -84,7 +137,7 @@ jobs:
             --self-contained `
             /p:DebugType=None `
             /p:DebugSymbols=false `
-            /p:Version=${{ steps.nbgv.outputs.SemVer2 }} `
+            /p:Version=${{ steps.channel.outputs.VERSION }} `
             /p:FileVersion=${{ steps.nbgv.outputs.AssemblyFileVersion }} `
             /p:AssemblyVersion=${{ steps.nbgv.outputs.AssemblyVersion }} `
             -o out
@@ -95,17 +148,19 @@ jobs:
         run: |
           vpk download github `
             --repoUrl "https://github.com/${{ github.repository }}" `
+            --channel "${{ steps.channel.outputs.CHANNEL }}" `
             --token "$env:GITHUB_TOKEN"
 
       - name: Pack with Velopack
         run: |
           vpk pack `
             --packId github.${{ github.repository_owner }}.eft-dma-radar `
-            --packVersion "${{ steps.nbgv.outputs.SemVer2 }}" `
+            --packVersion "${{ steps.channel.outputs.VERSION }}" `
             --packDir "out" `
             --mainExe "eft-dma-radar.exe" `
             --packTitle "EFT DMA Radar" `
-            --icon "src/lone-icon.ico"
+            --icon "src/lone-icon.ico" `
+            --channel "${{ steps.channel.outputs.CHANNEL }}"
 
       - name: Upload to GitHub Releases
         env:
@@ -114,7 +169,50 @@ jobs:
           vpk upload github `
             --repoUrl "https://github.com/${{ github.repository }}" `
             --publish `
-            --releaseName "EFT ${{ steps.nbgv.outputs.SemVer2 }}" `
-            --tag "v${{ steps.nbgv.outputs.SemVer2 }}" `
+            --releaseName "${{ steps.channel.outputs.RELEASE_NAME }}" `
+            --tag "${{ steps.channel.outputs.TAG }}" `
             --targetCommitish "${{ github.sha }}" `
+            --channel "${{ steps.channel.outputs.CHANNEL }}" `
+            --prerelease ${{ steps.channel.outputs.PRERELEASE }} `
             --token "$env:GITHUB_TOKEN"
+
+      - name: Send Discord Webhook (Release Published)
+        if: env.DISCORD_WEBHOOK != ''
+        shell: pwsh
+        env:
+          REPO: ${{ github.repository }}
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.channel.outputs.TAG }}
+          RELEASE_NAME: ${{ steps.channel.outputs.RELEASE_NAME }}
+          VERSION: ${{ steps.channel.outputs.VERSION }}
+          CHANNEL: ${{ steps.channel.outputs.CHANNEL }}
+          EMOJI: ${{ steps.channel.outputs.EMOJI }}
+          COLOR: ${{ steps.channel.outputs.COLOR }}
+        run: |
+          $payload = @{
+            username = "GitHub Actions"
+            embeds = @(
+              @{
+                title = "$env:EMOJI $env:RELEASE_NAME"
+                description = "✅ Release published!"
+                url = $env:RELEASE_URL
+                color = [int]$env:COLOR
+                fields = @(
+                  @{
+                    name  = "Version"
+                    value = "``$env:VERSION``"
+                    inline = $true
+                  },
+                  @{
+                    name  = "Channel"
+                    value = $env:CHANNEL
+                    inline = $true
+                  },
+                  @{
+                    name  = "Download"
+                    value = "[$env:RELEASE_NAME]($env:RELEASE_URL)"
+                  }
+                )
+              }
+            )
+          } | ConvertTo-Json -Depth 5
+          Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK -Method Post -ContentType "application/json" -Body $payload

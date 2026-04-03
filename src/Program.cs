@@ -38,6 +38,8 @@ using System.Windows;
 using Application = System.Windows.Forms.Application;
 using MessageBox = HandyControl.Controls.MessageBox;
 
+using Velopack;
+
 [assembly: AssemblyTitle(Program.Name)]
 [assembly: AssemblyProduct(Program.Name)]
 [assembly: AssemblyCopyright("BSD Zero Clause License ©2025 lone-dma")]
@@ -97,6 +99,7 @@ namespace eft_dma_radar
         [STAThread]
         static public void Main()
         {
+            VelopackApp.Build().Run();
             InitializeDpiAwareness();
 
             var app = new App();
