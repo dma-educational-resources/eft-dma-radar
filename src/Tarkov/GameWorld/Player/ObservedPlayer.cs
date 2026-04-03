@@ -45,6 +45,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// EFT network squad (real teammates only)
         /// </summary>
         public override int NetworkGroupID { get; }
+
         private bool _identityApplied = false;
 
         /// <summary>

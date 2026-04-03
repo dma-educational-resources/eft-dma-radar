@@ -133,10 +133,20 @@ jobs:
             --self-contained `
             /p:DebugType=None `
             /p:DebugSymbols=false `
+            /p:SatelliteResourceLanguages=en `
+            /p:IncludeNativeLibrariesForSelfExtract=true `
             /p:Version=${{ steps.channel.outputs.VERSION }} `
             /p:FileVersion=${{ steps.nbgv.outputs.AssemblyFileVersion }} `
             /p:AssemblyVersion=${{ steps.nbgv.outputs.AssemblyVersion }} `
             -o out
+
+      - name: Clean publish output
+        shell: pwsh
+        run: |
+          # Remove .NET crash dump utility
+          Remove-Item -Path "out\createdump.exe" -ErrorAction SilentlyContinue
+          # Remove debug symbols (libSkiaSharp.pdb is ~80 MB)
+          Remove-Item -Path "out\*.pdb" -ErrorAction SilentlyContinue
 
       - name: Create zip archive
         shell: pwsh

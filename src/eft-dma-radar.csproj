@@ -15,6 +15,7 @@
 		<ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
 		<RetainVMGarbageCollection>true</RetainVMGarbageCollection>
 		<DebugType>none</DebugType>
+		<PublishRelease>true</PublishRelease>
 	</PropertyGroup>
 
 	<!-- Native DLLs and Resources (vmm.dll, leechcore.dll etc. are now bundled by VmmSharpEx NuGet) -->
