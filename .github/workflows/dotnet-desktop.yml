@@ -175,6 +175,13 @@ jobs:
             --channel "${{ steps.channel.outputs.CHANNEL }}" `
             --token "$env:GITHUB_TOKEN"
 
+      - name: Mark as pre-release
+        if: steps.channel.outputs.PRERELEASE == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ steps.channel.outputs.TAG }}" --prerelease
+
       - name: Send Discord Webhook (Release Published)
         if: env.DISCORD_WEBHOOK != ''
         shell: pwsh
