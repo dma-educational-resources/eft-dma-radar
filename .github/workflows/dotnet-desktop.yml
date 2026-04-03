@@ -130,65 +130,16 @@ jobs:
           dotnet publish src/eft-dma-radar.csproj `
             -c Release `
             -r win-x64 `
-            --self-contained `
+            --self-contained false `
             /p:DebugType=None `
             /p:DebugSymbols=false `
-            /p:SatelliteResourceLanguages=en `
-            /p:IncludeNativeLibrariesForSelfExtract=true `
             /p:Version=${{ steps.channel.outputs.VERSION }} `
             -o out
 
       - name: Clean publish output
         shell: pwsh
         run: |
-          # Remove .NET crash dump utility
-          Remove-Item -Path "out\createdump.exe" -ErrorAction SilentlyContinue
-          # Remove debug symbols (libSkiaSharp.pdb is ~80 MB)
           Remove-Item -Path "out\*.pdb" -ErrorAction SilentlyContinue
-          # Remove unused ASP.NET Core DLLs (MVC, Razor, Blazor, Auth, IIS, etc.)
-          $unusedPatterns = @(
-            # MVC / Razor / Blazor
-            'Microsoft.AspNetCore.Mvc.*.dll',
-            'Microsoft.AspNetCore.Razor.dll',
-            'Microsoft.AspNetCore.Razor.Runtime.dll',
-            'Microsoft.AspNetCore.Components.*.dll',
-            # Auth / Identity / Crypto
-            'Microsoft.AspNetCore.Authentication.*.dll',
-            'Microsoft.AspNetCore.Authorization.*.dll',
-            'Microsoft.AspNetCore.Identity.dll',
-            'Microsoft.AspNetCore.Antiforgery.dll',
-            'Microsoft.AspNetCore.CookiePolicy.dll',
-            'Microsoft.AspNetCore.Cryptography.*.dll',
-            'Microsoft.AspNetCore.DataProtection.*.dll',
-            # IIS / HttpSys (Kestrel only)
-            'Microsoft.AspNetCore.Server.IIS.dll',
-            'Microsoft.AspNetCore.Server.IISIntegration.dll',
-            'Microsoft.AspNetCore.Server.HttpSys.dll',
-            # QUIC / HTTP3
-            'Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.dll',
-            # Unused middleware
-            'Microsoft.AspNetCore.Cors.dll',
-            'Microsoft.AspNetCore.Session.dll',
-            'Microsoft.AspNetCore.Html.Abstractions.dll',
-            'Microsoft.AspNetCore.HttpLogging.dll',
-            'Microsoft.AspNetCore.HttpOverrides.dll',
-            'Microsoft.AspNetCore.HttpsPolicy.dll',
-            'Microsoft.AspNetCore.HostFiltering.dll',
-            'Microsoft.AspNetCore.Localization.dll',
-            'Microsoft.AspNetCore.Localization.Routing.dll',
-            'Microsoft.AspNetCore.OutputCaching.dll',
-            'Microsoft.AspNetCore.RateLimiting.dll',
-            'Microsoft.AspNetCore.RequestDecompression.dll',
-            'Microsoft.AspNetCore.ResponseCaching.dll',
-            'Microsoft.AspNetCore.ResponseCaching.Abstractions.dll',
-            'Microsoft.AspNetCore.ResponseCompression.dll',
-            'Microsoft.AspNetCore.Rewrite.dll'
-          )
-          $files = Get-ChildItem -Path "out" -File
-          foreach ($pattern in $unusedPatterns) {
-            $files | Where-Object { $_.Name -like $pattern } | Remove-Item -Force
-          }
-          Write-Host "Cleanup complete."
 
       - name: Create zip archive
         shell: pwsh
