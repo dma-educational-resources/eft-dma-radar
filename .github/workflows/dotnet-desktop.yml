@@ -24,12 +24,14 @@ jobs:
     runs-on: windows-latest
     environment: production
 
+    env:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+
     steps:
       - name: Send Discord Webhook
-        if: secrets.DISCORD_WEBHOOK != ''
+        if: env.DISCORD_WEBHOOK != ''
         shell: pwsh
         env:
-          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           REPO: ${{ github.repository }}
           JOB_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
@@ -54,7 +56,7 @@ jobs:
               }
             )
           } | ConvertTo-Json -Depth 5
-          Invoke-RestMethod -Uri $env:WEBHOOK -Method Post -ContentType "application/json" -Body $payload
+          Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK -Method Post -ContentType "application/json" -Body $payload
 
       - name: Checkout
         uses: actions/checkout@v5
