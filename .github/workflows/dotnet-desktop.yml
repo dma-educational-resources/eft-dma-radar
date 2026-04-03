@@ -125,10 +125,6 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Install Velopack CLI
-        run: |
-          dotnet tool install -g vpk
-
       - name: Dotnet Publish
         run: |
           dotnet publish src/eft-dma-radar.csproj `
@@ -142,45 +138,28 @@ jobs:
             /p:AssemblyVersion=${{ steps.nbgv.outputs.AssemblyVersion }} `
             -o out
 
-      - name: Download previous release data
+      - name: Create zip archive
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "out\*" -DestinationPath "eft-dma-radar.zip"
+
+      - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          vpk download github `
-            --repoUrl "https://github.com/${{ github.repository }}" `
-            --channel "${{ steps.channel.outputs.CHANNEL }}" `
-            --token "$env:GITHUB_TOKEN"
-
-      - name: Pack with Velopack
-        run: |
-          vpk pack `
-            --packId github.${{ github.repository_owner }}.eft-dma-radar `
-            --packVersion "${{ steps.channel.outputs.VERSION }}" `
-            --packDir "out" `
-            --mainExe "eft-dma-radar.exe" `
-            --packTitle "EFT DMA Radar" `
-            --icon "src/lone-icon.ico" `
-            --channel "${{ steps.channel.outputs.CHANNEL }}"
-
-      - name: Upload to GitHub Releases
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          vpk upload github `
-            --repoUrl "https://github.com/${{ github.repository }}" `
-            --publish `
-            --releaseName "${{ steps.channel.outputs.RELEASE_NAME }}" `
-            --tag "${{ steps.channel.outputs.TAG }}" `
-            --targetCommitish "${{ github.sha }}" `
-            --channel "${{ steps.channel.outputs.CHANNEL }}" `
-            --token "$env:GITHUB_TOKEN"
-
-      - name: Mark as pre-release
-        if: steps.channel.outputs.PRERELEASE == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release edit "${{ steps.channel.outputs.TAG }}" --prerelease
+          $flags = @(
+            "${{ steps.channel.outputs.TAG }}"
+            "eft-dma-radar.zip"
+            "--title", "${{ steps.channel.outputs.RELEASE_NAME }}"
+            "--target", "${{ github.sha }}"
+            "--notes", "${{ github.event.head_commit.message }}"
+          )
+          if ("${{ steps.channel.outputs.PRERELEASE }}" -eq "true") {
+            $flags += "--prerelease"
+          } else {
+            $flags += "--latest"
+          }
+          gh release create @flags
 
       - name: Send Discord Webhook (Release Published)
         if: env.DISCORD_WEBHOOK != ''
