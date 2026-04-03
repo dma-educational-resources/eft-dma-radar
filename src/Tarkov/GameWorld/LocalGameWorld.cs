@@ -297,15 +297,32 @@ namespace eft_dma_radar.Tarkov.GameWorld
         {
             Log.WriteLine("[Raid] Initializing game data...");
 
+            Log.WriteLine($"[Raid] Reading RegisteredPlayers ptr @ 0x{Base + Offsets.ClientLocalGameWorld.RegisteredPlayers:X}...");
             var rgtPlayersAddr = Memory.ReadPtr(Base + Offsets.ClientLocalGameWorld.RegisteredPlayers, false);
+            Log.WriteLine($"[Raid] RegisteredPlayers addr = 0x{rgtPlayersAddr:X}");
+
+            Log.WriteLine("[Raid] Allocating RegisteredPlayers...");
             _rgtPlayers = new RegisteredPlayers(rgtPlayersAddr, this);
-            if (_rgtPlayers.GetPlayerCount() < 1)
+            var playerCount = _rgtPlayers.GetPlayerCount();
+            Log.WriteLine($"[Raid] RegisteredPlayers allocated, count = {playerCount}");
+            if (playerCount < 1)
                 throw new InvalidOperationException("RegisteredPlayers count is less than 1.");
 
+            Log.WriteLine("[Raid] Allocating LootManager...");
             _lootManager = new LootManager(Base, ct);
+            Log.WriteLine("[Raid] LootManager allocated.");
+
+            Log.WriteLine("[Raid] Allocating ExitManager...");
             _exfilManager = new ExitManager(Base, _rgtPlayers.LocalPlayer.IsPmc);
+            Log.WriteLine("[Raid] ExitManager allocated.");
+
+            Log.WriteLine("[Raid] Allocating ExplosivesManager...");
             _grenadeManager = new ExplosivesManager(Base);
+            Log.WriteLine("[Raid] ExplosivesManager allocated.");
+
+            Log.WriteLine("[Raid] Allocating WorldInteractablesManager...");
             _worldInteractablesManager = new WorldInteractablesManager(Base);
+            Log.WriteLine("[Raid] WorldInteractablesManager allocated.");
 
             Log.WriteLine("[Raid] Game data initialized successfully!");
         }
