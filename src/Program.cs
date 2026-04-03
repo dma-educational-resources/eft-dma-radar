@@ -46,6 +46,8 @@ using MessageBox = HandyControl.Controls.MessageBox;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
 [assembly: SupportedOSPlatform("Windows")]
 
 namespace eft_dma_radar

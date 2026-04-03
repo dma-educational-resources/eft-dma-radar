@@ -136,8 +136,6 @@ jobs:
             /p:SatelliteResourceLanguages=en `
             /p:IncludeNativeLibrariesForSelfExtract=true `
             /p:Version=${{ steps.channel.outputs.VERSION }} `
-            /p:FileVersion=${{ steps.nbgv.outputs.AssemblyFileVersion }} `
-            /p:AssemblyVersion=${{ steps.nbgv.outputs.AssemblyVersion }} `
             -o out
 
       - name: Clean publish output
