@@ -14,7 +14,7 @@ namespace eft_dma_radar.UI.LootFilters
         public static bool ShowFood = false;
         public static bool ShowBackpacks = false;
 
-        private static bool ShowQuestItems => Program.Config.QuestHelper.Enabled;
+        public static bool ShowQuestItems = false;
 
         /// <summary>
         /// Creates a loot filter based on current Loot Filter settings.
@@ -29,7 +29,8 @@ namespace eft_dma_radar.UI.LootFilters
                 Predicate<LootItem> p = (x) => // Default Predicate
                 {
                     return (x.IsRegularLoot || x.IsValuableLoot || x.IsImportant || x.IsWishlisted) ||
-                                (ShowQuestItems && x.IsQuestCondition) ||
+                                (Program.Config.QuestHelper.Enabled && x.IsQuestCondition) ||
+                                (LootFilter.ShowQuestItems && x is QuestItem) ||
                                 (LootFilter.ShowBackpacks && x.IsBackpack) ||
                                 (LootFilter.ShowMeds && x.IsMeds) ||
                                 (LootFilter.ShowFood && x.IsFood);

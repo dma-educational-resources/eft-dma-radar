@@ -27,6 +27,8 @@ namespace eft_dma_radar.Tarkov.WebRadar.Data
         [Key(10)] public float WorldY { get; set; }
         [Key(11)] public float WorldZ { get; set; }
 
+        [Key(12)] public bool IsQuestItem { get; set; }
+
         public static WebRadarLoot CreateFromLoot(LootItem loot)
         {
             var p = loot.Position;
@@ -45,6 +47,8 @@ namespace eft_dma_radar.Tarkov.WebRadar.Data
                 IsFood = loot.IsFood,
                 IsBackpack = loot.IsBackpack,
                 BsgId = loot.ID,
+
+                IsQuestItem = loot is QuestItem,
 
                 WorldX = p.X,
                 WorldY = p.Y,

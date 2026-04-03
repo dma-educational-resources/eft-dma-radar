@@ -55,7 +55,7 @@ namespace eft_dma_radar.UI.Pages
         public static bool ShowWeapons;
         public static bool firstRemove = false;
         private static Config Config => Program.Config;
-        private static bool ShowQuestItems => Config.QuestHelper.Enabled;
+        public static bool ShowQuestItems = false;
 
         private ObservableCollection<LootFilterGroup> _groupList = new();
         private LootFilterGroup _selectedGroup;
@@ -1609,7 +1609,8 @@ namespace eft_dma_radar.UI.Pages
                         return false;
 
                     return (x.IsRegularLoot || x.IsValuableLoot || x.IsImportant || x.IsWishlisted) ||
-                            (ShowQuestItems && x.IsQuestCondition) ||
+                            (Config.QuestHelper.Enabled && x.IsQuestCondition) ||
+                            (ShowQuestItems && x is QuestItem) ||
                             (ShowBackpacks && x.IsBackpack) ||
                             (ShowMeds && x.IsMeds) ||
                             (ShowFood && x.IsFood) ||

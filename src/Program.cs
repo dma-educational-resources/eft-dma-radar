@@ -28,7 +28,6 @@ using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.DMA.Features;
 using eft_dma_radar.UI.Radar.Maps;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Misc.Data;
 using eft_dma_radar.UI.Controls;
 using System.IO;

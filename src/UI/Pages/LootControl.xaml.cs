@@ -49,6 +49,7 @@ namespace eft_dma_radar.UI.Pages
             "Show Food",
             "Show Weapons",
             "Show Backpacks",
+            "Show Quest Items",
             "Corpse Markers (X)"
         };
         #endregion
@@ -247,6 +248,7 @@ namespace eft_dma_radar.UI.Pages
                 ["Show Food"] = LootFilterControl.ShowFood,
                 ["Show Backpacks"] = LootFilterControl.ShowBackpacks,
                 ["Show Weapons"] = LootFilterControl.ShowWeapons,
+                ["Show Quest Items"] = LootFilterControl.ShowQuestItems,
                 ["Corpse Markers (X)"] = Config.ShowCorpseMarkers
             };
 
@@ -516,6 +518,7 @@ namespace eft_dma_radar.UI.Pages
             LootFilterControl.ShowFood = IsFilterOptionSelected("Show Food");
             LootFilterControl.ShowWeapons = IsFilterOptionSelected("Show Weapons");
             LootFilterControl.ShowBackpacks = IsFilterOptionSelected("Show Backpacks");
+            LootFilterControl.ShowQuestItems = IsFilterOptionSelected("Show Quest Items");
             Config.ShowCorpseMarkers = IsFilterOptionSelected("Corpse Markers (X)");
 
             Config.Save();

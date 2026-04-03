@@ -277,7 +277,7 @@ namespace eft_dma_radar.Tarkov.Loot
                         (item.Important ||
                          item.IsWishlisted ||
                          item.IsHideoutRequired ||
-                         item is QuestItem ||
+                         (LootFilterControl.ShowQuestItems && item is QuestItem) ||
                          (Config.QuestHelper.Enabled && item.IsQuestCondition) ||
                          (LootFilterControl.ShowBackpacks && item.IsBackpack) ||
                          (LootFilterControl.ShowMeds && item.IsMeds) ||
@@ -291,12 +291,12 @@ namespace eft_dma_radar.Tarkov.Loot
                 if (this is LootContainer container)
                 {
                     return container.Loot?.Any(item =>
-                        !item.IsGroupedBlacklisted &&
-                        (item.Important ||
-                         item.IsWishlisted ||
-                         item.IsHideoutRequired ||
-                         item is QuestItem ||
-                         (Config.QuestHelper.Enabled && item.IsQuestCondition) ||
+                            !item.IsGroupedBlacklisted &&
+                            (item.Important ||
+                             item.IsWishlisted ||
+                             item.IsHideoutRequired ||
+                             (LootFilterControl.ShowQuestItems && item is QuestItem) ||
+                             (Config.QuestHelper.Enabled && item.IsQuestCondition) ||
                          (LootFilterControl.ShowBackpacks && item.IsBackpack) ||
                          (LootFilterControl.ShowMeds && item.IsMeds) ||
                          (LootFilterControl.ShowFood && item.IsFood) ||
@@ -312,7 +312,7 @@ namespace eft_dma_radar.Tarkov.Loot
                 return Important ||
                        IsWishlisted ||
                        IsHideoutRequired ||
-                       this is QuestItem ||
+                       (LootFilterControl.ShowQuestItems && this is QuestItem) ||
                        (Config.QuestHelper.Enabled && IsQuestCondition) ||
                        (LootFilterControl.ShowBackpacks && IsBackpack) ||
                        (LootFilterControl.ShowMeds && IsMeds) ||

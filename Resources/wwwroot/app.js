@@ -211,6 +211,7 @@ const defaults = {
   groupAlpha: 0.35,
 
   showLoot: true,
+  showQuestItems: false,
   showLootName: false,
   showLootPrice: false,
 
@@ -471,6 +472,7 @@ const inputs = {
   groupAlpha: $("groupAlpha"),
 
   showLoot: $("showLoot"),
+  showQuestItems: $("showQuestItems"),
   showLootName: $("showLootName"),
   showLootPrice: $("showLootPrice"),
 
@@ -653,6 +655,7 @@ function bindAllInputs(){
   onNum("groupAlpha", inputs.groupAlpha, (v)=>Math.min(1, Math.max(0, Number(v))));
 
   onBool("showLoot", inputs.showLoot);
+  if(inputs.showQuestItems){ inputs.showQuestItems.checked = !!state.showQuestItems; onBool("showQuestItems", inputs.showQuestItems); }
   onBool("showLootName", inputs.showLootName);
   onBool("showLootPrice", inputs.showLootPrice);
 
@@ -3042,16 +3045,22 @@ function drawLoot(loot, map, cx, cy, rotRad, mapRect, hits){
 
   for(const l of loot){
     const price = getLootPriceFromPayloadOrDb(l);
+    const isQuestItem = !!(l?.IsQuestItem ?? l?.isQuestItem ?? false);
 
-    let gi = null;
-    if (useFilters) {
-      gi = getLootGroupInfo(l);
-      if (!gi) continue;
+    if(isQuestItem){
+      if(!state.showQuestItems) continue;
+      // Quest items bypass price/filter check — fall through to draw
     } else {
-      gi = getLootGroupInfo(l);
-    }
+      let gi = null;
+      if (useFilters) {
+        gi = getLootGroupInfo(l);
+        if (!gi) continue;
+      } else {
+        gi = getLootGroupInfo(l);
+      }
 
-    if (!gi && price < minPrice) continue;
+      if (!gi && price < minPrice) continue;
+    }
 
     const lm = readLootMapXY(l, map);
     if(!Number.isFinite(lm.x) || !Number.isFinite(lm.y)) continue;
@@ -3061,7 +3070,7 @@ function drawLoot(loot, map, cx, cy, rotRad, mapRect, hits){
 
     hits.push({ kind:"loot", px, py, r: Math.max(10, size * 3), data: l });
 
-    const col = gi?.color || lootDefaultColor(price);
+    const col = isQuestItem ? (state.questItemColor || "#9acd32") : (gi?.color || lootDefaultColor(price));
     ctx.fillStyle = col;
     ctx.fillRect(px - size/2, py - size/2, size, size);
 
