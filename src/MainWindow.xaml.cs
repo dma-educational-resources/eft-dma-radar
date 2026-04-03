@@ -9,7 +9,6 @@ using eft_dma_radar.Tarkov.GameWorld.Explosives;
 using eft_dma_radar.Tarkov.GameWorld.Interactables;
 using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
-using eft_dma_radar.UI;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;

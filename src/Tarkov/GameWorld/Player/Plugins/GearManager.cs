@@ -1,3 +1,4 @@
+#pragma warning disable IDE0130
 using System.Collections.Frozen;
 using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;

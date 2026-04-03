@@ -1,4 +1,5 @@
-#pragma warning disable CA2211 // Non-constant fields should not be visible
+#pragma warning disable IDE0130
+#pragma warning disable CA2211
 
 namespace SDK
 {

@@ -1,7 +1,7 @@
 ﻿using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.SKWidgetControl;
 
-namespace eft_dma_radar.UI
+namespace eft_dma_radar.UI.Misc
 {
     public enum RadarColorOption
     {

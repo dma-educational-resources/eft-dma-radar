@@ -1,3 +1,4 @@
+#pragma warning disable IDE0130
 #nullable enable
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;

@@ -1,3 +1,4 @@
+#pragma warning disable IDE0130
 using SkiaSharp.Views.WPF;
 
 namespace eft_dma_radar.UI.SKWidgetControl

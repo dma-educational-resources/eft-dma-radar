@@ -1,3 +1,4 @@
+#pragma warning disable IDE0130
 using eft_dma_radar.Misc.Data.EFT;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.UI.Misc;

@@ -1,4 +1,5 @@
-﻿namespace eft_dma_radar.UI.ESP
+﻿#pragma warning disable IDE0130
+namespace eft_dma_radar.UI.ESP
 {
     public abstract class ESPWidget : IDisposable
     {

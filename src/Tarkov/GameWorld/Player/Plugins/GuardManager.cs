@@ -1,3 +1,4 @@
+#pragma warning disable IDE0130
 using static eft_dma_radar.Tarkov.EFTPlayer.Player;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins

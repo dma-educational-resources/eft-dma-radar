@@ -1,6 +1,6 @@
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
-using eft_dma_radar.UI.LootFilters;
+using eft_dma_radar.UI.Loot;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.Misc.Config;

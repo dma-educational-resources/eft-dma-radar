@@ -1,7 +1,7 @@
 using System.IO;
 using eft_dma_radar.Misc.Data;
 
-namespace eft_dma_radar.UI.LootFilters
+namespace eft_dma_radar.UI.Loot
 {
     public sealed class UserLootFilter
     {

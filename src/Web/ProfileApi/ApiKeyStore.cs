@@ -1,3 +1,4 @@
+#pragma warning disable IDE0130
 using System.IO;
 using System.Security.AccessControl;
 using System.Security.Cryptography;

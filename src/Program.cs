@@ -411,7 +411,7 @@ namespace eft_dma_radar
                 {
                     // Use debug level for icon caching - only visible when debug logging is enabled
                     Log.Write(AppLogLevel.Debug, $"Caching item icon: {itemId}", "IconCache");
-                    await Converters.ItemIconConverter.SaveItemIconAsPng(itemId, iconCachePath);
+                    await ItemIconConverter.SaveItemIconAsPng(itemId, iconCachePath);
                 }
                 catch (Exception ex)
                 {

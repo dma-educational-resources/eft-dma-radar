@@ -7,7 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Brushes = System.Windows.Media.Brushes;
 
-namespace eft_dma_radar.Converters
+namespace eft_dma_radar.UI.Misc
 {
     public class ColorHexToBrushConverter : IValueConverter
     {

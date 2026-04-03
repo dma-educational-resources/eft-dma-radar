@@ -4,7 +4,7 @@ using Application = System.Windows.Application;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
 
-namespace eft_dma_radar.UI
+namespace eft_dma_radar.UI.Misc
 {
     public enum InterfaceColorOption
     {

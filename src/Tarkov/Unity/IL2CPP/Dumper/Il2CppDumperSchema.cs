@@ -1,3 +1,4 @@
+#pragma warning disable IDE0130
 namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 {
     public static partial class Il2CppDumper

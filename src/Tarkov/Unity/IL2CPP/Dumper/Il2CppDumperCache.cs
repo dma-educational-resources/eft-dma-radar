@@ -1,3 +1,4 @@
+#pragma warning disable IDE0130
 using System.IO;
 
 namespace eft_dma_radar.Tarkov.Unity.IL2CPP

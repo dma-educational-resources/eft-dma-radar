@@ -1,3 +1,4 @@
+#pragma warning disable IDE0130
 using eft_dma_radar.Tarkov.Unity;
 using static SDK.Enums;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;

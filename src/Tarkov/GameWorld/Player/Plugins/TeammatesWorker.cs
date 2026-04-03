@@ -1,3 +1,4 @@
+#pragma warning disable IDE0130
 #nullable enable
 using System.IO;
 using eft_dma_radar.Tarkov.Unity;

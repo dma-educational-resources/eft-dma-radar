@@ -1,9 +1,9 @@
+#pragma warning disable IDE0130
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
-
-using eft_dma_radar.DMA.ScatterAPI;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.Unity.Collections;
 using eft_dma_radar.Tarkov.GameWorld.Explosives;
+using eft_dma_radar.DMA.ScatterAPI;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer
 {

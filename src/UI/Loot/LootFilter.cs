@@ -1,7 +1,7 @@
 ﻿#nullable enable
 using eft_dma_radar.Tarkov.Loot;
 
-namespace eft_dma_radar.UI.LootFilters
+namespace eft_dma_radar.UI.Loot
 {
     /// <summary>
     /// Enumerable Loot Filter Class.

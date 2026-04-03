@@ -1,4 +1,5 @@
-﻿namespace eft_dma_radar.UI.SKWidgetControl
+﻿#pragma warning disable IDE0130
+namespace eft_dma_radar.UI.SKWidgetControl
 {
     public enum WidgetClickEvent
     {

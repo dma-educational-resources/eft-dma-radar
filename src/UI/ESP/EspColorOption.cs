@@ -1,6 +1,6 @@
 ﻿using eft_dma_radar.UI.Misc;
 
-namespace eft_dma_radar.UI
+namespace eft_dma_radar.UI.ESP
 {
     public enum EspColorOption
     {

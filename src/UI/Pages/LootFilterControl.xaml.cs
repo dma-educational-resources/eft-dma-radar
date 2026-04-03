@@ -1,5 +1,4 @@
 using eft_dma_radar.Tarkov.Loot;
-using eft_dma_radar.UI.LootFilters;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.Misc.Data;
 using eft_dma_radar.UI.Controls;
@@ -30,6 +29,7 @@ using Point = System.Windows.Point;
 using UserControl = System.Windows.Controls.UserControl;
 using Window = HandyControl.Controls.Window;
 using MenuItem = System.Windows.Controls.MenuItem;
+using eft_dma_radar.UI.Loot;
 
 namespace eft_dma_radar.UI.Pages
 {

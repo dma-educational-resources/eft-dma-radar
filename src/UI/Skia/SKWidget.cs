@@ -1,3 +1,4 @@
+#pragma warning disable IDE0130
 using SkiaSharp.Views.WPF;
 using System.Windows;
 using System.Windows.Input;

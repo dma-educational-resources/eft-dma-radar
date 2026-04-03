@@ -1,4 +1,5 @@
-﻿namespace eft_dma_radar.Tarkov.WebRadar.Data
+﻿#pragma warning disable IDE0130
+namespace eft_dma_radar.Tarkov.WebRadar.Data
 {
     /// <summary>
     /// Defines Player Unit Type (Player,PMC,Scav,etc.)

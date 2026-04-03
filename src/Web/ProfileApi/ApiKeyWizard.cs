@@ -1,3 +1,4 @@
+#pragma warning disable IDE0130
 #nullable enable
 
 namespace eft_dma_radar.Tarkov.API

@@ -1,3 +1,4 @@
+#pragma warning disable IDE0130
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.Misc.Data;
