@@ -1282,14 +1282,20 @@ namespace eft_dma_radar.UI.Pages
         private void InitMonitors()
         {
             Log.WriteLine("[InitMonitors] Starting monitor initialization...");
-            if (!Memory.Ready)
-            {
-                Log.WriteLine("[ERROR] Memory or Game is null, cannot initialize monitors.");
-                return;
-            }
 
-            var gameRes = Memory.GetMonitorRes();
-            Log.WriteLine($"[InitMonitors] Game resolution: {gameRes.Width}x{gameRes.Height}");
+            Rectangle? gameRes = null;
+            if (Memory.Ready)
+            {
+                gameRes = Memory.GetMonitorRes();
+                if (gameRes.HasValue)
+                    Log.WriteLine($"[InitMonitors] Game resolution: {gameRes.Value.Width}x{gameRes.Value.Height}");
+                else
+                    Log.WriteLine("[InitMonitors] Could not read game resolution from memory — monitor auto-select disabled.");
+            }
+            else
+            {
+                Log.WriteLine("[InitMonitors] Memory not ready, listing monitors without game resolution matching.");
+            }
 
             var monitors = MonitorHelper.GetAllMonitors();
             Log.WriteLine($"[InitMonitors] Found {monitors.Count} monitor(s).");
@@ -1302,7 +1308,9 @@ namespace eft_dma_radar.UI.Pages
                 var mon = monitors[i];
                 Log.WriteLine($"[InitMonitors] Monitor {i + 1}: {mon.Bounds.Width}x{mon.Bounds.Height}");
 
-                var isGame = (int)mon.Bounds.Width == gameRes.Width && (int)mon.Bounds.Height == gameRes.Height;
+                var isGame = gameRes.HasValue &&
+                             (int)mon.Bounds.Width == gameRes.Value.Width &&
+                             (int)mon.Bounds.Height == gameRes.Value.Height;
                 if (isGame)
                     Log.WriteLine($"[InitMonitors] Monitor {i + 1} matches game resolution and will be selected.");
 

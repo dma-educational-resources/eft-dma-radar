@@ -769,19 +769,20 @@ namespace eft_dma_radar.DMA
             throw new GameNotRunning();
         }
 
-        public static Rectangle GetMonitorRes()
+        public static Rectangle? GetMonitorRes()
         {
             try
             {
                 var gfx = ReadPtr(UnityBase + UnityOffsets.ModuleBase.GfxDevice, false);
                 var res = ReadValue<Rectangle>(gfx + UnityOffsets.GfxDeviceClient.Viewport, false);
                 if (res.Width <= 0 || res.Width > 10000 || res.Height <= 0 || res.Height > 5000)
-                    throw new ArgumentOutOfRangeException(nameof(res));
+                    return null;
                 return res;
             }
             catch (Exception ex)
             {
-                throw new Exception("ERROR Getting Game Monitor Res", ex);
+                Log.WriteLine($"[Memory] ERROR Getting Game Monitor Res: {ex.Message}");
+                return null;
             }
         }
 
