@@ -2856,7 +2856,7 @@ namespace eft_dma_radar.UI.ESP
             if (localPlayer == null)
                 return null;
 
-            var loot = Loot?.Where(x => !(x is QuestItem));
+            var loot = Loot?.Where(x => !(x is QuestItem) || LootFilterControl.ShowQuestItems);
             if (loot == null || !loot.Any())
                 return null;
 

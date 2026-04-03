@@ -3047,11 +3047,11 @@ function drawLoot(loot, map, cx, cy, rotRad, mapRect, hits){
     const price = getLootPriceFromPayloadOrDb(l);
     const isQuestItem = !!(l?.IsQuestItem ?? l?.isQuestItem ?? false);
 
+    let gi = null;
     if(isQuestItem){
       if(!state.showQuestItems) continue;
       // Quest items bypass price/filter check — fall through to draw
     } else {
-      let gi = null;
       if (useFilters) {
         gi = getLootGroupInfo(l);
         if (!gi) continue;
@@ -3504,8 +3504,12 @@ function refreshLootWidget(){
     const name = getLootNameFromPayloadOrDb(l) || "Loot";
     const price = getLootPriceFromPayloadOrDb(l);
     const id = getLootBsgId(l);
+    const isQuestItem = !!(l?.IsQuestItem ?? l?.isQuestItem ?? false);
+
+    if(isQuestItem && !state.showQuestItems) continue;
+
     const gi = getLootGroupInfo(l);
-    const col = gi?.color || lootDefaultColor(price);
+    const col = isQuestItem ? (state.questItemColor || "#9acd32") : (gi?.color || lootDefaultColor(price));
 
     if(q){
       const hay = (name + " " + id).toLowerCase();

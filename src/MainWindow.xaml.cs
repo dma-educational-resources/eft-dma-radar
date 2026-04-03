@@ -653,7 +653,7 @@ namespace eft_dma_radar
                     // -----------------------------
                     // QUEST ITEMS & LOCATIONS
                     // -----------------------------
-                    if (!battleMode && Config.QuestHelper.Enabled && !localPlayer.IsScav)
+                    if (!battleMode && (Config.QuestHelper.Enabled || LootFilterControl.ShowQuestItems) && !localPlayer.IsScav)
                     {
                         if (LootItem.QuestItemSettings.Enabled)
                         {
