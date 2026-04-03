@@ -173,7 +173,6 @@ jobs:
             --tag "${{ steps.channel.outputs.TAG }}" `
             --targetCommitish "${{ github.sha }}" `
             --channel "${{ steps.channel.outputs.CHANNEL }}" `
-            --prerelease ${{ steps.channel.outputs.PRERELEASE }} `
             --token "$env:GITHUB_TOKEN"
 
       - name: Send Discord Webhook (Release Published)
