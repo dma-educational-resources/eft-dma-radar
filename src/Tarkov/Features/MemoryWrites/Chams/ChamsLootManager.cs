@@ -1,4 +1,3 @@
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.Unity.LowLevel;
 using eft_dma_radar.Tarkov.Unity.LowLevel.Types;

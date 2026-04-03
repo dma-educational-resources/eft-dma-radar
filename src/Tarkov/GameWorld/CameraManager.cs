@@ -1,28 +1,12 @@
-/*
- * XM EFT DMA Radar
- * Brought to you by XM (XM DMA)
- * 
- * MIT License
- */
 #nullable enable
 
-using System;
-using System.Diagnostics;
 using System.IO;
-using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using eft_dma_radar.DMA.ScatterAPI;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.Unity.Collections;
 using eft_dma_radar.Tarkov.EFTPlayer;
-using eft_dma_radar.Tarkov.Unity.IL2CPP;
 using static eft_dma_radar.Tarkov.Unity.UnityOffsets;
 using ObjectClass = eft_dma_radar.Tarkov.Unity.ObjectClass;
-using SDK;
 
 namespace eft_dma_radar.Tarkov.GameWorld
 {

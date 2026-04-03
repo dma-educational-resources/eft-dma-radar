@@ -1,5 +1,3 @@
-using VmmSharpEx;
-using VmmSharpEx.Extensions;
 using VmmSharpEx.Options;
 
 namespace VmmSharpEx.Extensions.Input

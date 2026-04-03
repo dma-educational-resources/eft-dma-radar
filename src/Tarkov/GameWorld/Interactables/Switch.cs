@@ -1,16 +1,9 @@
-using eft_dma_radar;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Radar.Maps;
-using eft_dma_radar.Misc;
-using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.Unity;
-using SkiaSharp;
-using System;
-using System.Collections.Generic;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace eft_dma_radar.Tarkov.GameWorld.Exits
 {

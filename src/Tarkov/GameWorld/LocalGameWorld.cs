@@ -1,10 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
@@ -14,13 +7,11 @@ using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;
-using eft_dma_radar.DMA;
 using eft_dma_radar.DMA.ScatterAPI;
-using eft_dma_radar.DMA.Features;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Web.ProfileApi;
+using eft_dma_radar.DMA.Features;
 
 namespace eft_dma_radar.Tarkov.GameWorld
 {

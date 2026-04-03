@@ -1,5 +1,3 @@
-using SkiaSharp;
-
 namespace eft_dma_radar.UI.Radar.Maps
 {
     /// <summary>

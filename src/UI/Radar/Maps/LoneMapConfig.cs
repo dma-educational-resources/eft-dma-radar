@@ -1,6 +1,4 @@
 using eft_dma_radar.Misc.Data;
-using SkiaSharp;
-using System.Text.Json.Serialization;
 
 namespace eft_dma_radar.UI.Radar.Maps
 {

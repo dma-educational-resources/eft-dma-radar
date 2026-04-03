@@ -1,4 +1,3 @@
-using eft_dma_radar.DMA;
 using eft_dma_radar.Misc.Pools;
 
 namespace eft_dma_radar.Tarkov.Unity.Collections

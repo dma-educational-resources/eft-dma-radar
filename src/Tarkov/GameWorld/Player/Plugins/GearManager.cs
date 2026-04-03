@@ -3,7 +3,6 @@ using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Tarkov.Unity.Collections;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Web.ProfileApi;

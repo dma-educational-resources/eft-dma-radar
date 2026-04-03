@@ -1,5 +1,3 @@
-using eft_dma_radar.Misc;
-
 namespace eft_dma_radar.UI.Misc
 {
     internal static class SKPaints

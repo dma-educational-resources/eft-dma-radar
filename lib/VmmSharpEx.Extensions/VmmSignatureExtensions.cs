@@ -1,4 +1,3 @@
-using VmmSharpEx;
 using VmmSharpEx.Options;
 
 namespace VmmSharpEx.Extensions

@@ -1,8 +1,4 @@
-using eft_dma_radar.Misc;
 using eft_dma_radar.Misc.Pools;
-using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace eft_dma_radar.Tarkov.Unity
 {

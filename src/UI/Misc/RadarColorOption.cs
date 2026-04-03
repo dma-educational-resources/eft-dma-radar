@@ -1,7 +1,5 @@
-﻿using eft_dma_radar.UI.ESP;
-using eft_dma_radar.UI.Misc;
+﻿using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.SKWidgetControl;
-using System.Windows.Markup.Localizer;
 
 namespace eft_dma_radar.UI
 {

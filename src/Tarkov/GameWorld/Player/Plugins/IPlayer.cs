@@ -1,6 +1,4 @@
-﻿using System.Numerics;
-
-namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
+﻿namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 {
     /// <summary>
     /// Interface defining a Player.

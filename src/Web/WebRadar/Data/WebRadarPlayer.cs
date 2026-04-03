@@ -3,11 +3,8 @@ using eft_dma_radar.UI.Radar.Maps;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
-using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
 using MessagePack;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace eft_dma_radar.Tarkov.WebRadar.Data
 {

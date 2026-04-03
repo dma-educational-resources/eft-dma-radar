@@ -1,7 +1,6 @@
 global using eft_dma_radar.DMA;
 
 using eft_dma_radar.DMA.ScatterAPI;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.GameWorld;
@@ -9,12 +8,8 @@ using eft_dma_radar.Tarkov.GameWorld.Exits;
 using eft_dma_radar.Tarkov.GameWorld.Explosives;
 using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
 using VmmSharpEx;
 using VmmSharpEx.Extensions;
 using VmmSharpEx.Options;

@@ -1,12 +1,9 @@
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 
 using eft_dma_radar.DMA.ScatterAPI;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.Unity.Collections;
-using System.Runtime.InteropServices;
 using eft_dma_radar.Tarkov.GameWorld.Explosives;
-using eft_dma_radar.Tarkov.Unity.IL2CPP;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer
 {

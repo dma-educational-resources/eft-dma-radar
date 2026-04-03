@@ -1,5 +1,3 @@
-using eft_dma_radar.DMA;
-using eft_dma_radar.Misc;
 using eft_dma_radar.UI.Misc;
 using System.Net.Http;
 

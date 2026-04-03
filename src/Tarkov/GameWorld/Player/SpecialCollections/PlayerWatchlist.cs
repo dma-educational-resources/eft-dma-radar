@@ -1,10 +1,5 @@
 using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Misc;
 using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections
 {

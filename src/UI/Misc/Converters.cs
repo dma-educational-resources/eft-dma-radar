@@ -1,4 +1,3 @@
-using System;
 using System.Globalization;
 using System.IO;
 using System.Net.Http;
@@ -6,10 +5,7 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using SkiaSharp;
-using eft_dma_radar.Misc;
 using Brushes = System.Windows.Media.Brushes;
-using Color = System.Windows.Media.Color;
 
 namespace eft_dma_radar.Converters
 {

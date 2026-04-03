@@ -1,28 +1,7 @@
-/*
- * Lone EFT DMA Radar
- * MIT License
- *
- * TeammatesWorker
- * ----------------
- * - Single press toggle:
- *   - Add teammate if not present
- *   - Remove teammate if already present
- * - Restores original PlayerType on removal
- * - Restart-safe via JSON (VoipId + OriginalType)
- * - Raid-safe via SessionID
- */
-
 #nullable enable
-using System.Collections.Concurrent;
-using System.Numerics;
-using System.Text.Json;
 using System.IO;
-using eft_dma_radar.DMA;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.Unity;
-using eft_dma_radar.Tarkov.Unity.Collections;
 using eft_dma_radar.Tarkov.GameWorld;
-using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 using static eft_dma_radar.Tarkov.EFTPlayer.Player;
 using static SDK.Enums;

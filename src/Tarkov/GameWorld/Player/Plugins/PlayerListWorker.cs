@@ -1,27 +1,6 @@
-/*
- * Lone EFT DMA Radar
- * MIT License
- *
- * PlayerListWorker
- * ----------------
- * - Stable PMC naming per raid (U:PMC1 / B:PMC1)
- * - Squad grouping via spawn proximity (¡Ü20m)
- * - Late-spawn safe
- * - VoipID identity
- * - SessionID scoped
- * - FILE IS TOUCHED ONLY WHEN SESSION ID CHANGES
- */
-
 #nullable enable
-using System.Collections.Concurrent;
-using System.Numerics;
-using System.Text.Json;
 using System.IO;
-using System.Threading;
-using eft_dma_radar.DMA;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.GameWorld;
-using eft_dma_radar.Tarkov.EFTPlayer;
 using static SDK.Enums;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 

@@ -1,6 +1,4 @@
-﻿using System.Runtime.InteropServices;
-
-namespace eft_dma_radar.Misc
+﻿namespace eft_dma_radar.Misc
 {
     /// <summary>
     /// Windows Native Code / Interop

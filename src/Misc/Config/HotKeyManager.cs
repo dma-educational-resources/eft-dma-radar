@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace eft_dma_radar.Misc.Data
 {
     public enum HotkeyMode

@@ -1,10 +1,8 @@
 using System.Collections.Frozen;
 using eft_dma_radar.DMA.ScatterAPI;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.Unity.Collections;
-using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 using static SDK.Offsets;
 

@@ -2,10 +2,6 @@ using eft_dma_radar.Misc.Data.TarkovMarket;
 using eft_dma_radar.UI.Controls;
 using System.Collections.Frozen;
 using System.IO;
-using System.Reflection;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace eft_dma_radar.Misc.Data
 {

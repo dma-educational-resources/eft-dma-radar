@@ -1,5 +1,3 @@
-using System.ComponentModel;
-
 namespace eft_dma_radar.Tarkov.Unity
 {
     /// <summary>

@@ -1,9 +1,7 @@
-using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
-using Orientation = System.Windows.Controls.Orientation;
 using Point = System.Windows.Point;
 using Size = System.Windows.Size;
 using UserControl = System.Windows.Controls.UserControl;

@@ -1,6 +1,4 @@
-﻿using System.Numerics;
-
-namespace eft_dma_radar.UI.ESP
+﻿namespace eft_dma_radar.UI.ESP
 {
     /// <summary>
     /// Defines a transposed Matrix4x4 for ESP Operations (only contains necessary fields).

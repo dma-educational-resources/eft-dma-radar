@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace eft_dma_radar.Misc.Data.TarkovMarket
 {
     public partial class TarkovDevQuery

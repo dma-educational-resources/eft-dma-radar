@@ -1,5 +1,3 @@
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
 
 namespace eft_dma_radar.Misc
 {

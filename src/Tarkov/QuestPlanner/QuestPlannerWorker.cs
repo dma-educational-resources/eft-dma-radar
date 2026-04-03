@@ -1,11 +1,7 @@
 #nullable enable
-using eft_dma_radar.Misc;
 using eft_dma_radar.Misc.Data;
-using eft_dma_radar.Tarkov.Unity;
-using eft_dma_radar.Tarkov.QuestPlanner.Models;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
-using eft_dma_radar.UI.Misc;
-using SDK;
+using eft_dma_radar.Tarkov.QuestPlanner.Models;
 
 namespace eft_dma_radar.Tarkov.QuestPlanner;
 

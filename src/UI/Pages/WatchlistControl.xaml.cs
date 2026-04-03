@@ -1,16 +1,8 @@
 using eft_dma_radar.Tarkov.EFTPlayer;
-using eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections;
 using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Misc;
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Net.Http;
 using System.Text.Encodings.Web;
-using System.Text.Json;
 using System.Text.Unicode;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;

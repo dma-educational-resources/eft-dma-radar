@@ -1,12 +1,4 @@
-using eft_dma_radar.Misc;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using UserControl = System.Windows.Controls.UserControl;
 
 namespace eft_dma_radar.UI.Misc

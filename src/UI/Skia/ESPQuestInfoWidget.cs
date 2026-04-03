@@ -1,12 +1,6 @@
 using eft_dma_radar.Tarkov.GameWorld;
-using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Misc.Data;
-using SkiaSharp;
-using SkiaSharp.Views.Desktop;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using eft_dma_radar.UI.Misc;
 
 namespace eft_dma_radar.UI.ESP
 {

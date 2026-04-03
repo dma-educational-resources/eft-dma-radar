@@ -1,11 +1,8 @@
 #nullable enable
-using eft_dma_radar.Tarkov;
-using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.Features;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
-using eft_dma_radar.Tarkov.Features.MemoryWrites.Patches;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.Tarkov.GameWorld.Exits;
 using eft_dma_radar.Tarkov.GameWorld.Explosives;
@@ -19,36 +16,21 @@ using eft_dma_radar.UI.Pages;
 using eft_dma_radar.UI.SKWidgetControl;
 using eft_dma_radar.DMA.Features;
 using eft_dma_radar.UI.Radar.Maps;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Tarkov.Unity;
-using eft_dma_radar.Tarkov.Unity.LowLevel;
 using HandyControl.Controls;
-using HandyControl.Themes;
-using HandyControl.Tools;
-using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
-using SkiaSharp;
-using SkiaSharp.Views.WPF;
-using System;
-using System.Linq;
-using System.Numerics;
-using System.Security.Authentication.ExtendedProtection;
-using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using static eft_dma_radar.Tarkov.EFTPlayer.Player;
 using Application = System.Windows.Application;
 using Color = System.Windows.Media.Color;
-using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
 using Size = System.Windows.Size;
 using Switch = eft_dma_radar.Tarkov.GameWorld.Exits.Switch;
-using Timer = System.Timers.Timer;
 using UserControl = System.Windows.Controls.UserControl;
 
 namespace eft_dma_radar

@@ -3,17 +3,12 @@ using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.UI.Misc;
-using eft_dma_radar.DMA;
-using eft_dma_radar.UI.ESP;
 using eft_dma_radar.DMA.Features;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.Features.Ballistics;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.Unity.Collections;
-using System.Windows;
 using eft_dma_radar.UI.Pages;
 using Application = System.Windows.Application;
-using eft_dma_radar.Tarkov.Unity.LowLevel;
 using eft_dma_radar.DMA.ScatterAPI;
 
 namespace eft_dma_radar.Tarkov.Features.MemoryWrites

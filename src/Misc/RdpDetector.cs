@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-
 namespace eft_dma_radar.Misc
 {
     /// <summary>

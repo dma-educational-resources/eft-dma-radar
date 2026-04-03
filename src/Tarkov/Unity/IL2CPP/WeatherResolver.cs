@@ -1,11 +1,3 @@
-using System;
-using System.Diagnostics;
-using eft_dma_radar.DMA;
-using eft_dma_radar.Misc;
-using eft_dma_radar.Misc.Data;
-using eft_dma_radar.Tarkov.Unity;
-using SDK;
-
 namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 {
     internal static class EftWeatherControllerResolver

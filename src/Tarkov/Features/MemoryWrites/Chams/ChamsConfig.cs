@@ -1,7 +1,4 @@
-﻿using SkiaSharp;
-using System.Text.Json.Serialization;
-
-namespace eft_dma_radar.Tarkov.Features.MemoryWrites.Chams
+﻿namespace eft_dma_radar.Tarkov.Features.MemoryWrites.Chams
 {
     public sealed class ChamsConfig
     {

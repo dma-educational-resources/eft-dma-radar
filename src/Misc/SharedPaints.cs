@@ -1,5 +1,3 @@
-using SkiaSharp;
-
 namespace eft_dma_radar.Misc
 {
     public static class SharedPaints

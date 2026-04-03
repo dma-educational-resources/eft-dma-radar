@@ -1,16 +1,9 @@
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.Loot;
+using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;
-using eft_dma_radar.Misc;
-using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
-using eft_dma_radar.Tarkov.Unity;
-using SkiaSharp;
 using SkiaSharp.Views.WPF;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
 
 namespace eft_dma_radar.UI.SKWidgetControl
 {

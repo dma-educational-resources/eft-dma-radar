@@ -1,9 +1,4 @@
 using eft_dma_radar.UI.ESP;
-using eft_dma_radar.Misc;
-using SkiaSharp;
-using System.Drawing;
-using System.Numerics;
-using System.Runtime.CompilerServices;
 
 namespace eft_dma_radar.Tarkov.Unity
 {

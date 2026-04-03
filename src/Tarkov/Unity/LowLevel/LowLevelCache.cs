@@ -1,6 +1,3 @@
-using System.Collections.Concurrent;
-using System.Text.Json.Serialization;
-
 namespace eft_dma_radar.Tarkov.Unity.LowLevel
 {
     /// <summary>

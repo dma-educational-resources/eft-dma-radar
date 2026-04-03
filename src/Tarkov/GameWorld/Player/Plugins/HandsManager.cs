@@ -1,8 +1,6 @@
 using eft_dma_radar.Tarkov.Loot;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Tarkov.Unity.Collections;
-using System.Collections.Frozen;
 using static eft_dma_radar.Tarkov.EFTPlayer.Plugins.FirearmManager;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins

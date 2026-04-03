@@ -1,13 +1,7 @@
-using eft_dma_radar.Misc;
 using eft_dma_radar.Misc.Data.EFT;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;
-using SkiaSharp;
-using SkiaSharp.Views.Desktop;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace eft_dma_radar.UI.ESP
 {

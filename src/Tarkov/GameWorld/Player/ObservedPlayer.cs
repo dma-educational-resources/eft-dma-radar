@@ -1,16 +1,11 @@
-using eft_dma_radar.DMA.Features;
 using eft_dma_radar.DMA.ScatterAPI;
-using eft_dma_radar.Misc;
-using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.Unity.Collections;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections;
-using eft_dma_radar.Tarkov.Features.MemoryWrites.Patches;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.Web.ProfileApi;
 using static SDK.Enums;
-using static SDK.Offsets;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer
 {

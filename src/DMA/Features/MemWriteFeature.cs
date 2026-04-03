@@ -1,6 +1,4 @@
 using eft_dma_radar.DMA.ScatterAPI;
-using eft_dma_radar.Misc;
-using System.Diagnostics;
 
 namespace eft_dma_radar.DMA.Features
 {

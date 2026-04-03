@@ -1,7 +1,4 @@
 #nullable enable
-using System.Collections.Concurrent;
-using System.Text.Json.Serialization;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.API;
 
 namespace eft_dma_radar.Web.ProfileApi

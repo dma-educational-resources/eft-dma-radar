@@ -1,7 +1,4 @@
 using System.IO;
-using System.Text;
-using eft_dma_radar.DMA;
-using eft_dma_radar.Misc;
 
 namespace eft_dma_radar.Tarkov.Unity.LowLevel.Types
 {

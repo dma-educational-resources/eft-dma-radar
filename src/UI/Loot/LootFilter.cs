@@ -1,7 +1,6 @@
 ﻿#nullable enable
 using eft_dma_radar.Tarkov.Loot;
 
-
 namespace eft_dma_radar.UI.LootFilters
 {
     /// <summary>
@@ -30,27 +29,21 @@ namespace eft_dma_radar.UI.LootFilters
                 {
                     return (x.IsRegularLoot || x.IsValuableLoot || x.IsImportant || x.IsWishlisted) ||
                                 (Program.Config.QuestHelper.Enabled && x.IsQuestCondition) ||
-                                (LootFilter.ShowQuestItems && x is QuestItem) ||
-                                (LootFilter.ShowBackpacks && x.IsBackpack) ||
-                                (LootFilter.ShowMeds && x.IsMeds) ||
-                                (LootFilter.ShowFood && x.IsFood);
+                                (ShowQuestItems && x is QuestItem) ||
+                                (ShowBackpacks && x.IsBackpack) ||
+                                (ShowMeds && x.IsMeds) ||
+                                (ShowFood && x.IsFood);
                 };
                 return (item) =>
                 {
-                    if (item is LootAirdrop airdrop)
-                    {
+                    if (item is LootAirdrop)
                         return true;
-                    }
-                    if (item is LootCorpse corpse)
-                    {
+                    if (item is LootCorpse)
                         return true;
-                    }
                     if (p(item))
                     {
                         if (item is LootContainer container)
-                        {
                             container.SetFilter(p);
-                        }
                         return true;
                     }
                     return false;
@@ -65,16 +58,12 @@ namespace eft_dma_radar.UI.LootFilters
                 };
                 return (item) =>
                 {
-                    if (item is LootAirdrop airdrop)
-                    {
+                    if (item is LootAirdrop)
                         return true;
-                    }
                     if (item.ContainsSearchPredicate(p))
                     {
                         if (item is LootContainer container)
-                        {
                             container.SetFilter(p);
-                        }
                         return true;
                     }
                     return false;

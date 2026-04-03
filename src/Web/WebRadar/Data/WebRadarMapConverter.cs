@@ -1,6 +1,5 @@
 using eft_dma_radar.UI.Radar.Maps;
 using eft_dma_radar.Tarkov.WebRadar.Data;
-using System.Linq;
 
 namespace eft_dma_radar.Tarkov.WebRadar
 {

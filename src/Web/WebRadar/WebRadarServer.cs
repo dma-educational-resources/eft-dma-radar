@@ -4,19 +4,14 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 
 using eft_dma_radar.Tarkov.WebRadar.Data;
-using eft_dma_radar.Misc;
 
 using Open.Nat;
 
-using System.Net;
 using System.Net.Sockets;
-using System.Diagnostics;
-using System.Text;
 using System.Net.Http;
 using eft_dma_radar.UI.Radar.Maps;
 using Microsoft.Extensions.Logging;
 using System.IO;
-using eft_dma_radar.Tarkov.GameWorld.Exits;
 using Microsoft.Extensions.FileProviders;
 
 namespace eft_dma_radar.Tarkov.WebRadar

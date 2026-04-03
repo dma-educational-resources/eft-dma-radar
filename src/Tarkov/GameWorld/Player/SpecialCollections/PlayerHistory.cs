@@ -1,14 +1,5 @@
-using eft_dma_radar;
-using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Misc;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.IO;
-using System.Linq;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections
 {

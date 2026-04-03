@@ -1,6 +1,5 @@
 #nullable enable
 using eft_dma_radar.DMA.ScatterAPI;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.Unity.Collections;
 using eft_dma_radar.Tarkov.Unity.LowLevel;
@@ -10,15 +9,8 @@ using eft_dma_radar.Tarkov.Features.MemoryWrites.Chams;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 using eft_dma_radar.UI.Misc;
-using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
 
 // (Safe to include even if you have global usings)
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using SkiaSharp;
 
 namespace eft_dma_radar.Tarkov.Features
 {

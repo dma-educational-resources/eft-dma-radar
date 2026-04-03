@@ -1,10 +1,7 @@
-using System;
 using System.IO;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
-using System.Text;
-using System.Text.Json;
 
 namespace eft_dma_radar.Tarkov.API
 {

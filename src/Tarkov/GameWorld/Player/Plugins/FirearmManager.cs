@@ -1,14 +1,9 @@
 using eft_dma_radar.DMA.ScatterAPI;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Misc.Pools;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.Unity.Collections;
-using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
-using eft_dma_radar.Tarkov.Unity.IL2CPP;
-using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
-using static SDK.Offsets;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 {

@@ -2,7 +2,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.ComponentModel;
 using eft_dma_radar.Tarkov.QuestPlanner;
 using eft_dma_radar.UI.Misc;
 using UserControl = System.Windows.Controls.UserControl;

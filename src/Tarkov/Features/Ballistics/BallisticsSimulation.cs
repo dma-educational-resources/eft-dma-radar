@@ -1,7 +1,4 @@
-﻿using System.Numerics;
-using System.Runtime.CompilerServices;
-
-namespace eft_dma_radar.Tarkov.Features.Ballistics
+﻿namespace eft_dma_radar.Tarkov.Features.Ballistics
 {
     public static class BallisticsSimulation
     {

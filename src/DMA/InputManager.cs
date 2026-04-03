@@ -1,4 +1,3 @@
-using eft_dma_radar.Misc;
 using VmmSharpEx;
 using VmmSharpEx.Extensions.Input;
 

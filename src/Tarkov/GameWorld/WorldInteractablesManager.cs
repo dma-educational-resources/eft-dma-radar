@@ -1,5 +1,4 @@
 using eft_dma_radar.Tarkov.GameWorld.Interactables;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.Unity.Collections;
 

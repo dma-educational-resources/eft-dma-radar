@@ -1,5 +1,4 @@
 using System.Collections.Frozen;
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.EFTPlayer;
 
 using eft_dma_radar.DMA.ScatterAPI;
@@ -7,15 +6,8 @@ using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.Unity.Collections;
 using eft_dma_radar.UI.Pages;
-using eft_dma_radar.Tarkov.Features.MemoryWrites;
-using eft_dma_radar.Tarkov.Features;
-using eft_dma_radar.Tarkov.GameWorld;
-using System.IO;
 using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.UI.ESP.eft_dma_radar.UI.ESP;
-using HandyControl.Controls;
-using System.Drawing.Imaging.Effects;
-using eft_dma_radar.UI.Misc;
 using static eft_dma_radar.Tarkov.EFTPlayer.Player;
 using eft_dma_radar.Web.ProfileApi;
 

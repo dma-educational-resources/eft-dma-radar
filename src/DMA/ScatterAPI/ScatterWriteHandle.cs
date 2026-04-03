@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using VmmSharpEx.Options;
 using VmmSharpEx.Scatter;
 

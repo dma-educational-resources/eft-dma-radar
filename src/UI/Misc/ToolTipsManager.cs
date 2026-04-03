@@ -1,4 +1,3 @@
-using HandyControl.Controls;
 using System.Windows.Controls;
 using Button = System.Windows.Controls.Button;
 using CheckBox = System.Windows.Controls.CheckBox;

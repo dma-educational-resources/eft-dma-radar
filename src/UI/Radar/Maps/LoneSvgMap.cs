@@ -1,10 +1,6 @@
-using eft_dma_radar.Misc;
-using SkiaSharp;
 using SkiaSharp.Views.WPF;
 using Svg.Skia;
 using System.IO;
-using System.Numerics;
-using System.Runtime.CompilerServices;
 
 namespace eft_dma_radar.UI.Radar.Maps
 {

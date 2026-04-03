@@ -1,11 +1,7 @@
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Radar.Maps;
-using eft_dma_radar.Misc;
-using HandyControl.Controls;
-using System;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using Point = System.Windows.Point;
 using UserControl = System.Windows.Controls.UserControl;

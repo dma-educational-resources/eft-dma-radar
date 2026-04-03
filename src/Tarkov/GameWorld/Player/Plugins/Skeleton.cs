@@ -1,12 +1,6 @@
 #nullable enable
-using eft_dma_radar.Misc;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.UI.ESP;
-using SkiaSharp;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 {

@@ -1,6 +1,3 @@
-using eft_dma_radar.Misc;
-using System.Runtime.CompilerServices;
-
 namespace eft_dma_radar.DMA.ScatterAPI
 {
     /// <summary>

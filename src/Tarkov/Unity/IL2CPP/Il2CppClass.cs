@@ -1,8 +1,4 @@
-using eft_dma_radar.DMA;
-using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.DMA.ScatterAPI;
-using System.Collections.Concurrent;
-using eft_dma_radar.Misc;
 
 namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 {

@@ -1,9 +1,4 @@
 using System.IO;
-using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using eft_dma_radar.Misc;
-using SDK;
 
 namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 {

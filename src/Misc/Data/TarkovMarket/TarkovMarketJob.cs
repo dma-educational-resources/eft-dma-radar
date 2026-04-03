@@ -1,8 +1,3 @@
-using System.Text.Json.Serialization;
-using System.Net.Http.Headers;
-using System.Net;
-using System.Text.Json;
-
 namespace eft_dma_radar.Misc.Data.TarkovMarket
 {
     public static class TarkovMarketJob

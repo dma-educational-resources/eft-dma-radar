@@ -1,7 +1,4 @@
-using eft_dma_radar.Misc;
 using eft_dma_radar.Misc.Pools;
-using System.Runtime.CompilerServices;
-using System.Text;
 using VmmSharpEx.Scatter;
 using static eft_dma_radar.Tarkov.Unity.UnityTransform;
 

@@ -1,8 +1,4 @@
-using SkiaSharp;
 using SkiaSharp.Views.WPF;
-using System;
-using System.Linq;
-using eft_dma_radar.Misc;
 
 namespace eft_dma_radar.UI.SKWidgetControl
 {

@@ -1,7 +1,5 @@
-using eft_dma_radar.Misc;
 using System.Collections.Frozen;
 using System.IO;
-using System.Text.Json;
 
 namespace eft_dma_radar.UI.Radar.Maps
 {
