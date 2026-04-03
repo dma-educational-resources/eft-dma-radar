@@ -147,17 +147,23 @@ jobs:
           Compress-Archive -Path "out\*" -DestinationPath "eft-dma-radar.zip"
 
       - name: Create GitHub Release
+        shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TAG: ${{ steps.channel.outputs.TAG }}
+          GH_RELEASE_NAME: ${{ steps.channel.outputs.RELEASE_NAME }}
+          GH_PRERELEASE: ${{ steps.channel.outputs.PRERELEASE }}
+          GH_SHA: ${{ github.sha }}
+          GH_NOTES: ${{ github.event.head_commit.message }}
         run: |
           $flags = @(
-            "${{ steps.channel.outputs.TAG }}"
+            $env:GH_TAG
             "eft-dma-radar.zip"
-            "--title", "${{ steps.channel.outputs.RELEASE_NAME }}"
-            "--target", "${{ github.sha }}"
-            "--notes", "${{ github.event.head_commit.message }}"
+            "--title", $env:GH_RELEASE_NAME
+            "--target", $env:GH_SHA
+            "--notes", $env:GH_NOTES
           )
-          if ("${{ steps.channel.outputs.PRERELEASE }}" -eq "true") {
+          if ($env:GH_PRERELEASE -eq "true") {
             $flags += "--prerelease"
           } else {
             $flags += "--latest"
