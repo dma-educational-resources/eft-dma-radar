@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>VmmSharpEx</RootNamespace>
+		<Nullable>enable</Nullable>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+	</PropertyGroup>
+
+	<!-- Native MemProcFS DLLs - copy to output -->
+	<ItemGroup>
+		<None Include="native\**\*.dll" Visible="false">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>%(Filename)%(Extension)</Link>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Collections.Pooled.V2" Version="2.2.2" />
+	</ItemGroup>
+
+	<PropertyGroup>
+		<IsTrimmable>false</IsTrimmable> <!-- Disable trimming due to heavy interop usage -->
+		<EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+		<EnableAotAnalyzer>true</EnableAotAnalyzer>
+		<EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+		<NoWarn>$(NoWarn);CS1591;CS0649;IDE0160;IDE0290;IDE0301;IDE0305;IDE0306;IDE0028;IDE0300;IDE0057;IDE0079</NoWarn>
+	</PropertyGroup>
+
+</Project>

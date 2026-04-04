@@ -18,7 +18,7 @@
 		<PublishRelease>true</PublishRelease>
 	</PropertyGroup>
 
-	<!-- Native DLLs and Resources (vmm.dll, leechcore.dll etc. are now bundled by VmmSharpEx NuGet) -->
+	<!-- Native DLLs and Resources (native MemProcFS DLLs are now managed locally in lib/VmmSharpEx/native/) -->
 	<ItemGroup Condition="'$(Configuration)' != 'Commercial'">
 		<Content Include="..\resources\DEFAULT_DATA.json">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -66,7 +66,10 @@
 		<PackageReference Include="SkiaSharp.Views.WPF" Version="3.119.2" />
 		<PackageReference Include="Svg.Skia" Version="3.0.3" />
 		<PackageReference Include="System.Management" Version="9.0.0" />
-		<PackageReference Include="VmmSharpEx" Version="3.200.12" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\lib\VmmSharpEx\VmmSharpEx.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -80,22 +83,12 @@
 		</Content>
 	</ItemGroup>
 
-	<Target Name="CopyNativeDLLs" AfterTargets="Build">
-		<ItemGroup>
-			<NativeLibs Include="$(OutputPath)runtimes\win-x64\native\*.dll" />
-		</ItemGroup>
-		<Copy SourceFiles="@(NativeLibs)" DestinationFolder="$(OutputPath)" />
-	</Target>
 
 	<ItemGroup>
 		<Compile Remove="Common\**" />
 		<EmbeddedResource Remove="Common\**" />
 		<None Remove="Common\**" />
 		<Page Remove="Common\**" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<ProjectReference Include="..\lib\VmmSharpEx.Extensions\VmmSharpEx.Extensions.csproj" />
 	</ItemGroup>
 
 </Project>

@@ -1,0 +1,329 @@
+﻿/*  
+ *  VmmSharpEx by Lone (Lone DMA)
+ *  Copyright (C) 2025 AGPL-3.0
+*/
+
+/*
+MIT License
+
+Copyright (c) 2023 Metick
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ */
+
+// Thanks to Metick for the original implementation! https://github.com/Metick/DMALibrary/blob/Master/DMALibrary/Memory/InputManager.cpp
+
+using System.Runtime.CompilerServices;
+
+namespace VmmSharpEx.Extensions.Input
+{
+    /// <summary>
+    /// Extension class that queries user input state via Win32 Kernel Interop (Read-Only).
+    /// <para>
+    /// Supports both Windows 10 and Windows 11.
+    /// Win11 (build ≥ 22000): resolves gafAsyncKeyStateExport via win32k session pointer chain.
+    /// Win10 (build &lt; 22000): resolves gafAsyncKeyState via win32kbase.sys EAT export or signature scan.
+    /// </para>
+    /// </summary>
+    public sealed class VmmInputManager
+    {
+        private readonly Vmm _vmm;
+
+        private readonly byte[] _stateBitmap = new byte[64];
+        private readonly byte[] _previousStateBitmap = new byte[256 / 8];
+        private readonly ulong _gafAsyncKeyStateExport;
+        private readonly uint _winLogonPid;
+
+        private VmmInputManager() { throw new NotImplementedException(); }
+
+        /// <summary>
+        /// Extension class that queries user input state via Win32 Kernel Interop (Read-Only).
+        /// Supports both Windows 10 and Windows 11.
+        /// </summary>
+        /// <param name="vmm">Parent VMM Instance (must be already initialized).</param>
+        /// <exception cref="VmmException"></exception>
+        public VmmInputManager(Vmm vmm)
+        {
+            _vmm = vmm;
+            if (!_vmm.PidGetFromName("winlogon.exe", out _winLogonPid))
+                throw new VmmException("Failed to get winlogon.exe PID");
+
+            int buildNumber = GetTargetBuildNumber();
+
+            // Try the expected path first based on the target OS build number,
+            // then fall back to the other path. This handles misdetection and
+            // edge-case builds (e.g. Win10 with win32ksgd.sys backport).
+            ulong gafAsyncKeyState = 0;
+            if (buildNumber >= 22000)
+            {
+                if (!TryResolveWin11KeyState(out gafAsyncKeyState))
+                    TryResolveWin10KeyState(out gafAsyncKeyState);
+            }
+            else
+            {
+                if (!TryResolveWin10KeyState(out gafAsyncKeyState))
+                    TryResolveWin11KeyState(out gafAsyncKeyState);
+            }
+
+            if (gafAsyncKeyState == 0)
+                throw new VmmException("Failed to resolve gafAsyncKeyState via Win11 or Win10 methods");
+
+            _gafAsyncKeyStateExport = gafAsyncKeyState;
+        }
+
+        /// <summary>
+        /// Updates the internal key state bitmap. Call this method periodically to refresh key states.
+        /// </summary>
+        /// <remarks>
+        /// Typically you would call this before you make <see cref="IsKeyDown(uint)"/> calls.
+        /// </remarks>
+        /// <exception cref="VmmException"></exception>
+        public void UpdateKeys()
+        {
+            Span<byte> previousKeyStateBitmap = stackalloc byte[64];
+            _stateBitmap.CopyTo(previousKeyStateBitmap);
+
+            // Read 64 bytes from gafAsyncKeyStateExport
+            if (!_vmm.MemReadSpan(_winLogonPid | Vmm.PID_PROCESS_WITH_KERNELMEMORY, _gafAsyncKeyStateExport, _stateBitmap, VmmSharpEx.Options.VmmFlags.NOCACHE))
+                throw new VmmException("Failed to read key state bitmap.");
+
+            for (int vk = 0; vk < 256; ++vk)
+                if ((_stateBitmap[(vk * 2 / 8)] & (1 << ((vk % 4) * 2))) != 0 && (previousKeyStateBitmap[(vk * 2 / 8)] & (1 << ((vk % 4) * 2))) == 0)
+                    _previousStateBitmap[vk / 8] |= (byte)(1 << (vk % 8));
+        }
+
+        /// <summary>
+        /// Checks if a given Virtual Key is currently down.
+        /// See: <see href="https://learn.microsoft.com/windows/win32/inputdev/virtual-key-codes"/>
+        /// </summary>
+        /// <remarks>
+        /// Recommend calling <see cref="UpdateKeys"/> before calling this method to ensure the key states are up-to-date.
+        /// </remarks>
+        /// <param name="vkey">Windows virtual key.</param>
+        /// <returns><see langword="true"/> if key is down, otherwise <see langword="false"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsKeyDown(Win32VirtualKey vkey) => IsKeyDown((uint)vkey);
+
+        /// <summary>
+        /// Checks if a given Virtual Key is currently down.
+        /// See: <see href="https://learn.microsoft.com/windows/win32/inputdev/virtual-key-codes"/>
+        /// </summary>
+        /// <remarks>
+        /// Recommend calling <see cref="UpdateKeys"/> before calling this method to ensure the key states are up-to-date.
+        /// </remarks>
+        /// <param name="vkeyCode">Windows virtual key code.</param>
+        /// <returns><see langword="true"/> if key is down, otherwise <see langword="false"/>.</returns>
+        public bool IsKeyDown(uint vkeyCode)
+        {
+            if (!_gafAsyncKeyStateExport.IsValidKernelVA())
+                return false;
+            int idx = (int)(vkeyCode * 2 / 8);
+            int bit = 1 << ((int)vkeyCode % 4 * 2);
+            return (_stateBitmap[idx] & bit) != 0;
+        }
+
+        #region Win11 Resolution
+
+        private bool TryResolveWin11KeyState(out ulong result)
+        {
+            result = 0;
+
+            uint[]? csrssPids;
+            try { csrssPids = _vmm.PidGetAllFromName("csrss.exe"); }
+            catch { return false; }
+            if (csrssPids is null || csrssPids.Length == 0)
+                return false;
+
+            foreach (uint pid in csrssPids)
+            {
+                try
+                {
+                    if (!_vmm.Map_GetModuleFromName(pid, "win32ksgd.sys", out var win32kModuleInfo))
+                    {
+                        if (!_vmm.Map_GetModuleFromName(pid, "win32k.sys", out win32kModuleInfo))
+                            continue;
+                    }
+                    ulong win32kBase = win32kModuleInfo.vaBase;
+                    ulong win32kSize = win32kModuleInfo.cbImageSize;
+
+                    ulong gSessionPtr = _vmm.FindSignature(pid, "48 8B 05 ?? ?? ?? ?? 48 8B 04 C8", win32kBase, win32kBase + win32kSize);
+                    if (gSessionPtr == 0)
+                    {
+                        gSessionPtr = _vmm.FindSignature(pid, "48 8B 05 ?? ?? ?? ?? FF C9", win32kBase, win32kBase + win32kSize);
+                        if (gSessionPtr == 0)
+                            continue;
+                    }
+                    int relative = _vmm.MemReadValue<int>(pid, gSessionPtr + 3);
+                    ulong gSessionGlobalSlots = gSessionPtr + 7 + (ulong)relative;
+                    ulong userSessionState = 0;
+                    for (int i = 0; i < 4; i++)
+                    {
+                        userSessionState = _vmm.MemReadValue<ulong>(pid, _vmm.MemReadValue<ulong>(pid, _vmm.MemReadValue<ulong>(pid, gSessionGlobalSlots) + (ulong)(8 * i)));
+                        if (userSessionState.IsValidKernelVA())
+                            break;
+                    }
+
+                    if (!_vmm.Map_GetModuleFromName(pid, "win32kbase.sys", out var win32kbaseModule))
+                        continue;
+                    ulong win32kbaseBase = win32kbaseModule.vaBase;
+                    ulong win32kbaseSize = win32kbaseModule.cbImageSize;
+
+                    ulong ptr = _vmm.FindSignature(pid, "48 8D 90 ?? ?? ?? ?? E8 ?? ?? ?? ?? 0F 57 C0", win32kbaseBase, win32kbaseBase + win32kbaseSize);
+                    if (ptr == 0)
+                        continue;
+                    uint sessionOffset = _vmm.MemReadValue<uint>(pid, ptr + 3);
+                    ulong candidate = userSessionState + sessionOffset;
+
+                    if (candidate.IsValidKernelVA())
+                    {
+                        result = candidate;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // Try next csrss PID
+                }
+            }
+
+            return false;
+        }
+
+        #endregion
+
+        #region Win10 Resolution
+
+        private bool TryResolveWin10KeyState(out ulong result)
+        {
+            result = 0;
+            try
+            {
+                uint kernelPid = _winLogonPid | Vmm.PID_PROCESS_WITH_KERNELMEMORY;
+
+                var eatEntries = _vmm.Map_GetEAT(kernelPid, "win32kbase.sys", out _);
+                if (eatEntries != null)
+                {
+                    foreach (var entry in eatEntries)
+                    {
+                        if (entry.sFunction == "gafAsyncKeyState")
+                        {
+                            result = entry.vaFunction;
+                            return true;
+                        }
+                    }
+                }
+
+                return TryResolveWin10KeyStateScan(kernelPid, out result);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool TryResolveWin10KeyStateScan(uint kernelPid, out ulong result)
+        {
+            result = 0;
+            ulong baseStart = 0, baseEnd = 0;
+            uint scanPid = kernelPid;
+
+            if (_vmm.Map_GetModuleFromName(kernelPid, "win32kbase.sys", out var kMod))
+            {
+                baseStart = kMod.vaBase;
+                baseEnd = baseStart + kMod.cbImageSize;
+            }
+            else
+            {
+                var csrssPids = _vmm.PidGetAllFromName("csrss.exe");
+                if (csrssPids != null)
+                {
+                    foreach (uint pid in csrssPids)
+                    {
+                        if (_vmm.Map_GetModuleFromName(pid, "win32kbase.sys", out var mod))
+                        {
+                            scanPid = pid;
+                            baseStart = mod.vaBase;
+                            baseEnd = baseStart + mod.cbImageSize;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (baseStart == 0)
+                return false;
+
+            ulong ptr = _vmm.FindSignature(scanPid, "48 8B 05 ?? ?? ?? ?? 48 63 D1 0F B6 44 10 08", baseStart, baseEnd);
+            if (ptr == 0)
+                ptr = _vmm.FindSignature(scanPid, "48 8B 05 ?? ?? ?? ?? 48 63 D1 0F B6 44 10 00", baseStart, baseEnd);
+            if (ptr == 0)
+                ptr = _vmm.FindSignature(scanPid, "48 8B 05 ?? ?? ?? ?? 48 8B 04 C8 0F B6 04 10 83 E0 01", baseStart, baseEnd);
+            if (ptr == 0)
+                return false;
+
+            int relative = _vmm.MemReadValue<int>(kernelPid, ptr + 3);
+            ulong candidate = ptr + 7 + (ulong)relative;
+            if (candidate.IsValidKernelVA())
+            {
+                result = candidate;
+                return true;
+            }
+
+            return false;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Reads the Windows build number from the target machine's registry
+        /// via DMA. Falls back to the local host registry if the DMA read fails.
+        /// </summary>
+        private int GetTargetBuildNumber()
+        {
+            // Prefer reading the target's registry through VMM.
+            try
+            {
+                const string regPath = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\CurrentBuild";
+                var data = _vmm.WinReg_QueryValue(regPath, out _);
+                if (data is { Length: > 0 })
+                {
+                    // REG_SZ comes back as a null-terminated UTF-16 byte array.
+                    string val = System.Text.Encoding.Unicode.GetString(data).TrimEnd('\0');
+                    if (int.TryParse(val, out int build))
+                        return build;
+                }
+            }
+            catch { }
+
+            // Fallback: read the local (host) registry.
+            try
+            {
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows NT\CurrentVersion", writable: false);
+                var val = key?.GetValue("CurrentBuild") as string;
+                if (int.TryParse(val, out int build))
+                    return build;
+            }
+            catch { }
+
+            // Default to Win11 so the more robust Win11 path is tried first.
+            return 22000;
+        }
+    }
+}
