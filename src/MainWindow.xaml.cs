@@ -292,15 +292,15 @@ namespace eft_dma_radar
 
             Window = this;
 
-            this.SizeChanged += MainWindow_SizeChanged;
+            SizeChanged += MainWindow_SizeChanged;
 
             if (Config.WindowMaximized)
-                this.WindowState = WindowState.Maximized;
+                WindowState = WindowState.Maximized;
 
             if (Config.WindowSize.Width > 0 && Config.WindowSize.Height > 0)
             {
-                this.Width = Config.WindowSize.Width;
-                this.Height = Config.WindowSize.Height;
+                Width = Config.WindowSize.Width;
+                Height = Config.WindowSize.Height;
             }
 
             EspColorOptions.LoadColors(Config);
@@ -309,16 +309,15 @@ namespace eft_dma_radar
             var interval = TimeSpan.FromMilliseconds(1000d / Config.RadarTargetFPS);
             _renderTimer = new(interval);
 
-            this.MouseDoubleClick += MainWindow_MouseDoubleClick;
-            this.Closing += MainWindow_Closing;
-            this.Loaded += (s, e) =>
+            Closing += MainWindow_Closing;
+            Loaded += (s, e) =>
             {
                 Growl.Register("MainGrowl", GrowlPanel);
 
                 RadarColorOptions.LoadColors(Config);
                 EspColorOptions.LoadColors(Config);
                 InterfaceColorOptions.LoadColors(Config);
-                this.PreviewKeyDown += MainWindow_PreviewKeyDown;
+                PreviewKeyDown += MainWindow_PreviewKeyDown;
 
                 InitializeCanvas();
             };
@@ -1287,45 +1286,6 @@ namespace eft_dma_radar
             NotifyUIActivity();
             TogglePanelVisibility("GeneralSettings");
         }
-
-        /// <summary>
-        /// Handle close request from settings panel
-        /// </summary>
-        private void GeneralSettingsControl_CloseRequested(object sender, EventArgs e)
-        {
-            GeneralSettingsPanel.Visibility = Visibility.Collapsed;
-        }
-
-        /// <summary>
-        /// Handle drag request from settings panel
-        /// </summary>
-        private void GeneralSettingsControl_DragRequested(object sender, PanelDragEventArgs e)
-        {
-            var left = Canvas.GetLeft(GeneralSettingsPanel) + e.OffsetX;
-            var top = Canvas.GetTop(GeneralSettingsPanel) + e.OffsetY;
-
-            Canvas.SetLeft(GeneralSettingsPanel, left);
-            Canvas.SetTop(GeneralSettingsPanel, top);
-
-            EnsurePanelInBounds(GeneralSettingsPanel, mainContentGrid, adjustSize: false);
-        }
-
-        /// <summary>
-        /// Handle resize request from settings panel
-        /// </summary>
-        private void GeneralSettingsControl_ResizeRequested(object sender, PanelResizeEventArgs e)
-        {
-            var width = GeneralSettingsPanel.Width + e.DeltaWidth;
-            var height = GeneralSettingsPanel.Height + e.DeltaHeight;
-
-            width = Math.Max(width, MIN_SETTINGS_PANEL_WIDTH);
-            height = Math.Max(height, MIN_SETTINGS_PANEL_HEIGHT);
-
-            GeneralSettingsPanel.Width = width;
-            GeneralSettingsPanel.Height = height;
-
-            EnsurePanelInBounds(GeneralSettingsPanel, mainContentGrid, adjustSize: false);
-        }
         #endregion
 
         #region Loot Settings
@@ -1336,46 +1296,6 @@ namespace eft_dma_radar
         {
             NotifyUIActivity();
             TogglePanelVisibility("LootSettings");
-
-        }
-
-        /// <summary>
-        /// Handle close request from loot settings control
-        /// </summary>
-        private void LootSettingsControl_CloseRequested(object sender, EventArgs e)
-        {
-            LootSettingsPanel.Visibility = Visibility.Collapsed;
-        }
-
-        /// <summary>
-        /// Handle drag request from loot settings control
-        /// </summary>
-        private void LootSettingsControl_DragRequested(object sender, PanelDragEventArgs e)
-        {
-            var left = Canvas.GetLeft(LootSettingsPanel) + e.OffsetX;
-            var top = Canvas.GetTop(LootSettingsPanel) + e.OffsetY;
-
-            Canvas.SetLeft(LootSettingsPanel, left);
-            Canvas.SetTop(LootSettingsPanel, top);
-
-            EnsurePanelInBounds(LootSettingsPanel, mainContentGrid, adjustSize: false);
-        }
-
-        /// <summary>
-        /// Handle resize request from loot settings control
-        /// </summary>
-        private void LootSettingsControl_ResizeRequested(object sender, PanelResizeEventArgs e)
-        {
-            var width = LootSettingsPanel.Width + e.DeltaWidth;
-            var height = LootSettingsPanel.Height + e.DeltaHeight;
-
-            width = Math.Max(width, MIN_LOOT_PANEL_WIDTH);
-            height = Math.Max(height, MIN_LOOT_PANEL_HEIGHT);
-
-            LootSettingsPanel.Width = width;
-            LootSettingsPanel.Height = height;
-
-            EnsurePanelInBounds(LootSettingsPanel, mainContentGrid, adjustSize: false);
         }
         #endregion
 
@@ -1388,45 +1308,6 @@ namespace eft_dma_radar
             NotifyUIActivity();
             TogglePanelVisibility("MemoryWriting");
         }
-
-        /// <summary>
-        /// Handle close request from memory writing control
-        /// </summary>
-        private void MemoryWritingControl_CloseRequested(object sender, EventArgs e)
-        {
-            MemoryWritingPanel.Visibility = Visibility.Collapsed;
-        }
-
-        /// <summary>
-        /// Handle drag request from memory writing control
-        /// </summary>
-        private void MemoryWritingControl_DragRequested(object sender, PanelDragEventArgs e)
-        {
-            var left = Canvas.GetLeft(MemoryWritingPanel) + e.OffsetX;
-            var top = Canvas.GetTop(MemoryWritingPanel) + e.OffsetY;
-
-            Canvas.SetLeft(MemoryWritingPanel, left);
-            Canvas.SetTop(MemoryWritingPanel, top);
-
-            EnsurePanelInBounds(MemoryWritingPanel, mainContentGrid, adjustSize: false);
-        }
-
-        /// <summary>
-        /// Handle resize request from memory writing control
-        /// </summary>
-        private void MemoryWritingControl_ResizeRequested(object sender, PanelResizeEventArgs e)
-        {
-            var width = MemoryWritingPanel.Width + e.DeltaWidth;
-            var height = MemoryWritingPanel.Height + e.DeltaHeight;
-
-            width = Math.Max(width, MIN_MEMORY_WRITING_PANEL_WIDTH);
-            height = Math.Max(height, MIN_MEMORY_WRITING_PANEL_HEIGHT);
-
-            MemoryWritingPanel.Width = width;
-            MemoryWritingPanel.Height = height;
-
-            EnsurePanelInBounds(MemoryWritingPanel, mainContentGrid, adjustSize: false);
-        }
         #endregion
 
         #region ESP Settings
@@ -1437,45 +1318,6 @@ namespace eft_dma_radar
         {
             NotifyUIActivity();
             TogglePanelVisibility("ESP");
-        }
-
-        /// <summary>
-        /// Handle close request from ESP settings control
-        /// </summary>
-        private void ESPControl_CloseRequested(object sender, EventArgs e)
-        {
-            ESPPanel.Visibility = Visibility.Collapsed;
-        }
-
-        /// <summary>
-        /// Handle drag request from ESP settings control
-        /// </summary>
-        private void ESPControl_DragRequested(object sender, PanelDragEventArgs e)
-        {
-            var left = Canvas.GetLeft(ESPPanel) + e.OffsetX;
-            var top = Canvas.GetTop(ESPPanel) + e.OffsetY;
-
-            Canvas.SetLeft(ESPPanel, left);
-            Canvas.SetTop(ESPPanel, top);
-
-            EnsurePanelInBounds(ESPPanel, mainContentGrid, adjustSize: false);
-        }
-
-        /// <summary>
-        /// Handle resize request from ESP settings control
-        /// </summary>
-        private void ESPControl_ResizeRequested(object sender, PanelResizeEventArgs e)
-        {
-            var width = ESPPanel.Width + e.DeltaWidth;
-            var height = ESPPanel.Height + e.DeltaHeight;
-
-            width = Math.Max(width, MIN_ESP_PANEL_WIDTH);
-            height = Math.Max(height, MIN_ESP_PANEL_HEIGHT);
-
-            ESPPanel.Width = width;
-            ESPPanel.Height = height;
-
-            EnsurePanelInBounds(ESPPanel, mainContentGrid, adjustSize: false);
         }
         #endregion
 
@@ -1490,45 +1332,6 @@ namespace eft_dma_radar
 
             if (!LootFilterControl.firstRemove)
                 LootFilterControl.RemoveNonStaticGroups();
-        }
-
-        /// <summary>
-        /// Handle close request from loot filter control
-        /// </summary>
-        private void LootFilterControl_CloseRequested(object sender, EventArgs e)
-        {
-            LootFilterPanel.Visibility = Visibility.Collapsed;
-        }
-
-        /// <summary>
-        /// Handle drag request from loot filter control
-        /// </summary>
-        private void LootFilterControl_DragRequested(object sender, PanelDragEventArgs e)
-        {
-            var left = Canvas.GetLeft(LootFilterPanel) + e.OffsetX;
-            var top = Canvas.GetTop(LootFilterPanel) + e.OffsetY;
-
-            Canvas.SetLeft(LootFilterPanel, left);
-            Canvas.SetTop(LootFilterPanel, top);
-
-            EnsurePanelInBounds(LootFilterPanel, mainContentGrid, adjustSize: false);
-        }
-
-        /// <summary>
-        /// Handle resize request from loot filter control
-        /// </summary>
-        private void LootFilterControl_ResizeRequested(object sender, PanelResizeEventArgs e)
-        {
-            var width = LootFilterPanel.Width + e.DeltaWidth;
-            var height = LootFilterPanel.Height + e.DeltaHeight;
-
-            width = Math.Max(width, MIN_LOOT_FILTER_PANEL_WIDTH);
-            height = Math.Max(height, MIN_LOOT_FILTER_PANEL_HEIGHT);
-
-            LootFilterPanel.Width = width;
-            LootFilterPanel.Height = height;
-
-            EnsurePanelInBounds(LootFilterPanel, mainContentGrid, adjustSize: false);
         }
         #endregion
 
@@ -1551,49 +1354,9 @@ namespace eft_dma_radar
                 MapSetupControl.UpdateMapConfiguration(0, 0, 1);
             }
         }
-
-        /// <summary>
-        /// Handle close request from map setup control
-        /// </summary>
-        private void MapSetupControl_CloseRequested(object sender, EventArgs e)
-        {
-            GeneralSettingsControl.chkMapSetup.IsChecked = false;
-        }
-
-        /// <summary>
-        /// Handle drag request from map setup control
-        /// </summary>
-        private void MapSetupControl_DragRequested(object sender, PanelDragEventArgs e)
-        {
-            var left = Canvas.GetLeft(MapSetupPanel) + e.OffsetX;
-            var top = Canvas.GetTop(MapSetupPanel) + e.OffsetY;
-
-            Canvas.SetLeft(MapSetupPanel, left);
-            Canvas.SetTop(MapSetupPanel, top);
-
-            EnsurePanelInBounds(MapSetupPanel, mainContentGrid, adjustSize: false);
-        }
-
-        /// <summary>
-        /// Handle resize request from map setup control
-        /// </summary>
-        private void MapSetupControl_ResizeRequested(object sender, PanelResizeEventArgs e)
-        {
-            var width = MapSetupPanel.Width + e.DeltaWidth;
-            var height = MapSetupPanel.Height + e.DeltaHeight;
-
-            width = Math.Max(width, 300);
-            height = Math.Max(height, 300);
-
-            MapSetupPanel.Width = width;
-            MapSetupPanel.Height = height;
-
-            EnsurePanelInBounds(MapSetupPanel, mainContentGrid, adjustSize: false);
-        }
         #endregion
 
         #region Search Panel Settings
-
         /// <summary>
         /// Handles visibility for search settings panel
         /// </summary>
@@ -1601,45 +1364,6 @@ namespace eft_dma_radar
         {
             NotifyUIActivity();
             TogglePanelVisibility("SettingsSearch");
-        }
-
-        /// <summary>
-        /// Handle close request from loot filter control
-        /// </summary>
-        private void SettingsSearchControl_CloseRequested(object sender, EventArgs e)
-        {
-            SettingsSearchPanel.Visibility = Visibility.Collapsed;
-        }
-
-        /// <summary>
-        /// Handle close request from search control
-        /// </summary>
-        private void SettingsSearchControl_DragRequested(object sender, PanelDragEventArgs e)
-        {
-            var left = Canvas.GetLeft(SettingsSearchPanel) + e.OffsetX;
-            var top = Canvas.GetTop(SettingsSearchPanel) + e.OffsetY;
-
-            Canvas.SetLeft(SettingsSearchPanel, left);
-            Canvas.SetTop(SettingsSearchPanel, top);
-
-            EnsurePanelInBounds(SettingsSearchPanel, mainContentGrid, adjustSize: false);
-        }
-
-        /// <summary>
-        /// Handle resize request from loot filter control
-        /// </summary>
-        private void SettingsSearchControl_ResizeRequested(object sender, PanelResizeEventArgs e)
-        {
-            var width = SettingsSearchPanel.Width + e.DeltaWidth;
-            var height = SettingsSearchPanel.Height + e.DeltaHeight;
-
-            width = Math.Max(width, MIN_SEARCH_SETTINGS_PANEL_WIDTH);
-            height = Math.Max(height, MIN_SEARCH_SETTINGS_PANEL_HEIGHT);
-
-            SettingsSearchPanel.Width = width;
-            SettingsSearchPanel.Height = height;
-
-            EnsurePanelInBounds(SettingsSearchPanel, mainContentGrid, adjustSize: false);
         }
 
         public void EnsurePanelVisibleForElement(FrameworkElement fe)
@@ -1924,10 +1648,6 @@ namespace eft_dma_radar
             {
                 Log.WriteLine($"Error during application shutdown: {ex}");
             }
-        }
-
-        private void MainWindow_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
         }
 
         private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)

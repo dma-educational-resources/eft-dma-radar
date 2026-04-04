@@ -81,6 +81,14 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
+        <Style x:Key="ToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonIcon}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Padding" Value="6"/>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -121,7 +129,7 @@
             <skia:SKElement x:Name="skCanvasCpu" Visibility="Collapsed"/>
         </Grid>
 
-        <Canvas Name="ToolbarCanvas" Panel.ZIndex="1500">
+        <Canvas Name="ToolbarCanvas" Panel.ZIndex="1500" Margin="0,32,0,0">
             <Border x:Name="customToolbar"
             Background="{DynamicResource RegionBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
@@ -146,97 +154,65 @@
 
                     <!--Debug button-->
                     <Button x:Name="btnDebug" Visibility="Collapsed"
-                            Style="{StaticResource ButtonIcon}" 
+                            Style="{StaticResource ToolbarButtonStyle}"
                             ToolTip="Debug/test functionality button"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Width="32" Height="32"
-                            Padding="6"
                             hc:IconElement.Width="20"
                             hc:IconElement.Geometry="{StaticResource StarGeometry}" Click="btnDebug_Click"/>
 
                     <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
 
-                    <Button x:Name="btnFreeMode" 
-                            Style="{StaticResource ButtonIcon}" 
+                    <Button x:Name="btnFreeMode"
+                            Style="{StaticResource ToolbarButtonStyle}"
                             ToolTip="Toggle Follow/Free Mode"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Width="32" Height="32"
-                            Padding="6"
                             hc:IconElement.Width="20"
                             hc:IconElement.Geometry="{StaticResource ArrowsToCirceGeometry}" Click="btnFreeMode_Click"/>
 
                     <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
 
-                    <Button x:Name="btnLootSettings" 
-                            Style="{StaticResource ButtonIcon}" 
+                    <Button x:Name="btnLootSettings"
+                            Style="{StaticResource ToolbarButtonStyle}"
                             ToolTip="Opens the loot settings"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Width="32" Height="32"
-                            Padding="6"
                             hc:IconElement.Height="20"
                             hc:IconElement.Geometry="{StaticResource DollarSignGeometry}"
                             Click="btnLootSettings_Click"/>
 
                     <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
 
-                    <Button x:Name="btnLootFilter" 
-                            Style="{StaticResource ButtonIcon}" 
+                    <Button x:Name="btnLootFilter"
+                            Style="{StaticResource ToolbarButtonStyle}"
                             ToolTip="Opens the loot filter panel"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Width="32" Height="32"
-                            Padding="6"
                             hc:IconElement.Width="18"
                             hc:IconElement.Geometry="{StaticResource FilterGeometry}" Click="btnLootFilter_Click"/>
 
                     <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
 
-                    <Button x:Name="btnESPSettings" 
-                            Style="{StaticResource ButtonIcon}" 
+                    <Button x:Name="btnESPSettings"
+                            Style="{StaticResource ToolbarButtonStyle}"
                             ToolTip="Opens the chams/fuser esp configuration panel"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Width="32" Height="32"
-                            Padding="6"
                             hc:IconElement.Width="18"
                             hc:IconElement.Geometry="{StaticResource GlassesGeometry}" Click="btnESPSettings_Click"/>
 
                     <Button x:Name="btnMemoryWritingSettings"
-                            Style="{StaticResource ButtonIcon}" 
+                            Style="{StaticResource ToolbarButtonStyle}"
                             ToolTip="Opens the memory writing configuration panel"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Width="32" Height="32"
-                            Padding="6"
                             hc:IconElement.Width="18"
                             hc:IconElement.Geometry="{StaticResource WandMagicSparklesGeometry}"
                             Click="btnMemoryWritingSettings_Click"/>
 
                     <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
 
-                    <Button x:Name="btnGeneralSettings" 
-                            Style="{StaticResource ButtonIcon}" 
+                    <Button x:Name="btnGeneralSettings"
+                            Style="{StaticResource ToolbarButtonStyle}"
                             ToolTip="Opens the general settings panel"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Width="32" Height="32"
-                            Padding="6"
                             hc:IconElement.Width="18"
                             hc:IconElement.Geometry="{StaticResource GearGeometry}"
                             Click="btnGeneralSettings_Click"/>
 
-                    <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0" />
+                    <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
 
                     <Button x:Name="btnSearchSettings"
-                            Style="{StaticResource ButtonIcon}"
+                            Style="{StaticResource ToolbarButtonStyle}"
                             ToolTip="Search settings (Ctrl+F)"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Width="32" Height="32"
-                            Padding="6"
                             hc:IconElement.Width="18"
                             hc:IconElement.Geometry="{StaticResource SearchGeometry}"
                             Click="btnSettingsSearch_Click"/>
@@ -244,60 +220,44 @@
                     <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
 
                     <Button x:Name="btnRestart"
-                            Style="{StaticResource ButtonIcon}"
+                            Style="{StaticResource ToolbarButtonStyle}"
                             ToolTip="Restarts the Radar for the current raid instance"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Width="32" Height="32"
-                            Padding="6"
                             hc:IconElement.Width="18"
                             hc:IconElement.Geometry="{StaticResource ArrowsRotateGeometry}"
                             Click="btnRestart_Click"/>
 
                     <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
+
                     <Button x:Name="btnQuestPlanner"
-                            Style="{StaticResource ButtonIcon}"
+                            Style="{StaticResource ToolbarButtonStyle}"
                             ToolTip="Opens the quest planner panel"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Width="32" Height="32"
-                            Padding="6"
                             hc:IconElement.Width="18"
                             hc:IconElement.Geometry="{StaticResource MapGeometry}"
                             Click="btnQuestPlanner_Click"/>
 
                     <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
+
                     <Button x:Name="btnHideoutStash"
-                            Style="{StaticResource ButtonIcon}"
+                            Style="{StaticResource ToolbarButtonStyle}"
                             ToolTip="Opens the hideout stash value panel"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Width="32" Height="32"
-                            Padding="6"
                             hc:IconElement.Width="18"
                             hc:IconElement.Geometry="{StaticResource BoxGeometry}"
                             Click="btnHideoutStash_Click"/>
 
                     <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
+
                     <Button x:Name="btnWatchlist"
-                            Style="{StaticResource ButtonIcon}"
+                            Style="{StaticResource ToolbarButtonStyle}"
                             ToolTip="Opens the player watchlist panel"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Width="32" Height="32"
-                            Padding="6"
                             hc:IconElement.Width="18"
                             hc:IconElement.Geometry="{StaticResource EyeGeometry}"
                             Click="btnWatchlist_Click"/>
 
                     <Rectangle Width="1" Height="24" Fill="{DynamicResource BorderBrush}" Opacity="0.7" Margin="3,0"/>
+
                     <Button x:Name="btnPlayerHistory"
-                            Style="{StaticResource ButtonIcon}"
+                            Style="{StaticResource ToolbarButtonStyle}"
                             ToolTip="Opens the player history panel"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Width="32" Height="32"
-                            Padding="6"
                             hc:IconElement.Width="18"
                             hc:IconElement.Geometry="{StaticResource ClockGeometry}"
                             Click="btnPlayerHistory_Click"/>
@@ -307,14 +267,10 @@
 
         <!-- general settings panel -->
         <Canvas Name="GeneralSettingsCanvas" Panel.ZIndex="1000">
-            <Canvas.Resources>
-                <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
-            </Canvas.Resources>
-
-            <Border x:Name="GeneralSettingsPanel" 
+            <Border x:Name="GeneralSettingsPanel"
                     Width="340" Height="600"
                     Canvas.Left="700" Canvas.Top="50"
-                    CornerRadius="8" 
+                    CornerRadius="8"
                     Visibility="Collapsed"
                     Effect="{StaticResource PanelShadow}"
                     Background="Transparent"
@@ -325,14 +281,10 @@
 
         <!-- loot settings panel -->
         <Canvas Name="LootSettingsCanvas" Panel.ZIndex="1000">
-            <Canvas.Resources>
-                <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
-            </Canvas.Resources>
-
-            <Border x:Name="LootSettingsPanel" 
+            <Border x:Name="LootSettingsPanel"
                     Width="350" Height="450"
                     Canvas.Left="700" Canvas.Top="50"
-                    CornerRadius="8" 
+                    CornerRadius="8"
                     Visibility="Collapsed"
                     Effect="{StaticResource PanelShadow}"
                     Background="Transparent"
@@ -343,14 +295,10 @@
 
         <!-- memory writing panel -->
         <Canvas Name="MemoryWritingCanvas" Panel.ZIndex="1000">
-            <Canvas.Resources>
-                <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
-            </Canvas.Resources>
-
-            <Border x:Name="MemoryWritingPanel" 
+            <Border x:Name="MemoryWritingPanel"
                     Width="350" Height="550"
                     Canvas.Left="650" Canvas.Top="70"
-                    CornerRadius="8" 
+                    CornerRadius="8"
                     Visibility="Collapsed"
                     Effect="{StaticResource PanelShadow}"
                     Background="Transparent"
@@ -361,14 +309,10 @@
         
         <!-- esp panel -->
         <Canvas Name="ESPCanvas" Panel.ZIndex="1000">
-            <Canvas.Resources>
-                <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
-            </Canvas.Resources>
-
-            <Border x:Name="ESPPanel" 
+            <Border x:Name="ESPPanel"
                     Width="350" Height="550"
                     Canvas.Left="600" Canvas.Top="90"
-                    CornerRadius="8" 
+                    CornerRadius="8"
                     Visibility="Collapsed"
                     Effect="{StaticResource PanelShadow}"
                     Background="Transparent"
@@ -379,14 +323,10 @@
 
         <!-- loot filter panel -->
         <Canvas Name="LootFilterCanvas" Panel.ZIndex="1000">
-            <Canvas.Resources>
-                <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
-            </Canvas.Resources>
-
-            <Border x:Name="LootFilterPanel" 
+            <Border x:Name="LootFilterPanel"
                     Width="350" Height="450"
                     Canvas.Left="550" Canvas.Top="110"
-                    CornerRadius="8" 
+                    CornerRadius="8"
                     Visibility="Collapsed"
                     Effect="{StaticResource PanelShadow}"
                     Background="Transparent"
@@ -397,27 +337,19 @@
         
         <!-- settings search panel -->
         <Canvas Name="SettingsSearchCanvas" Panel.ZIndex="1000">
-          <Canvas.Resources>
-            <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
-          </Canvas.Resources>
-
-          <Border x:Name="SettingsSearchPanel"
-                  Width="420" Height="560"
-                  Canvas.Left="760" Canvas.Top="60"
-                  CornerRadius="8"
-                  Visibility="Collapsed"
-                  Effect="{StaticResource PanelShadow}"
-                  Background="Transparent"
-                  BorderThickness="0">
-            <local:SettingsSearchControl x:Name="SettingsSearchControl"/>
-          </Border>
-        </Canvas>       
+            <Border x:Name="SettingsSearchPanel"
+                    Width="420" Height="560"
+                    Canvas.Left="760" Canvas.Top="60"
+                    CornerRadius="8"
+                    Visibility="Collapsed"
+                    Effect="{StaticResource PanelShadow}"
+                    Background="Transparent"
+                    BorderThickness="0">
+                <local:SettingsSearchControl x:Name="SettingsSearchControl"/>
+            </Border>
+        </Canvas>
         <!-- map setup panel -->
         <Canvas Name="MapSetupCanvas" Panel.ZIndex="1000">
-            <Canvas.Resources>
-                <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
-            </Canvas.Resources>
-
             <Border x:Name="MapSetupPanel"
                     Width="365" Height="145"
                     Canvas.Left="550" Canvas.Top="110"
@@ -432,10 +364,6 @@
 
         <!-- quest planner panel -->
         <Canvas Name="QuestPlannerCanvas" Panel.ZIndex="1000">
-            <Canvas.Resources>
-                <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
-            </Canvas.Resources>
-
             <Border x:Name="QuestPlannerPanel"
                     Width="340" Height="600"
                     Canvas.Left="650" Canvas.Top="50"
@@ -450,10 +378,6 @@
 
         <!-- hideout stash panel -->
         <Canvas Name="HideoutStashCanvas" Panel.ZIndex="1000">
-            <Canvas.Resources>
-                <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
-            </Canvas.Resources>
-
             <Border x:Name="HideoutStashPanel"
                     Width="540" Height="480"
                     Canvas.Left="500" Canvas.Top="70"
@@ -468,10 +392,6 @@
 
         <!-- watchlist panel -->
         <Canvas Name="WatchlistCanvas" Panel.ZIndex="1000">
-            <Canvas.Resources>
-                <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
-            </Canvas.Resources>
-
             <Border x:Name="WatchlistPanel"
                     Width="350" Height="450"
                     Canvas.Left="550" Canvas.Top="110"
@@ -486,10 +406,6 @@
 
         <!-- player history panel -->
         <Canvas Name="PlayerHistoryCanvas" Panel.ZIndex="1000">
-            <Canvas.Resources>
-                <DropShadowEffect x:Key="PanelShadow" BlurRadius="15" ShadowDepth="5" Direction="315" Color="Black" Opacity="0.5"/>
-            </Canvas.Resources>
-
             <Border x:Name="PlayerHistoryPanel"
                     Width="490" Height="200"
                     Canvas.Left="550" Canvas.Top="110"
@@ -510,7 +426,6 @@
             <hc:SimpleStackPanel x:Name="GrowlPanel"
                         hc:Growl.Token="MainGrowl"
                         Orientation="Vertical"
-                        Margin="0,0,0,0"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Bottom"/>
         </ScrollViewer>
