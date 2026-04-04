@@ -11,7 +11,6 @@ using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.SKWidgetControl;
 using eft_dma_radar.UI.Radar.Maps;
-using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Misc.Data.EFT;
 using eft_dma_radar.UI.Controls;
 using HandyControl.Controls;
@@ -39,6 +38,7 @@ using Point = System.Windows.Point;
 using RadioButton = System.Windows.Controls.RadioButton;
 using UserControl = System.Windows.Controls.UserControl;
 using MenuItem = System.Windows.Controls.MenuItem;
+using eft_dma_radar.Misc.Config;
 
 namespace eft_dma_radar.UI.Pages
 {

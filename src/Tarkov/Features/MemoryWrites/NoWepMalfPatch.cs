@@ -3,7 +3,7 @@ using eft_dma_radar.DMA.ScatterAPI;
 using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.Unity.Collections;
 
-namespace eft_dma_radar.Tarkov.Features.MemoryWrites.Patches
+namespace eft_dma_radar.Tarkov.Features.MemoryWrites
 {
     /// <summary>
     /// IL2CPP-safe replacement for the old Mono-based NoWeaponMalfunctions patch.

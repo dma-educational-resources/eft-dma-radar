@@ -1,4 +1,5 @@
 ﻿using eft_dma_radar.Tarkov.EFTPlayer;
+using eft_dma_radar.Tarkov.GameWorld.Loot;
 
 namespace eft_dma_radar.Tarkov.Loot
 {

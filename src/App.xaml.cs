@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Windows;
 using Application = System.Windows.Application;
 using Brush = System.Windows.Media.Brush;
+
 namespace eft_dma_radar
 {
     public partial class App : Application

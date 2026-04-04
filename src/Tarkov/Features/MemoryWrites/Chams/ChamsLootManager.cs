@@ -1,13 +1,12 @@
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.Unity.LowLevel;
 using eft_dma_radar.Tarkov.Unity.LowLevel.Types;
-using eft_dma_radar.Tarkov.Features.MemoryWrites.Chams;
 using eft_dma_radar.Tarkov.GameWorld;
-using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 using eft_dma_radar.UI.Misc;
+using eft_dma_radar.Tarkov.GameWorld.Loot;
 
-namespace eft_dma_radar.Tarkov.Features
+namespace eft_dma_radar.Tarkov.Features.MemoryWrites.Chams
 {
     /// <summary>
     /// Manages loot chams application, caching, and restoration
@@ -191,7 +190,7 @@ namespace eft_dma_radar.Tarkov.Features
 
         #region Private Implementation
 
-        private static void ProcessImportantItemChams(eft_dma_radar.Tarkov.Loot.LootManager lootManager, HashSet<string> currentImportantItems)
+        private static void ProcessImportantItemChams(LootManager lootManager, HashSet<string> currentImportantItems)
         {
             var importantItemSettings = ChamsConfig.GetEntitySettings(ChamsEntityType.ImportantItem);
             if (!importantItemSettings.Enabled)
@@ -218,7 +217,7 @@ namespace eft_dma_radar.Tarkov.Features
                 ApplyChamsToItems(lootManager.FilteredLoot, currentImportantItems, importantItemSettings.Mode, materialId);
         }
 
-        private static void ProcessQuestItemChams(eft_dma_radar.Tarkov.Loot.LootManager lootManager, HashSet<string> currentQuestItems)
+        private static void ProcessQuestItemChams(LootManager lootManager, HashSet<string> currentQuestItems)
         {
             var questItemSettings = ChamsConfig.GetEntitySettings(ChamsEntityType.QuestItem);
             if (!questItemSettings.Enabled)

@@ -3,7 +3,6 @@ using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.Tarkov.Features.MemoryWrites;
 using eft_dma_radar.Tarkov.GameWorld.Exits;
 using eft_dma_radar.Tarkov.GameWorld.Explosives;
-using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.Tarkov.Unity.IL2CPP;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;
@@ -12,6 +11,7 @@ using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Web.ProfileApi;
 using eft_dma_radar.DMA.Features;
+using eft_dma_radar.Tarkov.GameWorld.Loot;
 
 namespace eft_dma_radar.Tarkov.GameWorld
 {

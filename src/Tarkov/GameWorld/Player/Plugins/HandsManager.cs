@@ -1,8 +1,8 @@
 #pragma warning disable IDE0130
-using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Tarkov.Unity.Collections;
 using static eft_dma_radar.Tarkov.EFTPlayer.Plugins.FirearmManager;
+using eft_dma_radar.Tarkov.GameWorld.Loot;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 {

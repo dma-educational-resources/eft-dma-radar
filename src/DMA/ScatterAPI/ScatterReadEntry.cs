@@ -4,7 +4,8 @@ using static eft_dma_radar.Tarkov.Unity.UnityTransform;
 
 namespace eft_dma_radar.DMA.ScatterAPI
 {
-    public sealed class ScatterReadEntry<T> : IScatterEntry, IPooledObject<ScatterReadEntry<T>>
+    [method: Obsolete("You must rent this object via IPooledObject!")]
+    public sealed class ScatterReadEntry<T>() : IScatterEntry, IPooledObject<ScatterReadEntry<T>>
     {
         private static readonly bool _isValueType = !RuntimeHelpers.IsReferenceOrContainsReferences<T>();
         private T _result;
@@ -26,8 +27,6 @@ namespace eft_dma_radar.DMA.ScatterAPI
         /// </summary>
         public bool IsFailed { get; set; }
         public Action<ScatterReadEntry<T>> ActionOnComplete { get; set; }
-        [Obsolete("You must rent this object via IPooledObject!")]
-        public ScatterReadEntry() { }
 
         /// <summary>
         /// Get a Scatter Read Entry from the Object Pool.
@@ -143,7 +142,7 @@ namespace eft_dma_radar.DMA.ScatterAPI
                 }
                 var nullIndex = buffer.FindUtf16NullTerminatorIndex();
                 r3._result = nullIndex >= 0 ?
-                    Encoding.Unicode.GetString(buffer.Slice(0, nullIndex)) : Encoding.Unicode.GetString(buffer);
+                    Encoding.Unicode.GetString(buffer[..nullIndex]) : Encoding.Unicode.GetString(buffer);
             }
             else if (this is ScatterReadEntry<UTF8String> r4) // UTF-8
             {
@@ -156,7 +155,7 @@ namespace eft_dma_radar.DMA.ScatterAPI
                 }
                 var nullIndex = buffer.IndexOf((byte)0);
                 r4._result = nullIndex >= 0 ?
-                    Encoding.UTF8.GetString(buffer.Slice(0, nullIndex)) : Encoding.UTF8.GetString(buffer);
+                    Encoding.UTF8.GetString(buffer[..nullIndex]) : Encoding.UTF8.GetString(buffer);
             }
             else
                 throw new NotImplementedException($"Type {typeof(T)} not supported!");

@@ -30,6 +30,7 @@ using UserControl = System.Windows.Controls.UserControl;
 using Window = HandyControl.Controls.Window;
 using MenuItem = System.Windows.Controls.MenuItem;
 using eft_dma_radar.UI.Loot;
+using eft_dma_radar.Tarkov.GameWorld.Loot;
 
 namespace eft_dma_radar.UI.Pages
 {

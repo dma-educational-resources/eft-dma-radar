@@ -1,16 +1,16 @@
 #pragma warning disable IDE0130
 using System.Collections.Frozen;
-using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Tarkov.Unity.Collections;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.Tarkov.API;
 using eft_dma_radar.Web.ProfileApi;
+using eft_dma_radar.Tarkov.GameWorld.Loot;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 {
-    public sealed class GearManager
+    public sealed class GearManager(Player player, bool isPMC = false)
     {
         private static readonly FrozenSet<string> THERMAL_IDS =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -50,24 +50,14 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
         private const string SECURE_SLOT = "SecuredContainer";
-        private readonly bool _isPMC;
-        private readonly Player _player;
         private IReadOnlyDictionary<string, ulong> _slots =
             FrozenDictionary<string, ulong>.Empty;
-        public GearManager(Player player, bool isPMC = false)
-        {
-            _player = player;
-            _isPMC = isPMC;
-
-            Equipment = FrozenDictionary<string, GearItem>.Empty;
-            Loot = [];
-        }
 
         private IReadOnlyDictionary<string, ulong> Slots { get; set; }
 
 
-        public IReadOnlyDictionary<string, GearItem> Equipment { get; private set; }
-        public IReadOnlyList<LootItem> Loot { get; private set; }
+        public IReadOnlyDictionary<string, GearItem> Equipment { get; private set; } = FrozenDictionary<string, GearItem>.Empty;
+        public IReadOnlyList<LootItem> Loot { get; private set; } = [];
 
         public bool HasQuestItems => Loot?.Any(x => x.IsQuestCondition) ?? false;
         public bool HasNVG { get; private set; }
@@ -92,7 +82,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         }
         private bool TryBuildSlots()
         {
-            ulong invController = Memory.ReadPtr(_player.InventoryControllerAddr);
+            ulong invController = Memory.ReadPtr(player.InventoryControllerAddr);
             if (!invController.IsValidVirtualAddress())
                 return false;
 
@@ -128,7 +118,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 }
                 catch { }
             }
-            TryResolveAliveDogtagProfileId(_player, _equipmentSlotsPtr);
+            TryResolveAliveDogtagProfileId(player, _equipmentSlotsPtr);
 
             _slots = dict.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
             return _slots.Count > 0;
@@ -145,7 +135,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             {
                 try
                 {
-                    if (_isPMC && slot.Key == "Scabbard")
+                    if (isPMC && slot.Key == "Scabbard")
                         continue;
 
                     if (slot.Key == SECURE_SLOT)
@@ -183,7 +173,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 catch { }
             }
 
-            Loot = loot.OrderLoot().ToList();
+            Loot = [.. loot.OrderLoot()];
             Equipment = gear;
 
             int value = 0;

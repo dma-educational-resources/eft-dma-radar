@@ -3,6 +3,7 @@ using eft_dma_radar.UI.Radar.Maps;
 using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
 using MessagePack;
+using eft_dma_radar.Tarkov.GameWorld.Loot;
 
 namespace eft_dma_radar.Tarkov.WebRadar.Data
 {

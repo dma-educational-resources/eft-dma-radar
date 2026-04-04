@@ -10,8 +10,9 @@ using eft_dma_radar.Tarkov.EFTPlayer.Plugins;
 using eft_dma_radar.UI.ESP.eft_dma_radar.UI.ESP;
 using static eft_dma_radar.Tarkov.EFTPlayer.Player;
 using eft_dma_radar.Web.ProfileApi;
+using eft_dma_radar.Tarkov.Loot;
 
-namespace eft_dma_radar.Tarkov.Loot
+namespace eft_dma_radar.Tarkov.GameWorld.Loot
 {
     public sealed class LootManager
     {

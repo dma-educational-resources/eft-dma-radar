@@ -1,4 +1,6 @@
-namespace eft_dma_radar.Misc.Data
+using eft_dma_radar.Misc.Config;
+
+namespace eft_dma_radar.Misc.Config
 {
     public enum HotkeyMode
     {

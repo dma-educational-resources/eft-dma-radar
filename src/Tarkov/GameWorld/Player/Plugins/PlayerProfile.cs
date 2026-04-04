@@ -7,13 +7,8 @@ using eft_dma_radar.Web.ProfileApi;
 
 namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 {
-    public sealed class PlayerProfile
+    public sealed class PlayerProfile(ObservedPlayer player)
     {
-        private readonly ObservedPlayer _player;
-        public PlayerProfile(ObservedPlayer player)
-        {
-            _player = player;
-        }
 
         /// <summary>
         /// Resolves the account ID from the API cache (via ProfileID ? API lookup).
@@ -22,7 +17,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         {
             get
             {
-                var profileId = _player.ProfileID;
+                var profileId = player.ProfileID;
                 if (string.IsNullOrEmpty(profileId))
                     return null;
                 return PlayerLookupApiClient.TryGetCached(profileId)?.AccountId;
@@ -216,7 +211,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 
         /// Player's Achievements Dictionary (only human players).
         /// Key = Achievement ID, Value = Unix timestamp when earned
-        public Dictionary<string, long> Achievements => Profile?.Achievements ?? new Dictionary<string, long>();
+        public Dictionary<string, long> Achievements => Profile?.Achievements ?? [];
 
         /// Player's Total Achievement Count (only human players).
         public int AchievementCount => Achievements.Count;
@@ -236,7 +231,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                     try
                     {
                         var profileStr = profile.ToString() ?? string.Empty;
-                        var fixUnix = profileStr.Substring(0, profileStr.Length - 3);
+                        var fixUnix = profileStr[..^3];
                         var time = (DateTime.Now - DateTimeOffset.FromUnixTimeSeconds(Convert.ToInt64(fixUnix)).LocalDateTime);
 
                         if (time.Days > 0)

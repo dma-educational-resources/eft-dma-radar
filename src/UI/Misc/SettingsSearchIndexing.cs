@@ -13,6 +13,7 @@ using TextBox = System.Windows.Controls.TextBox;
 using GroupBox = System.Windows.Controls.GroupBox;
 using TabControl = System.Windows.Controls.TabControl;
 using System.Windows.Media.Media3D;
+
 namespace eft_dma_radar.UI.Misc
 {
     public enum SettingsHitKind

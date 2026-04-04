@@ -7,8 +7,9 @@ using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;
 using eft_dma_radar.UI.ESP;
 using eft_dma_radar.UI.Loot;
+using eft_dma_radar.Tarkov.Loot;
 
-namespace eft_dma_radar.Tarkov.Loot
+namespace eft_dma_radar.Tarkov.GameWorld.Loot
 {
     public class LootItem : IMouseoverEntity, IMapEntity, IWorldEntity, IESPEntity
     {

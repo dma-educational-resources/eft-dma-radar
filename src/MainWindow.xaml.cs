@@ -29,8 +29,9 @@ using Color = System.Windows.Media.Color;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
 using Size = System.Windows.Size;
-using Switch = eft_dma_radar.Tarkov.GameWorld.Exits.Switch;
+using Switch = eft_dma_radar.Tarkov.GameWorld.Interactables.Switch;
 using UserControl = System.Windows.Controls.UserControl;
+using eft_dma_radar.Tarkov.GameWorld.Loot;
 
 namespace eft_dma_radar
 {
@@ -281,7 +282,7 @@ namespace eft_dma_radar
             else
                 TitleTextBlock.Text = $"EFT DMA Radar - {configName}";
         }
-        private List<Tarkov.GameWorld.Exits.Switch> Switches = new List<Tarkov.GameWorld.Exits.Switch>();
+        private List<Switch> Switches = new List<Switch>();
         public static List<Tarkov.GameWorld.Interactables.Door> Doors = new List<Tarkov.GameWorld.Interactables.Door>();
         #endregion
 
@@ -405,9 +406,9 @@ namespace eft_dma_radar
                     var mapCanvasBounds = new SKRect
                     {
                         Left = 0,
-                        Right = (float)ActiveCanvas.ActualWidth,
+                        Right = canvasSize.Width,
                         Top = 0,
-                        Bottom = (float)ActiveCanvas.ActualHeight
+                        Bottom = canvasSize.Height
                     };
 
                     var centerX = (mapCanvasBounds.Left + mapCanvasBounds.Right) / 2;
@@ -749,11 +750,11 @@ namespace eft_dma_radar
                 else
                 {
                     if (!isStarting)
-                        GameNotRunningStatus(canvas);
+                        GameNotRunningStatus(canvas, canvasSize);
                     else if (isStarting && !isReady)
-                        StartingUpStatus(canvas);
+                        StartingUpStatus(canvas, canvasSize);
                     else if (!inRaid)
-                        WaitingForRaidStatus(canvas);
+                        WaitingForRaidStatus(canvas, canvasSize);
                 }
 
                 SetStatusText(canvas);
@@ -924,7 +925,7 @@ namespace eft_dma_radar
                     _mouseOverItem = exit;
                     MouseoverGroup = null;
                     break;
-                case Tarkov.GameWorld.Exits.Switch swtch:
+                case Switch swtch:
                     _mouseOverItem = swtch;
                     MouseoverGroup = null;
                     break;
@@ -1024,16 +1025,16 @@ namespace eft_dma_radar
             }
         }
 
-        private void GameNotRunningStatus(SKCanvas canvas)
+        private void GameNotRunningStatus(SKCanvas canvas, SKSize canvasSize)
         {
             const string notRunning = "Game Process Not Running!";
             float textWidth = SKPaints.RadarFontRegular48.MeasureText(notRunning);
-            canvas.DrawText(notRunning, ((float)ActiveCanvas.ActualWidth / 2) - textWidth / 2f, (float)ActiveCanvas.ActualHeight / 2,
+            canvas.DrawText(notRunning, (canvasSize.Width / 2) - textWidth / 2f, canvasSize.Height / 2,
                 SKTextAlign.Left, SKPaints.RadarFontRegular48, SKPaints.TextRadarStatus);
             IncrementStatus();
         }
 
-        private void StartingUpStatus(SKCanvas canvas)
+        private void StartingUpStatus(SKCanvas canvas, SKSize canvasSize)
         {
             const string startingUp1 = "Starting Up.";
             const string startingUp2 = "Starting Up..";
@@ -1042,12 +1043,12 @@ namespace eft_dma_radar
                 startingUp1 : _statusOrder == 2 ?
                 startingUp2 : startingUp3;
             float textWidth = SKPaints.RadarFontRegular48.MeasureText(startingUp1);
-            canvas.DrawText(status, ((float)ActiveCanvas.ActualWidth / 2) - textWidth / 2f, (float)ActiveCanvas.ActualHeight / 2,
+            canvas.DrawText(status, (canvasSize.Width / 2) - textWidth / 2f, canvasSize.Height / 2,
                 SKTextAlign.Left, SKPaints.RadarFontRegular48, SKPaints.TextRadarStatus);
             IncrementStatus();
         }
 
-        private void WaitingForRaidStatus(SKCanvas canvas)
+        private void WaitingForRaidStatus(SKCanvas canvas, SKSize canvasSize)
         {
             string dots = _statusOrder == 1 ? "." : _statusOrder == 2 ? ".." : "...";
             string stageText = "Waiting for Raid Start";
@@ -1058,7 +1059,7 @@ namespace eft_dma_radar
 
             string status = stageText + dots;
             float textWidth = SKPaints.RadarFontRegular48.MeasureText(stageText + "...");
-            canvas.DrawText(status, ((float)ActiveCanvas.ActualWidth / 2) - textWidth / 2f, (float)ActiveCanvas.ActualHeight / 2,
+            canvas.DrawText(status, (canvasSize.Width / 2) - textWidth / 2f, canvasSize.Height / 2,
                 SKTextAlign.Left, SKPaints.RadarFontRegular48, SKPaints.TextRadarStatus);
             IncrementStatus();
         }
@@ -1675,10 +1676,30 @@ namespace eft_dma_radar
         #endregion
 
         #region Toolbar Events
-        private void Grid_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void btnMinimize_Click(object sender, RoutedEventArgs e)
+            => WindowState = WindowState.Minimized;
+
+        private void btnMaximizeRestore_Click(object sender, RoutedEventArgs e)
+            => WindowState = WindowState == WindowState.Maximized
+                ? WindowState.Normal
+                : WindowState.Maximized;
+
+        private void btnClose_Click(object sender, RoutedEventArgs e)
+            => Close();
+
+        private void Window_StateChanged(object sender, EventArgs e)
         {
-            if (e.ClickCount == 1)
-                DragMove();
+            if (btnMaximizeRestore == null) return;
+            if (WindowState == WindowState.Maximized)
+            {
+                btnMaximizeRestore.Content = "\uE923";
+                btnMaximizeRestore.ToolTip = "Restore";
+            }
+            else
+            {
+                btnMaximizeRestore.Content = "\uE739";
+                btnMaximizeRestore.ToolTip = "Maximize";
+            }
         }
 
         private void CustomToolbar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -2305,7 +2326,7 @@ namespace eft_dma_radar
             if (GameData.Switches.TryGetValue(MapID, out var switchesDict))
                 foreach (var kvp in switchesDict)
                 {
-                    Switches.Add(new Tarkov.GameWorld.Exits.Switch(kvp.Value, kvp.Key));
+                    Switches.Add(new Switch(kvp.Value, kvp.Key));
                 }
         }
 

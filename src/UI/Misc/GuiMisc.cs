@@ -5,6 +5,7 @@ using eft_dma_radar.UI.Pages;
 using eft_dma_radar.UI.Radar.Maps;
 using eft_dma_radar.Misc.Data;
 using eft_dma_radar.Tarkov.Unity;
+using eft_dma_radar.Tarkov.GameWorld.Loot;
 
 namespace eft_dma_radar.UI.Misc
 {

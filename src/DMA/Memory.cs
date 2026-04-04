@@ -6,7 +6,6 @@ using eft_dma_radar.Tarkov.EFTPlayer;
 using eft_dma_radar.Tarkov.GameWorld;
 using eft_dma_radar.Tarkov.GameWorld.Exits;
 using eft_dma_radar.Tarkov.GameWorld.Explosives;
-using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
 using System.IO;
 using System.Runtime;
@@ -16,6 +15,7 @@ using VmmSharpEx.Options;
 using VmmSharpEx.Refresh;
 using VmmSharpEx.Scatter;
 using IL2CPP = eft_dma_radar.Tarkov.Unity.IL2CPP;
+using eft_dma_radar.Tarkov.GameWorld.Loot;
 
 namespace eft_dma_radar.DMA
 {

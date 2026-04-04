@@ -9,12 +9,13 @@ using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
 using eft_dma_radar.UI.Pages;
 using RectFSer = eft_dma_radar.UI.Misc.RectFSer;
-using Switch = eft_dma_radar.Tarkov.GameWorld.Exits.Switch;
+using Switch = eft_dma_radar.Tarkov.GameWorld.Interactables.Switch;
 using eft_dma_radar.Tarkov.Unity;
 using eft_dma_radar.DMA.Features;
 using eft_dma_radar.Misc.Data;
 using eft_dma_radar.UI.Radar.Maps;
 using eft_dma_radar.UI.ESP.eft_dma_radar.UI.ESP;
+using eft_dma_radar.Tarkov.GameWorld.Loot;
 
 namespace eft_dma_radar.UI.ESP
 {
@@ -1268,7 +1269,7 @@ namespace eft_dma_radar.UI.ESP
             {
                 foreach (var switchEntry in switches)
                 {
-                    var switchObj = new Tarkov.GameWorld.Exits.Switch(switchEntry.Value, switchEntry.Key);
+                    var switchObj = new Switch(switchEntry.Value, switchEntry.Key);
                     switchObj.DrawESP(canvas, localPlayer);
                 }
             }
