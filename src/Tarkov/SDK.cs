@@ -1,7 +1,6 @@
 #pragma warning disable IDE0130
 #pragma warning disable CA2211
 
-
 namespace SDK
 {
     public readonly partial struct Offsets
