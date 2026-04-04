@@ -13,7 +13,7 @@ namespace eft_dma_radar.DMA
         private static readonly HashSet<int> _pressedKeys = new();
 
         private static Vmm _hVMM;
-        private static VmmInputManagerEx _vmmInput;
+        private static VmmInputManager _vmmInput;
 
         private static int _initAttempts = 0;
         private const int MAX_ATTEMPTS = 3;
@@ -94,7 +94,7 @@ namespace eft_dma_radar.DMA
 
             try
             {
-                _vmmInput = new VmmInputManagerEx(_hVMM);
+                _vmmInput = new VmmInputManager(_hVMM);
                 _initialized = true;
                 ReadyChanged?.Invoke(null, EventArgs.Empty);
                 return true;
