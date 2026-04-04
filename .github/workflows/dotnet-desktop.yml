@@ -110,16 +110,16 @@ jobs:
                     name  = "Commit"
                     value = $env:COMMIT_MESSAGE
                   },
-                          @{
-                            name  = "Job Link"
-                            value = $env:JOB_URL
-                          }
-                        )
-                      }
-                    )
+                  @{
+                    name  = "Job Link"
+                    value = $env:JOB_URL
                   }
-                  $json = $payload | ConvertTo-Json -Depth 5
-                  Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK -Method Post -ContentType "application/json" -Body $json
+                )
+              }
+            )
+          }
+          $json = $payload | ConvertTo-Json -Depth 5
+          Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK -Method Post -ContentType "application/json" -Body $json
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
@@ -202,13 +202,13 @@ jobs:
                     value = $env:CHANNEL
                     inline = $true
                   },
-                          @{
-                            name  = "Download"
-                            value = "[$env:RELEASE_NAME]($env:RELEASE_URL)"
-                          }
-                        )
-                      }
-                    )
+                  @{
+                    name  = "Download"
+                    value = "[$env:RELEASE_NAME]($env:RELEASE_URL)"
                   }
-                  $json = $payload | ConvertTo-Json -Depth 5
-                  Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK -Method Post -ContentType "application/json" -Body $json
+                )
+              }
+            )
+          }
+          $json = $payload | ConvertTo-Json -Depth 5
+          Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK -Method Post -ContentType "application/json" -Body $json
