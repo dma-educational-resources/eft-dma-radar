@@ -450,18 +450,25 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 // ?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่?ก่
                 try
                 {
-                    ulong classNamePtr = Memory.ReadPtrChain(
+                    if (Memory.TryReadPtrChain(
                         localGameWorld,
                         UnityOffsets.Component.To_NativeClassName,
-                        useCache: false);
+                        out var classNamePtr,
+                        useCache: false) &&
+                        Memory.TryReadString(classNamePtr, out var className, 64, useCache: false) &&
+                        className is not null)
+                    {
+                        IsOffline = className.Equals(
+                            "ClientLocalGameWorld",
+                            StringComparison.OrdinalIgnoreCase);
 
-                    string className = Memory.ReadString(classNamePtr, 64, useCache: false);
-
-                    IsOffline = className.Equals(
-                        "ClientLocalGameWorld",
-                        StringComparison.OrdinalIgnoreCase);
-
-                    Log.WriteLine($"[IL2CPP] Raid Mode: {(IsOffline ? "OFFLINE" : "ONLINE")}");
+                        Log.WriteLine($"[IL2CPP] Raid Mode: {(IsOffline ? "OFFLINE" : "ONLINE")}");
+                    }
+                    else
+                    {
+                        Log.WriteLine("[IL2CPP] Could not detect offline mode: read failed");
+                        IsOffline = false;
+                    }
                 }
                 catch (Exception ex)
                 {

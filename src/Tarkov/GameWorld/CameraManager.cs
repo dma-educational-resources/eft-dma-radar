@@ -220,23 +220,19 @@ namespace eft_dma_radar.Tarkov.GameWorld
         /// </summary>
         private static bool ValidateAllCamerasAddr(ulong addr)
         {
-            try
-            {
-                if (!addr.IsValidVirtualAddress())
-                    return false;
-
-                var listPtr = Memory.ReadPtr(addr, false);
-                if (!listPtr.IsValidVirtualAddress())
-                    return false;
-
-                var items = Memory.ReadPtr(listPtr, false);
-                int count = Memory.ReadValue<int>(listPtr + 0x8, false);
-                return items.IsValidVirtualAddress() && count >= 0 && count < 1024;
-            }
-            catch
-            {
+            if (!addr.IsValidVirtualAddress())
                 return false;
-            }
+
+            if (!Memory.TryReadPtr(addr, out var listPtr, false))
+                return false;
+
+            if (!Memory.TryReadPtr(listPtr, out var items, false))
+                return false;
+
+            if (!Memory.TryReadValue<int>(listPtr + 0x8, out var count, false))
+                return false;
+
+            return items.IsValidVirtualAddress() && count >= 0 && count < 1024;
         }
 
         /// <summary>
@@ -280,49 +276,41 @@ namespace eft_dma_radar.Tarkov.GameWorld
             fpsCamera = 0;
             opticCamera = 0;
 
-            try
-            {
-                if (!_eftCameraManagerInstance.IsValidVirtualAddress())
-                    return false;
+            if (!_eftCameraManagerInstance.IsValidVirtualAddress())
+                return false;
 
-                // FPS camera
-                var fpsCameraRef = Memory.ReadPtr(_eftCameraManagerInstance + Offsets.EFTCameraManager.Camera, false);
-                if (!fpsCameraRef.IsValidVirtualAddress())
-                    return false;
+            // FPS camera
+            if (!Memory.TryReadPtr(_eftCameraManagerInstance + Offsets.EFTCameraManager.Camera, out var fpsCameraRef, false))
+                return false;
 
-                var name = ObjectClass.ReadName(fpsCameraRef, 32, false);
-                if (!string.Equals(name, "Camera", StringComparison.Ordinal))
-                    return false;
+            if (!ObjectClass.TryReadName(fpsCameraRef, out var name, 32, false) ||
+                !string.Equals(name, "Camera", StringComparison.Ordinal))
+                return false;
 
-                fpsCamera = Memory.ReadPtr(fpsCameraRef + UnityOffsets.ObjectClass.MonoBehaviourOffset, false);
-                if (!fpsCamera.IsValidVirtualAddress() || !ValidateCameraMatrix(fpsCamera))
-                    return false;
+            if (!Memory.TryReadPtr(fpsCameraRef + UnityOffsets.ObjectClass.MonoBehaviourOffset, out fpsCamera, false))
+                return false;
 
-                // Optic camera
-                var opticCameraManager = Memory.ReadPtr(_eftCameraManagerInstance + Offsets.EFTCameraManager.OpticCameraManager, false);
-                if (!opticCameraManager.IsValidVirtualAddress())
-                    return false;
-
-                var opticCameraRef = Memory.ReadPtr(opticCameraManager + Offsets.OpticCameraManager.Camera, false);
-                if (!opticCameraRef.IsValidVirtualAddress())
-                    return false;
-
-                name = ObjectClass.ReadName(opticCameraRef, 32, false);
-                if (!string.Equals(name, "Camera", StringComparison.Ordinal))
-                    return false;
-
-                opticCamera = Memory.ReadPtr(opticCameraRef + UnityOffsets.ObjectClass.MonoBehaviourOffset, false);
-                if (!opticCamera.IsValidVirtualAddress())
-                    return false;
-
-                return true;
-            }
-            catch
+            if (!ValidateCameraMatrix(fpsCamera))
             {
                 fpsCamera = 0;
-                opticCamera = 0;
                 return false;
             }
+
+            // Optic camera
+            if (!Memory.TryReadPtr(_eftCameraManagerInstance + Offsets.EFTCameraManager.OpticCameraManager, out var opticCameraManager, false))
+                return false;
+
+            if (!Memory.TryReadPtr(opticCameraManager + Offsets.OpticCameraManager.Camera, out var opticCameraRef, false))
+                return false;
+
+            if (!ObjectClass.TryReadName(opticCameraRef, out name, 32, false) ||
+                !string.Equals(name, "Camera", StringComparison.Ordinal))
+                return false;
+
+            if (!Memory.TryReadPtr(opticCameraRef + UnityOffsets.ObjectClass.MonoBehaviourOffset, out opticCamera, false))
+                return false;
+
+            return true;
         }
 
         /// <summary>
@@ -341,27 +329,16 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     return false;
                 }
 
-                var allCamerasPtr = Memory.ReadPtr(_allCamerasAddr, false);
-                if (!allCamerasPtr.IsValidVirtualAddress())
+                if (!Memory.TryReadPtr(_allCamerasAddr, out var allCamerasPtr, false))
                 {
                     Log.Write(AppLogLevel.Warning, "AllCameras pointer invalid.", "CameraManager");
                     return false;
                 }
 
-                ulong itemsPtr;
-                int count;
-
-                try
+                if (!Memory.TryReadPtr(allCamerasPtr + 0x0, out var itemsPtr, false) ||
+                    !Memory.TryReadValue<int>(allCamerasPtr + 0x8, out var count, false))
                 {
-                    // Internal Unity list layout:
-                    // [0x00] -> items array (camera*[])
-                    // [0x08] -> int count
-                    itemsPtr = Memory.ReadPtr(allCamerasPtr + 0x0, false);
-                    count = Memory.ReadValue<int>(allCamerasPtr + 0x8, false);
-                }
-                catch (Exception ex)
-                {
-                    Log.Write(AppLogLevel.Error, $"Failed reading AllCameras header: {ex.Message}", "CameraManager");
+                    Log.Write(AppLogLevel.Error, "Failed reading AllCameras header.", "CameraManager");
                     return false;
                 }
 
@@ -407,48 +384,37 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
             for (int i = 0; i < max; i++)
             {
-                try
-                {
-                    ulong entryAddr = itemsPtr + (uint)(i * 0x8);
-                    var cameraPtr = Memory.ReadPtr(entryAddr, false);
-                    if (!cameraPtr.IsValidVirtualAddress())
-                        continue;
+                ulong entryAddr = itemsPtr + (uint)(i * 0x8);
+                if (!Memory.TryReadPtr(entryAddr, out var cameraPtr, false))
+                    continue;
 
-                    // Component -> GameObject -> Name
-                    var gameObject = Memory.ReadPtr(cameraPtr + UnityOffsets.GameObject.ObjectClassOffset, false);
-                    if (!gameObject.IsValidVirtualAddress())
-                        continue;
+                // Component -> GameObject -> Name
+                if (!Memory.TryReadPtr(cameraPtr + UnityOffsets.GameObject.ObjectClassOffset, out var gameObject, false))
+                    continue;
 
-                    var namePtr = Memory.ReadPtr(gameObject + UnityOffsets.GameObject.NameOffset, false);
-                    if (!namePtr.IsValidVirtualAddress())
-                        continue;
+                if (!Memory.TryReadPtr(gameObject + UnityOffsets.GameObject.NameOffset, out var namePtr, false))
+                    continue;
 
-                    var name = Memory.ReadUnityString(namePtr, 64, false);
-                    if (string.IsNullOrEmpty(name))
-                        continue;
+                if (!Memory.TryReadUnityString(namePtr, out var name, 64, false) || string.IsNullOrEmpty(name))
+                    continue;
 
-                    bool isFps =
-                        name.IndexOf("FPS", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                        name.IndexOf("Camera", StringComparison.OrdinalIgnoreCase) >= 0;
+                bool isFps =
+                    name.IndexOf("FPS", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                    name.IndexOf("Camera", StringComparison.OrdinalIgnoreCase) >= 0;
 
-                    bool isOptic =
-                        (name.IndexOf("Optic", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         name.IndexOf("BaseOptic", StringComparison.OrdinalIgnoreCase) >= 0) &&
-                        name.IndexOf("Camera", StringComparison.OrdinalIgnoreCase) >= 0;
+                bool isOptic =
+                    (name.IndexOf("Optic", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     name.IndexOf("BaseOptic", StringComparison.OrdinalIgnoreCase) >= 0) &&
+                    name.IndexOf("Camera", StringComparison.OrdinalIgnoreCase) >= 0;
 
-                    if (isFps && fpsCamera == 0)
-                        fpsCamera = cameraPtr;
+                if (isFps && fpsCamera == 0)
+                    fpsCamera = cameraPtr;
 
-                    if (isOptic && opticCamera == 0)
-                        opticCamera = cameraPtr;
+                if (isOptic && opticCamera == 0)
+                    opticCamera = cameraPtr;
 
-                    if (fpsCamera != 0 && opticCamera != 0)
-                        break;
-                }
-                catch
-                {
-                    // Ignore individual failures
-                }
+                if (fpsCamera != 0 && opticCamera != 0)
+                    break;
             }
         }
 
@@ -457,30 +423,24 @@ namespace eft_dma_radar.Tarkov.GameWorld
         /// </summary>
         private static bool ValidateCameraMatrix(ulong cameraPtr)
         {
-            try
-            {
-                var vmAddr = cameraPtr + UnityOffsets.Camera.ViewMatrix;
-                var vm = Memory.ReadValue<Matrix4x4>(vmAddr, false);
-
-                if (float.IsNaN(vm.M11) || float.IsInfinity(vm.M11) ||
-                    float.IsNaN(vm.M22) || float.IsInfinity(vm.M22) ||
-                    float.IsNaN(vm.M33) || float.IsInfinity(vm.M33) ||
-                    float.IsNaN(vm.M44) || float.IsInfinity(vm.M44))
-                    return false;
-
-                if (vm.M11 == 0f && vm.M22 == 0f && vm.M33 == 0f && vm.M44 == 0f)
-                    return false;
-
-                // simple translation sanity
-                if (Math.Abs(vm.M41) > 5000f || Math.Abs(vm.M42) > 5000f || Math.Abs(vm.M43) > 5000f)
-                    return false;
-
-                return true;
-            }
-            catch
-            {
+            var vmAddr = cameraPtr + UnityOffsets.Camera.ViewMatrix;
+            if (!Memory.TryReadValue<Matrix4x4>(vmAddr, out var vm, false))
                 return false;
-            }
+
+            if (float.IsNaN(vm.M11) || float.IsInfinity(vm.M11) ||
+                float.IsNaN(vm.M22) || float.IsInfinity(vm.M22) ||
+                float.IsNaN(vm.M33) || float.IsInfinity(vm.M33) ||
+                float.IsNaN(vm.M44) || float.IsInfinity(vm.M44))
+                return false;
+
+            if (vm.M11 == 0f && vm.M22 == 0f && vm.M33 == 0f && vm.M44 == 0f)
+                return false;
+
+            // simple translation sanity
+            if (Math.Abs(vm.M41) > 5000f || Math.Abs(vm.M42) > 5000f || Math.Abs(vm.M43) > 5000f)
+                return false;
+
+            return true;
         }
 
         /// <summary>
@@ -518,31 +478,29 @@ namespace eft_dma_radar.Tarkov.GameWorld
             // Try signature scan first
             foreach (var (sig, relOff, instrLen, desc) in AllCamerasSigs)
             {
-                try
-                {
-                    var sigAddr = Memory.FindSignature(sig, "UnityPlayer.dll");
-                    if (sigAddr == 0)
-                        continue;
+                var sigAddr = Memory.FindSignature(sig, "UnityPlayer.dll");
+                if (sigAddr == 0)
+                    continue;
 
-                    int disp32 = Memory.ReadValue<int>(sigAddr + (ulong)relOff, false);
-                    ulong resolved = sigAddr + (ulong)instrLen + (ulong)(long)disp32;
+                if (!Memory.TryReadValue<int>(sigAddr + (ulong)relOff, out var disp32, false))
+                    continue;
 
-                    if (!resolved.IsValidVirtualAddress())
-                        continue;
+                ulong resolved = sigAddr + (ulong)instrLen + (ulong)(long)disp32;
 
-                    var listPtr = Memory.ReadPtr(resolved, false);
-                    if (listPtr.IsValidVirtualAddress())
-                    {
-                        var items = Memory.ReadPtr(listPtr, false);
-                        int count = Memory.ReadValue<int>(listPtr + 0x8, false);
-                        if (items.IsValidVirtualAddress() && count >= 0 && count < 1024)
-                            return resolved;
-                    }
-                }
-                catch
-                {
-                    // Try next signature
-                }
+                if (!resolved.IsValidVirtualAddress())
+                    continue;
+
+                if (!Memory.TryReadPtr(resolved, out var listPtr, false))
+                    continue;
+
+                if (!Memory.TryReadPtr(listPtr, out var items, false))
+                    continue;
+
+                if (!Memory.TryReadValue<int>(listPtr + 0x8, out var count, false))
+                    continue;
+
+                if (items.IsValidVirtualAddress() && count >= 0 && count < 1024)
+                    return resolved;
             }
 
             // Fallback: hardcoded offset
@@ -590,7 +548,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
                         continue;
                     }
 
-                    int disp32 = Memory.ReadValue<int>(sigAddr + (ulong)relOff, false);
+                    if (!Memory.TryReadValue<int>(sigAddr + (ulong)relOff, out var disp32, false))
+                    {
+                        bodyLines.Add($"[{idx}] READ FAIL — {desc} (UP+0x{sigAddr - unityBase:X})");
+                        continue;
+                    }
                     ulong resolved = sigAddr + (ulong)instrLen + (ulong)(long)disp32;
                     string status;
 
@@ -598,22 +560,22 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     {
                         status = $"BAD ADDR 0x{resolved:X}";
                     }
+                    else if (!Memory.TryReadPtr(resolved, out var listPtr, false))
+                    {
+                        status = $"BAD LIST PTR (read failed)";
+                    }
+                    else if (!listPtr.IsValidVirtualAddress())
+                    {
+                        status = $"BAD LIST PTR 0x{listPtr:X}";
+                    }
                     else
                     {
-                        var listPtr = Memory.ReadPtr(resolved, false);
-                        if (!listPtr.IsValidVirtualAddress())
-                        {
-                            status = $"BAD LIST PTR 0x{listPtr:X}";
-                        }
-                        else
-                        {
-                            var items = Memory.ReadPtr(listPtr, false);
-                            int count = Memory.ReadValue<int>(listPtr + 0x8, false);
-                            bool valid = items.IsValidVirtualAddress() && count >= 0 && count < 1024;
-                            status = valid
-                                ? $"OK 0x{resolved:X} RVA=0x{resolved - unityBase:X} count={count}"
-                                : $"INVALID items=0x{items:X} count={count}";
-                        }
+                        Memory.TryReadPtr(listPtr, out var items, false);
+                        Memory.TryReadValue<int>(listPtr + 0x8, out var count, false);
+                        bool valid = items.IsValidVirtualAddress() && count >= 0 && count < 1024;
+                        status = valid
+                            ? $"OK 0x{resolved:X} RVA=0x{resolved - unityBase:X} count={count}"
+                            : $"INVALID items=0x{items:X} count={count}";
                     }
 
                     bodyLines.Add($"[{idx}] {status} — {desc} (UP+0x{sigAddr - unityBase:X})");
@@ -722,7 +684,11 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
                     if (entry.IsCallSite)
                     {
-                        int callRel32 = Memory.ReadValue<int>(sigAddr + (ulong)entry.OffsetPos + 1, false);
+                        if (!Memory.TryReadValue<int>(sigAddr + (ulong)entry.OffsetPos + 1, out var callRel32, false))
+                        {
+                            bodyLines.Add($"[{idx}] READ FAIL — {entry.Desc} ({matchInfo})");
+                            continue;
+                        }
                         ulong callTarget = sigAddr + 5 + (ulong)(long)callRel32;
                         matchInfo += $" ? UP+0x{callTarget - unityBase:X}";
 
@@ -734,8 +700,8 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
                         offset = entry.TargetBodyDispSize switch
                         {
-                            1 => Memory.ReadValue<byte>(callTarget + (ulong)entry.TargetBodyDispOffset, false),
-                            4 => Memory.ReadValue<uint>(callTarget + (ulong)entry.TargetBodyDispOffset, false),
+                            1 => Memory.TryReadValue<byte>(callTarget + (ulong)entry.TargetBodyDispOffset, out var b, false) ? b : 0u,
+                            4 => Memory.TryReadValue<uint>(callTarget + (ulong)entry.TargetBodyDispOffset, out var u, false) ? u : 0u,
                             _ => 0,
                         };
                     }
@@ -743,8 +709,8 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     {
                         offset = entry.DispSize switch
                         {
-                            1 => Memory.ReadValue<byte>(sigAddr + (ulong)entry.OffsetPos, false),
-                            4 => Memory.ReadValue<uint>(sigAddr + (ulong)entry.OffsetPos, false),
+                            1 => Memory.TryReadValue<byte>(sigAddr + (ulong)entry.OffsetPos, out var b, false) ? b : 0u,
+                            4 => Memory.TryReadValue<uint>(sigAddr + (ulong)entry.OffsetPos, out var u, false) ? u : 0u,
                             _ => 0,
                         };
                     }
@@ -958,53 +924,45 @@ namespace eft_dma_radar.Tarkov.GameWorld
         {
             foreach (var entry in sigs)
             {
-                try
+                var sigAddr = Memory.FindSignature(entry.Sig, "UnityPlayer.dll");
+                if (sigAddr == 0)
+                    continue;
+
+                uint offset;
+
+                if (entry.IsCallSite)
                 {
-                    var sigAddr = Memory.FindSignature(entry.Sig, "UnityPlayer.dll");
-                    if (sigAddr == 0)
-                    {
+                    if (!Memory.TryReadValue<int>(sigAddr + (ulong)entry.OffsetPos + 1, out var callRel32, false))
                         continue;
-                    }
+                    ulong callTarget = sigAddr + 5 + (ulong)(long)callRel32;
 
-                    uint offset;
+                    if (!callTarget.IsValidVirtualAddress())
+                        continue;
 
-                    if (entry.IsCallSite)
+                    offset = entry.TargetBodyDispSize switch
                     {
-                        int callRel32 = Memory.ReadValue<int>(sigAddr + (ulong)entry.OffsetPos + 1, false);
-                        ulong callTarget = sigAddr + 5 + (ulong)(long)callRel32;
-
-                        if (!callTarget.IsValidVirtualAddress())
-                            continue;
-
-                        offset = entry.TargetBodyDispSize switch
-                        {
-                            1 => Memory.ReadValue<byte>(callTarget + (ulong)entry.TargetBodyDispOffset, false),
-                            4 => Memory.ReadValue<uint>(callTarget + (ulong)entry.TargetBodyDispOffset, false),
-                            _ => 0,
-                        };
-                    }
-                    else
-                    {
-                        offset = entry.DispSize switch
-                        {
-                            1 => Memory.ReadValue<byte>(sigAddr + (ulong)entry.OffsetPos, false),
-                            4 => Memory.ReadValue<uint>(sigAddr + (ulong)entry.OffsetPos, false),
-                            _ => 0,
-                        };
-                    }
-
-                    // Sanity: Camera struct offsets should be reasonable (< 0x1000)
-                    if (offset > 0 && offset < 0x1000)
-                    {
-                        return offset;
-                    }
-
-                    // Offset out of range, try next sig
+                        1 => Memory.TryReadValue<byte>(callTarget + (ulong)entry.TargetBodyDispOffset, out var b, false) ? b : 0u,
+                        4 => Memory.TryReadValue<uint>(callTarget + (ulong)entry.TargetBodyDispOffset, out var u, false) ? u : 0u,
+                        _ => 0,
+                    };
                 }
-                catch
+                else
                 {
-                    // Sig failed, try next
+                    offset = entry.DispSize switch
+                    {
+                        1 => Memory.TryReadValue<byte>(sigAddr + (ulong)entry.OffsetPos, out var b, false) ? b : 0u,
+                        4 => Memory.TryReadValue<uint>(sigAddr + (ulong)entry.OffsetPos, out var u, false) ? u : 0u,
+                        _ => 0,
+                    };
                 }
+
+                // Sanity: Camera struct offsets should be reasonable (< 0x1000)
+                if (offset > 0 && offset < 0x1000)
+                {
+                    return offset;
+                }
+
+                // Offset out of range, try next sig
             }
 
             return null;
@@ -1030,8 +988,8 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 ulong methodAddr = gameAssemblyBase + Offsets.EFTCameraManager.GetInstance_RVA;
 
                 // Read method bytes
-                byte[] methodBytes = Memory.ReadBuffer(methodAddr, 128, false);
-                if (methodBytes == null || methodBytes.Length < 64)
+                Span<byte> methodBytes = stackalloc byte[128];
+                if (!Memory.TryReadBuffer(methodAddr, methodBytes, false))
                 {
                     Log.Write(AppLogLevel.Warning, "Failed to read get_Instance method bytes.", "CameraManager");
                     return 0;
@@ -1042,31 +1000,30 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 {
                     if (methodBytes[i] == 0x48 && methodBytes[i + 1] == 0x8D && methodBytes[i + 2] == 0x0D)
                     {
-                        int disp32 = BitConverter.ToInt32(methodBytes, i + 3);
+                        int disp32 = BitConverter.ToInt32(methodBytes.Slice(i + 3, 4));
                         ulong classMetadataAddr = methodAddr + (ulong)i + 7 + (ulong)disp32;
 
-                        ulong classPtr = Memory.ReadPtr(classMetadataAddr, false);
-                        if (classPtr.IsValidVirtualAddress())
-                        {
-                            // Use the known Il2CppClass::static_fields offset first, then probe nearby offsets as fallback
-                            var knownOffset = Offsets.Il2CppClass.StaticFields;
-                            ReadOnlySpan<uint> fallbackOffsets = [knownOffset - 0x10, knownOffset - 0x08, knownOffset + 0x08, knownOffset + 0x10, knownOffset + 0x18];
+                        if (!Memory.TryReadPtr(classMetadataAddr, out var classPtr, false))
+                            continue;
 
-                            if (TryReadStaticInstance(classPtr, knownOffset, out var instance))
+                        // Use the known Il2CppClass::static_fields offset first, then probe nearby offsets as fallback
+                        var knownOffset = Offsets.Il2CppClass.StaticFields;
+                        ReadOnlySpan<uint> fallbackOffsets = [knownOffset - 0x10, knownOffset - 0x08, knownOffset + 0x08, knownOffset + 0x10, knownOffset + 0x18];
+
+                        if (TryReadStaticInstance(classPtr, knownOffset, out var instance))
+                        {
+                            _eftCameraManagerClassPtr = classPtr;
+                            return instance;
+                        }
+
+                        foreach (var offset in fallbackOffsets)
+                        {
+                            if (offset == knownOffset)
+                                continue;
+                            if (TryReadStaticInstance(classPtr, offset, out instance))
                             {
                                 _eftCameraManagerClassPtr = classPtr;
                                 return instance;
-                            }
-
-                            foreach (var offset in fallbackOffsets)
-                            {
-                                if (offset == knownOffset)
-                                    continue;
-                                if (TryReadStaticInstance(classPtr, offset, out instance))
-                                {
-                                    _eftCameraManagerClassPtr = classPtr;
-                                    return instance;
-                                }
                             }
                         }
                     }
@@ -1077,16 +1034,15 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 {
                     if (methodBytes[i] == 0x48 && methodBytes[i + 1] == 0x8B && methodBytes[i + 2] == 0x05)
                     {
-                        int disp32 = BitConverter.ToInt32(methodBytes, i + 3);
+                        int disp32 = BitConverter.ToInt32(methodBytes.Slice(i + 3, 4));
                         ulong staticFieldAddr = methodAddr + (ulong)i + 7 + (ulong)disp32;
 
-                        ulong instancePtr = Memory.ReadPtr(staticFieldAddr, false);
-                        if (instancePtr.IsValidVirtualAddress())
-                        {
-                            ulong testCamera = Memory.ReadPtr(instancePtr + Offsets.EFTCameraManager.Camera, false);
-                            if (testCamera.IsValidVirtualAddress())
-                                return instancePtr;
-                        }
+                        if (!Memory.TryReadPtr(staticFieldAddr, out var instancePtr, false))
+                            continue;
+
+                        if (Memory.TryReadPtr(instancePtr + Offsets.EFTCameraManager.Camera, out var testCamera, false)
+                            && testCamera.IsValidVirtualAddress())
+                            return instancePtr;
                     }
                 }
 
@@ -1106,27 +1062,18 @@ namespace eft_dma_radar.Tarkov.GameWorld
         private static bool TryReadStaticInstance(ulong classPtr, uint staticFieldsOffset, out ulong instance)
         {
             instance = 0;
-            try
-            {
-                var staticFieldsPtr = Memory.ReadPtr(classPtr + staticFieldsOffset, false);
-                if (!staticFieldsPtr.IsValidVirtualAddress())
-                    return false;
 
-                var instancePtr = Memory.ReadPtr(staticFieldsPtr, false);
-                if (!instancePtr.IsValidVirtualAddress())
-                    return false;
-
-                var testCamera = Memory.ReadPtr(instancePtr + Offsets.EFTCameraManager.Camera, false);
-                if (!testCamera.IsValidVirtualAddress())
-                    return false;
-
-                instance = instancePtr;
-                return true;
-            }
-            catch
-            {
+            if (!Memory.TryReadPtr(classPtr + staticFieldsOffset, out var staticFieldsPtr, false))
                 return false;
-            }
+
+            if (!Memory.TryReadPtr(staticFieldsPtr, out var instancePtr, false))
+                return false;
+
+            if (!Memory.TryReadPtr(instancePtr + Offsets.EFTCameraManager.Camera, out var testCamera, false))
+                return false;
+
+            instance = instancePtr;
+            return true;
         }
 
         private static void MemDMA_GameStopped(object? sender, EventArgs e)

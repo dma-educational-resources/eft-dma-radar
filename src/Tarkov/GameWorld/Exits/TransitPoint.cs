@@ -21,9 +21,12 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
             _addr = baseAddr;
 
             // Read the destination location from memory
-            var parameters = Memory.ReadPtr(baseAddr + Offsets.TransitPoint.parameters, false);
-            var locationPtr = Memory.ReadPtr(parameters + Offsets.TransitParameters.location, false);
-            var location = Memory.ReadUnityString(locationPtr, 64, false);
+            if (!Memory.TryReadPtr(baseAddr + Offsets.TransitPoint.parameters, out var parameters, false))
+                throw new Exception("Failed to read transit parameters");
+            if (!Memory.TryReadPtr(parameters + Offsets.TransitParameters.location, out var locationPtr, false))
+                throw new Exception("Failed to read transit location pointer");
+            if (!Memory.TryReadUnityString(locationPtr, out var location, 64, false) || location is null)
+                throw new Exception("Failed to read transit location string");
 
             if (GameData.MapNames.TryGetValue(location, out string destinationMapName))
             {

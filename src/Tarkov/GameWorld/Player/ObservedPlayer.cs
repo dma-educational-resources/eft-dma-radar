@@ -121,22 +121,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         public override int VoipId { get; }
         private static int ParseVoipId(ulong baseAddr)
         {
-            try
-            {
-                ulong strPtr = Memory.ReadPtr(baseAddr + Offsets.ObservedPlayerView.VoipId);
-                if (strPtr == 0)
-                    return -1;
-
-                string s = Memory.ReadUnityString(strPtr);
-                if (string.IsNullOrWhiteSpace(s))
-                    return -1;
-
-                return int.TryParse(s, out int id) ? id : -1;
-            }
-            catch
-            {
+            if (!Memory.TryReadPtr(baseAddr + Offsets.ObservedPlayerView.VoipId, out var strPtr) || strPtr == 0)
                 return -1;
-            }
+            if (!Memory.TryReadUnityString(strPtr, out var s) || string.IsNullOrWhiteSpace(s))
+                return -1;
+            return int.TryParse(s, out int id) ? id : -1;
         }
         public bool TryEnsureSkeleton()
         {
@@ -163,15 +152,21 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         {
             var localPlayer = Memory.LocalPlayer;
             ArgumentNullException.ThrowIfNull(localPlayer, nameof(localPlayer));
-            ObservedPlayerController = Memory.ReadPtr(this + Offsets.ObservedPlayerView.ObservedPlayerController);
-            ArgumentOutOfRangeException.ThrowIfNotEqual(this,
-                Memory.ReadValue<ulong>(ObservedPlayerController + Offsets.ObservedPlayerController.Player),
-                nameof(ObservedPlayerController));
-            ObservedHealthController = Memory.ReadPtr(ObservedPlayerController + Offsets.ObservedPlayerController.HealthController);
-            ArgumentOutOfRangeException.ThrowIfNotEqual(this,
-                Memory.ReadValue<ulong>(ObservedHealthController + Offsets.ObservedHealthController.Player),
-                nameof(ObservedHealthController));
-            Body = Memory.ReadPtr(this + Offsets.ObservedPlayerView.PlayerBody);
+            if (!Memory.TryReadPtr(this + Offsets.ObservedPlayerView.ObservedPlayerController, out var observedPlayerController))
+                throw new InvalidOperationException("Player class not ready");
+            ObservedPlayerController = observedPlayerController;
+            if (!Memory.TryReadValue<ulong>(ObservedPlayerController + Offsets.ObservedPlayerController.Player, out var opcPlayer))
+                throw new InvalidOperationException("Player class not ready");
+            ArgumentOutOfRangeException.ThrowIfNotEqual(this, opcPlayer, nameof(ObservedPlayerController));
+            if (!Memory.TryReadPtr(ObservedPlayerController + Offsets.ObservedPlayerController.HealthController, out var observedHealthController))
+                throw new InvalidOperationException("Player class not ready");
+            ObservedHealthController = observedHealthController;
+            if (!Memory.TryReadValue<ulong>(ObservedHealthController + Offsets.ObservedHealthController.Player, out var ohcPlayer))
+                throw new InvalidOperationException("Player class not ready");
+            ArgumentOutOfRangeException.ThrowIfNotEqual(this, ohcPlayer, nameof(ObservedHealthController));
+            if (!Memory.TryReadPtr(this + Offsets.ObservedPlayerView.PlayerBody, out var body))
+                throw new InvalidOperationException("Player class not ready");
+            Body = body;
             InventoryControllerAddr = ObservedPlayerController + Offsets.ObservedPlayerController.InventoryController;
             HandsControllerAddr = ObservedPlayerController + Offsets.ObservedPlayerController.HandsController;
             CorpseAddr = ObservedHealthController + Offsets.ObservedHealthController.PlayerCorpse;
@@ -182,11 +177,14 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             RotationAddress = ValidateRotationAddr(MovementContext + Offsets.ObservedMovementController.Rotation);
 
             /// Determine Player Type
-            PlayerSide = (Enums.EPlayerSide)Memory.ReadValue<int>(this + Offsets.ObservedPlayerView.Side); // Usec,Bear,Scav,etc.
+            if (!Memory.TryReadValue<int>(this + Offsets.ObservedPlayerView.Side, out var sideVal))
+                throw new InvalidOperationException("Player class not ready");
+            PlayerSide = (Enums.EPlayerSide)sideVal; // Usec,Bear,Scav,etc.
             if (!Enum.IsDefined(PlayerSide)) // Make sure PlayerSide is valid
                 throw new Exception("Invalid Player Side/Faction!");
 
-            var isAI = Memory.ReadValue<bool>(this + Offsets.ObservedPlayerView.IsAI);
+            if (!Memory.TryReadValue<bool>(this + Offsets.ObservedPlayerView.IsAI, out var isAI))
+                throw new InvalidOperationException("Player class not ready");
             IsHuman = !isAI;
             if (IsScav)
             {
@@ -236,8 +234,10 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     // =====================================================
                     // 2) NORMAL AI ROLE (VOICE-BASED, NON-AUTHORITATIVE)
                     // =====================================================
-                    var voicePtr = Memory.ReadPtr(this + Offsets.ObservedPlayerView.Voice);
-                    string voice = Memory.ReadUnityString(voicePtr);
+                    if (!Memory.TryReadPtr(this + Offsets.ObservedPlayerView.Voice, out var voicePtr)
+                        || !Memory.TryReadUnityString(voicePtr, out var voice)
+                        || voice is null)
+                        throw new InvalidOperationException("Player class not ready");
                     var role = Player.GetAIRoleInfo(voice);
 
                     Name = role.Name;
@@ -327,9 +327,12 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
 
             if (IsHuman)
             {
-                var handController = Memory.ReadPtr(HandsControllerAddr);
-                var dickController = Memory.ReadPtr(handController + Offsets.ObservedHandsController.BundleAnimationBones);
-                this.PWA = Memory.ReadPtr(dickController + Offsets.BundleAnimationBonesController.ProceduralWeaponAnimationObs);
+                if (Memory.TryReadPtr(HandsControllerAddr, out var handController)
+                    && Memory.TryReadPtr(handController + Offsets.ObservedHandsController.BundleAnimationBones, out var dickController)
+                    && Memory.TryReadPtr(dickController + Offsets.BundleAnimationBonesController.ProceduralWeaponAnimationObs, out var pwa))
+                {
+                    this.PWA = pwa;
+                }
                 Profile = new PlayerProfile(this);
             }
 
@@ -342,16 +345,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// </summary>
         private int GetNetworkGroupID()
         {
-            try
-            {
-                var grpIdPtr = Memory.ReadPtr(this + Offsets.ObservedPlayerView.GroupID);
-                var grp = Memory.ReadUnityString(grpIdPtr);
-                return _groups.GetGroup(grp);
-            }
-            catch
-            {
+            if (!Memory.TryReadPtr(this + Offsets.ObservedPlayerView.GroupID, out var grpIdPtr))
                 return -1;
-            }
+            if (!Memory.TryReadUnityString(grpIdPtr, out var grp) || grp is null)
+                return -1;
+            return _groups.GetGroup(grp);
         }
 
 
@@ -425,7 +423,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// </summary>
         private ulong GetMovementContext()
         {
-            var movementController = Memory.ReadPtrChain(ObservedPlayerController, Offsets.ObservedPlayerController.MovementController);
+            if (!Memory.TryReadPtrChain(ObservedPlayerController, Offsets.ObservedPlayerController.MovementController, out var movementController))
+                throw new InvalidOperationException("Player class not ready");
             return movementController;
         }
 

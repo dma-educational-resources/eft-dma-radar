@@ -22,8 +22,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
             var list = new List<IExitPoint>();
             try
             {
-                var exfilController = Memory.ReadPtr(_localGameWorld + Offsets.ClientLocalGameWorld.ExfilController, false);
-                if (exfilController == 0)
+                if (!Memory.TryReadPtr(_localGameWorld + Offsets.ClientLocalGameWorld.ExfilController, out var exfilController, false) || exfilController == 0)
                 {
                     Log.WriteLine($"[ExitManager] ExfilController is null");
                     _exits = list;
@@ -35,9 +34,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                 {
                     var listOffset = _isPMC ?
                         Offsets.ExfilController.ExfiltrationPointArray : Offsets.ExfilController.ScavExfiltrationPointArray;
-                    var exfilPoints = Memory.ReadPtr(exfilController + listOffset, false);
-
-                    if (exfilPoints != 0)
+                    if (Memory.TryReadPtr(exfilController + listOffset, out var exfilPoints, false) && exfilPoints != 0)
                     {
                         using var exfils = MemArray<ulong>.Get(exfilPoints, false);
                         Log.WriteLine($"[ExitManager] {(_isPMC ? "PMC" : "Scav")} exfil array @ 0x{exfilPoints:X}, count: {exfils.Count}");
@@ -68,8 +65,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                 // Secret Extracts
                 try
                 {
-                    var secretExfilPtr = Memory.ReadPtr(exfilController + Offsets.ExfilController.SecretExfiltrationPointArray, false);
-                    if (secretExfilPtr != 0)
+                    if (Memory.TryReadPtr(exfilController + Offsets.ExfilController.SecretExfiltrationPointArray, out var secretExfilPtr, false) && secretExfilPtr != 0)
                     {
                         using var secrets = MemArray<ulong>.Get(secretExfilPtr, false);
                         Log.WriteLine($"[ExitManager] Secret exfil array @ 0x{secretExfilPtr:X}, count: {secrets.Count}");
@@ -105,11 +101,9 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                 // Entry structure: hashCode(4) + next(4) + key(4) + padding(4) + value(8) = 24 bytes per entry
                 try
                 {
-                    var transitController = Memory.ReadPtr(_localGameWorld + Offsets.ClientLocalGameWorld.TransitController, false);
-                    if (transitController != 0)
+                    if (Memory.TryReadPtr(_localGameWorld + Offsets.ClientLocalGameWorld.TransitController, out var transitController, false) && transitController != 0)
                     {
-                        var transitsPtr = Memory.ReadPtr(transitController + Offsets.TransitController.TransitPoints, false);
-                        if (transitsPtr != 0)
+                        if (Memory.TryReadPtr(transitController + Offsets.TransitController.TransitPoints, out var transitsPtr, false) && transitsPtr != 0)
                         {
                             // IL2CPP Dictionary offsets (hardcoded to not break existing MemDictionary)
                             const uint IL2CPP_DICT_COUNT = 0x20;      // _count offset in IL2CPP
@@ -118,12 +112,9 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                             const int IL2CPP_ENTRY_SIZE = 24;         // Size of each dictionary entry
                             const int IL2CPP_ENTRY_VALUE_OFFSET = 16; // Offset to value within entry (after hashCode+next+key+pad)
 
-                            var count = Memory.ReadValue<int>(transitsPtr + IL2CPP_DICT_COUNT, false);
-
-                            if (count > 0 && count < 100) // Sanity check
+                            if (Memory.TryReadValue<int>(transitsPtr + IL2CPP_DICT_COUNT, out var count, false) && count > 0 && count < 100)
                             {
-                                var entriesPtr = Memory.ReadPtr(transitsPtr + IL2CPP_DICT_ENTRIES, false);
-                                if (entriesPtr != 0)
+                                if (Memory.TryReadPtr(transitsPtr + IL2CPP_DICT_ENTRIES, out var entriesPtr, false) && entriesPtr != 0)
                                 {
                                     var entriesBase = entriesPtr + IL2CPP_ENTRIES_START;
 
@@ -133,9 +124,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
                                         {
                                             // Read the TransitPoint pointer from the entry's value field
                                             var entryAddr = entriesBase + (ulong)(i * IL2CPP_ENTRY_SIZE);
-                                            var transitAddr = Memory.ReadPtr(entryAddr + IL2CPP_ENTRY_VALUE_OFFSET, false);
-
-                                            if (transitAddr != 0)
+                                            if (Memory.TryReadPtr(entryAddr + IL2CPP_ENTRY_VALUE_OFFSET, out var transitAddr, false) && transitAddr != 0)
                                             {
                                                 var transit = new TransitPoint(transitAddr);
                                                 list.Add(transit);

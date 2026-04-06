@@ -48,53 +48,46 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         {
             result = null;
 
-            try
+            // Resolve GamePlayerOwner class pointer from TypeInfoTable (once)
+            var klassPtr = _cachedGamePlayerOwnerKlass;
+            if (!klassPtr.IsValidVirtualAddress())
             {
-                // Resolve GamePlayerOwner class pointer from TypeInfoTable (once)
-                var klassPtr = _cachedGamePlayerOwnerKlass;
+                klassPtr = ResolveGamePlayerOwnerKlass();
                 if (!klassPtr.IsValidVirtualAddress())
-                {
-                    klassPtr = ResolveGamePlayerOwnerKlass();
-                    if (!klassPtr.IsValidVirtualAddress())
-                        return false;
-
-                    _cachedGamePlayerOwnerKlass = klassPtr;
-                    Log.WriteLine($"[IL2CPP] GamePlayerOwner class resolved @ 0x{klassPtr:X}");
-                }
-
-                // Read static_fields from the Il2CppClass struct
-                var staticFields = Memory.ReadValue<ulong>(
-                    klassPtr + Offsets.Il2CppClass.StaticFields);
-
-                if (!staticFields.IsValidVirtualAddress())
                     return false;
 
-                // Read _myPlayer from static fields
-                var myPlayer = Memory.ReadPtr(
-                    staticFields + Offsets.GamePlayerOwner._myPlayer);
-
-                if (!myPlayer.IsValidVirtualAddress())
-                    return false;
-
-                // Read GameWorld from the player
-                var gameWorld = Memory.ReadPtr(
-                    myPlayer + Offsets.Player.GameWorld);
-
-                if (!gameWorld.IsValidVirtualAddress())
-                    return false;
-
-                // Resolve map name
-                if (TryResolveMap(gameWorld, out var map))
-                {
-                    result = new GameWorldResult
-                    {
-                        GameWorld = gameWorld,
-                        Map = map
-                    };
-                    return true;
-                }
+                _cachedGamePlayerOwnerKlass = klassPtr;
+                Log.WriteLine($"[IL2CPP] GamePlayerOwner class resolved @ 0x{klassPtr:X}");
             }
-            catch { }
+
+            // Read static_fields from the Il2CppClass struct
+            if (!Memory.TryReadValue<ulong>(
+                klassPtr + Offsets.Il2CppClass.StaticFields, out var staticFields))
+                return false;
+
+            if (!staticFields.IsValidVirtualAddress())
+                return false;
+
+            // Read _myPlayer from static fields
+            if (!Memory.TryReadPtr(
+                staticFields + Offsets.GamePlayerOwner._myPlayer, out var myPlayer))
+                return false;
+
+            // Read GameWorld from the player
+            if (!Memory.TryReadPtr(
+                myPlayer + Offsets.Player.GameWorld, out var gameWorld))
+                return false;
+
+            // Resolve map name
+            if (TryResolveMap(gameWorld, out var map))
+            {
+                result = new GameWorldResult
+                {
+                    GameWorld = gameWorld,
+                    Map = map
+                };
+                return true;
+            }
 
             return false;
         }
@@ -110,26 +103,16 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             if (!gaBase.IsValidVirtualAddress() || Offsets.Special.TypeInfoTableRva == 0)
                 return 0;
 
-            ulong tablePtr;
-            try { tablePtr = Memory.ReadPtr(gaBase + Offsets.Special.TypeInfoTableRva, false); }
-            catch { return 0; }
-
-            if (!tablePtr.IsValidVirtualAddress())
+            if (!Memory.TryReadPtr(gaBase + Offsets.Special.TypeInfoTableRva, out var tablePtr, false))
                 return 0;
 
             // Fast path: use cached TypeIndex from the dumper
             var typeIndex = Offsets.Special.GamePlayerOwner_TypeIndex;
             if (typeIndex != 0)
             {
-                try
-                {
-                    var ptr = Memory.ReadValue<ulong>(
-                        tablePtr + (ulong)typeIndex * 8);
-
-                    if (ptr.IsValidVirtualAddress())
-                        return ptr;
-                }
-                catch { }
+                if (Memory.TryReadValue<ulong>(
+                    tablePtr + (ulong)typeIndex * 8, out var ptr) && ptr.IsValidVirtualAddress())
+                    return ptr;
             }
 
             // Slow fallback: scan first N entries for class named "GamePlayerOwner"
@@ -137,31 +120,27 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             const int maxEntries = 20_000;
             for (int i = 0; i < maxEntries; i++)
             {
-                try
+                if (!Memory.TryReadValue<ulong>(tablePtr + (ulong)i * 8, out var ptr) || !ptr.IsValidVirtualAddress())
+                    continue;
+
+                if (!Memory.TryReadValue<ulong>(ptr + Offsets.Il2CppClass.Name, out var namePtr) || !namePtr.IsValidVirtualAddress())
+                    continue;
+
+                if (!Memory.TryReadString(namePtr, out var name, 64, useCache: false) || name is null)
+                    continue;
+
+                if (name == "GamePlayerOwner")
                 {
-                    var ptr = Memory.ReadValue<ulong>(tablePtr + (ulong)i * 8);
-                    if (!ptr.IsValidVirtualAddress())
-                        continue;
+                    Log.WriteLine($"[IL2CPP] GamePlayerOwner found at TypeIndex {i}");
+                    Offsets.Special.GamePlayerOwner_TypeIndex = (uint)i;
 
-                    var namePtr = Memory.ReadValue<ulong>(ptr + Offsets.Il2CppClass.Name);
-                    if (!namePtr.IsValidVirtualAddress())
-                        continue;
+                    // Persist the newly discovered TypeIndex to the cache so
+                    // subsequent startups use the fast path immediately.
+                    try { Il2CppDumper.SaveCache(); }
+                    catch { }
 
-                    var name = Memory.ReadString(namePtr, 64, useCache: false);
-                    if (name == "GamePlayerOwner")
-                    {
-                        Log.WriteLine($"[IL2CPP] GamePlayerOwner found at TypeIndex {i}");
-                        Offsets.Special.GamePlayerOwner_TypeIndex = (uint)i;
-
-                        // Persist the newly discovered TypeIndex to the cache so
-                        // subsequent startups use the fast path immediately.
-                        try { Il2CppDumper.SaveCache(); }
-                        catch { }
-
-                        return ptr;
-                    }
+                    return ptr;
                 }
-                catch { }
             }
 
             return 0;
@@ -182,7 +161,8 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
             {
                 var sw = Stopwatch.StartNew();
                 var gom = GameObjectManager.Get(gomAddress);
-                var current = Memory.ReadValue<LinkedListObject>(gom.ActiveNodes);
+                if (!Memory.TryReadValue<LinkedListObject>(gom.ActiveNodes, out var current))
+                    return false;
                 int nodesScanned = 0;
                 const int maxDepth = 10_000;
 
@@ -198,7 +178,8 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
                         return true;
                     }
 
-                    current = Memory.ReadValue<LinkedListObject>(current.NextObjectLink);
+                    if (!Memory.TryReadValue<LinkedListObject>(current.NextObjectLink, out current))
+                        break;
                 }
 
                 Log.WriteLine($"[IL2CPP] GOM scan: exhausted {nodesScanned} nodes in {sw.ElapsedMilliseconds}ms");
@@ -213,36 +194,34 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
 
         private static GameWorldResult? TryParseGameWorldByName(ref LinkedListObject node)
         {
-            try
+            var go = node.ThisObject;
+            if (!go.IsValidVirtualAddress())
+                return null;
+
+            if (!Memory.TryReadValue<ulong>(
+                go + UnityOffsets.GameObject.NameOffset, out var namePtr) || !namePtr.IsValidVirtualAddress())
+                return null;
+
+            if (!Memory.TryReadString(namePtr, out var name, 64, useCache: false) || name is null)
+                return null;
+
+            if (!name.Equals("GameWorld", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            if (!Memory.TryReadPtrChain(go, UnityOffsets.GameWorldChain, out var gameWorld))
+                return null;
+
+            if (!gameWorld.IsValidVirtualAddress())
+                return null;
+
+            if (TryResolveMap(gameWorld, out var map))
             {
-                var go = node.ThisObject;
-                if (!go.IsValidVirtualAddress())
-                    return null;
-
-                var namePtr = Memory.ReadValue<ulong>(
-                    go + UnityOffsets.GameObject.NameOffset);
-
-                if (!namePtr.IsValidVirtualAddress())
-                    return null;
-
-                var name = Memory.ReadString(namePtr, 64, useCache: false);
-                if (!name.Equals("GameWorld", StringComparison.OrdinalIgnoreCase))
-                    return null;
-
-                var gameWorld = Memory.ReadPtrChain(go, UnityOffsets.GameWorldChain);
-                if (!gameWorld.IsValidVirtualAddress())
-                    return null;
-
-                if (TryResolveMap(gameWorld, out var map))
+                return new GameWorldResult
                 {
-                    return new GameWorldResult
-                    {
-                        GameWorld = gameWorld,
-                        Map = map
-                    };
-                }
+                    GameWorld = gameWorld,
+                    Map = map
+                };
             }
-            catch { }
 
             return null;
         }
@@ -255,23 +234,20 @@ namespace eft_dma_radar.Tarkov.Unity.IL2CPP
         {
             map = null;
 
-            ulong mapPtr = Memory.ReadValue<ulong>(
-                gameWorld + Offsets.ClientLocalGameWorld.LocationId);
-
-            if (!mapPtr.IsValidVirtualAddress())
+            if (!Memory.TryReadValue<ulong>(
+                gameWorld + Offsets.ClientLocalGameWorld.LocationId, out var mapPtr) || !mapPtr.IsValidVirtualAddress())
             {
-                var lp = Memory.ReadValue<ulong>(
-                    gameWorld + Offsets.ClientLocalGameWorld.MainPlayer);
-
-                if (!lp.IsValidVirtualAddress())
+                if (!Memory.TryReadValue<ulong>(
+                    gameWorld + Offsets.ClientLocalGameWorld.MainPlayer, out var lp) || !lp.IsValidVirtualAddress())
                     return false;
 
-                mapPtr = Memory.ReadValue<ulong>(
-                    lp + Offsets.Player.Location);
+                if (!Memory.TryReadValue<ulong>(
+                    lp + Offsets.Player.Location, out mapPtr) || !mapPtr.IsValidVirtualAddress())
+                    return false;
             }
 
-            var mapName = Memory.ReadUnityString(mapPtr, 128);
-            if (string.IsNullOrEmpty(mapName) ||
+            if (!Memory.TryReadUnityString(mapPtr, out var mapName, 128) ||
+                string.IsNullOrEmpty(mapName) ||
                 !GameData.MapNames.ContainsKey(mapName))
                 return false;
 

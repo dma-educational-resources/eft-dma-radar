@@ -304,6 +304,17 @@ namespace eft_dma_radar.Tarkov.Unity
             return Memory.ReadString(namePtr, length, useCache);
         }
 
+        /// <summary>
+        /// Non-throwing variant of <see cref="ReadName"/>.
+        /// </summary>
+        public static bool TryReadName(ulong objectClass, out string? name, int length = 128, bool useCache = true)
+        {
+            name = null;
+            if (!Memory.TryReadPtrChain(objectClass, To_NamePtr, out var namePtr, useCache))
+                return false;
+            return Memory.TryReadString(namePtr, out name, length, useCache);
+        }
+
         public static bool TryReadClassName(
             ulong objectBase,
             out string className,
@@ -315,19 +326,17 @@ namespace eft_dma_radar.Tarkov.Unity
                 return false;
 
             // Il2CppObject.klass is always at +0x0 in IL2CPP
-            ulong klass = Memory.ReadPtr(objectBase, false);
-            if (!klass.IsValidVirtualAddress())
+            if (!Memory.TryReadPtr(objectBase, out var klass, false))
                 return false;
 
-            try
-            {
-                className = ObjectClass.ReadName(objectBase, maxLen);
-                return !string.IsNullOrEmpty(className);
-            }
-            catch
-            {
+            if (!Memory.TryReadPtrChain(objectBase, To_NamePtr, out var namePtr))
                 return false;
-            }
+
+            if (!Memory.TryReadString(namePtr, out var name, maxLen))
+                return false;
+
+            className = name;
+            return !string.IsNullOrEmpty(className);
         }
     }
 

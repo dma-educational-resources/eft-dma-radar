@@ -1,4 +1,5 @@
 using eft_dma_radar.Misc.Pools;
+using VmmSharpEx;
 
 namespace eft_dma_radar.Tarkov.Unity.Collections
 {
@@ -39,13 +40,17 @@ namespace eft_dma_radar.Tarkov.Unity.Collections
         {
             try
             {
-                var count = Memory.ReadValue<int>(addr + CountOffset, useCache);
+                if (!Memory.TryReadValue<int>(addr + CountOffset, out var count, useCache))
+                    throw new VmmException("Failed to read dictionary count");
                 ArgumentOutOfRangeException.ThrowIfGreaterThan(count, 16384, nameof(count));
                 Initialize(count);
                 if (count == 0)
                     return;
-                var dictBase = Memory.ReadPtr(addr + EntriesOffset, useCache) + EntriesStartOffset;
-                Memory.ReadBuffer(dictBase, Span, useCache); // Single read into mem buffer
+                if (!Memory.TryReadPtr(addr + EntriesOffset, out var dictPtr, useCache))
+                    throw new VmmException("Failed to read dictionary entries pointer");
+                var dictBase = dictPtr + EntriesStartOffset;
+                if (!Memory.TryReadBuffer(dictBase, Span, useCache))
+                    throw new VmmException("Failed to read dictionary data");
             }
             catch
             {

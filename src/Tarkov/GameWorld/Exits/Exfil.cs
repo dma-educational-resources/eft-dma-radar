@@ -31,9 +31,13 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
         {
             _addr = baseAddr;
             _isPMC = isPMC;
-            var transformInternal = Memory.ReadPtrChain(baseAddr, UnityOffsets.TransformChain, false);
-            var namePtr = Memory.ReadPtrChain(baseAddr, new[] { Offsets.Exfil.Settings, Offsets.ExfilSettings.Name });
-            Name = Memory.ReadUnityString(namePtr)?.Trim();
+            if (!Memory.TryReadPtrChain(baseAddr, UnityOffsets.TransformChain, out var transformInternal, false))
+                throw new Exception("Failed to read transform chain");
+            if (!Memory.TryReadPtrChain(baseAddr, new[] { Offsets.Exfil.Settings, Offsets.ExfilSettings.Name }, out var namePtr))
+                throw new Exception("Failed to read name pointer chain");
+            if (!Memory.TryReadUnityString(namePtr, out var name))
+                throw new Exception("Failed to read exfil name");
+            Name = name?.Trim();
 
             if (string.IsNullOrEmpty(Name))
                 Name = "default";
@@ -82,22 +86,26 @@ namespace eft_dma_radar.Tarkov.GameWorld.Exits
             /// Update Entry Points
             if (_isPMC)
             {
-                var entriesArrPtr = Memory.ReadPtr(_addr + Offsets.Exfil.EligibleEntryPoints);
-                using var entriesArr = MemArray<ulong>.Get(entriesArrPtr);
-                foreach (var entryNamePtr in entriesArr)
+                if (Memory.TryReadPtr(_addr + Offsets.Exfil.EligibleEntryPoints, out var entriesArrPtr))
                 {
-                    var entryName = Memory.ReadUnityString(entryNamePtr);
-                    PmcEntries.Add(entryName);
+                    using var entriesArr = MemArray<ulong>.Get(entriesArrPtr);
+                    foreach (var entryNamePtr in entriesArr)
+                    {
+                        if (Memory.TryReadUnityString(entryNamePtr, out var entryName) && entryName is not null)
+                            PmcEntries.Add(entryName);
+                    }
                 }
             }
             else // Scav Exfils
             {
-                var eligibleIdsPtr = Memory.ReadPtr(_addr + Offsets.ScavExfil.EligibleIds);
-                using var idsArr = MemList<ulong>.Get(eligibleIdsPtr);
-                foreach (var idPtr in idsArr)
+                if (Memory.TryReadPtr(_addr + Offsets.ScavExfil.EligibleIds, out var eligibleIdsPtr))
                 {
-                    var idName = Memory.ReadUnityString(idPtr);
-                    ScavIds.Add(idName);
+                    using var idsArr = MemList<ulong>.Get(eligibleIdsPtr);
+                    foreach (var idPtr in idsArr)
+                    {
+                        if (Memory.TryReadUnityString(idPtr, out var idName) && idName is not null)
+                            ScavIds.Add(idName);
+                    }
                 }
             }
         }

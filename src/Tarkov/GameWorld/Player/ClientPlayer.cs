@@ -81,30 +81,29 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
 
         private static int ParseVoipId(ulong baseAddr)
         {
-            try
-            {
-                ulong strPtr = Memory.ReadPtr(baseAddr + Offsets.Player.VoipID);
-                if (strPtr == 0)
-                    return -1;
-
-                string s = Memory.ReadUnityString(strPtr);
-                if (string.IsNullOrWhiteSpace(s))
-                    return -1;
-
-                return int.TryParse(s, out int id) ? id : -1;
-            }
-            catch
-            {
+            if (!Memory.TryReadPtr(baseAddr + Offsets.Player.VoipID, out var strPtr) || strPtr == 0)
                 return -1;
-            }
+            if (!Memory.TryReadUnityString(strPtr, out var s) || string.IsNullOrWhiteSpace(s))
+                return -1;
+            return int.TryParse(s, out int id) ? id : -1;
         }
         internal ClientPlayer(ulong playerBase) : base(playerBase)
         {
-            Profile = Memory.ReadPtr(this + Offsets.Player.Profile);
-            CharacterController = Memory.ReadPtr(this + Offsets.Player._characterController);
-            Info = Memory.ReadPtr(Profile + Offsets.Profile.Info);
-            PWA = Memory.ReadPtr(this + Offsets.Player.ProceduralWeaponAnimation);
-            Body = Memory.ReadPtr(this + Offsets.Player._playerBody);
+            if (!Memory.TryReadPtr(this + Offsets.Player.Profile, out var profile))
+                throw new InvalidOperationException("Player class not ready");
+            Profile = profile;
+            if (!Memory.TryReadPtr(this + Offsets.Player._characterController, out var charController))
+                throw new InvalidOperationException("Player class not ready");
+            CharacterController = charController;
+            if (!Memory.TryReadPtr(Profile + Offsets.Profile.Info, out var info))
+                throw new InvalidOperationException("Player class not ready");
+            Info = info;
+            if (!Memory.TryReadPtr(this + Offsets.Player.ProceduralWeaponAnimation, out var pwa))
+                throw new InvalidOperationException("Player class not ready");
+            PWA = pwa;
+            if (!Memory.TryReadPtr(this + Offsets.Player._playerBody, out var body))
+                throw new InvalidOperationException("Player class not ready");
+            Body = body;
             InventoryControllerAddr = this + Offsets.Player._inventoryController;
             HandsControllerAddr = this + Offsets.Player._handsController;
             CorpseAddr = this + Offsets.Player.Corpse;
@@ -115,13 +114,17 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             RotationAddress = ValidateRotationAddr(MovementContext + Offsets.MovementContext._rotation);
 
             /// Determine Player Type
-            PlayerSide = (Enums.EPlayerSide)Memory.ReadValue<int>(Info + Offsets.PlayerInfo.Side); // Usec,Bear,Scav,etc.
+            if (!Memory.TryReadValue<int>(Info + Offsets.PlayerInfo.Side, out var sideVal))
+                throw new InvalidOperationException("Player class not ready");
+            PlayerSide = (Enums.EPlayerSide)sideVal; // Usec,Bear,Scav,etc.
             if (!Enum.IsDefined(PlayerSide)) // Make sure PlayerSide is valid
                 throw new Exception("Invalid Player Side/Faction!");
             if (this is LocalPlayer) // Handled in derived class
                 return;
 
-            bool isAI = Memory.ReadValue<int>(Info + Offsets.PlayerInfo.RegistrationDate) == 0;
+            if (!Memory.TryReadValue<int>(Info + Offsets.PlayerInfo.RegistrationDate, out var regDate))
+                throw new InvalidOperationException("Player class not ready");
+            bool isAI = regDate == 0;
             if (IsScav)
             {
                 if (isAI)
@@ -135,13 +138,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     IsHuman = true;
 
                     string nickname = null;
-                    try
-                    {
-                        var nickPtr = Memory.ReadPtr(Info + Offsets.PlayerInfo.Nickname);
-                        if (nickPtr != 0)
-                            nickname = Memory.ReadUnityString(nickPtr);
-                    }
-                    catch { }
+                    if (Memory.TryReadPtr(Info + Offsets.PlayerInfo.Nickname, out var nickPtr) && nickPtr != 0)
+                        Memory.TryReadUnityString(nickPtr, out nickname);
 
                     Name = !string.IsNullOrWhiteSpace(nickname) ? nickname : "PScav";
                     Type = PlayerType.PScav;
@@ -152,13 +150,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 IsHuman = true;
 
                 string nickname = null;
-                try
-                {
-                    var nickPtr = Memory.ReadPtr(Info + Offsets.PlayerInfo.Nickname);
-                    if (nickPtr != 0)
-                        nickname = Memory.ReadUnityString(nickPtr);
-                }
-                catch { }
+                if (Memory.TryReadPtr(Info + Offsets.PlayerInfo.Nickname, out var nickPtr) && nickPtr != 0)
+                    Memory.TryReadUnityString(nickPtr, out nickname);
 
                 Name = !string.IsNullOrWhiteSpace(nickname)
                     ? nickname
@@ -196,13 +189,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// </summary>
         private int GetGroupID()
         {
-            try
-            {
-                var grpIdPtr = Memory.ReadPtr(Info + Offsets.PlayerInfo.GroupId);
-                var grp = Memory.ReadUnityString(grpIdPtr);
-                return _groups.GetGroup(grp);
-            }
-            catch { return -1; } // will return null if Solo / Don't have a team
+            if (!Memory.TryReadPtr(Info + Offsets.PlayerInfo.GroupId, out var grpIdPtr))
+                return -1;
+            if (!Memory.TryReadUnityString(grpIdPtr, out var grp) || grp is null)
+                return -1;
+            return _groups.GetGroup(grp);
         }
 
         /// <summary>
@@ -210,8 +201,10 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// </summary>
         private ulong GetMovementContext()
         {
-            var movementContext = Memory.ReadPtr(this + Offsets.Player.MovementContext);
-            var player = Memory.ReadPtr(movementContext + Offsets.MovementContext.Player, false);
+            if (!Memory.TryReadPtr(this + Offsets.Player.MovementContext, out var movementContext))
+                throw new InvalidOperationException("Player class not ready");
+            if (!Memory.TryReadPtr(movementContext + Offsets.MovementContext.Player, out var player, false))
+                throw new InvalidOperationException("Player class not ready");
             if (player != this)
                 throw new ArgumentOutOfRangeException(nameof(movementContext));
             return movementContext;

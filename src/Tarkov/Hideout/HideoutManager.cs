@@ -1031,13 +1031,13 @@ namespace eft_dma_radar.Tarkov.Hideout
                                         continue;
                                     try
                                     {
-                                        var ocPtr = Memory.ReadPtr(
+                                        if (!Memory.TryReadPtr(
                                             entry.Component + UnityOffsets.Component.ObjectClassOffset,
-                                            false);
-                                        if (!ocPtr.IsValidVirtualAddress()) continue;
+                                            out var ocPtr, false) || !ocPtr.IsValidVirtualAddress())
+                                            continue;
 
-                                        var name = ObjectClass.ReadName(ocPtr, 128, false);
-                                        if (!string.IsNullOrWhiteSpace(name))
+                                        if (ObjectClass.TryReadName(ocPtr, out var name, 128, false)
+                                            && !string.IsNullOrWhiteSpace(name))
                                             components.Add(name);
                                     }
                                     catch { }

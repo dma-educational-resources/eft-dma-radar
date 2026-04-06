@@ -597,6 +597,89 @@ namespace eft_dma_radar.DMA
                 throw new VmmException("Memory Read Failed!");
         }
 
+        #endregion
+
+        #region Try Read Methods (Non-Throwing)
+
+        /// <summary>
+        /// Try to read a value type/struct from the specified address.
+        /// </summary>
+        /// <returns><see langword="true"/> if the read succeeded; otherwise <see langword="false"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool TryReadValue<T>(ulong addr, out T result, bool useCache = true)
+            where T : unmanaged, allows ref struct
+        {
+            var flags = ToVmmFlags(useCache);
+            return _vmm.MemReadValue(_pid, addr, out result, flags);
+        }
+
+        /// <summary>
+        /// Try to resolve a pointer and return the memory address it points to.
+        /// </summary>
+        /// <returns><see langword="true"/> if the read succeeded and the pointer is a valid virtual address; otherwise <see langword="false"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool TryReadPtr(ulong addr, out ulong result, bool useCache = true)
+        {
+            if (!TryReadValue(addr, out result, useCache))
+                return false;
+            return result.IsValidVirtualAddress();
+        }
+
+        /// <summary>
+        /// Try to read a chain of pointers and get the final result.
+        /// </summary>
+        /// <returns><see langword="true"/> if all reads in the chain succeeded; otherwise <see langword="false"/>.</returns>
+        public static bool TryReadPtrChain(ulong addr, ReadOnlySpan<uint> offsets, out ulong result, bool useCache = true)
+        {
+            result = addr;
+            foreach (var offset in offsets)
+            {
+                if (!TryReadPtr(result + offset, out result, useCache))
+                    return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Try to read memory into a buffer of type <typeparamref name="T"/>.
+        /// </summary>
+        /// <returns><see langword="true"/> if the read succeeded; otherwise <see langword="false"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool TryReadBuffer<T>(ulong addr, Span<T> buffer, bool useCache = true)
+            where T : unmanaged
+        {
+            var flags = ToVmmFlags(useCache);
+            return _vmm.MemReadSpan(_pid, addr, buffer, flags);
+        }
+
+        /// <summary>
+        /// Try to read a null terminated ASCII/UTF8 string.
+        /// </summary>
+        /// <returns><see langword="true"/> if the read succeeded; otherwise <see langword="false"/>.</returns>
+        public static bool TryReadString(ulong addr, out string? result, int cb = 128, bool useCache = true)
+        {
+            result = null;
+            if (cb <= 0 || cb > 0x1000)
+                return false;
+            var flags = ToVmmFlags(useCache);
+            result = _vmm.MemReadString(_pid, addr, cb, Encoding.UTF8, flags);
+            return result is not null;
+        }
+
+        /// <summary>
+        /// Try to read a null terminated Unity string (Unicode Encoding).
+        /// </summary>
+        /// <returns><see langword="true"/> if the read succeeded; otherwise <see langword="false"/>.</returns>
+        public static bool TryReadUnityString(ulong addr, out string? result, int length = 128, bool useCache = true)
+        {
+            result = null;
+            if (length <= 0 || length > 0x1000)
+                return false;
+            var flags = ToVmmFlags(useCache);
+            result = _vmm.MemReadString(_pid, addr + 0x14, length, Encoding.Unicode, flags);
+            return result is not null;
+        }
+
         /// <summary>
         /// Reads the PE header TimeDateStamp and SizeOfImage from a remote module base address.
         /// Together these form a cheap version fingerprint that changes when a module is rebuilt.
@@ -604,20 +687,16 @@ namespace eft_dma_radar.DMA
         /// </summary>
         public static (uint Timestamp, uint SizeOfImage) ReadPeFingerprint(ulong moduleBase)
         {
-            try
-            {
-                uint eLfanew = ReadValue<uint>(moduleBase + 0x3C, false);
-                if (eLfanew == 0 || eLfanew > 0x1000)
-                    return (0, 0);
-
-                uint timestamp = ReadValue<uint>(moduleBase + eLfanew + 8, false);
-                uint sizeOfImage = ReadValue<uint>(moduleBase + eLfanew + 0x50, false);
-                return (timestamp, sizeOfImage);
-            }
-            catch
-            {
+            if (!TryReadValue<uint>(moduleBase + 0x3C, out var eLfanew, false) || eLfanew == 0 || eLfanew > 0x1000)
                 return (0, 0);
-            }
+
+            if (!TryReadValue<uint>(moduleBase + eLfanew + 8, out var timestamp, false))
+                return (0, 0);
+
+            if (!TryReadValue<uint>(moduleBase + eLfanew + 0x50, out var sizeOfImage, false))
+                return (0, 0);
+
+            return (timestamp, sizeOfImage);
         }
 
         #endregion

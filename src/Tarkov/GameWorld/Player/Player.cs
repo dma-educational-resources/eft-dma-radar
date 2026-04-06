@@ -601,7 +601,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// <returns>Validated rotation virtual address.</returns>
         protected static ulong ValidateRotationAddr(ulong rotationAddr)
         {
-            var rotation = Memory.ReadValue<Vector2>(rotationAddr, false);
+            if (!Memory.TryReadValue<Vector2>(rotationAddr, out var rotation, false))
+                throw new ArgumentOutOfRangeException(nameof(rotationAddr));
             if (!rotation.IsNormalOrZero())
                 throw new ArgumentOutOfRangeException(nameof(rotationAddr));
 

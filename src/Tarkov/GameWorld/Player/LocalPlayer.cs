@@ -66,7 +66,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
 
         public LocalPlayer(ulong playerBase) : base(playerBase)
         {
-            string classType = ObjectClass.ReadName(this);
+            if (!ObjectClass.TryReadName(this, out var classType))
+                throw new ArgumentOutOfRangeException(nameof(classType));
             if (!(classType == "LocalPlayer" || classType == "ClientPlayer"))
                 throw new ArgumentOutOfRangeException(nameof(classType));
 
@@ -78,21 +79,15 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             // Read entry point/profile ID lazily if needed
             if (IsPmc)
             {
-                try
-                {
-                    var entryPtr = Memory.ReadPtr(Info + Offsets.PlayerInfo.EntryPoint);
-                    EntryPoint = Memory.ReadUnityString(entryPtr);
-                }
-                catch { }
+                if (Memory.TryReadPtr(Info + Offsets.PlayerInfo.EntryPoint, out var entryPtr)
+                    && Memory.TryReadUnityString(entryPtr, out var entryPoint))
+                    EntryPoint = entryPoint;
             }
             else if (IsScav)
             {
-                try
-                {
-                    var profileIdPtr = Memory.ReadPtr(this.Profile + Offsets.Profile.Id);
-                    ProfileId = Memory.ReadUnityString(profileIdPtr);
-                }
-                catch { }
+                if (Memory.TryReadPtr(this.Profile + Offsets.Profile.Id, out var profileIdPtr)
+                    && Memory.TryReadUnityString(profileIdPtr, out var profileId))
+                    ProfileId = profileId;
             }
 
             // IL2CPP: HealthController moved - initialize lazily when needed
@@ -114,7 +109,12 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         {
             try
             {
-                _healthController = Memory.ReadPtr(Base + Offsets.Player._healthController, false);
+                if (!Memory.TryReadPtr(Base + Offsets.Player._healthController, out var healthController, false))
+                {
+                    Log.Write(AppLogLevel.Warning, "Failed to read HealthController pointer", "LocalPlayer");
+                    return;
+                }
+                _healthController = healthController;
 
                 if (!_healthController.IsValidVirtualAddress())
                 {
@@ -122,8 +122,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                     return;
                 }
 
-                _energyPtr = Memory.ReadPtr(_healthController + Offsets.HealthController.Energy, false);
-                _hydrationPtr = Memory.ReadPtr(_healthController + Offsets.HealthController.Hydration, false);
+                Memory.TryReadPtr(_healthController + Offsets.HealthController.Energy, out _energyPtr, false);
+                Memory.TryReadPtr(_healthController + Offsets.HealthController.Hydration, out _hydrationPtr, false);
 
                 if (_energyPtr.IsValidVirtualAddress() && _hydrationPtr.IsValidVirtualAddress())
                 {
@@ -145,8 +145,10 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// </summary>
         public void RefreshWishlist()
         {
-            var wishlistManager = Memory.ReadPtr(this.Profile + Offsets.Profile.WishlistManager);
-            var itemsPtr = Memory.ReadPtr(wishlistManager + Offsets.WishlistManager.Items);
+            if (!Memory.TryReadPtr(this.Profile + Offsets.Profile.WishlistManager, out var wishlistManager))
+                return;
+            if (!Memory.TryReadPtr(wishlistManager + Offsets.WishlistManager.Items, out var itemsPtr))
+                return;
             using var items = MemDictionary<Types.MongoID, int>.Get(itemsPtr);
             var wishlist = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var item in items)
@@ -155,8 +157,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 {
                     if (item.Key.StringID == 0)
                         continue;
-                    string id = Memory.ReadUnityString(item.Key.StringID);
-                    if (string.IsNullOrWhiteSpace(id))
+                    if (!Memory.TryReadUnityString(item.Key.StringID, out var id) || string.IsNullOrWhiteSpace(id))
                         continue;
                     wishlist.Add(id);
                 }
@@ -203,7 +204,9 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         {
             try
             {
-                return Memory.ReadValue<bool>(this.PWA + Offsets.ProceduralWeaponAnimation._isAiming, false);
+                if (!Memory.TryReadValue<bool>(this.PWA + Offsets.ProceduralWeaponAnimation._isAiming, out var isAiming, false))
+                    return false;
+                return isAiming;
             }
             catch (ObjectDisposedException)
             {
@@ -278,11 +281,10 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 }
 
                 // Read ValueStruct from HealthValue.Value (offset 0x10)
-                var energyStruct = Memory.ReadValue<ValueStruct>(_energyPtr + Offsets.HealthValue.Value, false);
-                var hydrationStruct = Memory.ReadValue<ValueStruct>(_hydrationPtr + Offsets.HealthValue.Value, false);
-
-                _cachedEnergy = energyStruct.Current;
-                _cachedHydration = hydrationStruct.Current;
+                if (Memory.TryReadValue<ValueStruct>(_energyPtr + Offsets.HealthValue.Value, out var energyStruct, false))
+                    _cachedEnergy = energyStruct.Current;
+                if (Memory.TryReadValue<ValueStruct>(_hydrationPtr + Offsets.HealthValue.Value, out var hydrationStruct, false))
+                    _cachedHydration = hydrationStruct.Current;
             }
             catch (Exception ex)
             {

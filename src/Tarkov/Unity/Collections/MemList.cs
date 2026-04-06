@@ -1,4 +1,5 @@
 using eft_dma_radar.Misc.Pools;
+using VmmSharpEx;
 
 namespace eft_dma_radar.Tarkov.Unity.Collections
 {
@@ -36,13 +37,17 @@ namespace eft_dma_radar.Tarkov.Unity.Collections
         {
             try
             {
-                var count = Memory.ReadValue<int>(addr + CountOffset, useCache);
+                if (!Memory.TryReadValue<int>(addr + CountOffset, out var count, useCache))
+                    throw new VmmException("Failed to read list count");
                 ArgumentOutOfRangeException.ThrowIfGreaterThan(count, 16384, nameof(count));
                 Initialize(count);
                 if (count == 0)
                     return;
-                var listBase = Memory.ReadPtr(addr + ArrOffset, useCache) + ArrStartOffset;
-                Memory.ReadBuffer(listBase, Span, useCache);
+                if (!Memory.TryReadPtr(addr + ArrOffset, out var listPtr, useCache))
+                    throw new VmmException("Failed to read list array pointer");
+                var listBase = listPtr + ArrStartOffset;
+                if (!Memory.TryReadBuffer(listBase, Span, useCache))
+                    throw new VmmException("Failed to read list data");
             }
             catch
             {

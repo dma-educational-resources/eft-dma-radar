@@ -454,7 +454,8 @@ namespace eft_dma_radar.Tarkov.Features
         {
             DLog($"ApplyClothingChams | {player.Name} Body={Hex(player.Body)} materialId={materialId}");
 
-            var pRendererContainersArray = Memory.ReadPtr(player.Body + Offsets.PlayerBody._bodyRenderers);
+            if (!Memory.TryReadPtr(player.Body + Offsets.PlayerBody._bodyRenderers, out var pRendererContainersArray))
+                return;
             DLog($"BodyRenderers ptr={Hex(pRendererContainersArray)} offset={Hex(Offsets.PlayerBody._bodyRenderers)}");
 
             using var rendererContainersArray = MemArray<Types.BodyRendererContainer>.Get(pRendererContainersArray);
@@ -473,7 +474,11 @@ namespace eft_dma_radar.Tarkov.Features
                 int rendererIndex = 0;
                 foreach (var skinnedMeshRenderer in renderersArray)
                 {
-                    var renderer = Memory.ReadPtr(skinnedMeshRenderer + UnityOffsets.SkinnedMeshRenderer.Renderer);
+                    if (!Memory.TryReadPtr(skinnedMeshRenderer + UnityOffsets.SkinnedMeshRenderer.Renderer, out var renderer))
+                    {
+                        rendererIndex++;
+                        continue;
+                    }
 
                     if (containerIndex < LogSampleLimit && rendererIndex < LogSampleLimit)
                         DLog($"  SMR[{containerIndex}:{rendererIndex}] smr={Hex(skinnedMeshRenderer)} renderer={Hex(renderer)}");
@@ -493,7 +498,8 @@ namespace eft_dma_radar.Tarkov.Features
         {
             DLog($"ApplyGearChams | {player.Name} Body={Hex(player.Body)} materialId={materialId}");
 
-            var slotViews = Memory.ReadValue<ulong>(player.Body + Offsets.PlayerBody.SlotViews);
+            if (!Memory.TryReadValue<ulong>(player.Body + Offsets.PlayerBody.SlotViews, out var slotViews))
+                return;
             DLog($"SlotViews ptr={Hex(slotViews)} offset={Hex(Offsets.PlayerBody.SlotViews)}");
 
             if (!Utils.IsValidVirtualAddress(slotViews))
@@ -502,7 +508,8 @@ namespace eft_dma_radar.Tarkov.Features
                 return;
             }
 
-            var pSlotViewsDict = Memory.ReadValue<ulong>(slotViews + Offsets.SlotViewsContainer.Dict);
+            if (!Memory.TryReadValue<ulong>(slotViews + Offsets.SlotViewsContainer.Dict, out var pSlotViewsDict))
+                return;
             DLog($"SlotViewsDict ptr={Hex(pSlotViewsDict)} offset={Hex(Offsets.SlotViewsContainer.Dict)}");
 
             if (!Utils.IsValidVirtualAddress(pSlotViewsDict))
@@ -538,7 +545,8 @@ namespace eft_dma_radar.Tarkov.Features
         {
             DLog($"ProcessSlotDresses | slotValue={Hex(slotValue)} materialId={materialId}");
 
-            var pDressesArray = Memory.ReadValue<ulong>(slotValue + Offsets.PlayerBodySubclass.Dresses);
+            if (!Memory.TryReadValue<ulong>(slotValue + Offsets.PlayerBodySubclass.Dresses, out var pDressesArray))
+                return;
             DLog($"Dresses ptr={Hex(pDressesArray)} offset={Hex(Offsets.PlayerBodySubclass.Dresses)}");
 
             if (!Utils.IsValidVirtualAddress(pDressesArray))
@@ -561,7 +569,11 @@ namespace eft_dma_radar.Tarkov.Features
                     continue;
                 }
 
-                var pRenderersArray = Memory.ReadValue<ulong>(dress + Offsets.Dress.Renderers);
+                if (!Memory.TryReadValue<ulong>(dress + Offsets.Dress.Renderers, out var pRenderersArray))
+                {
+                    dressIndex++;
+                    continue;
+                }
 
                 if (dressIndex < LogSampleLimit)
                     DLog($"Dress[{dressIndex}] ptr={Hex(dress)} RenderersPtr={Hex(pRenderersArray)} offset={Hex(Offsets.Dress.Renderers)}");
@@ -588,7 +600,11 @@ namespace eft_dma_radar.Tarkov.Features
                         continue;
                     }
 
-                    var rendererNative = Memory.ReadValue<ulong>(renderer + 0x10);
+                    if (!Memory.TryReadValue<ulong>(renderer + 0x10, out var rendererNative))
+                    {
+                        rendererIndex++;
+                        continue;
+                    }
 
                     if (dressIndex < LogSampleLimit && rendererIndex < LogSampleLimit)
                         DLog($"  Renderer[{dressIndex}:{rendererIndex}] managed={Hex(renderer)} native={Hex(rendererNative)}");
@@ -607,7 +623,8 @@ namespace eft_dma_radar.Tarkov.Features
         {
             try
             {
-                int materialsCount = Memory.ReadValueEnsure<int>(renderer + UnityOffsets.Renderer.Count);
+                if (!Memory.TryReadValue<int>(renderer + UnityOffsets.Renderer.Count, out var materialsCount))
+                    return;
 
                 if (materialsCount <= 0 || materialsCount > 30)
                 {
@@ -615,11 +632,11 @@ namespace eft_dma_radar.Tarkov.Features
                     return;
                 }
 
-                var materialsArrayPtr = Memory.ReadValueEnsure<ulong>(renderer + UnityOffsets.Renderer.Materials);
+                if (!Memory.TryReadValue<ulong>(renderer + UnityOffsets.Renderer.Materials, out var materialsArrayPtr)
+                    || !materialsArrayPtr.IsValidVirtualAddress())
+                    return;
 
                 DLog($"WriteMaterialToRenderer | renderer={Hex(renderer)} count={materialsCount} matsPtr={Hex(materialsArrayPtr)} matId={materialId}");
-
-                materialsArrayPtr.ThrowIfInvalidVirtualAddress();
 
                 var materials = Enumerable.Repeat(materialId, materialsCount).ToArray();
                 writes.AddBufferEntry(materialsArrayPtr, materials.AsSpan());
@@ -634,7 +651,8 @@ namespace eft_dma_radar.Tarkov.Features
 
         private static bool ValidateWrite(Player player, LocalGameWorld game)
         {
-            var corpse = Memory.ReadValue<ulong>(player.CorpseAddr, false);
+            if (!Memory.TryReadValue<ulong>(player.CorpseAddr, out var corpse, false))
+                return false;
             var ok = corpse == 0 && game.IsSafeToWriteMem;
 
             DLog($"ValidateWrite | {player.Name} CorpseAddr={Hex(player.CorpseAddr)} corpseVal={Hex(corpse)} gameSafe={game.IsSafeToWriteMem} => {ok}");

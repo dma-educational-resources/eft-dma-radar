@@ -82,22 +82,23 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         }
         private bool TryBuildSlots()
         {
-            ulong invController = Memory.ReadPtr(player.InventoryControllerAddr);
-            if (!invController.IsValidVirtualAddress())
+            if (!Memory.TryReadPtr(player.InventoryControllerAddr, out var invController)
+                || !invController.IsValidVirtualAddress())
                 return false;
 
-            ulong inventory = Memory.ReadPtr(invController + Offsets.InventoryController.Inventory);
-            if (!inventory.IsValidVirtualAddress())
+            if (!Memory.TryReadPtr(invController + Offsets.InventoryController.Inventory, out var inventory)
+                || !inventory.IsValidVirtualAddress())
                 return false;
 
-            ulong equipment = Memory.ReadPtr(inventory + Offsets.Inventory.Equipment);
-            if (!equipment.IsValidVirtualAddress())
+            if (!Memory.TryReadPtr(inventory + Offsets.Inventory.Equipment, out var equipment)
+                || !equipment.IsValidVirtualAddress())
                 return false;
 
-            _equipmentSlotsPtr = Memory.ReadPtr(equipment + Offsets.Equipment.Slots);
-            ulong slotsPtr = _equipmentSlotsPtr;
-            if (!slotsPtr.IsValidVirtualAddress())
+            if (!Memory.TryReadPtr(equipment + Offsets.Equipment.Slots, out var slotsPtr)
+                || !slotsPtr.IsValidVirtualAddress())
                 return false;
+
+            _equipmentSlotsPtr = slotsPtr;
 
             var dict = new Dictionary<string, ulong>(StringComparer.OrdinalIgnoreCase);
 
@@ -106,11 +107,12 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             {
                 try
                 {
-                    var namePtr = Memory.ReadPtr(slotPtr + Offsets.Slot.ID);
-                    if (!namePtr.IsValidVirtualAddress())
+                    if (!Memory.TryReadPtr(slotPtr + Offsets.Slot.ID, out var namePtr)
+                        || !namePtr.IsValidVirtualAddress())
                         continue;
 
-                    var name = Memory.ReadUnityString(namePtr);
+                    if (!Memory.TryReadUnityString(namePtr, out var name) || name is null)
+                        continue;
                     if (_skipSlots.Contains(name))
                         continue;
 
@@ -144,13 +146,16 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                         continue;
                     }
 
-                    var item = Memory.ReadPtr(slot.Value + Offsets.Slot.ContainedItem);
-                    if (!item.IsValidVirtualAddress())
+                    if (!Memory.TryReadPtr(slot.Value + Offsets.Slot.ContainedItem, out var item)
+                        || !item.IsValidVirtualAddress())
                         continue;
 
-                    var template = Memory.ReadPtr(item + Offsets.LootItem.Template);
-                    var idPtr = Memory.ReadValue<Types.MongoID>(template + Offsets.ItemTemplate._id);
-                    var id = Memory.ReadUnityString(idPtr.StringID);
+                    if (!Memory.TryReadPtr(item + Offsets.LootItem.Template, out var template))
+                        continue;
+                    if (!Memory.TryReadValue<Types.MongoID>(template + Offsets.ItemTemplate._id, out var idPtr))
+                        continue;
+                    if (!Memory.TryReadUnityString(idPtr.StringID, out var id) || id is null)
+                        continue;
 
                     if (EftDataManager.AllItems.TryGetValue(id, out var entry))
                         loot.Add(new LootItem(entry));
@@ -207,21 +212,12 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
             using var slots = MemArray<ulong>.Get(slotsPtr);
             foreach (var slotPtr in slots)
             {
-                ulong item;
-                try
-                {
-                    item = Memory.ReadPtr(slotPtr + Offsets.Slot.ContainedItem);
-                    if (!item.IsValidVirtualAddress())
-                        continue;
-                }
-                catch { continue; }
+                if (!Memory.TryReadPtr(slotPtr + Offsets.Slot.ContainedItem, out var item)
+                    || !item.IsValidVirtualAddress())
+                    continue;
 
-                string className;
-                try
-                {
-                    className = ObjectClass.ReadName(item);
-                }
-                catch { continue; }
+                if (!ObjectClass.TryReadName(item, out var className))
+                    continue;
 
                 if (!className.Equals("BarterOther", StringComparison.Ordinal))
                     continue;
@@ -235,16 +231,16 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
 
             try
             {
-                var dogtag = Memory.ReadPtr(barterOther + Offsets.BarterOtherOffsets.Dogtag);
-                if (!dogtag.IsValidVirtualAddress())
+                if (!Memory.TryReadPtr(barterOther + Offsets.BarterOtherOffsets.Dogtag, out var dogtag)
+                    || !dogtag.IsValidVirtualAddress())
                     return;
 
-                var profileIdPtr = Memory.ReadPtr(dogtag + Offsets.DogtagComponent.ProfileId);
-                if (!profileIdPtr.IsValidVirtualAddress())
+                if (!Memory.TryReadPtr(dogtag + Offsets.DogtagComponent.ProfileId, out var profileIdPtr)
+                    || !profileIdPtr.IsValidVirtualAddress())
                     return;
 
-                var profileId = Memory.ReadUnityString(profileIdPtr);
-                if (string.IsNullOrWhiteSpace(profileId))
+                if (!Memory.TryReadUnityString(profileIdPtr, out var profileId)
+                    || string.IsNullOrWhiteSpace(profileId))
                     return;
 
                 // ? SET PROFILE ID ONCE
@@ -272,13 +268,16 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         {
             try
             {
-                var item = Memory.ReadPtr(slotPtr + Offsets.Slot.ContainedItem);
-                if (!item.IsValidVirtualAddress())
+                if (!Memory.TryReadPtr(slotPtr + Offsets.Slot.ContainedItem, out var item)
+                    || !item.IsValidVirtualAddress())
                     return;
 
-                var template = Memory.ReadPtr(item + Offsets.LootItem.Template);
-                var idPtr = Memory.ReadValue<Types.MongoID>(template + Offsets.ItemTemplate._id);
-                var id = Memory.ReadUnityString(idPtr.StringID);
+                if (!Memory.TryReadPtr(item + Offsets.LootItem.Template, out var template))
+                    return;
+                if (!Memory.TryReadValue<Types.MongoID>(template + Offsets.ItemTemplate._id, out var idPtr))
+                    return;
+                if (!Memory.TryReadUnityString(idPtr.StringID, out var id) || id is null)
+                    return;
 
                 if (EftDataManager.AllItems.TryGetValue(id, out var entry))
                 {
@@ -298,16 +297,18 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         {
             weaponTemplate = 0;
 
-            var item = Memory.ReadPtr(slotPtr + Offsets.Slot.ContainedItem);
-            if (!item.IsValidVirtualAddress())
+            if (!Memory.TryReadPtr(slotPtr + Offsets.Slot.ContainedItem, out var item)
+                || !item.IsValidVirtualAddress())
                 return false;
 
-            var template = Memory.ReadPtr(item + Offsets.LootItem.Template);
-            if (!template.IsValidVirtualAddress())
+            if (!Memory.TryReadPtr(item + Offsets.LootItem.Template, out var template)
+                || !template.IsValidVirtualAddress())
                 return false;
 
-            var idPtr = Memory.ReadValue<Types.MongoID>(template + Offsets.ItemTemplate._id);
-            var id = Memory.ReadUnityString(idPtr.StringID, 64);
+            if (!Memory.TryReadValue<Types.MongoID>(template + Offsets.ItemTemplate._id, out var idPtr))
+                return false;
+            if (!Memory.TryReadUnityString(idPtr.StringID, out var id, 64) || id is null)
+                return false;
 
             if (!EftDataManager.AllItems.TryGetValue(id, out var itemDef))
                 return false;
@@ -325,17 +326,22 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
         {
             try
             {
-                var slotsPtr = Memory.ReadPtr(lootItemBase + Offsets.LootItemMod.Slots);
+                if (!Memory.TryReadPtr(lootItemBase + Offsets.LootItemMod.Slots, out var slotsPtr))
+                    return;
                 using var slots = MemArray<ulong>.Get(slotsPtr);
 
                 foreach (var slotPtr in slots)
                 {
                     try
                     {
-                        var item = Memory.ReadPtr(slotPtr + Offsets.Slot.ContainedItem);
-                        var template = Memory.ReadPtr(item + Offsets.LootItem.Template);
-                        var idPtr = Memory.ReadValue<Types.MongoID>(template + Offsets.ItemTemplate._id);
-                        var id = Memory.ReadUnityString(idPtr.StringID);
+                        if (!Memory.TryReadPtr(slotPtr + Offsets.Slot.ContainedItem, out var item))
+                            continue;
+                        if (!Memory.TryReadPtr(item + Offsets.LootItem.Template, out var template))
+                            continue;
+                        if (!Memory.TryReadValue<Types.MongoID>(template + Offsets.ItemTemplate._id, out var idPtr))
+                            continue;
+                        if (!Memory.TryReadUnityString(idPtr.StringID, out var id) || id is null)
+                            continue;
 
                         if (EftDataManager.AllItems.TryGetValue(id, out var entry))
                             loot.Add(new LootItem(entry));
