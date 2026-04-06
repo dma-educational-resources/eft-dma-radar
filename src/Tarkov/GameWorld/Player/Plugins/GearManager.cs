@@ -243,7 +243,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                 if (!profileIdPtr.IsValidVirtualAddress())
                     return;
 
-                var profileId = Memory.ReadUnityString(profileIdPtr, 32);
+                var profileId = Memory.ReadUnityString(profileIdPtr);
                 if (string.IsNullOrWhiteSpace(profileId))
                     return;
 

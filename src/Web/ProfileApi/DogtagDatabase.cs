@@ -103,6 +103,8 @@ namespace eft_dma_radar.Web.ProfileApi
         // Persistence
         // ─────────────────────────────────────────────────────────────
 
+        private const int MinProfileIdLength = 24;
+
         private static ConcurrentDictionary<string, DbEntry> Load()
         {
             try
@@ -114,6 +116,7 @@ namespace eft_dma_radar.Web.ProfileApi
                     if (db?.Entries is { Count: > 0 } entries)
                     {
                         Log.WriteLine($"[DogtagDB] Loaded {entries.Count} entries from disk.");
+                        PurgeTruncatedKeys(entries);
                         return entries;
                     }
                 }
@@ -123,6 +126,29 @@ namespace eft_dma_radar.Web.ProfileApi
                 Log.WriteLine($"[DogtagDB] Failed to load: {ex.Message}");
             }
             return new ConcurrentDictionary<string, DbEntry>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Removes entries whose profileId key is shorter than <see cref="MinProfileIdLength"/>
+        /// characters. These are leftovers from a previous bug that truncated profileIds.
+        /// </summary>
+        private static void PurgeTruncatedKeys(ConcurrentDictionary<string, DbEntry> entries)
+        {
+            int removed = 0;
+            foreach (var key in entries.Keys)
+            {
+                if (key.Length < MinProfileIdLength)
+                {
+                    if (entries.TryRemove(key, out _))
+                        removed++;
+                }
+            }
+
+            if (removed > 0)
+            {
+                _dirty = true;
+                Log.WriteLine($"[DogtagDB] Purged {removed} truncated profileId entries.");
+            }
         }
 
         private static void FlushLoop()

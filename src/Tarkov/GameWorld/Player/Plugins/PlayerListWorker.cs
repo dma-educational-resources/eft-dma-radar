@@ -272,6 +272,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
          * RAID LIFECYCLE
          * ============================== */
 
+        private const int MinProfileIdLength = 24;
+
         private static void OnRaidStart(LocalGameWorld game)
         {
             string? sessionId = GetSessionId();
@@ -291,6 +293,10 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.Plugins
                     foreach (var p in file.Players)
                     {
                         if (!IsValidSpawn(p.Spawn))
+                            continue;
+
+                        // Skip entries with truncated profileIds left over from a previous bug.
+                        if (p.ProfileId.Length < MinProfileIdLength)
                             continue;
 
                         _players[p.ProfileId] = p;
