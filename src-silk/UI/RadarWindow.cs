@@ -1,21 +1,13 @@
-using eft_dma_radar.DMA;
-using eft_dma_radar.Tarkov.EFTPlayer;
-using eft_dma_radar.Tarkov.GameWorld;
-using eft_dma_radar.Tarkov.GameWorld.Exits;
-using eft_dma_radar.Tarkov.GameWorld.Explosives;
-using eft_dma_radar.Tarkov.GameWorld.Interactables;
-using eft_dma_radar.Tarkov.GameWorld.Loot;
-using eft_dma_radar.Tarkov.Loot;
 using eft_dma_radar.UI.Misc;
-using eft_dma_radar.UI.Radar.Maps;
+using eft_dma_radar.Silk.UI.Panels;
+using eft_dma_radar.Silk.UI.Widgets;
 using ImGuiNET;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.ImGui;
 using Silk.NET.Windowing;
-using System.IO;
-using static eft_dma_radar.Tarkov.EFTPlayer.Player;
+using SilkWindow = Silk.NET.Windowing.Window;
 
 #nullable enable
 namespace eft_dma_radar.Silk.UI
@@ -25,7 +17,7 @@ namespace eft_dma_radar.Silk.UI
     /// Silk.NET-based radar window with SkiaSharp GPU rendering and ImGui UI.
     /// Replaces WPF MainWindow for high-performance native rendering.
     /// </summary>
-    internal static class RadarWindow
+    internal static partial class RadarWindow
     {
         #region Fields
 
@@ -45,7 +37,7 @@ namespace eft_dma_radar.Silk.UI
         // Mouse state
         private static bool _mouseDown;
         private static Vector2 _lastMousePosition;
-        private static IMouseoverEntity? _mouseOverItem;
+        private static PlayerBase? _mouseOverPlayer;
 
         // Map state
         private static bool _freeMode;
@@ -71,35 +63,47 @@ namespace eft_dma_radar.Silk.UI
         private const float ZOOM_TO_MOUSE_STRENGTH = 5f;
         private const int ZOOM_STEP = 5;
 
-        // ImGui panel state
-        private static bool _settingsOpen;
-        private static bool _lootFiltersOpen;
-
         #endregion
 
         #region Properties
 
-        private static Config Config => SilkProgram.Config;
+        private static SilkConfig Config => SilkProgram.Config;
         private static float UIScale => Config.UIScale;
         private static string MapID => Memory.MapID ?? "null";
-        private static LocalPlayer? LocalPlayer => Memory.LocalPlayer;
-        private static IEnumerable<LootItem>? FilteredLoot => Memory.Loot?.FilteredLoot;
-        private static IEnumerable<StaticLootContainer>? Containers => Memory.Loot?.StaticLootContainers;
-        private static IReadOnlyCollection<Player>? AllPlayers => Memory.Players;
-        private static IReadOnlyCollection<IExplosiveItem>? Explosives => Memory.Explosives;
-        private static IReadOnlyCollection<IExitPoint>? Exits => Memory.Exits;
-        private static QuestManager? QuestManager => Memory.QuestManager;
+        private static PlayerBase? LocalPlayer => Memory.LocalPlayer;
+        private static IReadOnlyCollection<PlayerBase>? AllPlayers => Memory.Players;
         private static bool InRaid => Memory.InRaid;
-        private static bool Starting => Memory.Starting;
         private static bool Ready => Memory.Ready;
+
+        // Internal accessors for panels
+        internal static int Zoom
+        {
+            get => _zoom;
+            set => _zoom = value;
+        }
+
+        internal static bool FreeMode
+        {
+            get => _freeMode;
+            set
+            {
+                _freeMode = value;
+                if (!value)
+                    _mapPanPosition = default;
+            }
+        }
+
+        internal static IWindow Window => _window;
+
+        private static int? _mouseoverGroup;
 
         /// <summary>
         /// Currently 'Moused Over' Group.
         /// </summary>
         public static int? MouseoverGroup
         {
-            get => UISharedState.MouseoverGroup;
-            private set => UISharedState.MouseoverGroup = value;
+            get => _mouseoverGroup;
+            private set => _mouseoverGroup = value;
         }
 
         #endregion
@@ -111,12 +115,10 @@ namespace eft_dma_radar.Silk.UI
             Log.WriteLine("[RadarWindow] Initialize starting...");
 
             var options = WindowOptions.Default;
-            options.Size = new Vector2D<int>(
-                (int)Config.WindowSize.Width,
-                (int)Config.WindowSize.Height);
+            options.Size = new Vector2D<int>(Config.WindowWidth, Config.WindowHeight);
             options.Title = SilkProgram.Name;
             options.VSync = false;
-            options.FramesPerSecond = Config.RadarTargetFPS;
+            options.FramesPerSecond = Config.TargetFps;
             options.PreferredStencilBufferBits = 8;
             options.PreferredBitDepth = new Vector4D<int>(8, 8, 8, 8);
 
@@ -125,7 +127,7 @@ namespace eft_dma_radar.Silk.UI
 
             Log.WriteLine($"[RadarWindow] Creating window: {options.Size.X}x{options.Size.Y}, FPS={options.FramesPerSecond}, API={options.API}");
 
-            _window = Window.Create(options);
+            _window = SilkWindow.Create(options);
             _window.Load += OnLoad;
 
             Log.WriteLine("[RadarWindow] Initialize complete, window created.");
@@ -216,11 +218,7 @@ namespace eft_dma_radar.Silk.UI
                 // Start FPS timer
                 _ = RunFpsTimerAsync();
 
-                // Signal ready
-                SilkProgram.UpdateState(AppState.ProcessNotStarted);
-
-                // Tell Memory worker the UI is ready (no WPF dependency).
-                Memory.UIReady = true;
+                // Wire up the notification callback into the silk Memory module
                 Memory.ShowNotification ??= static (msg, level) =>
                     Log.WriteLine($"[Notification:{level}] {msg}");
 
@@ -334,13 +332,13 @@ namespace eft_dma_radar.Silk.UI
                 var scale = UIScale;
                 canvas.Scale(scale, scale);
 
-                if (InRaid && LocalPlayer is LocalPlayer localPlayer)
+                if (InRaid && LocalPlayer is PlayerBase localPlayer)
                 {
                     var mapID = MapID;
-                    if (!mapID.Equals(XMMapManager.Map?.ID, StringComparison.OrdinalIgnoreCase))
-                        XMMapManager.LoadMap(mapID);
+                    if (!mapID.Equals(MapManager.Map?.ID, StringComparison.OrdinalIgnoreCase))
+                        MapManager.LoadMap(mapID);
 
-                    var map = XMMapManager.Map;
+                    var map = MapManager.Map;
                     if (map is not null)
                     {
                         DrawRadar(canvas, localPlayer, map, scale);
@@ -350,11 +348,7 @@ namespace eft_dma_radar.Silk.UI
                         DrawStatusMessage(canvas, "Waiting for Raid Start", scale);
                     }
                 }
-                else if (!Starting)
-                {
-                    DrawStatusMessage(canvas, "Game Process Not Running!", scale);
-                }
-                else if (Starting && !Ready)
+                else if (!Ready)
                 {
                     DrawStatusMessage(canvas, "Starting Up", scale, animated: true);
                 }
@@ -371,15 +365,13 @@ namespace eft_dma_radar.Silk.UI
             }
         }
 
-        private static void DrawRadar(SKCanvas canvas, LocalPlayer localPlayer, IXMMap map, float scale)
+        private static void DrawRadar(SKCanvas canvas, PlayerBase localPlayer, RadarMap map, float scale)
         {
-            var closestToMouse = _mouseOverItem;
-            var localPlayerPos = localPlayer.Position;
-            var localPlayerMapPos = localPlayerPos.ToMapPos(map.Config);
+            var localPlayerPos    = localPlayer.Position;
+            var localPlayerMapPos = MapParams.ToMapPos(localPlayerPos, map.Config);
 
-            // Get map parameters
             var canvasSize = new SKSize(_window.Size.X / scale, _window.Size.Y / scale);
-            XMMapParams mapParams;
+            MapParams mapParams;
 
             if (_freeMode)
             {
@@ -395,151 +387,95 @@ namespace eft_dma_radar.Silk.UI
 
             var mapCanvasBounds = new SKRect(0, 0, canvasSize.Width, canvasSize.Height);
 
-            // Draw map
-            map.Draw(canvas, localPlayer.Position.Y, mapParams.Bounds, mapCanvasBounds);
+            map.Draw(canvas, localPlayerPos.Y, mapParams.Bounds, mapCanvasBounds);
 
             SKPaints.UpdatePulsingAsteriskColor();
 
-            // Draw local player first (background)
-            localPlayer.Draw(canvas, mapParams, localPlayer);
-
-            // Snapshot collections
+            // Snapshot players
             var allPlayersSnapshot = AllPlayers;
-            var lootSnapshot = FilteredLoot;
-            var containersSnapshot = Containers;
-            var explosivesSnapshot = Explosives;
-            var exitsSnapshot = Exits;
 
-            // Build filtered player lists in a single pass
-            List<Player>? normalPlayers = null;
-            List<BtrOperator>? btrs = null;
+            List<PlayerBase>? normalPlayers = null;
             if (allPlayersSnapshot is not null)
             {
-                normalPlayers = new List<Player>(allPlayersSnapshot.Count);
-                btrs = new List<BtrOperator>(2);
+                normalPlayers = new List<PlayerBase>(allPlayersSnapshot.Count);
                 foreach (var p in allPlayersSnapshot)
                 {
-                    if (p.HasExfild)
-                        continue;
-                    if (p is BtrOperator btr)
-                        btrs.Add(btr);
-                    else
+                    if (p.IsActive && p.IsAlive)
                         normalPlayers.Add(p);
                 }
                 normalPlayers.Sort(static (a, b) => DrawPriority(a.Type).CompareTo(DrawPriority(b.Type)));
             }
 
-            var battleMode = Config.BattleMode;
-
             // Group connectors
             if (Config.ConnectGroups && normalPlayers is not null)
                 DrawGroupConnectors(canvas, normalPlayers, map, mapParams);
+
+            // Draw local player
+            DrawPlayer(canvas, localPlayer, mapParams, map, isLocal: true);
 
             // Players (bottom layer)
             if (!Config.PlayersOnTop && normalPlayers is not null)
             {
                 foreach (var player in normalPlayers)
                 {
-                    if (player != localPlayer)
-                        player.Draw(canvas, mapParams, localPlayer);
+                    if (!player.IsLocalPlayer)
+                        DrawPlayer(canvas, player, mapParams, map, isLocal: false);
                 }
             }
 
-            // BTRs
-            if (btrs is not null)
-            {
-                foreach (var btr in btrs)
-                    btr.Draw(canvas, mapParams, localPlayer);
-            }
-
-            // Containers
-            if (!battleMode && Config.Containers.Show && StaticLootContainer.Settings.Enabled && containersSnapshot is not null)
-            {
-                foreach (var container in containersSnapshot)
-                {
-                    if (Config.Containers.HideSearched && container.Searched)
-                        continue;
-                    container.Draw(canvas, mapParams, localPlayer);
-                }
-            }
-
-            // Loot
-            if (!battleMode && Config.ProcessLoot &&
-                (LootItem.CorpseSettings.Enabled ||
-                 LootItem.LootSettings.Enabled ||
-                 LootItem.ImportantLootSettings.Enabled ||
-                 LootItem.QuestItemSettings.Enabled))
-            {
-                if (lootSnapshot is not null)
-                {
-                    foreach (var item in lootSnapshot)
-                    {
-                        if (item is QuestItem)
-                            continue;
-                        if (!LootItem.CorpseSettings.Enabled && item is LootCorpse)
-                            continue;
-                        item.CheckNotify();
-                        item.Draw(canvas, mapParams, localPlayer);
-                    }
-                }
-            }
-
-            // Quest items & locations
-            if (!battleMode && (Config.QuestHelper.Enabled) && !localPlayer.IsScav)
-            {
-                if (LootItem.QuestItemSettings.Enabled && lootSnapshot is not null)
-                {
-                    foreach (var item in lootSnapshot)
-                    {
-                        if (item is QuestItem)
-                            item.Draw(canvas, mapParams, localPlayer);
-                    }
-                }
-
-                if (QuestManager.Settings.Enabled)
-                {
-                    var questLocations = Memory.QuestManager?.LocationConditions?.ToList();
-                    if (questLocations is not null)
-                    {
-                        foreach (var loc in questLocations)
-                            loc.Draw(canvas, mapParams, localPlayer);
-                    }
-                }
-            }
-
-            // Explosives
-            if (explosivesSnapshot is not null)
-            {
-                foreach (var explosive in explosivesSnapshot)
-                    explosive.Draw(canvas, mapParams, localPlayer);
-            }
-
-            // Exits
-            if (!battleMode && exitsSnapshot is not null)
-            {
-                foreach (var exit in exitsSnapshot)
-                {
-                    if (exit is Exfil ex && !localPlayer.IsPmc && ex.Status is Exfil.EStatus.Closed)
-                        continue;
-                    exit.Draw(canvas, mapParams, localPlayer);
-                }
-            }
-
-            // Players on top
+            // Players (top layer)
             if (Config.PlayersOnTop && normalPlayers is not null)
             {
                 foreach (var player in normalPlayers)
                 {
-                    if (player != localPlayer)
-                        player.Draw(canvas, mapParams, localPlayer);
+                    if (!player.IsLocalPlayer)
+                        DrawPlayer(canvas, player, mapParams, map, isLocal: false);
                 }
             }
 
-            // Mouseover
-            closestToMouse?.DrawMouseover(canvas, mapParams, localPlayer);
-
             // Pings
             DrawPings(canvas, map, mapParams);
+        }
+
+        private static void DrawPlayer(SKCanvas canvas, PlayerBase player, MapParams mapParams,
+            RadarMap map, bool isLocal)
+        {
+            var pos = mapParams.ToScreenPos(MapParams.ToMapPos(player.Position, map.Config));
+
+            var (dotPaint, textPaint) = GetPlayerPaints(player.Type, isLocal);
+
+            const float dotRadius = 5f;
+            canvas.DrawCircle(pos.X, pos.Y, dotRadius, dotPaint);
+
+            // Directional arrow — rotate by yaw
+            float yawRad = MathF.PI * player.RotationYaw / 180f;
+            float arrowLen = 10f;
+            var tip = new SKPoint(
+                pos.X + arrowLen * MathF.Sin(yawRad),
+                pos.Y - arrowLen * MathF.Cos(yawRad));
+            canvas.DrawLine(pos, tip, dotPaint);
+
+            // Name label
+            canvas.DrawText(player.Name, pos.X + 7f, pos.Y + 4f, SKTextAlign.Left,
+                SKPaints.FontRegular12, textPaint);
+        }
+
+        private static (SKPaint dot, SKPaint text) GetPlayerPaints(PlayerType t, bool isLocal)
+        {
+            if (isLocal) return (SKPaints.PaintLocalPlayer, SKPaints.TextLocalPlayer);
+            return t switch
+            {
+                PlayerType.Teammate     => (SKPaints.PaintTeammate, SKPaints.TextTeammate),
+                PlayerType.USEC         => (SKPaints.PaintUSEC, SKPaints.TextUSEC),
+                PlayerType.BEAR         => (SKPaints.PaintBEAR, SKPaints.TextBEAR),
+                PlayerType.PScav        => (SKPaints.PaintPScav, SKPaints.TextPScav),
+                PlayerType.AIScav       => (SKPaints.PaintScav, SKPaints.TextScav),
+                PlayerType.AIRaider     => (SKPaints.PaintRaider, SKPaints.TextRaider),
+                PlayerType.AIBoss       => (SKPaints.PaintBoss, SKPaints.TextBoss),
+                PlayerType.SpecialPlayer => (SKPaints.PaintSpecial, SKPaints.TextSpecial),
+                PlayerType.Streamer     => (SKPaints.PaintStreamer, SKPaints.TextStreamer),
+                _                       => (SKPaints.PaintLocalPlayer, SKPaints.TextLocalPlayer)
+            };
         }
 
         private static int DrawPriority(PlayerType t) => t switch
@@ -552,12 +488,12 @@ namespace eft_dma_radar.Silk.UI
             _ => 1
         };
 
-        private static void DrawGroupConnectors(SKCanvas canvas, List<Player> players, IXMMap map, XMMapParams mapParams)
+        private static void DrawGroupConnectors(SKCanvas canvas, List<PlayerBase> players, RadarMap map, MapParams mapParams)
         {
             Dictionary<int, List<SKPoint>>? groups = null;
             foreach (var p in players)
             {
-                if (p.IsHumanHostileActive && p.SpawnGroupID != -1)
+                if (p.IsHuman && p.IsHostile && p.SpawnGroupID != -1)
                 {
                     groups ??= new Dictionary<int, List<SKPoint>>(8);
                     if (!groups.TryGetValue(p.SpawnGroupID, out var list))
@@ -565,7 +501,7 @@ namespace eft_dma_radar.Silk.UI
                         list = new List<SKPoint>(4);
                         groups[p.SpawnGroupID] = list;
                     }
-                    list.Add(p.Position.ToMapPos(map.Config).ToZoomedPos(mapParams));
+                    list.Add(mapParams.ToScreenPos(MapParams.ToMapPos(p.Position, map.Config)));
                 }
             }
             if (groups is null)
@@ -584,7 +520,7 @@ namespace eft_dma_radar.Silk.UI
             }
         }
 
-        private static void DrawPings(SKCanvas canvas, IXMMap map, XMMapParams mapParams)
+        private static void DrawPings(SKCanvas canvas, RadarMap map, MapParams mapParams)
         {
             if (_activePings.Count == 0)
                 return;
@@ -604,7 +540,7 @@ namespace eft_dma_radar.Silk.UI
                 float radius = 10 + 50 * progress;
                 float alpha = 1f - progress;
 
-                var center = ping.Position.ToMapPos(map.Config).ToZoomedPos(mapParams);
+                var center = mapParams.ToScreenPos(MapParams.ToMapPos(ping.Position, map.Config));
                 _pingPaint.Color = new SKColor(0, 255, 255, (byte)(alpha * 255));
                 canvas.DrawCircle(center.X, center.Y, radius, _pingPaint);
             }
@@ -650,11 +586,13 @@ namespace eft_dma_radar.Silk.UI
                 if (ImGui.BeginMainMenuBar())
                 {
                     // Map mode toggle
+                    int pushedColors = 0;
                     if (_freeMode)
                     {
                         ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.2f, 0.6f, 0.2f, 1.0f));
                         ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.3f, 0.7f, 0.3f, 1.0f));
                         ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.1f, 0.5f, 0.1f, 1.0f));
+                        pushedColors = 3;
                     }
 
                     if (ImGui.Button(_freeMode ? "Map Free" : "Map Follow"))
@@ -668,19 +606,22 @@ namespace eft_dma_radar.Silk.UI
                             ? "Free map panning (drag to move map)"
                             : "Follow player (map centered on you)");
 
-                    if (_freeMode)
-                        ImGui.PopStyleColor(3);
+                    if (pushedColors > 0)
+                        ImGui.PopStyleColor(pushedColors);
 
                     ImGui.Separator();
 
-                    if (ImGui.MenuItem("Settings", null, _settingsOpen))
-                        _settingsOpen = !_settingsOpen;
+                    if (ImGui.MenuItem("Settings", null, SettingsPanel.IsOpen))
+                        SettingsPanel.IsOpen = !SettingsPanel.IsOpen;
 
-                    if (ImGui.MenuItem("Loot Filters", null, _lootFiltersOpen))
-                        _lootFiltersOpen = !_lootFiltersOpen;
+                    if (ImGui.MenuItem("Loot Filters", null, LootFiltersPanel.IsOpen))
+                        LootFiltersPanel.IsOpen = !LootFiltersPanel.IsOpen;
+
+                    if (ImGui.MenuItem("Players", null, PlayerInfoWidget.IsOpen))
+                        PlayerInfoWidget.IsOpen = !PlayerInfoWidget.IsOpen;
 
                     // Right-aligned: Map name + FPS
-                    string mapName = XMMapManager.Map?.Config?.Name ?? "No Map";
+                    string mapName = MapManager.Map?.Config?.Name ?? "No Map";
                     string rightText = $"{mapName} | {_fps} FPS";
                     float rightTextWidth = ImGui.CalcTextSize(rightText).X;
                     ImGui.SetCursorPosX(ImGui.GetWindowWidth() - rightTextWidth - 10);
@@ -689,13 +630,8 @@ namespace eft_dma_radar.Silk.UI
                     ImGui.EndMainMenuBar();
                 }
 
-                // Settings window
-                if (_settingsOpen)
-                    DrawSettingsWindow();
-
-                // Loot filters window
-                if (_lootFiltersOpen)
-                    DrawLootFiltersWindow();
+                // Draw windows
+                DrawWindows();
             }
             finally
             {
@@ -703,76 +639,16 @@ namespace eft_dma_radar.Silk.UI
             }
         }
 
-        private static void DrawSettingsWindow()
+        private static void DrawWindows()
         {
-            bool isOpen = _settingsOpen;
-            ImGui.SetNextWindowSize(new Vector2(500, 600), ImGuiCond.FirstUseEver);
-            if (ImGui.Begin("Radar Settings", ref isOpen))
-            {
-                if (ImGui.CollapsingHeader("General", ImGuiTreeNodeFlags.DefaultOpen))
-                {
-                    float uiScale = Config.UIScale;
-                    if (ImGui.SliderFloat("UI Scale", ref uiScale, 0.5f, 2.0f))
-                        Config.UIScale = uiScale;
+            if (SettingsPanel.IsOpen)
+                SettingsPanel.Draw();
 
-                    int fps = Config.RadarTargetFPS;
-                    if (ImGui.SliderInt("Target FPS", ref fps, 30, 300))
-                    {
-                        Config.RadarTargetFPS = fps;
-                        _window.FramesPerSecond = fps;
-                    }
+            if (LootFiltersPanel.IsOpen)
+                LootFiltersPanel.Draw();
 
-                    bool battleMode = Config.BattleMode;
-                    if (ImGui.Checkbox("Battle Mode", ref battleMode))
-                        Config.BattleMode = battleMode;
-
-                    bool playersOnTop = Config.PlayersOnTop;
-                    if (ImGui.Checkbox("Players On Top", ref playersOnTop))
-                        Config.PlayersOnTop = playersOnTop;
-
-                    bool connectGroups = Config.ConnectGroups;
-                    if (ImGui.Checkbox("Connect Groups", ref connectGroups))
-                        Config.ConnectGroups = connectGroups;
-                }
-
-                if (ImGui.CollapsingHeader("Loot"))
-                {
-                    bool processLoot = Config.ProcessLoot;
-                    if (ImGui.Checkbox("Show Loot", ref processLoot))
-                        Config.ProcessLoot = processLoot;
-                }
-
-                if (ImGui.CollapsingHeader("Map"))
-                {
-                    int zoom = _zoom;
-                    if (ImGui.SliderInt("Zoom", ref zoom, 1, 200))
-                        _zoom = zoom;
-
-                    bool freeMode = _freeMode;
-                    if (ImGui.Checkbox("Free Mode", ref freeMode))
-                    {
-                        _freeMode = freeMode;
-                        if (!freeMode) _mapPanPosition = default;
-                    }
-                }
-            }
-            ImGui.End();
-            _settingsOpen = isOpen;
-        }
-
-        private static void DrawLootFiltersWindow()
-        {
-            bool isOpen = _lootFiltersOpen;
-            ImGui.SetNextWindowSize(new Vector2(600, 400), ImGuiCond.FirstUseEver);
-            if (ImGui.Begin("Loot Filters", ref isOpen))
-            {
-                ImGui.Text("Loot filter configuration.");
-                ImGui.Separator();
-                ImGui.TextWrapped("Configure loot filters in the existing config file. " +
-                    "Full ImGui loot filter UI will be added in a future update.");
-            }
-            ImGui.End();
-            _lootFiltersOpen = isOpen;
+            if (PlayerInfoWidget.IsOpen && InRaid)
+                PlayerInfoWidget.Draw();
         }
 
         private static void ApplyImGuiDarkStyle()
@@ -840,14 +716,14 @@ namespace eft_dma_radar.Silk.UI
 
             if (!InRaid)
             {
-                _mouseOverItem = null;
+                _mouseOverPlayer = null;
                 MouseoverGroup = null;
                 return;
             }
 
             // Find closest mouseover entity
             var mousePos = position;
-            IMouseoverEntity? closest = null;
+            PlayerBase? closest = null;
             float closestDist = float.MaxValue;
 
             var players = AllPlayers;
@@ -855,9 +731,12 @@ namespace eft_dma_radar.Silk.UI
             {
                 foreach (var p in players)
                 {
-                    if (p is LocalPlayer || p.HasExfild)
+                    if (p.IsLocalPlayer || !p.IsActive || !p.IsAlive)
                         continue;
-                    float dist = Vector2.Distance(p.MouseoverPosition, mousePos);
+                    var curParams = GetCurrentMapParams();
+                    if (curParams is null) break;
+                    var screenPos = curParams.Value.ToScreenPos(MapParams.ToMapPos(p.Position, curParams.Value.Config));
+                    float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
                     if (dist < closestDist)
                     {
                         closestDist = dist;
@@ -866,50 +745,36 @@ namespace eft_dma_radar.Silk.UI
                 }
             }
 
-            var loot = FilteredLoot;
-            if (loot is not null)
-            {
-                foreach (var item in loot)
-                {
-                    float dist = Vector2.Distance(item.MouseoverPosition, mousePos);
-                    if (dist < closestDist)
-                    {
-                        closestDist = dist;
-                        closest = item;
-                    }
-                }
-            }
-
-            var exits = Exits;
-            if (exits is not null)
-            {
-                foreach (var exit in exits)
-                {
-                    if (exit is IMouseoverEntity mo)
-                    {
-                        float dist = Vector2.Distance(mo.MouseoverPosition, mousePos);
-                        if (dist < closestDist)
-                        {
-                            closestDist = dist;
-                            closest = mo;
-                        }
-                    }
-                }
-            }
-
             if (closestDist < 12f * UIScale && closest is not null)
             {
-                _mouseOverItem = closest;
-                if (closest is Player player && player.IsHumanHostile && player.SpawnGroupID != -1)
-                    MouseoverGroup = player.SpawnGroupID;
+                _mouseOverPlayer = null;
+                if (closest.IsHuman && closest.IsHostile && closest.SpawnGroupID != -1)
+                    MouseoverGroup = closest.SpawnGroupID;
                 else
                     MouseoverGroup = null;
             }
             else
             {
-                _mouseOverItem = null;
+                _mouseOverPlayer = null;
                 MouseoverGroup = null;
             }
+        }
+
+        /// <summary>Returns the current map params (approximate — for mouseover hit-testing only).</summary>
+        private static MapParams? GetCurrentMapParams()
+        {
+            var map = MapManager.Map;
+            if (map is null || LocalPlayer is null)
+                return null;
+            var scale = UIScale;
+            var canvasSize = new SKSize(_window.Size.X / scale, _window.Size.Y / scale);
+            var lp = MapParams.ToMapPos(LocalPlayer.Position, map.Config);
+            if (_freeMode)
+            {
+                var pan = _mapPanPosition;
+                return map.GetParameters(canvasSize, _zoom, ref pan);
+            }
+            return map.GetParameters(canvasSize, _zoom, ref lp);
         }
 
         private static void OnMouseScroll(IMouse mouse, ScrollWheel scroll)
@@ -950,8 +815,9 @@ namespace eft_dma_radar.Silk.UI
                     Config.BattleMode = !Config.BattleMode;
                     break;
                 case Key.Escape:
-                    _settingsOpen = false;
-                    _lootFiltersOpen = false;
+                    SettingsPanel.IsOpen = false;
+                    LootFiltersPanel.IsOpen = false;
+                    PlayerInfoWidget.IsOpen = false;
                     break;
             }
         }
@@ -968,15 +834,23 @@ namespace eft_dma_radar.Silk.UI
 
         private static void OnClosing()
         {
-            Config.WindowSize = new System.Windows.Size(_window.Size.X, _window.Size.Y);
+            // Persist window state
+            Config.WindowWidth = _window.Size.X;
+            Config.WindowHeight = _window.Size.Y;
             Config.WindowMaximized = _window.WindowState == WindowState.Maximized;
             Config.Save();
 
+            // Signal the memory worker to stop cleanly before we release GPU resources
+            Memory.Close();
+
+            // Dispose GPU/UI resources
             _imgui?.Dispose();
             _skSurface?.Dispose();
             _skBackendRenderTarget?.Dispose();
             _grContext?.Dispose();
             _input?.Dispose();
+
+            Log.WriteLine("[RadarWindow] Closed.");
         }
 
         private static async Task RunFpsTimerAsync()

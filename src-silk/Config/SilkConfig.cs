@@ -1,0 +1,102 @@
+using System.IO;
+
+namespace eft_dma_radar.Silk.Config
+{
+    /// <summary>
+    /// Minimal configuration for the Silk.NET radar.
+    /// Loaded from / saved to a JSON file in %AppData%\eft-dma-radar-silk\.
+    /// </summary>
+    public sealed class SilkConfig
+    {
+        private static readonly string _configDir =
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eft-dma-radar-silk");
+
+        private static readonly string _configPath =
+            Path.Combine(_configDir, "config.json");
+
+        // ── DMA ─────────────────────────────────────────────────────────────────
+
+        /// <summary>FPGA device string passed to MemProcFS (e.g. "fpga", "usb3380").</summary>
+        public string DeviceStr { get; set; } = "fpga";
+
+        /// <summary>Use a persisted memory map file for faster DMA init.</summary>
+        public bool MemMapEnabled { get; set; } = true;
+
+        // ── UI ──────────────────────────────────────────────────────────────────
+
+        /// <summary>UI scaling factor (1.0 = 100%).</summary>
+        public float UIScale { get; set; } = 1.0f;
+
+        /// <summary>Target frames per second for the radar window.</summary>
+        public int TargetFps { get; set; } = 60;
+
+        /// <summary>Radar window width in pixels.</summary>
+        public int WindowWidth { get; set; } = 1600;
+
+        /// <summary>Radar window height in pixels.</summary>
+        public int WindowHeight { get; set; } = 900;
+
+        /// <summary>Whether the radar window starts maximized.</summary>
+        public bool WindowMaximized { get; set; } = false;
+
+        /// <summary>Hide loot and other clutter; show only players.</summary>
+        public bool BattleMode { get; set; } = false;
+
+        /// <summary>Draw players above all other entities.</summary>
+        public bool PlayersOnTop { get; set; } = false;
+
+        /// <summary>Draw lines connecting squad members.</summary>
+        public bool ConnectGroups { get; set; } = true;
+
+        // ── Memory Writes ───────────────────────────────────────────────────────
+
+        /// <summary>Master toggle for all memory write features.</summary>
+        public bool MemWritesEnabled { get; set; } = false;
+
+        // ── Persistence ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Load config from disk. Returns a default instance if the file does not exist or is corrupt.
+        /// </summary>
+        public static SilkConfig Load()
+        {
+            try
+            {
+                if (File.Exists(_configPath))
+                {
+                    var json = File.ReadAllText(_configPath);
+                    var cfg = JsonSerializer.Deserialize<SilkConfig>(json);
+                    if (cfg is not null)
+                    {
+                        Log.WriteLine("[SilkConfig] Config loaded OK.");
+                        return cfg;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[SilkConfig] Failed to load config, using defaults: {ex.Message}");
+            }
+
+            Log.WriteLine("[SilkConfig] No config found, using defaults.");
+            return new SilkConfig();
+        }
+
+        /// <summary>
+        /// Save config to disk.
+        /// </summary>
+        public void Save()
+        {
+            try
+            {
+                Directory.CreateDirectory(_configDir);
+                var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(_configPath, json);
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[SilkConfig] Failed to save config: {ex.Message}");
+            }
+        }
+    }
+}

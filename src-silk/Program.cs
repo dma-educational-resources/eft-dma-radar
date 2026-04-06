@@ -1,6 +1,3 @@
-global using eft_dma_radar;
-global using eft_dma_radar.Common;
-global using eft_dma_radar.Misc;
 global using SDK;
 global using SkiaSharp;
 global using System.Buffers;
@@ -15,12 +12,18 @@ global using System.Text;
 global using System.Text.Json;
 global using System.Text.Json.Serialization;
 
-using eft_dma_radar.DMA;
-using eft_dma_radar.Misc.Data;
+// Silk namespaces
+global using eft_dma_radar.Silk.Misc;
+global using eft_dma_radar.Silk.Misc.Pools;
+global using eft_dma_radar.Silk.DMA;
+global using eft_dma_radar.Silk.Tarkov;
+global using eft_dma_radar.Silk.Config;
+global using eft_dma_radar.Silk.UI.Map;
+
+// Keep WPF project Log until silk has its own (shared)
+global using eft_dma_radar.Misc;
+
 using eft_dma_radar.Silk.UI;
-using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Tarkov.Features;
-using eft_dma_radar.UI.Radar.Maps;
 using Silk.NET.Input.Glfw;
 using Silk.NET.Windowing.Glfw;
 using System.Runtime.Versioning;
@@ -38,15 +41,9 @@ namespace eft_dma_radar.Silk
     {
         internal const string Name = "EFT DMA Radar (Silk.NET)";
 
-        /// <summary>
-        /// Application State.
-        /// </summary>
-        internal static AppState State { get; private set; } = AppState.Initializing;
+        internal static MemoryState State => Memory.State;
 
-        /// <summary>
-        /// Global Program Configuration (reuses existing Config).
-        /// </summary>
-        internal static Config Config => Program.Config;
+        internal static SilkConfig Config { get; private set; } = null!;
 
         static SilkProgram()
         {
@@ -60,26 +57,15 @@ namespace eft_dma_radar.Silk
         {
             try
             {
-                // Accessing Program.Config triggers the WPF Program static
-                // constructor, which loads the config file, creates directories,
-                // and calls SharedProgram.Initialize (mutex, HTTP client, etc.).
-                // We simply reuse that fully-initialized state here.
-                var config = Program.Config
-                    ?? throw new InvalidOperationException("Config failed to load.");
-
+                Config = SilkConfig.Load();
                 Log.WriteLine("[SilkProgram] Config loaded OK.");
 
-                // Load data and map assets
-                EftDataManager.ModuleInitAsync(null).GetAwaiter().GetResult();
-                XMMapManager.ModuleInit();
+                Memory.ModuleInit(Config);
+                Log.WriteLine("[SilkProgram] Memory module initialized.");
 
-                // Start DMA connection
-                Memory.ModuleInit();
-                FeatureManager.ModuleInit();
+                MapManager.ModuleInit();
+                Log.WriteLine("[SilkProgram] Map manager initialized, starting RadarWindow...");
 
-                Log.WriteLine("[SilkProgram] All modules initialized, starting RadarWindow...");
-
-                // Initialize and run the Silk.NET radar window
                 RadarWindow.Initialize();
                 RadarWindow.Run();
 
@@ -89,35 +75,20 @@ namespace eft_dma_radar.Silk
             {
                 HandleFatalError(ex);
             }
-        }
-
-        internal static void UpdateState(AppState newState)
-        {
-            State = newState;
+            finally
+            {
+                Memory.Close();
+            }
         }
 
         private static void HandleFatalError(Exception ex)
         {
             string error = $"FATAL ERROR -> {ex}";
             Log.WriteLine(error);
-            try
-            {
-                File.WriteAllText("crash.log", $"[{DateTime.Now:u}] {error}");
-            }
+            try { File.WriteAllText("crash.log", $"[{DateTime.Now:u}] {error}"); }
             catch { }
             Environment.FailFast(error);
         }
     }
-
-    /// <summary>
-    /// Application state enum matching the Lone radar pattern.
-    /// </summary>
-    internal enum AppState
-    {
-        Initializing,
-        ProcessNotStarted,
-        ProcessStarting,
-        WaitingForRaid,
-        InRaid
-    }
 }
+
