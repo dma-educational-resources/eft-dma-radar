@@ -205,14 +205,14 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             var toPos = Position.ToMapPos(mapParams.Map).ToZoomedPos(mapParams);
             var fromPos = FromPosition.ToMapPos(mapParams.Map).ToZoomedPos(mapParams);
 
-            var size = 5 * MainWindow.UIScale;
-            var lineWidth = 2f * MainWindow.UIScale;
+            var size = 5 * UISharedState.UIScale;
+            var lineWidth = 2f * UISharedState.UIScale;
 
             SKPaints.PaintExplosives.StrokeWidth = lineWidth;
 
             if (Settings.ShowTripwireLine)
             {
-                SKPaints.ShapeOutline.StrokeWidth = lineWidth + 1f * MainWindow.UIScale;
+                SKPaints.ShapeOutline.StrokeWidth = lineWidth + 1f * UISharedState.UIScale;
                 canvas.DrawLine(fromPos, toPos, SKPaints.ShapeOutline);
                 canvas.DrawLine(fromPos, toPos, SKPaints.PaintExplosives);
             }
@@ -231,7 +231,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
                 var nameWidth = SKPaints.RadarFontRegular12.MeasureText(Name, SKPaints.TextExplosives);
                 var namePt = new SKPoint(
                     toPos.X - (nameWidth / 2),
-                    toPos.Y - 10f * MainWindow.UIScale);
+                    toPos.Y - 10f * UISharedState.UIScale);
 
                 canvas.DrawText(Name, namePt, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
                 canvas.DrawText(Name, namePt, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextExplosives);
@@ -243,7 +243,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
                 var distWidth = SKPaints.RadarFontRegular12.MeasureText(distText, SKPaints.TextExplosives);
                 var distPt = new SKPoint(
                     toPos.X - (distWidth / 2),
-                    toPos.Y + 18f * MainWindow.UIScale);
+                    toPos.Y + 18f * UISharedState.UIScale);
 
                 canvas.DrawText(distText, distPt, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
                 canvas.DrawText(distText, distPt, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextExplosives);

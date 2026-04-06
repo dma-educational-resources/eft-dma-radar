@@ -45,15 +45,15 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
 
             var point = Position.ToMapPos(mapParams.Map).ToZoomedPos(mapParams);
 
-            SKPaints.ShapeOutline.StrokeWidth = SKPaints.PaintExplosives.StrokeWidth + 2f * MainWindow.UIScale;
+            SKPaints.ShapeOutline.StrokeWidth = SKPaints.PaintExplosives.StrokeWidth + 2f * UISharedState.UIScale;
 
-            var size = 5 * MainWindow.UIScale;
+            var size = 5 * UISharedState.UIScale;
             canvas.DrawCircle(point, size, SKPaints.ShapeOutline);
             canvas.DrawCircle(point, size, SKPaints.PaintExplosives);
 
-            var distanceYOffset = 16f * MainWindow.UIScale;
-            var nameXOffset = 7f * MainWindow.UIScale;
-            var nameYOffset = 4f * MainWindow.UIScale;
+            var distanceYOffset = 16f * UISharedState.UIScale;
+            var nameXOffset = 7f * UISharedState.UIScale;
+            var nameYOffset = 4f * UISharedState.UIScale;
 
             if (Settings.ShowName)
             {

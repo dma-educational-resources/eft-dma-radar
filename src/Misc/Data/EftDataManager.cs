@@ -48,7 +48,7 @@ namespace eft_dma_radar.Misc.Data
         /// <param name="loading">Loading UI Form.</param>
         /// <param name="defaultOnly">True if you want to load cached/default data only.</param>
         /// <returns></returns>
-        public static async Task ModuleInitAsync(LoadingWindow loading, bool defaultOnly = false)
+        public static async Task ModuleInitAsync(LoadingWindow? loading, bool defaultOnly = false)
         {
             TarkovMarketData data = null;
 
@@ -59,7 +59,7 @@ namespace eft_dma_radar.Misc.Data
             catch (Exception ex)
             {
                 Log.WriteLine($"Error loading data: {ex}");
-                loading.UpdateStatus("Error loading data. Generating default data set...", loading.PercentComplete);
+                loading?.UpdateStatus("Error loading data. Generating default data set...", loading.PercentComplete);
 
                 data = CreateMinimalDataSet();
             }
@@ -94,12 +94,12 @@ namespace eft_dma_radar.Misc.Data
                     .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
                 IsInitialized = true;
-                loading.UpdateStatus("Data initialization complete", loading.PercentComplete);
+                loading?.UpdateStatus("Data initialization complete", loading.PercentComplete);
             }
             catch (Exception ex)
             {
                 Log.WriteLine($"Error processing data: {ex}");
-                loading.UpdateStatus("Error processing data. Using empty data structures.", loading.PercentComplete);
+                loading?.UpdateStatus("Error processing data. Using empty data structures.", loading.PercentComplete);
 
                 AllItems = new Dictionary<string, TarkovMarketItem>(StringComparer.OrdinalIgnoreCase).ToFrozenDictionary();
                 AllContainers = new Dictionary<string, TarkovMarketItem>(StringComparer.OrdinalIgnoreCase).ToFrozenDictionary();
@@ -127,7 +127,7 @@ namespace eft_dma_radar.Misc.Data
         /// <summary>
         /// Attempts to load data from various sources, with clean fallbacks
         /// </summary>
-        private static async Task<TarkovMarketData> LoadDataWithFallbacksAsync(LoadingWindow loading, bool defaultOnly)
+        private static async Task<TarkovMarketData> LoadDataWithFallbacksAsync(LoadingWindow? loading, bool defaultOnly)
         {
             TarkovMarketData data = null;
             JsonSerializerOptions jsonOptions = new JsonSerializerOptions()
@@ -141,17 +141,17 @@ namespace eft_dma_radar.Misc.Data
             {
                 try
                 {
-                    loading.UpdateStatus("Loading cached data file...", loading.PercentComplete);
+                    loading?.UpdateStatus("Loading cached data file...", loading.PercentComplete);
                     string json = await File.ReadAllTextAsync(_dataFile);
                     data = JsonSerializer.Deserialize<TarkovMarketData>(json, jsonOptions);
 
                     if (data != null && data.Items != null && data.Tasks != null)
                     {
-                        loading.UpdateStatus("Cached data loaded successfully", loading.PercentComplete);
+                        loading?.UpdateStatus("Cached data loaded successfully", loading.PercentComplete);
 
                         if (!defaultOnly && IsDataFileOutdated(_dataFile, _defaultDataUpdateInterval))
                         {
-                            loading.UpdateStatus($"Cached data is outdated (older than {_defaultDataUpdateInterval.TotalHours} hours), will update after initialization", loading.PercentComplete);
+                            loading?.UpdateStatus($"Cached data is outdated (older than {_defaultDataUpdateInterval.TotalHours} hours), will update after initialization", loading.PercentComplete);
 
                             _ = Task.Run(async () =>
                             {
@@ -161,7 +161,7 @@ namespace eft_dma_radar.Misc.Data
                         }
                         else
                         {
-                            loading.UpdateStatus($"Using cached data (updated in the last {_defaultDataUpdateInterval.TotalHours} hours)", loading.PercentComplete);
+                            loading?.UpdateStatus($"Using cached data (updated in the last {_defaultDataUpdateInterval.TotalHours} hours)", loading.PercentComplete);
                         }
 
                         return data;
@@ -170,7 +170,7 @@ namespace eft_dma_radar.Misc.Data
                 catch (Exception ex)
                 {
                     Log.WriteLine($"Error loading cached data: {ex}");
-                    loading.UpdateStatus("Cached data is invalid, will create new data", loading.PercentComplete);
+                    loading?.UpdateStatus("Cached data is invalid, will create new data", loading.PercentComplete);
 
                     try
                     {
@@ -187,7 +187,7 @@ namespace eft_dma_radar.Misc.Data
             {
                 try
                 {
-                    loading.UpdateStatus("Fetching data from Tarkov.Dev API...", loading.PercentComplete);
+                    loading?.UpdateStatus("Fetching data from Tarkov.Dev API...", loading.PercentComplete);
                     string json = await TarkovMarketJob.GetUpdatedMarketDataAsync();
 
                     if (!string.IsNullOrEmpty(json))
@@ -196,12 +196,12 @@ namespace eft_dma_radar.Misc.Data
 
                         if (data != null && data.Items != null && data.Tasks != null)
                         {
-                            loading.UpdateStatus("API data fetched successfully", loading.PercentComplete);
+                            loading?.UpdateStatus("API data fetched successfully", loading.PercentComplete);
 
                             try
                             {
                                 await File.WriteAllTextAsync(_dataFile, json);
-                                loading.UpdateStatus("API data saved to cache", loading.PercentComplete);
+                                loading?.UpdateStatus("API data saved to cache", loading.PercentComplete);
                             }
                             catch (Exception ex)
                             {
@@ -215,24 +215,24 @@ namespace eft_dma_radar.Misc.Data
                 catch (Exception ex)
                 {
                     Log.WriteLine($"Error fetching API data: {ex}");
-                    loading.UpdateStatus("API fetch failed, falling back to embedded data", loading.PercentComplete);
+                    loading?.UpdateStatus("API fetch failed, falling back to embedded data", loading.PercentComplete);
                 }
             }
 
             try
             {
-                loading.UpdateStatus("Loading embedded default data...", loading.PercentComplete);
+                loading?.UpdateStatus("Loading embedded default data...", loading.PercentComplete);
 
                 var assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!;
                 var defaultDataPath = Path.Combine(assemblyDir, _defaultDataFileName);
 
                 if (File.Exists(defaultDataPath) && !IsDataFileOutdated(defaultDataPath, _defaultDataUpdateInterval))
                 {
-                    loading.UpdateStatus($"Using embedded default data (updated in the last {_defaultDataUpdateInterval.TotalHours} hours)", loading.PercentComplete);
+                    loading?.UpdateStatus($"Using embedded default data (updated in the last {_defaultDataUpdateInterval.TotalHours} hours)", loading.PercentComplete);
                 }
                 else if (!defaultOnly)
                 {
-                    loading.UpdateStatus($"Default data is outdated (older than {_defaultDataUpdateInterval.TotalHours} hours), attempting to update", loading.PercentComplete);
+                    loading?.UpdateStatus($"Default data is outdated (older than {_defaultDataUpdateInterval.TotalHours} hours), attempting to update", loading.PercentComplete);
                     await UpdateDefaultDataAsync(loading);
                 }
 
@@ -244,12 +244,12 @@ namespace eft_dma_radar.Misc.Data
 
                     if (data != null && data.Items != null && data.Tasks != null)
                     {
-                        loading.UpdateStatus("Embedded default data loaded successfully", loading.PercentComplete);
+                        loading?.UpdateStatus("Embedded default data loaded successfully", loading.PercentComplete);
 
                         try
                         {
                             await File.WriteAllTextAsync(_dataFile, json);
-                            loading.UpdateStatus("Default data saved to cache", loading.PercentComplete);
+                            loading?.UpdateStatus("Default data saved to cache", loading.PercentComplete);
                         }
                         catch (Exception ex)
                         {
@@ -263,7 +263,7 @@ namespace eft_dma_radar.Misc.Data
             catch (Exception ex)
             {
                 Log.WriteLine($"Error loading embedded data: {ex}");
-                loading.UpdateStatus("Embedded data load failed, using minimal dataset", loading.PercentComplete);
+                loading?.UpdateStatus("Embedded data load failed, using minimal dataset", loading.PercentComplete);
             }
 
             return CreateMinimalDataSet();
@@ -292,7 +292,7 @@ namespace eft_dma_radar.Misc.Data
         /// <summary>
         /// Updates the embedded default data if needed
         /// </summary>
-        private static async Task UpdateDefaultDataAsync(LoadingWindow loading)
+        private static async Task UpdateDefaultDataAsync(LoadingWindow? loading)
         {
             try
             {
@@ -301,7 +301,7 @@ namespace eft_dma_radar.Misc.Data
 
                 if (IsDataFileOutdated(defaultDataPath, _defaultDataUpdateInterval))
                 {
-                    loading.UpdateStatus("Updating embedded default data...", loading.PercentComplete);
+                    loading?.UpdateStatus("Updating embedded default data...", loading.PercentComplete);
 
                     try
                     {
@@ -320,28 +320,28 @@ namespace eft_dma_radar.Misc.Data
                             if (testData != null && testData.Items != null && testData.Tasks != null)
                             {
                                 await File.WriteAllTextAsync(defaultDataPath, json);
-                                loading.UpdateStatus("Default data updated successfully", loading.PercentComplete);
+                                loading?.UpdateStatus("Default data updated successfully", loading.PercentComplete);
                                 return;
                             }
                         }
 
-                        loading.UpdateStatus("Failed to update default data, will use existing data", loading.PercentComplete);
+                        loading?.UpdateStatus("Failed to update default data, will use existing data", loading.PercentComplete);
                     }
                     catch (Exception ex)
                     {
                         Log.WriteLine($"Error updating default data: {ex}");
-                        loading.UpdateStatus("Error updating default data, will use existing data", loading.PercentComplete);
+                        loading?.UpdateStatus("Error updating default data, will use existing data", loading.PercentComplete);
                     }
                 }
                 else
                 {
-                    loading.UpdateStatus($"Default data is up to date (updated in the last {_defaultDataUpdateInterval.TotalHours} hours)", loading.PercentComplete);
+                    loading?.UpdateStatus($"Default data is up to date (updated in the last {_defaultDataUpdateInterval.TotalHours} hours)", loading.PercentComplete);
                 }
             }
             catch (Exception ex)
             {
                 Log.WriteLine($"Error in UpdateDefaultDataAsync: {ex}");
-                loading.UpdateStatus("Error checking default data, continuing with existing data", loading.PercentComplete);
+                loading?.UpdateStatus("Error checking default data, continuing with existing data", loading.PercentComplete);
             }
         }
 

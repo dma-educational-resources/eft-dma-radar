@@ -83,6 +83,13 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         /// Key = VerticesAddr, Value = Player.Base that claimed it.
         /// </summary>
         private static readonly ConcurrentDictionary<ulong, ulong> _verticesOwner = new();
+        private static readonly SKPaint _deathMarkerPaint = new()
+        {
+            IsAntialias = true,
+            Style = SKPaintStyle.Stroke
+        };
+        [ThreadStatic]
+        private static List<string> _rightSideInfoBuf;
 
         /// <summary>
         /// Resets/Updates 'static' assets in preparation for a new game/raid instance.
@@ -1552,8 +1559,10 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 string distanceText = null;
                 string heightText = null;
 
-                // PERF: reuse list instead of recreating many temporaries
-                var rightSideInfo = new List<string>(8);
+                // PERF: reuse thread-static list to avoid per-player allocation
+                _rightSideInfoBuf ??= new List<string>(8);
+                var rightSideInfo = _rightSideInfoBuf;
+                rightSideInfo.Clear();
 
                 // PERF: snapshot loot once
                 var gearLoot = Gear?.Loot;
@@ -1605,7 +1614,11 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                              !string.IsNullOrEmpty(item.MatchedFilter.Color)))
                             temp.Add(item);
                     }
-                    importantLootItems = temp.OrderLoot().Take(5).ToList();
+                    if (temp.Count > 0)
+                    {
+                        temp.Sort(LootItemComparer.Instance);
+                        importantLootItems = temp.Count > 5 ? temp.GetRange(0, 5) : temp;
+                    }
                 }
 
                 if (typeSettings.ShowHeight && !typeSettings.HeightIndicator)
@@ -1666,12 +1679,12 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
 
         private void DrawAlternateHeightIndicator(SKCanvas canvas, SKPoint point, float heightDiff, ValueTuple<SKPaint, SKPaint> paints)
         {
-            var baseX = point.X - (15.0f * MainWindow.UIScale);
-            var baseY = point.Y + (3.5f * MainWindow.UIScale);
+            var baseX = point.X - (15.0f * UISharedState.UIScale);
+            var baseY = point.Y + (3.5f * UISharedState.UIScale);
 
-            SKPaints.ShapeOutline.StrokeWidth = 2f * MainWindow.UIScale;
+            SKPaints.ShapeOutline.StrokeWidth = 2f * UISharedState.UIScale;
 
-            var arrowSize = HEIGHT_INDICATOR_ARROW_SIZE * MainWindow.UIScale;
+            var arrowSize = HEIGHT_INDICATOR_ARROW_SIZE * UISharedState.UIScale;
             var circleSize = arrowSize * 0.7f;
 
             if (heightDiff > HEIGHT_INDICATOR_THRESHOLD)
@@ -1698,15 +1711,15 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             var paints = GetPaints();
 
             if (this is ObservedPlayer op &&
-                MainWindow.MouseoverGroup is int grp &&
+                UISharedState.MouseoverGroup is int grp &&
                 grp == op.SpawnGroupID)
             {
                 paints.Item2 = SKPaints.TextMouseoverGroup;
             }
 
-            var spacing = 1 * MainWindow.UIScale;
-            var textSize = 12 * MainWindow.UIScale;
-            var baseYPosition = point.Y - 12 * MainWindow.UIScale;
+            var spacing = 1 * UISharedState.UIScale;
+            var textSize = 12 * UISharedState.UIScale;
+            var baseYPosition = point.Y - 12 * UISharedState.UIScale;
 
             var playerTypeKey = DeterminePlayerTypeKey();
             var typeSettings = Config.PlayerTypeSettings.GetSettings(playerTypeKey);
@@ -1724,10 +1737,10 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 {
                     var asteriskWidth = SKPaints.RadarFontEmbolden24.MeasureText("*", SKPaints.TextPulsingAsterisk);
                     var verticalOffset = (SKPaints.RadarFontEmbolden24.Size - SKPaints.RadarFontRegular12.Size) / 2;
-                    verticalOffset += 1.5f * MainWindow.UIScale;
+                    verticalOffset += 1.5f * UISharedState.UIScale;
 
                     var asteriskPoint = new SKPoint(
-                        namePoint.X - asteriskWidth - (2 * MainWindow.UIScale),
+                        namePoint.X - asteriskWidth - (2 * UISharedState.UIScale),
                         namePoint.Y + verticalOffset
                     );
 
@@ -1738,14 +1751,14 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             else if (showImportantIndicator)
             {
                 var asteriskWidth = SKPaints.RadarFontEmbolden24.MeasureText("*", SKPaints.TextPulsingAsterisk);
-                var yPos = point.Y - 2 * MainWindow.UIScale;
+                var yPos = point.Y - 2 * UISharedState.UIScale;
                 var asteriskPoint = new SKPoint(point.X - (asteriskWidth / 2), yPos);
 
                 canvas.DrawText("*", asteriskPoint, SKTextAlign.Left, SKPaints.RadarFontEmbolden24, SKPaints.TextPulsingAsteriskOutline);
                 canvas.DrawText("*", asteriskPoint, SKTextAlign.Left, SKPaints.RadarFontEmbolden24, SKPaints.TextPulsingAsterisk);
             }
 
-            var currentBottomY = point.Y + 20 * MainWindow.UIScale;
+            var currentBottomY = point.Y + 20 * UISharedState.UIScale;
             if (!string.IsNullOrEmpty(distanceText))
             {
                 var distWidth = SKPaints.RadarFontRegular12.MeasureText(distanceText, paints.Item2);
@@ -1776,7 +1789,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             if (!string.IsNullOrEmpty(heightText))
             {
                 var heightWidth = SKPaints.RadarFontRegular12.MeasureText(heightText, paints.Item2);
-                var heightPoint = new SKPoint(point.X - heightWidth - 15 * MainWindow.UIScale, point.Y + 5 * MainWindow.UIScale);
+                var heightPoint = new SKPoint(point.X - heightWidth - 15 * UISharedState.UIScale, point.Y + 5 * UISharedState.UIScale);
 
                 canvas.DrawText(heightText, heightPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
                 canvas.DrawText(heightText, heightPoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, paints.Item2);
@@ -1785,8 +1798,8 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
             if (rightSideInfo.Count > 0)
             {
                 var rightPoint = new SKPoint(
-                    point.X + 14 * MainWindow.UIScale,
-                    point.Y + 2 * MainWindow.UIScale
+                    point.X + 14 * UISharedState.UIScale,
+                    point.Y + 2 * UISharedState.UIScale
                 );
 
                 foreach (var line in rightSideInfo)
@@ -1811,15 +1824,15 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
 
             if (this is ObservedPlayer op &&
                 this != localPlayer &&
-                MainWindow.MouseoverGroup is int grp &&
+                UISharedState.MouseoverGroup is int grp &&
                 grp == op.SpawnGroupID)
             {
                 paints.Item1 = SKPaints.PaintMouseoverGroup;
             }
 
-            SKPaints.ShapeOutline.StrokeWidth = paints.Item1.StrokeWidth + 2f * MainWindow.UIScale;
+            SKPaints.ShapeOutline.StrokeWidth = paints.Item1.StrokeWidth + 2f * UISharedState.UIScale;
 
-            var size = 6 * MainWindow.UIScale;
+            var size = 6 * UISharedState.UIScale;
             canvas.DrawCircle(point, size, SKPaints.ShapeOutline);
             canvas.DrawCircle(point, size, paints.Item1);
 
@@ -1839,20 +1852,15 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void DrawDeathMarker(SKCanvas canvas, SKPoint point, SKColor color)
         {
-            var length = 6 * MainWindow.UIScale;
+            var length = 6 * UISharedState.UIScale;
 
-            using var corpseLinePaint = new SKPaint
-            {
-                Color = color,
-                StrokeWidth = SKPaints.PaintDeathMarker.StrokeWidth,
-                IsAntialias = true,
-                Style = SKPaintStyle.Stroke
-            };
+            _deathMarkerPaint.Color = color;
+            _deathMarkerPaint.StrokeWidth = SKPaints.PaintDeathMarker.StrokeWidth;
 
             canvas.DrawLine(new SKPoint(point.X - length, point.Y + length),
-                new SKPoint(point.X + length, point.Y - length), corpseLinePaint);
+                new SKPoint(point.X + length, point.Y - length), _deathMarkerPaint);
             canvas.DrawLine(new SKPoint(point.X - length, point.Y - length),
-                new SKPoint(point.X + length, point.Y + length), corpseLinePaint);
+                new SKPoint(point.X + length, point.Y + length), _deathMarkerPaint);
         }
 
         /// <summary>
@@ -1861,7 +1869,7 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static SKPoint GetAimlineEndpoint(SKPoint start, float radians, float aimlineLength)
         {
-            aimlineLength *= MainWindow.UIScale;
+            aimlineLength *= UISharedState.UIScale;
             return new SKPoint(start.X + MathF.Cos(radians) * aimlineLength,
                 start.Y + MathF.Sin(radians) * aimlineLength);
         }

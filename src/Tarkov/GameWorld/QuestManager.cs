@@ -326,8 +326,15 @@ namespace eft_dma_radar.Tarkov.GameWorld
                     Log.WriteLine($"[QuestManager] No location objectives for current map ({MapID}). Active quests: {activeQuests.Count}");
             }
 
-            if (MainWindow.Window?.GeneralSettingsControl?.QuestItems?.Count != AllStartedQuestIds.Count)
-                MainWindow.Window?.GeneralSettingsControl?.RefreshQuestHelper();
+            try
+            {
+                if (MainWindow.Window?.GeneralSettingsControl?.QuestItems?.Count != AllStartedQuestIds.Count)
+                    MainWindow.Window?.GeneralSettingsControl?.RefreshQuestHelper();
+            }
+            catch
+            {
+                // MainWindow may not be available in non-WPF mode
+            }
 
             _rateLimit.Restart();
         }
@@ -1033,7 +1040,7 @@ namespace eft_dma_radar.Tarkov.GameWorld
 
             SKPaints.ShapeOutline.StrokeWidth = 2f;
             float distanceYOffset;
-            float nameXOffset = 7f * MainWindow.UIScale;
+            float nameXOffset = 7f * UISharedState.UIScale;
             float nameYOffset;
 
             const float HEIGHT_INDICATOR_THRESHOLD = 1.85f;
@@ -1043,24 +1050,24 @@ namespace eft_dma_radar.Tarkov.GameWorld
                 using var path = point.GetUpArrow(5);
                 canvas.DrawPath(path, SKPaints.ShapeOutline);
                 canvas.DrawPath(path, SKPaints.QuestHelperPaint);
-                distanceYOffset = 18f * MainWindow.UIScale;
-                nameYOffset = 6f * MainWindow.UIScale;
+                distanceYOffset = 18f * UISharedState.UIScale;
+                nameYOffset = 6f * UISharedState.UIScale;
             }
             else if (heightDiff < -HEIGHT_INDICATOR_THRESHOLD)
             {
                 using var path = point.GetDownArrow(5);
                 canvas.DrawPath(path, SKPaints.ShapeOutline);
                 canvas.DrawPath(path, SKPaints.QuestHelperPaint);
-                distanceYOffset = 12f * MainWindow.UIScale;
-                nameYOffset = 1f * MainWindow.UIScale;
+                distanceYOffset = 12f * UISharedState.UIScale;
+                nameYOffset = 1f * UISharedState.UIScale;
             }
             else
             {
-                var size = 5 * MainWindow.UIScale;
+                var size = 5 * UISharedState.UIScale;
                 canvas.DrawCircle(point, size, SKPaints.ShapeOutline);
                 canvas.DrawCircle(point, size, SKPaints.QuestHelperPaint);
-                distanceYOffset = 16f * MainWindow.UIScale;
-                nameYOffset = 4f * MainWindow.UIScale;
+                distanceYOffset = 16f * UISharedState.UIScale;
+                nameYOffset = 4f * UISharedState.UIScale;
             }
 
             if (QuestManager.Settings.ShowName)

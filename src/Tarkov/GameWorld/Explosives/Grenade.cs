@@ -304,8 +304,8 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
             var isPlayerInDanger = EffectiveDistance > 0 && dist <= EffectiveDistance;
 
             SKPaints.ShapeOutline.StrokeWidth =
-                SKPaints.PaintExplosives.StrokeWidth + 2f * MainWindow.UIScale;
-            var size = 5 * MainWindow.UIScale;
+                SKPaints.PaintExplosives.StrokeWidth + 2f * UISharedState.UIScale;
+            var size = 5 * UISharedState.UIScale;
             canvas.DrawCircle(point, size, SKPaints.ShapeOutline);
 
             var paintToUse = isPlayerInDanger ? SKPaints.PaintExplosivesDanger : SKPaints.PaintExplosives;
@@ -321,7 +321,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
                 using (var radiusPaint = new SKPaint
                 {
                     Color = paintToUse.Color.WithAlpha(80),
-                    StrokeWidth = 1.5f * MainWindow.UIScale,
+                    StrokeWidth = 1.5f * UISharedState.UIScale,
                     IsAntialias = true,
                     Style = SKPaintStyle.Stroke
                 })
@@ -340,9 +340,9 @@ namespace eft_dma_radar.Tarkov.GameWorld.Explosives
                 }
             }
 
-            var distanceYOffset = 20f * MainWindow.UIScale;
-            var nameXOffset = 10f * MainWindow.UIScale;
-            var nameYOffset = 4f * MainWindow.UIScale;
+            var distanceYOffset = 20f * UISharedState.UIScale;
+            var nameXOffset = 10f * UISharedState.UIScale;
+            var nameYOffset = 4f * UISharedState.UIScale;
 
             if (Settings.ShowName && !string.IsNullOrEmpty(Name))
             {

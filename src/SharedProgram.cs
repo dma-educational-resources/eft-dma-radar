@@ -11,6 +11,7 @@ namespace eft_dma_radar
     public static class SharedProgram
     {
         private const string _mutexID = "0f908ff7-e614-6a93-60a3-cee36c9cea91";
+        private static int _initialized;
 #pragma warning disable IDE0052 // Remove unread private members
         private static Mutex _mutex;
 #pragma warning restore IDE0052 // Remove unread private members
@@ -24,6 +25,8 @@ namespace eft_dma_radar
 
         /// <summary>
         /// Initialize the Shared State between this module and the main application.
+        /// This method is idempotent — subsequent calls update ConfigPath/Config but
+        /// skip mutex creation, system checks, and other one-time setup.
         /// </summary>
         /// <param name="configPath">Config path directory.</param>
         /// <param name="config">Config file instance.</param>
@@ -34,6 +37,8 @@ namespace eft_dma_radar
             ArgumentNullException.ThrowIfNull(config, nameof(config));
             ConfigPath = configPath;
             Config = config;
+            if (Interlocked.Exchange(ref _initialized, 1) != 0)
+                return;
             CheckSystemRequirements();
             _mutex = new Mutex(true, _mutexID, out bool singleton);
             if (!singleton)

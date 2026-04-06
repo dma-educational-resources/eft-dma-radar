@@ -8,7 +8,10 @@ on:
     paths:
       - 'resources/**'
       - 'src/**'
+      - 'src-silk/**'
       - 'lib/**'
+      - 'version.json'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 permissions:
@@ -88,6 +91,10 @@ jobs:
           EMOJI: ${{ steps.channel.outputs.EMOJI }}
           COLOR: ${{ steps.channel.outputs.COLOR }}
         run: |
+          # Truncate commit message to first line and cap at 1024 chars for Discord field limit
+          $commitMsg = ($env:COMMIT_MESSAGE -split "`n")[0]
+          if ($commitMsg.Length -gt 1024) { $commitMsg = $commitMsg.Substring(0, 1021) + "..." }
+
           $payload = @{
             username = "GitHub Actions"
             embeds = @(
@@ -108,7 +115,7 @@ jobs:
                   },
                   @{
                     name  = "Commit"
-                    value = $env:COMMIT_MESSAGE
+                    value = $commitMsg
                   },
                   @{
                     name  = "Job Link"
@@ -119,7 +126,7 @@ jobs:
             )
           }
           $json = $payload | ConvertTo-Json -Depth 5
-          Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK -Method Post -ContentType "application/json" -Body $json
+          Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK -Method Post -ContentType "application/json" -Body ([System.Text.Encoding]::UTF8.GetBytes($json))
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
@@ -211,4 +218,4 @@ jobs:
             )
           }
           $json = $payload | ConvertTo-Json -Depth 5
-          Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK -Method Post -ContentType "application/json" -Body $json
+          Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK -Method Post -ContentType "application/json" -Body ([System.Text.Encoding]::UTF8.GetBytes($json))

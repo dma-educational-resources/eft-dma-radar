@@ -204,29 +204,29 @@ namespace eft_dma_radar.Tarkov.EFTPlayer
                 using var path = point.GetUpArrow(5f);
                 canvas.DrawPath(path, SKPaints.ShapeOutline);
                 canvas.DrawPath(path, paints.Item1);
-                distanceYOffset = 18f * MainWindow.UIScale;
-                nameYOffset = 6f * MainWindow.UIScale;
+                distanceYOffset = 18f * UISharedState.UIScale;
+                nameYOffset = 6f * UISharedState.UIScale;
             }
             else if (heightDiff < -1.85f)
             {
                 using var path = point.GetDownArrow(5f);
                 canvas.DrawPath(path, SKPaints.ShapeOutline);
                 canvas.DrawPath(path, paints.Item1);
-                distanceYOffset = 12f * MainWindow.UIScale;
-                nameYOffset = 1f * MainWindow.UIScale;
+                distanceYOffset = 12f * UISharedState.UIScale;
+                nameYOffset = 1f * UISharedState.UIScale;
             }
             else
             {
                 canvas.DrawText("¦", point, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
                 canvas.DrawText("¦", point, SKTextAlign.Left, SKPaints.RadarFontRegular12, paints.Item2);
-                distanceYOffset = 12f * MainWindow.UIScale;
+                distanceYOffset = 12f * UISharedState.UIScale;
                 nameYOffset = 0f;
             }
 
             if (Settings.ShowName)
             {
                 var namePoint = point;
-                namePoint.Offset(7f * MainWindow.UIScale, nameYOffset);
+                namePoint.Offset(7f * UISharedState.UIScale, nameYOffset);
                 canvas.DrawText("BTR", namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
                 canvas.DrawText("BTR", namePoint, SKTextAlign.Left, SKPaints.RadarFontRegular12, paints.Item2);
             }

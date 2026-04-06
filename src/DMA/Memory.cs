@@ -43,6 +43,19 @@ namespace eft_dma_radar.DMA
         private static readonly Lock _restartSync = new();
         private static CancellationTokenSource _radarCts = new();
 
+        /// <summary>
+        /// UI-agnostic flag indicating the frontend (WPF or Silk) is ready.
+        /// Set by the active UI layer so the memory worker can proceed
+        /// without touching WPF types directly (avoids STA thread issues).
+        /// </summary>
+        public static volatile bool UIReady;
+
+        /// <summary>
+        /// Optional callback to display a notification in the active UI.
+        /// When null, notifications are silently skipped (logged only).
+        /// </summary>
+        public static Action<string, NotificationLevel>? ShowNotification;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static VmmFlags ToVmmFlags(bool useCache) =>
             useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
@@ -163,12 +176,12 @@ namespace eft_dma_radar.DMA
         {
             Log.Write(AppLogLevel.Info, "Memory thread starting...");
 
-            if (!MainWindow.Initialized)
+            if (!UIReady)
             {
-                Log.Write(AppLogLevel.Info, "Main window not ready, waiting...", "Waiting");
-                while (!MainWindow.Initialized)
+                Log.Write(AppLogLevel.Info, "UI not ready, waiting...", "Waiting");
+                while (!UIReady)
                     Thread.Sleep(100);
-                Log.Write(AppLogLevel.Info, "Main window ready.", "Waiting");
+                Log.Write(AppLogLevel.Info, "UI ready.", "Waiting");
             }
 
             while (true)
@@ -183,8 +196,7 @@ namespace eft_dma_radar.DMA
                 catch (Exception ex)
                 {
                     Log.Write(AppLogLevel.Error, $"FATAL ERROR on Memory Thread: {ex}");
-                    if (MainWindow.Window != null)
-                        NotificationsShared.Warning("FATAL ERROR on Memory Thread");
+                    Notify("FATAL ERROR on Memory Thread", NotificationLevel.Warning);
                     OnGameStopped();
                     Thread.Sleep(1000);
                 }
@@ -250,8 +262,7 @@ namespace eft_dma_radar.DMA
                     _ready = true;
 
                     Log.WriteLine("Game Startup [OK]");
-                    if (MainWindow.Window != null)
-                        NotificationsShared.Info("Game Startup [OK]");
+                    Notify("Game Startup [OK]", NotificationLevel.Info);
                     return;
                 }
                 catch (Exception ex)
@@ -301,8 +312,7 @@ namespace eft_dma_radar.DMA
                             if (_restartRadar)
                             {
                                 Log.WriteLine("Restarting Radar per User Request.");
-                                if (MainWindow.Window != null)
-                                    NotificationsShared.Info("Restarting Radar per User Request.");
+                                Notify("Restarting Radar per User Request.", NotificationLevel.Info);
                                 _restartRadar = false;
                                 LocalGameWorld.ClearStaleGuard();
                                 RequestRestart();
@@ -326,8 +336,7 @@ namespace eft_dma_radar.DMA
                 catch (Exception ex)
                 {
                     Log.WriteLine($"CRITICAL ERROR in Game Loop: {ex}");
-                    if (MainWindow.Window != null)
-                        NotificationsShared.Warning("CRITICAL ERROR in Game Loop");
+                    Notify("CRITICAL ERROR in Game Loop", NotificationLevel.Warning);
                     break;
                 }
                 finally
@@ -338,8 +347,7 @@ namespace eft_dma_radar.DMA
             }
 
             Log.WriteLine("Game is no longer running!");
-            if (MainWindow.Window != null)
-                NotificationsShared.Warning("Game is no longer running!");
+            Notify("Game is no longer running!", NotificationLevel.Warning);
         }
 
         #endregion
@@ -883,6 +891,28 @@ namespace eft_dma_radar.DMA
             public GameNotRunning(string message, Exception inner) : base(message, inner) { }
         }
 
+        /// <summary>
+        /// Sends a notification to the active UI if a handler is registered.
+        /// </summary>
+        private static void Notify(string message, NotificationLevel level)
+        {
+            try
+            {
+                ShowNotification?.Invoke(message, level);
+            }
+            catch { /* UI notification failures must not crash the memory thread */ }
+        }
+
         #endregion
+    }
+
+    /// <summary>
+    /// Notification severity level used by <see cref="Memory.ShowNotification"/>.
+    /// </summary>
+    internal enum NotificationLevel
+    {
+        Info,
+        Warning,
+        Error
     }
 }

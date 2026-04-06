@@ -42,16 +42,17 @@ using MessageBox = HandyControl.Controls.MessageBox;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("2.0.0.0")]
+[assembly: AssemblyFileVersion("2.0.0.0")]
 [assembly: SupportedOSPlatform("Windows")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("eft-dma-radar-silk")]
 
 namespace eft_dma_radar
 {
     internal static class Program
     {
         internal const string Name = "EFT DMA Radar";
-        internal const string Version = "1.0.0";
+        internal const string Version = "2.0.0";
 
         /// <summary>
         /// Current application mode

@@ -47,7 +47,7 @@ namespace eft_dma_radar.Tarkov.Loot
             SKPaints.ShapeOutline.StrokeWidth = 2f;
 
             float distanceYOffset;
-            float nameXOffset = 7f * MainWindow.UIScale;
+            float nameXOffset = 7f * UISharedState.UIScale;
             float nameYOffset;
 
             if (heightDiff > HEIGHT_INDICATOR_THRESHOLD)
@@ -55,24 +55,24 @@ namespace eft_dma_radar.Tarkov.Loot
                 using var path = point.GetUpArrow(4);
                 canvas.DrawPath(path, SKPaints.ShapeOutline);
                 canvas.DrawPath(path, SKPaints.PaintContainerLoot);
-                distanceYOffset = 18f * MainWindow.UIScale;
-                nameYOffset = 6f * MainWindow.UIScale;
+                distanceYOffset = 18f * UISharedState.UIScale;
+                nameYOffset = 6f * UISharedState.UIScale;
             }
             else if (heightDiff < -HEIGHT_INDICATOR_THRESHOLD)
             {
                 using var path = point.GetDownArrow(4);
                 canvas.DrawPath(path, SKPaints.ShapeOutline);
                 canvas.DrawPath(path, SKPaints.PaintContainerLoot);
-                distanceYOffset = 12f * MainWindow.UIScale;
-                nameYOffset = 1f * MainWindow.UIScale;
+                distanceYOffset = 12f * UISharedState.UIScale;
+                nameYOffset = 1f * UISharedState.UIScale;
             }
             else
             {
-                var size = 4 * MainWindow.UIScale;
+                var size = 4 * UISharedState.UIScale;
                 canvas.DrawCircle(point, size, SKPaints.ShapeOutline);
                 canvas.DrawCircle(point, size, SKPaints.PaintContainerLoot);
-                distanceYOffset = 16f * MainWindow.UIScale;
-                nameYOffset = 4f * MainWindow.UIScale;
+                distanceYOffset = 16f * UISharedState.UIScale;
+                nameYOffset = 4f * UISharedState.UIScale;
             }
 
             if (Settings.ShowName)

@@ -9,6 +9,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "lib", "lib", "{3A8DF596-E81
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VmmSharpEx", "lib\VmmSharpEx\VmmSharpEx.csproj", "{4E07DF6F-71B0-4A44-B934-E54A6340F47D}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src-silk", "src-silk", "{93350626-D752-32FA-2F52-C589771CDCD2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "eft-dma-radar-silk", "src-silk\eft-dma-radar-silk.csproj", "{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,12 +49,25 @@ Global
 		{4E07DF6F-71B0-4A44-B934-E54A6340F47D}.Release|x64.Build.0 = Release|x64
 		{4E07DF6F-71B0-4A44-B934-E54A6340F47D}.Release|x86.ActiveCfg = Release|Any CPU
 		{4E07DF6F-71B0-4A44-B934-E54A6340F47D}.Release|x86.Build.0 = Release|Any CPU
+		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}.Debug|x64.ActiveCfg = Debug|x64
+		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}.Debug|x64.Build.0 = Debug|x64
+		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}.Debug|x86.Build.0 = Debug|Any CPU
+		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}.Release|x64.ActiveCfg = Release|x64
+		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}.Release|x64.Build.0 = Release|x64
+		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}.Release|x86.ActiveCfg = Release|Any CPU
+		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{4E07DF6F-71B0-4A44-B934-E54A6340F47D} = {3A8DF596-E814-FECC-DD4B-D8EF8AAC1A0D}
+		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D} = {93350626-D752-32FA-2F52-C589771CDCD2}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {226CDDDB-E756-47FA-B12B-7CFB825527F3}

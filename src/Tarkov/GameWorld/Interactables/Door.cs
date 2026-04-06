@@ -125,7 +125,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Interactables
             SKPaints.ShapeOutline.StrokeWidth = 1f;
 
             float distanceYOffset;
-            float nameXOffset = 7f * MainWindow.UIScale;
+            float nameXOffset = 7f * UISharedState.UIScale;
             float nameYOffset;
 
             if (heightDiff > HEIGHT_INDICATOR_THRESHOLD)
@@ -133,23 +133,23 @@ namespace eft_dma_radar.Tarkov.GameWorld.Interactables
                 using var path = point.GetUpArrow(5f);
                 canvas.DrawPath(path, SKPaints.ShapeOutline);
                 canvas.DrawPath(path, paint.Item1);
-                distanceYOffset = 18f * MainWindow.UIScale;
-                nameYOffset = 6f * MainWindow.UIScale;
+                distanceYOffset = 18f * UISharedState.UIScale;
+                nameYOffset = 6f * UISharedState.UIScale;
             }
             else if (heightDiff < -HEIGHT_INDICATOR_THRESHOLD)
             {
                 using var path = point.GetDownArrow(5f);
                 canvas.DrawPath(path, SKPaints.ShapeOutline);
                 canvas.DrawPath(path, paint.Item1);
-                distanceYOffset = 12f * MainWindow.UIScale;
-                nameYOffset = 1f * MainWindow.UIScale;
+                distanceYOffset = 12f * UISharedState.UIScale;
+                nameYOffset = 1f * UISharedState.UIScale;
             }
             else
             {
                 canvas.DrawText("i", point, SKTextAlign.Left, SKPaints.RadarFontRegular12, SKPaints.TextOutline);
                 canvas.DrawText("i", point, SKTextAlign.Left, SKPaints.RadarFontRegular12, paint.Item2);
-                distanceYOffset = 12f * MainWindow.UIScale;
-                nameYOffset = 0f * MainWindow.UIScale;
+                distanceYOffset = 12f * UISharedState.UIScale;
+                nameYOffset = 0f * UISharedState.UIScale;
             }
 
             if (Settings.ShowName)

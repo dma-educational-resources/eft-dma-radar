@@ -75,8 +75,15 @@ namespace eft_dma_radar.Tarkov.EFTPlayer.SpecialCollections
 
                     Update();
 
-                    if (MainWindow.Window?.WatchlistControl != null)
-                        MainWindow.Window.WatchlistControl.SaveWatchlistToFile();
+                    try
+                    {
+                        if (MainWindow.Window?.WatchlistControl != null)
+                            MainWindow.Window.WatchlistControl.SaveWatchlistToFile();
+                    }
+                    catch
+                    {
+                        // MainWindow may not be available in non-WPF mode
+                    }
                 }
             }
             catch (Exception ex)

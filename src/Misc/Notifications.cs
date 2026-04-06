@@ -7,38 +7,59 @@ namespace eft_dma_radar.Misc
     {
         private const string Token = "MainGrowl";
 
-        public static void Info(string msg) => Growl.Info(msg, Token);
-        public static void Success(string msg) => Growl.Success(msg, Token);
-        public static void Warning(string msg) => Growl.Warning(msg, Token);
-        public static void Error(string msg) => Growl.Error(msg, Token);
-        public static void Fatal(string msg) => Growl.Fatal(msg, Token);
+        public static void Info(string msg) => TryGrowl(() => Growl.Info(msg, Token), msg);
+        public static void Success(string msg) => TryGrowl(() => Growl.Success(msg, Token), msg);
+        public static void Warning(string msg) => TryGrowl(() => Growl.Warning(msg, Token), msg);
+        public static void Error(string msg) => TryGrowl(() => Growl.Error(msg, Token), msg);
+        public static void Fatal(string msg) => TryGrowl(() => Growl.Fatal(msg, Token), msg);
         public static void InfoExtended(string label, string status)
         {
-            Growl.Info(new GrowlInfo
+            TryGrowl(() => Growl.Info(new GrowlInfo
             {
                 Message = $"{label}: {status}",
                 Token = Token,
                 IsCustom = true,
                 ShowDateTime = false
-            });
+            }), $"{label}: {status}");
         }
 
         public static void InfoWithToken(string token, string message)
         {
-            Growl.Clear(token);
-            Growl.InfoGlobal(new GrowlInfo
+            TryGrowl(() =>
             {
-                Message = message,
-                ShowDateTime = false,
-                WaitTime = 0,
-                IsCustom = true,
-                Token = token
-            });
+                Growl.Clear(token);
+                Growl.InfoGlobal(new GrowlInfo
+                {
+                    Message = message,
+                    ShowDateTime = false,
+                    WaitTime = 0,
+                    IsCustom = true,
+                    Token = token
+                });
+            }, message);
         }
         public static void Ask(string msg, Func<bool, bool> callback) =>
-            Growl.Ask(msg, callback, Token);
+            TryGrowl(() => Growl.Ask(msg, callback, Token), msg);
 
-        public static void Clear() => Growl.Clear(Token);
+        public static void Clear() => TryGrowl(() => Growl.Clear(Token), null);
 
+        /// <summary>
+        /// Safely invokes a Growl action. When no WPF visual tree exists
+        /// (e.g. Silk.NET mode), the call is silently skipped and the message
+        /// is written to the log instead.
+        /// </summary>
+        private static void TryGrowl(Action action, string? fallbackMsg)
+        {
+            try
+            {
+                action();
+            }
+            catch
+            {
+                // No WPF visual tree available (Silk.NET mode) — log only.
+                if (fallbackMsg is not null)
+                    Log.WriteLine($"[Notification] {fallbackMsg}");
+            }
+        }
     }
 }

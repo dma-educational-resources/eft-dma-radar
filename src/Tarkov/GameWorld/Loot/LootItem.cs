@@ -474,7 +474,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Loot
             }
 
             float distanceYOffset;
-            float nameXOffset = 7f * MainWindow.UIScale;
+            float nameXOffset = 7f * UISharedState.UIScale;
             float nameYOffset;
 
             if (heightDiff > HEIGHT_INDICATOR_THRESHOLD)
@@ -482,24 +482,24 @@ namespace eft_dma_radar.Tarkov.GameWorld.Loot
                 using var path = point.GetUpArrow(5);
                 canvas.DrawPath(path, SKPaints.ShapeOutline);
                 canvas.DrawPath(path, paints.Item1);
-                distanceYOffset = 18f * MainWindow.UIScale;
-                nameYOffset = 6f * MainWindow.UIScale;
+                distanceYOffset = 18f * UISharedState.UIScale;
+                nameYOffset = 6f * UISharedState.UIScale;
             }
             else if (heightDiff < -HEIGHT_INDICATOR_THRESHOLD)
             {
                 using var path = point.GetDownArrow(5);
                 canvas.DrawPath(path, SKPaints.ShapeOutline);
                 canvas.DrawPath(path, paints.Item1);
-                distanceYOffset = 12f * MainWindow.UIScale;
-                nameYOffset = 1f * MainWindow.UIScale;
+                distanceYOffset = 12f * UISharedState.UIScale;
+                nameYOffset = 1f * UISharedState.UIScale;
             }
             else
             {
-                var size = 5 * MainWindow.UIScale;
+                var size = 5 * UISharedState.UIScale;
                 canvas.DrawCircle(point, size, SKPaints.ShapeOutline);
                 canvas.DrawCircle(point, size, paints.Item1);
-                distanceYOffset = 16f * MainWindow.UIScale;
-                nameYOffset = 4f * MainWindow.UIScale;
+                distanceYOffset = 16f * UISharedState.UIScale;
+                nameYOffset = 4f * UISharedState.UIScale;
             }
 
             if (entitySettings.ShowName || entitySettings.ShowValue)
@@ -531,8 +531,8 @@ namespace eft_dma_radar.Tarkov.GameWorld.Loot
 
             if (importantLootItems?.Count > 0)
             {
-                var spacing = 1 * MainWindow.UIScale;
-                var textSize = 12 * MainWindow.UIScale;
+                var spacing = 1 * UISharedState.UIScale;
+                var textSize = 12 * UISharedState.UIScale;
 
                 currentBottomY += textSize + spacing;
 
@@ -1325,7 +1325,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Loot
                     var paint = new SKPaint
                     {
                         Color = skColor,
-                        StrokeWidth = 3f * MainWindow.UIScale,
+                        StrokeWidth = 3f * UISharedState.UIScale,
                         Style = SKPaintStyle.Fill,
                         IsAntialias = true,
                     };
@@ -1352,7 +1352,7 @@ namespace eft_dma_radar.Tarkov.GameWorld.Loot
                 },
                 (key, existingValue) =>
                 {
-                    existingValue.Item1.StrokeWidth = 3f * MainWindow.UIScale;
+                    existingValue.Item1.StrokeWidth = 3f * UISharedState.UIScale;
                     return existingValue;
                 });
             return result;
@@ -1374,6 +1374,38 @@ namespace eft_dma_radar.Tarkov.GameWorld.Loot
                 .ThenByDescending(x => (Program.Config.QuestHelper.Enabled && x.IsQuestCondition))
                 .ThenByDescending(x => x.IsWishlisted)
                 .ThenByDescending(x => x.Price);
+        }
+    }
+
+    /// <summary>
+    /// Allocation-free comparer matching OrderLoot semantics for List.Sort().
+    /// </summary>
+    internal sealed class LootItemComparer : IComparer<LootItem>
+    {
+        public static readonly LootItemComparer Instance = new();
+        private LootItemComparer() { }
+
+        public int Compare(LootItem? a, LootItem? b)
+        {
+            if (ReferenceEquals(a, b)) return 0;
+            if (a is null) return 1;
+            if (b is null) return -1;
+
+            // Descending: important (not wishlisted) first
+            int cmp = (b.IsImportant && !b.IsWishlisted).CompareTo(a.IsImportant && !a.IsWishlisted);
+            if (cmp != 0) return cmp;
+
+            // Descending: quest condition
+            bool qe = Program.Config.QuestHelper.Enabled;
+            cmp = (qe && b.IsQuestCondition).CompareTo(qe && a.IsQuestCondition);
+            if (cmp != 0) return cmp;
+
+            // Descending: wishlisted
+            cmp = b.IsWishlisted.CompareTo(a.IsWishlisted);
+            if (cmp != 0) return cmp;
+
+            // Descending: price
+            return b.Price.CompareTo(a.Price);
         }
     }
 }

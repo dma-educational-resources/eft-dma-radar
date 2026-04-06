@@ -65,7 +65,8 @@ namespace eft_dma_radar
 
         private Dictionary<string, PanelInfo>? _panels;
 
-        private int _fps;
+        private int _fpsCounter;
+        private int _lastReportedFps;
         private int _zoom = 100;
         public int _rotationDegrees = 0;
         private bool _freeMode = false;
@@ -97,6 +98,7 @@ namespace eft_dma_radar
         private volatile bool _uiInteractionActive = false;
 
         // ---- Map cache ----
+        private SKSurface? _mapCacheSurface;
         private SKImage? _mapCacheImage;
         private SKRect _lastMapBounds;
         private float _lastMapPlayerHeight;
@@ -167,7 +169,11 @@ namespace eft_dma_radar
         /// Currently 'Moused Over' Group.
         /// </summary>
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-        public static int? MouseoverGroup { get; private set; }
+        public static int? MouseoverGroup
+        {
+            get => UISharedState.MouseoverGroup;
+            private set => UISharedState.MouseoverGroup = value;
+        }
 
         /// <summary>
         /// Map Identifier of Current Map.
@@ -441,17 +447,24 @@ namespace eft_dma_radar
                         {
                             _lastMapRebuildTick = nowTick;
 
-                            var info = new SKImageInfo(cacheW, cacheH, SKColorType.Rgba8888, SKAlphaType.Premul);
-                            using var cacheSurface = SKSurface.Create(info);
-
-                            if (cacheSurface is not null)
+                            // Reuse surface when dimensions match, only recreate on resize
+                            if (_mapCacheSurface is null || _lastMapCacheWidth != cacheW || _lastMapCacheHeight != cacheH)
                             {
-                                var cacheCanvas = cacheSurface.Canvas;
+                                _mapCacheImage?.Dispose();
+                                _mapCacheImage = null;
+                                _mapCacheSurface?.Dispose();
+                                var info = new SKImageInfo(cacheW, cacheH, SKColorType.Rgba8888, SKAlphaType.Premul);
+                                _mapCacheSurface = SKSurface.Create(info);
+                            }
+
+                            if (_mapCacheSurface is not null)
+                            {
+                                var cacheCanvas = _mapCacheSurface.Canvas;
                                 cacheCanvas.Clear(SKColors.Transparent);
                                 map.Draw(cacheCanvas, playerHeight, mapParams.Bounds, mapCanvasBounds);
 
                                 _mapCacheImage?.Dispose();
-                                _mapCacheImage = cacheSurface.Snapshot();
+                                _mapCacheImage = _mapCacheSurface.Snapshot();
                             }
 
                             _lastCachedMapID = mapID;
@@ -480,88 +493,41 @@ namespace eft_dma_radar
                     // -----------------------------
                     // SNAPSHOT ALL COLLECTIONS ONCE
                     // -----------------------------
-                    var allPlayersSnapshot = AllPlayers?.ToList();
-                    var lootSnapshot = Loot?.ToList();
-                    var containersSnapshot = Containers?.ToList();
-                    var explosivesSnapshot = Explosives?.ToList();
-                    var exitsSnapshot = Exits?.ToList();
-                    var switchesSnapshot = Switches?.ToList();
+                    var allPlayersSnapshot = AllPlayers;
+                    var lootSnapshot = Loot;
+                    var containersSnapshot = Containers;
+                    var explosivesSnapshot = Explosives;
+                    var exitsSnapshot = Exits;
+                    var switchesSnapshot = Switches;
                     var doorsSnapshot = Memory.Game?.Interactables._Doors?.ToList();
 
-                    var allPlayers = allPlayersSnapshot?
-                        .Where(x => !x.HasExfild)
-                        .ToList();
-
-                    var btrs = allPlayers?
-                        .OfType<BtrOperator>()
-                        .ToList();
-
-                    var normalPlayers = allPlayers?
-                        .Where(p => p is not BtrOperator)
-                        .ToList();
+                    // Build filtered player lists in a single pass (avoid repeated .ToList()/.Where()/.ToList())
+                    List<Player> normalPlayers = null;
+                    List<BtrOperator> btrs = null;
+                    if (allPlayersSnapshot is not null)
+                    {
+                        normalPlayers = new List<Player>(allPlayersSnapshot.Count);
+                        btrs = new List<BtrOperator>(2);
+                        foreach (var p in allPlayersSnapshot)
+                        {
+                            if (p.HasExfild)
+                                continue;
+                            if (p is BtrOperator btr)
+                                btrs.Add(btr);
+                            else
+                                normalPlayers.Add(p);
+                        }
+                        normalPlayers.Sort(static (a, b) => DrawPriority(a.Type).CompareTo(DrawPriority(b.Type)));
+                    }
 
                     var battleMode = Config.BattleMode;
 
                     // -----------------------------
-                    // GROUP CONNECTORS (BOTTOM)
+                    // GROUP CONNECTORS
                     // -----------------------------
-                    if (!Config.PlayersOnTop && Config.ConnectGroups && allPlayers is not null)
+                    if (Config.ConnectGroups && normalPlayers is not null)
                     {
-                        var groupedPlayers = allPlayers
-                            .Where(x => x.IsHumanHostileActive && x.SpawnGroupID != -1)
-                            .ToList();
-
-                        var groups = groupedPlayers
-                            .Select(x => x.SpawnGroupID)
-                            .ToHashSet();
-
-                        foreach (var grp in groups)
-                        {
-                            var grpMembers = groupedPlayers
-                                .Where(x => x.SpawnGroupID == grp)
-                                .ToList();
-
-                            if (grpMembers.Count <= 1)
-                                continue;
-
-                            var positions = grpMembers
-                                .Select(x => x.Position.ToMapPos(map.Config).ToZoomedPos(mapParams))
-                                .ToArray();
-
-                            for (int i = 0; i < positions.Length - 1; i++)
-                            {
-                                canvas.DrawLine(
-                                    positions[i].X, positions[i].Y,
-                                    positions[i + 1].X, positions[i + 1].Y,
-                                    SKPaints.PaintConnectorGroup);
-                            }
-                        }
-                    }
-                    if (Config.PlayersOnTop && Config.ConnectGroups)
-                    {
-                        var groupedPlayers = allPlayers?.Where(x => x.IsHumanHostileActive && x.SpawnGroupID != -1);
-                        if (groupedPlayers is not null)
-                        {
-                            var groups = groupedPlayers.Select(x => x.SpawnGroupID).ToHashSet();
-                            foreach (var grp in groups)
-                            {
-                                var grpMembers = groupedPlayers.Where(x => x.SpawnGroupID == grp).ToList();
-                                if (grpMembers.Count > 1)
-                                {
-                                    var positions = grpMembers
-                                        .Select(x => x.Position.ToMapPos(map.Config).ToZoomedPos(mapParams))
-                                        .ToArray();
-
-                                    for (int i = 0; i < positions.Length - 1; i++)
-                                    {
-                                        canvas.DrawLine(
-                                            positions[i].X, positions[i].Y,
-                                            positions[i + 1].X, positions[i + 1].Y,
-                                            SKPaints.PaintConnectorGroup);
-                                    }
-                                }
-                            }
-                        }
+                        DrawGroupConnectors(canvas, normalPlayers, map, mapParams);
                     }
 
 
@@ -570,13 +536,11 @@ namespace eft_dma_radar
                     // -----------------------------
                     if (!Config.PlayersOnTop && normalPlayers is not null)
                     {
-                        var ordered = normalPlayers
-                            .Where(p => p != localPlayer)
-                            .OrderBy(p => DrawPriority(p.Type))
-                            .ToList();
-
-                        foreach (var player in ordered)
-                            player.Draw(canvas, mapParams, localPlayer);
+                        foreach (var player in normalPlayers)
+                        {
+                            if (player != localPlayer)
+                                player.Draw(canvas, mapParams, localPlayer);
+                        }
                     }
 
                     if (btrs is not null)
@@ -616,9 +580,8 @@ namespace eft_dma_radar
                     {
                         if (lootSnapshot is not null)
                         {
-                            for (int i = lootSnapshot.Count - 1; i >= 0; i--)
+                            foreach (var item in lootSnapshot)
                             {
-                                var item = lootSnapshot[i];
                                 if (item is QuestItem)
                                     continue;
 
@@ -682,15 +645,13 @@ namespace eft_dma_radar
                     // -----------------------------
                     // PLAYERS ON TOP
                     // -----------------------------
-                    if (Config.PlayersOnTop && allPlayers is not null)
+                    if (Config.PlayersOnTop && normalPlayers is not null)
                     {
-                        var ordered = allPlayers
-                            .Where(p => p != localPlayer)
-                            .OrderBy(p => DrawPriority(p.Type))
-                            .ToList();
-
-                        foreach (var player in ordered)
-                            player.Draw(canvas, mapParams, localPlayer);
+                        foreach (var player in normalPlayers)
+                        {
+                            if (player != localPlayer)
+                                player.Draw(canvas, mapParams, localPlayer);
+                        }
                     }
 
                     closestToMouse?.DrawMouseover(canvas, mapParams, localPlayer);
@@ -729,8 +690,8 @@ namespace eft_dma_radar
                         }
                     }
 
-                    if (allPlayers is not null && Config.ShowInfoTab)
-                        _playerInfo?.Draw(canvas, localPlayer, allPlayers);
+                    if (normalPlayers is not null && Config.ShowInfoTab)
+                        _playerInfo?.Draw(canvas, localPlayer, normalPlayers);
 
                     if (Config.AimviewWidgetEnabled)
                         _aimview?.Draw(canvas);
@@ -775,6 +736,44 @@ namespace eft_dma_radar
             _ => 1
 
         };
+
+        /// <summary>
+        /// Draws group connectors between grouped hostile players in a single pass
+        /// without allocating intermediate LINQ collections.
+        /// </summary>
+        private static void DrawGroupConnectors(SKCanvas canvas, List<Player> players, IXMMap map, XMMapParams mapParams)
+        {
+            // Single-pass: bucket grouped players by SpawnGroupID
+            Dictionary<int, List<SKPoint>>? groups = null;
+            foreach (var p in players)
+            {
+                if (p.IsHumanHostileActive && p.SpawnGroupID != -1)
+                {
+                    groups ??= new Dictionary<int, List<SKPoint>>(8);
+                    if (!groups.TryGetValue(p.SpawnGroupID, out var list))
+                    {
+                        list = new List<SKPoint>(4);
+                        groups[p.SpawnGroupID] = list;
+                    }
+                    list.Add(p.Position.ToMapPos(map.Config).ToZoomedPos(mapParams));
+                }
+            }
+            if (groups is null)
+                return;
+            foreach (var grp in groups.Values)
+            {
+                if (grp.Count <= 1)
+                    continue;
+                for (int i = 0; i < grp.Count - 1; i++)
+                {
+                    canvas.DrawLine(
+                        grp[i].X, grp[i].Y,
+                        grp[i + 1].X, grp[i + 1].Y,
+                        SKPaints.PaintConnectorGroup);
+                }
+            }
+        }
+
         public static void PingItem(string itemName)
         {
             var matchingLootItems = Loot?.Where(x => x?.Name?.IndexOf(itemName, StringComparison.OrdinalIgnoreCase) >= 0);
@@ -1065,17 +1064,15 @@ namespace eft_dma_radar
 
         private void SetFPS(bool inRaid, SKCanvas canvas)
         {
+            Interlocked.Increment(ref _fpsCounter);
+
             if (_fpsSw.ElapsedMilliseconds >= 1000)
             {
-                if (Config.ShowDebugWidget)
-                    _debugInfo?.UpdateFps(_fps);
-
-                var fps = Interlocked.Exchange(ref _fps, 0); // Get FPS -> Reset FPS counter
+                _lastReportedFps = Interlocked.Exchange(ref _fpsCounter, 0);
                 _fpsSw.Restart();
-            }
-            else
-            {
-                _fps++; // Increment FPS counter
+
+                if (Config.ShowDebugWidget)
+                    _debugInfo?.UpdateFps(_lastReportedFps);
             }
         }
 
@@ -1160,10 +1157,6 @@ namespace eft_dma_radar
 
             try
             {
-                var priority = _uiInteractionActive ?
-                    DispatcherPriority.Background :
-                    DispatcherPriority.Render;
-
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     try
@@ -1175,7 +1168,7 @@ namespace eft_dma_radar
                     {
                         Interlocked.Exchange(ref _isRenderingFlag, 0);
                     }
-                }), priority);
+                }), DispatcherPriority.Render);
             }
             catch (Exception ex)
             {
@@ -1638,6 +1631,8 @@ namespace eft_dma_radar
                 _renderTimer.Dispose();
                 _mapCacheImage?.Dispose();
                 _mapCacheImage = null;
+                _mapCacheSurface?.Dispose();
+                _mapCacheSurface = null;
                 _pingPaint.Dispose();
 
                 Window = null;
@@ -1784,6 +1779,24 @@ namespace eft_dma_radar
 
             Log.WriteLine("[PANELS] All panels are ready!");
             Initialized = true;
+
+            // Signal the Memory worker that the UI is ready (UI-agnostic hook).
+            Memory.UIReady = true;
+            Memory.ShowNotification ??= static (msg, level) =>
+            {
+                switch (level)
+                {
+                    case NotificationLevel.Info:
+                        NotificationsShared.Info(msg);
+                        break;
+                    case NotificationLevel.Warning:
+                        NotificationsShared.Warning(msg);
+                        break;
+                    case NotificationLevel.Error:
+                        NotificationsShared.Error(msg);
+                        break;
+                }
+            };
         }
 
         public void EnsureAllPanelsInBounds()
