@@ -3,7 +3,7 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
 {
     /// <summary>
     /// Precomputed coordinate parameters for drawing the map on screen.
-    /// Replaces the WPF XMMapParams type with silk-native coordinate helpers.
+    /// Coordinate-conversion helpers for world → screen mapping.
     /// </summary>
     internal readonly struct MapParams
     {

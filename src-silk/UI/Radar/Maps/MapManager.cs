@@ -6,7 +6,7 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
     /// <summary>
     /// Manages map configs and the currently active <see cref="RadarMap"/>.
     /// Thread-safe lazy load — rasterizes SVG layers on first use per map ID.
-    /// Replaces WPF XMMapManager with no WPF or Lone/XM dependencies.
+    /// Self-contained map manager with no external dependencies.
     /// </summary>
     internal static class MapManager
     {

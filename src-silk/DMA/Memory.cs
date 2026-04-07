@@ -12,7 +12,7 @@ namespace eft_dma_radar.Silk.DMA
 {
     /// <summary>
     /// Standalone DMA Memory module for the Silk.NET radar.
-    /// Clean rewrite — minimal dependencies, no WPF types.
+    /// Minimal dependencies, self-contained.
     /// </summary>
     internal static class Memory
     {

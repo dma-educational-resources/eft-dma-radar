@@ -5,7 +5,7 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
 {
     /// <summary>
     /// Rasterizes and draws a multi-layer SVG map.
-    /// Replaces WPF XMSvgMap — no WPF dependencies, honors DisableDimming flag.
+    /// SVG-based radar map — no external dependencies, honors DisableDimming flag.
     /// Implements <see cref="IRadarMap"/> for interface-based usage.
     /// </summary>
     internal sealed class RadarMap : IRadarMap
@@ -188,7 +188,6 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
 
         /// <summary>
         /// Expands <paramref name="rect"/> to fill <paramref name="size"/> while preserving aspect ratio.
-        /// Equivalent to WPF SkiaSharp's SKRect.AspectFill extension.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static SKRect AspectFill(SKRect rect, SKSize size)

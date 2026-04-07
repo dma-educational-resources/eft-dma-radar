@@ -2,7 +2,7 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
 {
     /// <summary>
     /// Interface for a radar map that can draw itself and provide coordinate parameters.
-    /// Mirrors WPF IXMMap pattern.
+    /// Radar map interface.
     /// </summary>
     internal interface IRadarMap : IDisposable
     {

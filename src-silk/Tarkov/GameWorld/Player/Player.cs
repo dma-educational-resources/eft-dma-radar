@@ -6,8 +6,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
     /// </summary>
     public class Player
     {
-        public string Name { get; init; } = string.Empty;
-        public PlayerType Type { get; init; }
+        public string Name { get; set; } = string.Empty;
+        public PlayerType Type { get; set; }
         public Vector3 Position { get; set; }
         public float RotationYaw { get; set; }
         public int GroupID { get; set; }
@@ -55,9 +55,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 pos.Y - arrowLen * MathF.Cos(yawRad));
             canvas.DrawLine(pos, tip, dotPaint);
 
-            // Name label
-            canvas.DrawText(Name, pos.X + 7f, pos.Y + 4f, SKTextAlign.Left,
-                SKPaints.FontRegular12, textPaint);
+            // Name label (skip for local player)
+            if (!IsLocalPlayer)
+            {
+                canvas.DrawText(Name, pos.X + 7f, pos.Y + 4f, SKTextAlign.Left,
+                    SKPaints.FontRegular12, textPaint);
+            }
         }
 
         /// <summary>

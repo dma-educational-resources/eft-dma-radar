@@ -1,15 +1,19 @@
+using System.Collections.Frozen;
+using eft_dma_radar.Silk.Tarkov;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using VmmSharpEx;
 using VmmSharpEx.Options;
 using VmmSharpEx.Scatter;
 
+using static eft_dma_radar.Silk.Tarkov.Unity.UnitySDK;
+
 namespace eft_dma_radar.Silk.Tarkov.GameWorld
 {
     /// <summary>
     /// Manages registered players in a raid — reads, caches, and updates player data.
-    /// Currently supports local player tracking only.
+    /// Supports local player, observed players (PMC, PScav, AI), and voice-based AI identification.
     /// <para>
-    /// Inspired by Lone's scatter-based refresh pattern:
+    /// Uses a two-tier refresh model:
     /// <list type="bullet">
     ///   <item>Registration refresh (slower): reads player list, discovers/removes players, updates lifecycle.</item>
     ///   <item>Realtime refresh (fast): scatter-batched position + rotation for all active players — single DMA round-trip.</item>
@@ -20,38 +24,27 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
     {
         #region Constants
 
-        // UnityList<T> layout constants
-        private const uint ListArrOffset = 0x10;
-        private const uint ListArrStartOffset = 0x20;
-
-        // TransformAccess field offsets read directly from TransformInternal
-        // Verified against il2cpp_offsets.json
-        private const uint TA_IndexOffset = 0x78;
-        private const uint TA_HierarchyOffset = 0x70;
-
-        // TransformHierarchy field offsets
-        private const uint TH_VerticesOffset = 0x68;
-        private const uint TH_IndicesOffset = 0x40;
-
-        // Rotation offsets (verified against il2cpp_offsets.json)
-        // ObservedMovementController._Rotation = 0x28 (40 decimal)
-        private const uint ObservedRotationOffset = 0x28;
-        // MovementContext._rotation = 0xC0 (192 decimal)
-        private const uint ClientRotationOffset = 0xC0;
-
         // Maximum parent-chain iterations (safety guard)
         private const int MaxHierarchyIterations = 4000;
 
         // Maximum valid player count from the registered players list
         private const int MaxPlayerCount = 256;
 
+        // Spawn-group proximity threshold (squared distance, meters²)
+        private const float SpawnGroupDistanceSqr = 25f; // 5m radius
+
         #endregion
 
         #region Fields
 
         private readonly ulong _gameWorldBase;
+        private readonly string _mapId;
         private readonly ConcurrentDictionary<ulong, PlayerEntry> _players = new();
         private HashSet<ulong> _seenSet = new(MaxPlayerCount);
+
+        // Spawn-group tracking (position-proximity-based)
+        private readonly List<SpawnGroupEntry> _spawnGroups = [];
+        private int _nextSpawnGroupId = 1;
 
         #endregion
 
@@ -116,9 +109,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         #region Constructor
 
-        internal RegisteredPlayers(ulong gameWorldBase)
+        internal RegisteredPlayers(ulong gameWorldBase, string mapId)
         {
             _gameWorldBase = gameWorldBase;
+            _mapId = mapId;
         }
 
         #endregion
@@ -195,7 +189,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             try
             {
                 rgtPlayersAddr = Memory.ReadPtr(_gameWorldBase + Offsets.ClientLocalGameWorld.RegisteredPlayers, false);
-                listItemsPtr = Memory.ReadPtr(rgtPlayersAddr + ListArrOffset, false);
+                listItemsPtr = Memory.ReadPtr(rgtPlayersAddr + UnityList.ArrOffset, false);
                 count = Memory.ReadValue<int>(rgtPlayersAddr + 0x18, false);
             }
             catch (Exception ex)
@@ -211,7 +205,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             ulong[] ptrs;
             try
             {
-                ptrs = Memory.ReadArray<ulong>(listItemsPtr + ListArrStartOffset, count, false);
+                ptrs = Memory.ReadArray<ulong>(listItemsPtr + UnityList.ArrStartOffset, count, false);
             }
             catch (Exception ex)
             {
@@ -276,7 +270,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>
         /// Updates existing player states based on the current registered set.
-        /// Uses scatter-batched reads for lifecycle checks (Lone's OnRegRefresh pattern).
+        /// Uses scatter-batched reads for lifecycle checks.
         /// </summary>
         private void UpdateExistingPlayers(HashSet<ulong> registered)
         {
@@ -438,7 +432,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>
         /// Validates that cached transform addresses are still correct.
-        /// Uses a two-round scatter pattern (Lone's ValidatePlayerTransforms).
+        /// Uses a two-round scatter pattern for validation.
         /// Round 1: read Hierarchy ptr from TransformInternal.
         /// Round 2: read VerticesAddr from Hierarchy — compare with cached value.
         /// </summary>
@@ -453,16 +447,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             foreach (var entry in activePlayers)
             {
-                round1.PrepareReadPtr(entry.TransformInternal + TA_HierarchyOffset);
+                round1.PrepareReadPtr(entry.TransformInternal + TransformAccess.HierarchyOffset);
                 round1.Completed += (_, r1) =>
                 {
-                    if (!r1.ReadPtr(entry.TransformInternal + TA_HierarchyOffset, out var hierarchy))
+                    if (!r1.ReadPtr(entry.TransformInternal + TransformAccess.HierarchyOffset, out var hierarchy))
                         return;
 
-                    round2.PrepareReadPtr(hierarchy + TH_VerticesOffset);
+                    round2.PrepareReadPtr(hierarchy + TransformHierarchy.VerticesOffset);
                     round2.Completed += (_, r2) =>
                     {
-                        if (!r2.ReadPtr(hierarchy + TH_VerticesOffset, out var verticesPtr))
+                        if (!r2.ReadPtr(hierarchy + TransformHierarchy.VerticesOffset, out var verticesPtr))
                             return;
 
                         if ((ulong)verticesPtr != entry.VerticesAddr)
@@ -485,9 +479,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>
         /// Reads name, side, and allocates a <see cref="PlayerEntry"/> for a new player address.
+        /// For observed AI players, reads voice line for boss/raider/scav classification.
         /// Returns null if the read fails or data looks invalid.
         /// </summary>
-        private static PlayerEntry? CreatePlayerEntry(ulong playerBase, bool isLocal)
+        private PlayerEntry? CreatePlayerEntry(ulong playerBase, bool isLocal)
         {
             try
             {
@@ -496,26 +491,55 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                 string name;
                 int sideRaw;
+                PlayerType type;
 
                 if (isObserved)
                 {
-                    var nicknamePtr = Memory.ReadPtr(playerBase + Offsets.ObservedPlayerView.NickName, false);
-                    name = Memory.ReadUnityString(nicknamePtr, 64, false);
                     sideRaw = Memory.ReadValue<int>(playerBase + Offsets.ObservedPlayerView.Side, false);
+                    bool isScav = sideRaw == 4; // EPlayerSide.Savage
+
+                    if (isScav)
+                    {
+                        var isAI = Memory.ReadValue<bool>(playerBase + Offsets.ObservedPlayerView.IsAI, false);
+                        if (isAI)
+                        {
+                            // AI scav — identify by voice line
+                            var voicePtr = Memory.ReadPtr(playerBase + Offsets.ObservedPlayerView.Voice, false);
+                            var voice = Memory.ReadUnityString(voicePtr, 64, false);
+                            var role = GetInitialAIRole(voice);
+                            name = role.Name;
+                            type = role.Type;
+                        }
+                        else
+                        {
+                            // Player scav
+                            var id = Memory.ReadValue<int>(playerBase + Offsets.ObservedPlayerView.Id, false);
+                            name = $"PScav{id}";
+                            type = PlayerType.PScav;
+                        }
+                    }
+                    else
+                    {
+                        // PMC (USEC/BEAR)
+                        var id = Memory.ReadValue<int>(playerBase + Offsets.ObservedPlayerView.Id, false);
+                        var side = sideRaw == 1 ? "Usec" : "Bear";
+                        name = $"{side}{id}";
+                        type = sideRaw == 1 ? PlayerType.USEC : PlayerType.BEAR;
+                    }
                 }
                 else
                 {
+                    // Local / Client player — read from profile
                     var profilePtr = Memory.ReadPtr(playerBase + Offsets.Player.Profile, false);
                     var infoPtr = Memory.ReadPtr(profilePtr + Offsets.Profile.Info, false);
                     var nicknamePtr = Memory.ReadPtr(infoPtr + Offsets.PlayerInfo.Nickname, false);
                     name = Memory.ReadUnityString(nicknamePtr, 64, false);
                     sideRaw = Memory.ReadValue<int>(infoPtr + Offsets.PlayerInfo.Side, false);
+                    type = isLocal ? PlayerType.Default : ResolveClientPlayerType(sideRaw);
                 }
 
                 if (string.IsNullOrWhiteSpace(name))
                     return null;
-
-                var type = ResolvePlayerType(sideRaw, isLocal, playerBase, isObserved);
 
                 Player.Player player = isLocal
                     ? new LocalPlayer { Name = name, Type = type, IsAlive = true, IsActive = true }
@@ -526,6 +550,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 // Pre-warm caches so the first draw tick has position/rotation
                 TryInitTransform(playerBase, entry);
                 TryInitRotation(playerBase, entry);
+
+                // Assign spawn-group based on initial position proximity (for human players)
+                if (!isLocal && player.IsHuman && entry.TransformReady)
+                    player.SpawnGroupID = GetOrAssignSpawnGroup(player.Position);
+
+                Log.WriteLine($"[RegisteredPlayers] Discovered player: {player} @ 0x{playerBase:X} (class='{className}')");
 
                 return entry;
             }
@@ -552,21 +582,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 var bodyPtr = Memory.ReadPtr(playerBase + bodyOffset, false);
                 var skelRootJoint = Memory.ReadPtr(bodyPtr + Offsets.PlayerBody.SkeletonRootJoint, false);
                 var dizValues = Memory.ReadPtr(skelRootJoint + Offsets.DizSkinningSkeleton._values, false);
-                var arrPtr = Memory.ReadPtr(dizValues + ListArrOffset, false);
-                var boneEntryPtr = Memory.ReadPtr(arrPtr + ListArrStartOffset, false);
+                var arrPtr = Memory.ReadPtr(dizValues + UnityList.ArrOffset, false);
+                var boneEntryPtr = Memory.ReadPtr(arrPtr + UnityList.ArrStartOffset, false);
                 var transformInternal = Memory.ReadPtr(boneEntryPtr + 0x10, false);
 
                 // TransformAccess fields are embedded directly in TransformInternal
-                var taIndex = Memory.ReadValue<int>(transformInternal + TA_IndexOffset, false);
-                var taHierarchy = Memory.ReadPtr(transformInternal + TA_HierarchyOffset, false);
+                var taIndex = Memory.ReadValue<int>(transformInternal + TransformAccess.IndexOffset, false);
+                var taHierarchy = Memory.ReadPtr(transformInternal + TransformAccess.HierarchyOffset, false);
 
                 if (taIndex < 0 || taIndex > 128_000)
                     return;
                 if (!taHierarchy.IsValidVirtualAddress())
                     return;
 
-                var verticesAddr = Memory.ReadPtr(taHierarchy + TH_VerticesOffset, false);
-                var indicesAddr = Memory.ReadPtr(taHierarchy + TH_IndicesOffset, false);
+                var verticesAddr = Memory.ReadPtr(taHierarchy + TransformHierarchy.VerticesOffset, false);
+                var indicesAddr = Memory.ReadPtr(taHierarchy + TransformHierarchy.IndicesOffset, false);
 
                 if (!verticesAddr.IsValidVirtualAddress())
                     return;
@@ -599,12 +629,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 {
                     var opc = Memory.ReadPtr(playerBase + Offsets.ObservedPlayerView.ObservedPlayerController, false);
                     var mc = Memory.ReadPtrChain(opc, Offsets.ObservedPlayerController.MovementController, false);
-                    rotAddr = mc + ObservedRotationOffset;
+                    rotAddr = mc + GameSDK.Rotation.Observed;
                 }
                 else
                 {
                     var movCtx = Memory.ReadPtr(playerBase + Offsets.Player.MovementContext, false);
-                    rotAddr = movCtx + ClientRotationOffset;
+                    rotAddr = movCtx + GameSDK.Rotation.Client;
                 }
 
                 // Validate rotation is sane before caching
@@ -640,24 +670,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             }
         }
 
-        private static PlayerType ResolvePlayerType(int side, bool isLocal, ulong playerBase, bool isObserved)
+        private static PlayerType ResolveClientPlayerType(int side)
         {
-            if (isLocal)
-                return PlayerType.Default;
-
-            if (side == 4 && isObserved)
-            {
-                try
-                {
-                    var isAI = Memory.ReadValue<bool>(playerBase + Offsets.ObservedPlayerView.IsAI, false);
-                    return isAI ? PlayerType.AIScav : PlayerType.PScav;
-                }
-                catch
-                {
-                    return PlayerType.AIScav;
-                }
-            }
-
             return side switch
             {
                 1 => PlayerType.USEC,
@@ -665,6 +679,109 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 4 => PlayerType.AIScav,
                 _ => PlayerType.Default
             };
+        }
+
+        #endregion
+
+        #region Spawn Group Assignment
+
+        /// <summary>
+        /// Tracks a spawn position associated with a group ID.
+        /// </summary>
+        private sealed class SpawnGroupEntry
+        {
+            public int GroupId;
+            public Vector3 SpawnPosition;
+        }
+
+        /// <summary>
+        /// Assigns a spawn-group ID based on position proximity.
+        /// Players spawning within <see cref="SpawnGroupDistanceSqr"/> of each other
+        /// are placed in the same group.
+        /// </summary>
+        private int GetOrAssignSpawnGroup(Vector3 spawnPos)
+        {
+            // Check for zero/invalid spawn positions
+            if (spawnPos == Vector3.Zero)
+                return -1;
+
+            foreach (var group in _spawnGroups)
+            {
+                if (Vector3.DistanceSquared(group.SpawnPosition, spawnPos) <= SpawnGroupDistanceSqr)
+                    return group.GroupId;
+            }
+
+            int newId = _nextSpawnGroupId++;
+            _spawnGroups.Add(new SpawnGroupEntry { GroupId = newId, SpawnPosition = spawnPos });
+            return newId;
+        }
+
+        #endregion
+
+        #region AI Role Identification
+
+        /// <summary>
+        /// AI role determined by voice line — contains a display name and player type.
+        /// </summary>
+        private readonly record struct AIRole(string Name, PlayerType Type);
+
+        /// <summary>
+        /// Known voice lines mapped to AI roles. Checked first before fallback pattern matching.
+        /// </summary>
+        private static readonly FrozenDictionary<string, AIRole> _aiRolesByVoice = new Dictionary<string, AIRole>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["BossSanitar"] = new("Sanitar", PlayerType.AIBoss),
+            ["BossBully"] = new("Reshala", PlayerType.AIBoss),
+            ["BossGluhar"] = new("Gluhar", PlayerType.AIBoss),
+            ["SectantPriest"] = new("Priest", PlayerType.AIBoss),
+            ["SectantWarrior"] = new("Cultist", PlayerType.AIRaider),
+            ["BossKilla"] = new("Killa", PlayerType.AIBoss),
+            ["BossTagilla"] = new("Tagilla", PlayerType.AIBoss),
+            ["Boss_Partizan"] = new("Partisan", PlayerType.AIBoss),
+            ["BossBigPipe"] = new("Big Pipe", PlayerType.AIBoss),
+            ["BossBirdEye"] = new("Birdeye", PlayerType.AIBoss),
+            ["BossKnight"] = new("Knight", PlayerType.AIBoss),
+            ["Arena_Guard_1"] = new("Arena Guard", PlayerType.AIScav),
+            ["Arena_Guard_2"] = new("Arena Guard", PlayerType.AIScav),
+            ["Boss_Kaban"] = new("Kaban", PlayerType.AIBoss),
+            ["Boss_Kollontay"] = new("Kollontay", PlayerType.AIBoss),
+            ["Boss_Sturman"] = new("Shturman", PlayerType.AIBoss),
+            ["Zombie_Generic"] = new("Zombie", PlayerType.AIScav),
+            ["BossZombieTagilla"] = new("Zombie Tagilla", PlayerType.AIBoss),
+            ["Zombie_Fast"] = new("Zombie", PlayerType.AIScav),
+            ["Zombie_Medium"] = new("Zombie", PlayerType.AIScav),
+        }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Determines the AI role from a voice line string.
+        /// Checks the frozen dictionary first, then falls back to pattern matching.
+        /// Applies map-based overrides (e.g., laboratory → Raider).
+        /// </summary>
+        private AIRole GetInitialAIRole(string voiceLine)
+        {
+            if (string.IsNullOrEmpty(voiceLine))
+                return new("Scav", PlayerType.AIScav);
+
+            if (!_aiRolesByVoice.TryGetValue(voiceLine, out var role))
+            {
+                role = voiceLine switch
+                {
+                    _ when voiceLine.Contains("scav", StringComparison.OrdinalIgnoreCase) => new("Scav", PlayerType.AIScav),
+                    _ when voiceLine.Contains("boss", StringComparison.OrdinalIgnoreCase) => new("Boss", PlayerType.AIBoss),
+                    _ when voiceLine.Contains("usec", StringComparison.OrdinalIgnoreCase) => new("Raider", PlayerType.AIRaider),
+                    _ when voiceLine.Contains("bear", StringComparison.OrdinalIgnoreCase) => new("Raider", PlayerType.AIRaider),
+                    _ when voiceLine.Contains("black_division", StringComparison.OrdinalIgnoreCase) => new("BD", PlayerType.AIRaider),
+                    _ when voiceLine.Contains("vsrf", StringComparison.OrdinalIgnoreCase) => new("Vsrf", PlayerType.AIRaider),
+                    _ when voiceLine.Contains("civilian", StringComparison.OrdinalIgnoreCase) => new("Civ", PlayerType.AIScav),
+                    _ => new("Scav", PlayerType.AIScav)
+                };
+            }
+
+            // Labs override: all non-boss AI → Raider
+            if (_mapId == "laboratory" && role.Type != PlayerType.AIBoss)
+                role = new("Raider", PlayerType.AIRaider);
+
+            return role;
         }
 
         #endregion

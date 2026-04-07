@@ -14,7 +14,7 @@ namespace eft_dma_radar.Silk.UI
 
     /// <summary>
     /// Silk.NET-based radar window with SkiaSharp GPU rendering and ImGui UI.
-    /// Replaces WPF MainWindow for high-performance native rendering.
+    /// Main radar window for high-performance native rendering.
     /// </summary>
     internal static partial class RadarWindow
     {

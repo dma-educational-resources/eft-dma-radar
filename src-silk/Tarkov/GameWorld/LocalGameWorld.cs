@@ -106,7 +106,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             _base = gameWorldBase;
             MapID = mapId;
             _ct = ct;
-            _registeredPlayers = new RegisteredPlayers(gameWorldBase);
+            _registeredPlayers = new RegisteredPlayers(gameWorldBase, mapId);
 
             _realtimeWorker = new WorkerThread
             {

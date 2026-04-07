@@ -2,7 +2,7 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
 {
     /// <summary>
     /// An entity that can draw itself on the radar map.
-    /// Mirrors WPF IMapEntity pattern.
+    /// Radar map entity interface.
     /// </summary>
     internal interface IMapEntity
     {

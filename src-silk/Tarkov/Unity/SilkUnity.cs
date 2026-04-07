@@ -7,12 +7,12 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
 {
     // ─────────────────────────────────────────────────────────────────────────────
     // Standalone IL2CPP Unity helpers for the Silk layer.
-    // Replaces WPF GameObjectManager / ObjectClass without any WPF Memory calls.
+    // Self-contained GOM resolution and object class reading.
     // ─────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Centralized IL2CPP Unity offsets for the Silk layer.
-    /// Mirrors WPF <c>UnityOffsets</c> — update when game patches break functionality.
+    /// Update when game patches break functionality.
     /// </summary>
     internal static class SilkUnityOffsets
     {
@@ -236,7 +236,6 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
         /// Navigates from a behaviour/component's ObjectClass back to its parent
         /// GameObject, then searches that GameObject's components for the specified
         /// class name. Returns the ObjectClass pointer of the sibling component, or 0.
-        /// Mirrors WPF <c>GameObjectManager.GetComponentFromBehaviour</c>.
         /// </summary>
         public static ulong GetComponentFromBehaviour(ulong componentObject, string className)
         {
