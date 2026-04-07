@@ -1,7 +1,7 @@
 using System.Collections.Frozen;
 
 #nullable enable
-namespace eft_dma_radar.Silk.UI.Map
+namespace eft_dma_radar.Silk.UI.Radar.Maps
 {
     /// <summary>
     /// Manages map configs and the currently active <see cref="RadarMap"/>.

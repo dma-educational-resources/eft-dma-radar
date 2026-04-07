@@ -1,13 +1,14 @@
 using Svg.Skia;
 
 #nullable enable
-namespace eft_dma_radar.Silk.UI.Map
+namespace eft_dma_radar.Silk.UI.Radar.Maps
 {
     /// <summary>
     /// Rasterizes and draws a multi-layer SVG map.
     /// Replaces WPF XMSvgMap — no WPF dependencies, honors DisableDimming flag.
+    /// Implements <see cref="IRadarMap"/> for interface-based usage.
     /// </summary>
-    internal sealed class RadarMap : IDisposable
+    internal sealed class RadarMap : IRadarMap
     {
         private readonly LoadedLayer[] _layers;
         private readonly float _mapWidth;

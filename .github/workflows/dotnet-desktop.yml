@@ -91,8 +91,8 @@ jobs:
           EMOJI: ${{ steps.channel.outputs.EMOJI }}
           COLOR: ${{ steps.channel.outputs.COLOR }}
         run: |
-          # Truncate commit message to first line and cap at 1024 chars for Discord field limit
-          $commitMsg = ($env:COMMIT_MESSAGE -split "`n")[0]
+          # Keep full commit message (title + description), cap at 1024 chars for Discord field limit
+          $commitMsg = $env:COMMIT_MESSAGE.Trim()
           if ($commitMsg.Length -gt 1024) { $commitMsg = $commitMsg.Substring(0, 1021) + "..." }
 
           $payload = @{

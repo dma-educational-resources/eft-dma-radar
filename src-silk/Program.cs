@@ -16,9 +16,10 @@ global using System.Text.Json.Serialization;
 global using eft_dma_radar.Silk.Misc;
 global using eft_dma_radar.Silk.Misc.Pools;
 global using eft_dma_radar.Silk.DMA;
-global using eft_dma_radar.Silk.Tarkov;
+global using eft_dma_radar.Silk.Tarkov.GameWorld;
+global using eft_dma_radar.Silk.Tarkov.GameWorld.Player;
 global using eft_dma_radar.Silk.Config;
-global using eft_dma_radar.Silk.UI.Map;
+global using eft_dma_radar.Silk.UI.Radar.Maps;
 
 // Keep WPF project Log until silk has its own (shared)
 global using eft_dma_radar.Misc;

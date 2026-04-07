@@ -4,7 +4,8 @@ using System.IO;
 using System.Runtime;
 using eft_dma_radar.Silk.Config;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
-using eft_dma_radar.Silk.Tarkov;
+using eft_dma_radar.Silk.Tarkov.GameWorld;
+using eft_dma_radar.Silk.Tarkov.GameWorld.Player;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using VmmSharpEx;
 using VmmSharpEx.Extensions;
@@ -58,10 +59,10 @@ namespace eft_dma_radar.Silk.DMA
         public static bool Ready => _state is MemoryState.ProcessFound or MemoryState.InRaid;
         public static bool InRaid => _state is MemoryState.InRaid;
 
-        public static GameSession? Game { get; private set; }
+        public static LocalGameWorld? Game { get; private set; }
         public static string? MapID => Game?.MapID;
-        public static IReadOnlyCollection<PlayerBase>? Players => Game?.Players;
-        public static PlayerBase? LocalPlayer => Game?.LocalPlayer;
+        public static IReadOnlyCollection<Player>? Players => Game?.Players;
+        public static Player? LocalPlayer => Game?.LocalPlayer;
 
         #endregion
 
@@ -91,6 +92,7 @@ namespace eft_dma_radar.Silk.DMA
             GOM = default;
             GameAssemblyBase = default;
             _pid = default;
+            SilkGOM.ResetCachedAddresses();
             GameStopped?.Invoke(null, EventArgs.Empty);
         }
 
@@ -289,7 +291,7 @@ namespace eft_dma_radar.Silk.DMA
                 {
                     var ct = _cts.Token;
 
-                    using var game = Game = GameSession.Create(ct);
+                    using var game = Game = LocalGameWorld.Create(ct);
 
                     Log.WriteLine($"[Memory] Raid started. Map = '{game.MapID}'");
                     OnRaidStarted();

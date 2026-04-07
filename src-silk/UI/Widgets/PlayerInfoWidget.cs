@@ -34,7 +34,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
             var localPos = localPlayer.Position;
 
             // One-pass build: count + collect human hostiles
-            var hostilePlayers = new List<PlayerBase>();
+            var hostilePlayers = new List<Player>();
             int pmcCount = 0, pscavCount = 0, aiCount = 0, bossCount = 0;
 
             foreach (var p in allPlayers)

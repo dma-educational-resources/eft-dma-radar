@@ -37,7 +37,7 @@ namespace eft_dma_radar.Silk.UI
         // Mouse state
         private static bool _mouseDown;
         private static Vector2 _lastMousePosition;
-        private static PlayerBase? _mouseOverPlayer;
+        private static Player? _mouseOverPlayer;
 
         // Map state
         private static bool _freeMode;
@@ -70,8 +70,8 @@ namespace eft_dma_radar.Silk.UI
         private static SilkConfig Config => SilkProgram.Config;
         private static float UIScale => Config.UIScale;
         private static string MapID => Memory.MapID ?? "null";
-        private static PlayerBase? LocalPlayer => Memory.LocalPlayer;
-        private static IReadOnlyCollection<PlayerBase>? AllPlayers => Memory.Players;
+        private static Player? LocalPlayer => Memory.LocalPlayer;
+        private static IReadOnlyCollection<Player>? AllPlayers => Memory.Players;
         private static bool InRaid => Memory.InRaid;
         private static bool Ready => Memory.Ready;
 
@@ -332,7 +332,7 @@ namespace eft_dma_radar.Silk.UI
                 var scale = UIScale;
                 canvas.Scale(scale, scale);
 
-                if (InRaid && LocalPlayer is PlayerBase localPlayer)
+                if (InRaid && LocalPlayer is Player localPlayer)
                 {
                     var mapID = MapID;
                     if (!mapID.Equals(MapManager.Map?.ID, StringComparison.OrdinalIgnoreCase))
@@ -365,7 +365,7 @@ namespace eft_dma_radar.Silk.UI
             }
         }
 
-        private static void DrawRadar(SKCanvas canvas, PlayerBase localPlayer, RadarMap map, float scale)
+        private static void DrawRadar(SKCanvas canvas, Player localPlayer, RadarMap map, float scale)
         {
             var localPlayerPos    = localPlayer.Position;
             var localPlayerMapPos = MapParams.ToMapPos(localPlayerPos, map.Config);
@@ -394,16 +394,16 @@ namespace eft_dma_radar.Silk.UI
             // Snapshot players
             var allPlayersSnapshot = AllPlayers;
 
-            List<PlayerBase>? normalPlayers = null;
+            List<Player>? normalPlayers = null;
             if (allPlayersSnapshot is not null)
             {
-                normalPlayers = new List<PlayerBase>(allPlayersSnapshot.Count);
+                normalPlayers = new List<Player>(allPlayersSnapshot.Count);
                 foreach (var p in allPlayersSnapshot)
                 {
                     if (p.IsActive && p.IsAlive)
                         normalPlayers.Add(p);
                 }
-                normalPlayers.Sort(static (a, b) => DrawPriority(a.Type).CompareTo(DrawPriority(b.Type)));
+                normalPlayers.Sort(static (a, b) => a.DrawPriority.CompareTo(b.DrawPriority));
             }
 
             // Group connectors
@@ -411,7 +411,7 @@ namespace eft_dma_radar.Silk.UI
                 DrawGroupConnectors(canvas, normalPlayers, map, mapParams);
 
             // Draw local player
-            DrawPlayer(canvas, localPlayer, mapParams, map, isLocal: true);
+            localPlayer.Draw(canvas, mapParams, map.Config);
 
             // Players (bottom layer)
             if (!Config.PlayersOnTop && normalPlayers is not null)
@@ -419,7 +419,7 @@ namespace eft_dma_radar.Silk.UI
                 foreach (var player in normalPlayers)
                 {
                     if (!player.IsLocalPlayer)
-                        DrawPlayer(canvas, player, mapParams, map, isLocal: false);
+                        player.Draw(canvas, mapParams, map.Config);
                 }
             }
 
@@ -429,7 +429,7 @@ namespace eft_dma_radar.Silk.UI
                 foreach (var player in normalPlayers)
                 {
                     if (!player.IsLocalPlayer)
-                        DrawPlayer(canvas, player, mapParams, map, isLocal: false);
+                        player.Draw(canvas, mapParams, map.Config);
                 }
             }
 
@@ -437,58 +437,7 @@ namespace eft_dma_radar.Silk.UI
             DrawPings(canvas, map, mapParams);
         }
 
-        private static void DrawPlayer(SKCanvas canvas, PlayerBase player, MapParams mapParams,
-            RadarMap map, bool isLocal)
-        {
-            var pos = mapParams.ToScreenPos(MapParams.ToMapPos(player.Position, map.Config));
-
-            var (dotPaint, textPaint) = GetPlayerPaints(player.Type, isLocal);
-
-            const float dotRadius = 5f;
-            canvas.DrawCircle(pos.X, pos.Y, dotRadius, dotPaint);
-
-            // Directional arrow — rotate by yaw
-            float yawRad = MathF.PI * player.RotationYaw / 180f;
-            float arrowLen = 10f;
-            var tip = new SKPoint(
-                pos.X + arrowLen * MathF.Sin(yawRad),
-                pos.Y - arrowLen * MathF.Cos(yawRad));
-            canvas.DrawLine(pos, tip, dotPaint);
-
-            // Name label
-            canvas.DrawText(player.Name, pos.X + 7f, pos.Y + 4f, SKTextAlign.Left,
-                SKPaints.FontRegular12, textPaint);
-        }
-
-        private static (SKPaint dot, SKPaint text) GetPlayerPaints(PlayerType t, bool isLocal)
-        {
-            if (isLocal) return (SKPaints.PaintLocalPlayer, SKPaints.TextLocalPlayer);
-            return t switch
-            {
-                PlayerType.Teammate     => (SKPaints.PaintTeammate, SKPaints.TextTeammate),
-                PlayerType.USEC         => (SKPaints.PaintUSEC, SKPaints.TextUSEC),
-                PlayerType.BEAR         => (SKPaints.PaintBEAR, SKPaints.TextBEAR),
-                PlayerType.PScav        => (SKPaints.PaintPScav, SKPaints.TextPScav),
-                PlayerType.AIScav       => (SKPaints.PaintScav, SKPaints.TextScav),
-                PlayerType.AIRaider     => (SKPaints.PaintRaider, SKPaints.TextRaider),
-                PlayerType.AIBoss       => (SKPaints.PaintBoss, SKPaints.TextBoss),
-                PlayerType.SpecialPlayer => (SKPaints.PaintSpecial, SKPaints.TextSpecial),
-                PlayerType.Streamer     => (SKPaints.PaintStreamer, SKPaints.TextStreamer),
-                _                       => (SKPaints.PaintLocalPlayer, SKPaints.TextLocalPlayer)
-            };
-        }
-
-        private static int DrawPriority(PlayerType t) => t switch
-        {
-            PlayerType.SpecialPlayer => 7,
-            PlayerType.USEC or PlayerType.BEAR => 5,
-            PlayerType.PScav => 4,
-            PlayerType.AIBoss => 3,
-            PlayerType.AIRaider => 2,
-            _ => 1
-        };
-
-        private static void DrawGroupConnectors(SKCanvas canvas, List<PlayerBase> players, RadarMap map, MapParams mapParams)
+        private static void DrawGroupConnectors(SKCanvas canvas, List<Player> players, RadarMap map, MapParams mapParams)
         {
             Dictionary<int, List<SKPoint>>? groups = null;
             foreach (var p in players)
@@ -723,7 +672,7 @@ namespace eft_dma_radar.Silk.UI
 
             // Find closest mouseover entity
             var mousePos = position;
-            PlayerBase? closest = null;
+            Player? closest = null;
             float closestDist = float.MaxValue;
 
             var players = AllPlayers;

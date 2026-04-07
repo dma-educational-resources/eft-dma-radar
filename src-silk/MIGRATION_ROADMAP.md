@@ -1,18 +1,25 @@
 # WPF → Silk.NET Migration Roadmap
 
 ## Current State
-**Phase 1 complete.** `src-silk` is a fully standalone executable — no runtime dependency
+**Phase 1 complete (including structural restructuring).** `src-silk` is a fully standalone executable — no runtime dependency
 on the WPF project's `Memory.cs`, `Player.cs`, or `LocalGameWorld.cs`.
 
 - **Silk.NET project** (`src-silk`): Silk.NET + SkiaSharp + ImGui window — **running independently**
   - Own `Memory.cs` (DMA layer): state machine, worker thread, full scatter read/write API
   - Own IL2CPP dumper (`src-silk/Tarkov/Unity/IL2CPP/Dumper/`) — silk-native namespace,
     isolated cache at `%AppData%\eft-dma-radar-silk\il2cpp_offsets.json`
-  - Own minimal game model: `PlayerBase`, `GameSession` (positions, rotations, raid lifecycle)
+  - Own game model mirroring WPF structure:
+    - `Tarkov/GameWorld/Player/Player.cs` — base player class with `Draw()`, `DrawPriority`
+    - `Tarkov/GameWorld/Player/LocalPlayer.cs` — sealed subclass, `IsLocalPlayer => true`
+    - `Tarkov/GameWorld/RegisteredPlayers.cs` — player collection with refresh logic
+    - `Tarkov/GameWorld/LocalGameWorld.cs` — raid lifecycle, background refresh thread
+  - Own map system mirroring WPF structure:
+    - `UI/Radar/Maps/IRadarMap.cs`, `IMapEntity.cs` — interfaces
+    - `UI/Radar/Maps/MapConfig.cs`, `MapParams.cs`, `MapManager.cs`, `RadarMap.cs`
   - Own `SilkConfig` (`%AppData%\eft-dma-radar-silk\config.json`)
-  - `RadarWindow` draws from `IReadOnlyCollection<PlayerBase>` via silk `Memory` only
+  - `RadarWindow` draws via `Player.Draw()` — rendering logic lives on the player, not the window
   - `WPF ProjectReference` still present in `.csproj` — referenced only for shared SDK types
-    (`Offsets`, `EftDataManager`, etc.) that have not yet been ported; no WPF runtime types used
+    (`Offsets`, `EftDataManager`, `SKPaints`) that have not yet been ported; no WPF runtime types used
 - **WPF project** (`src`): unchanged, still fully functional in parallel
 
 ## Architecture Goals
@@ -87,6 +94,37 @@ on the WPF project's `Memory.cs`, `Player.cs`, or `LocalGameWorld.cs`.
 - [x] **`PlayerBase`** — `Name`, `Type` (`PlayerType` enum), `Position` (Vector3), `RotationYaw` (float), `GroupID`, `SpawnGroupID`, `IsAlive`, `IsActive`, `IsLocalPlayer`, `IsHuman`, `IsHostile`
 - [x] **`GameSession`** — `MapID`, `InRaid`, `Players` (IReadOnlyCollection), `LocalPlayer`, `Create()` factory (scans GOM for GameWorld), `Start()` (starts refresh thread), `Dispose()`
 
+### 1C′. Structural Restructuring (WPF-mirrored hierarchy) ✅
+> Reorganized flat file layout to mirror WPF's well-organized folder hierarchy.
+
+**Player hierarchy** (mirrors `src/Tarkov/GameWorld/Player/`):
+- [x] `PlayerBase` → `Player` base class in `Tarkov/GameWorld/Player/Player.cs`
+  - `virtual bool IsLocalPlayer => false` (replaces `init` property)
+  - `internal virtual void Draw(SKCanvas, MapParams, MapConfig)` — rendering logic moved from RadarWindow
+  - `int DrawPriority` property — replaces static `DrawPriority()` method in RadarWindow
+  - `protected virtual GetPaints()` — returns dot/text paints by PlayerType
+- [x] `LocalPlayer : Player` sealed subclass in `Tarkov/GameWorld/Player/LocalPlayer.cs`
+  - `override bool IsLocalPlayer => true`
+  - `override GetPaints()` returns LocalPlayer-specific paints
+
+**Game world** (mirrors `src/Tarkov/GameWorld/`):
+- [x] `GameSession` split into:
+  - `LocalGameWorld` in `Tarkov/GameWorld/LocalGameWorld.cs` — raid lifecycle, factory, worker thread
+  - `RegisteredPlayers` in `Tarkov/GameWorld/RegisteredPlayers.cs` — player collection, refresh, transform reads
+- [x] `RegisteredPlayers : IReadOnlyCollection<Player>` — owns PlayerEntry, TrsX, all offset constants
+
+**Map system** (mirrors `src/UI/Radar/Maps/`):
+- [x] `UI/Map/*.cs` → `UI/Radar/Maps/*.cs` with namespace `eft_dma_radar.Silk.UI.Radar.Maps`
+- [x] `IRadarMap` interface — mirrors WPF `IXMMap` (ID, Config, Draw, GetParameters)
+- [x] `IMapEntity` interface — `Draw(SKCanvas, MapParams, MapConfig)`
+- [x] `RadarMap` now implements `IRadarMap`
+
+**Consumer updates**:
+- [x] `Memory.cs` — `GameSession` → `LocalGameWorld`, `PlayerBase` → `Player`
+- [x] `RadarWindow.cs` — removed `DrawPlayer()`, `GetPlayerPaints()`, `DrawPriority()`; uses `player.Draw()`
+- [x] `PlayerInfoWidget.cs` — `PlayerBase` → `Player`
+- [x] `GlobalUsings.cs` / `Program.cs` — updated namespace imports
+
 ### 1D. Update `SilkProgram` (entry point) ✅
 - [x] WPF `ProjectReference` kept for now (types still needed by RadarWindow draw code)
 - [x] `SilkConfig` — own JSON config: `DeviceStr`, `MemMapEnabled`, `UIScale`, `TargetFps`, `MemWritesEnabled`
@@ -96,18 +134,18 @@ on the WPF project's `Memory.cs`, `Player.cs`, or `LocalGameWorld.cs`.
 
 ### 1E. Update `RadarWindow` to use new types ✅
 - [x] Replace `Memory.Players` (was `IReadOnlyCollection<Player>`) with `Memory.Players`
-  (now `IReadOnlyCollection<PlayerBase>`)
-- [x] Replace `Memory.LocalPlayer` (was WPF's `LocalPlayer`) with `PlayerBase`
-- [x] Radar drawing: player dot + directional arrow from position + rotation (`DrawPlayer()`)
+  (now `IReadOnlyCollection<Player>` via silk `Player` type)
+- [x] Replace `Memory.LocalPlayer` (was WPF's `LocalPlayer`) with silk `Player`
+- [x] Radar drawing: `player.Draw(canvas, mapParams, mapConfig)` — rendering logic on the entity, not the window
 - [x] Removed all WPF-only properties: `FilteredLoot`, `Containers`, `Explosives`, `Exits`, `QuestManager`
 - [x] Status bar shows: `MemoryState`, `MapID`, player count, FPS
 - [x] `SettingsPanel` rewired to `SilkConfig` (removed WpfConfig); Loot tab removed (Phase 3)
-- [x] `PlayerInfoWidget` rewired to silk `Memory.Players` / `PlayerBase`
+- [x] `PlayerInfoWidget` rewired to silk `Memory.Players` / `Player`
 - [x] `SilkConfig` extended: `WindowWidth/Height`, `WindowMaximized`, `BattleMode`, `PlayersOnTop`, `ConnectGroups`
-- [x] `DrawSkiaScene` conditions on silk `Memory.InRaid` + `PlayerBase` local player
-- [x] `DrawGroupConnectors` works on `List<PlayerBase>`
+- [x] `DrawSkiaScene` conditions on silk `Memory.InRaid` + `Player` local player
+- [x] `DrawGroupConnectors` works on `List<Player>`
 - [x] `UISharedState` dependency removed; `MouseoverGroup` is a plain backing field
-- [x] Mouseover hit-testing uses silk player positions projected through `XMMapParams`
+- [x] Mouseover hit-testing uses silk player positions projected through `MapParams`
 
 ### 1F. Graceful Error Handling & Restart ✅
 - [x] `Memory` catches all exceptions in the worker loop, logs them, resets state, retries
@@ -151,7 +189,7 @@ on the WPF project's `Memory.cs`, `Player.cs`, or `LocalGameWorld.cs`.
 | EftDataManager (item database) | Phase 3 |
 | FeatureManager (chams, memory writes) | Phase 5+ |
 | Config system (multi-profile, IConfig) | Phase 2 |
-| XMMapManager (map asset loading) | Phase 2 |
+| Own SKPaints (remove WPF project ref) | Phase 2 |
 | ResourceJanitor (GC pressure mgmt) | Phase 4+ |
 | HideoutManager | Phase 6+ |
 | InputManager (DMA-based input) | Phase 5 |

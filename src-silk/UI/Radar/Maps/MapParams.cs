@@ -1,5 +1,5 @@
 #nullable enable
-namespace eft_dma_radar.Silk.UI.Map
+namespace eft_dma_radar.Silk.UI.Radar.Maps
 {
     /// <summary>
     /// Precomputed coordinate parameters for drawing the map on screen.
