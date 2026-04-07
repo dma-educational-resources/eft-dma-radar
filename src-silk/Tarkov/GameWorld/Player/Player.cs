@@ -1,19 +1,145 @@
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 {
     /// <summary>
-    /// Minimal player representation for Phase 1.
-    /// Contains only what's needed to render a dot + direction arrow on the radar.
+    /// Player representation for radar rendering.
+    /// Renders as a filled circle with a directional chevron tick.
     /// </summary>
     public class Player
     {
+        #region Marker Geometry
+
+        // Core dot — small filled circle
+        private const float DotRadius = 5f;
+
+        // Directional chevron extending from the dot
+        private static readonly SKPath _chevron = CreateChevron();
+        private static readonly SKPath _deathMarker = CreateDeathMarker();
+
+        /// <summary>
+        /// Small forward-pointing chevron (arrow tick).
+        /// Points right (+X), rotated by MapRotation via canvas transform.
+        /// </summary>
+        private static SKPath CreateChevron()
+        {
+            var path = new SKPath();
+            float tipX = DotRadius + 6f;
+            float baseX = DotRadius + 0.5f;
+            float wingY = 3.2f;
+
+            path.MoveTo(baseX, -wingY);
+            path.LineTo(tipX, 0f);
+            path.LineTo(baseX, wingY);
+            return path;
+        }
+
+        private static SKPath CreateDeathMarker()
+        {
+            const float s = 4f;
+            var path = new SKPath();
+            path.MoveTo(-s, -s);
+            path.LineTo(s, s);
+            path.MoveTo(-s, s);
+            path.LineTo(s, -s);
+            return path;
+        }
+
+        // Chevron stroke paints
+        private static readonly SKPaint _chevronOutline = new()
+        {
+            Color = new SKColor(0, 0, 0, 160),
+            StrokeWidth = 3.2f,
+            Style = SKPaintStyle.Stroke,
+            StrokeCap = SKStrokeCap.Round,
+            StrokeJoin = SKStrokeJoin.Round,
+            IsAntialias = true,
+        };
+
+        // Reused on render thread — Color is set per-draw in DrawMarker()
+        private static readonly SKPaint _chevronStroke = new()
+        {
+            StrokeWidth = 1.8f,
+            Style = SKPaintStyle.Stroke,
+            StrokeCap = SKStrokeCap.Round,
+            StrokeJoin = SKStrokeJoin.Round,
+            IsAntialias = true,
+        };
+
+        // Small font for the compact H/D info line
+        private static readonly SKFont _infoFont = new(CustomFonts.Regular, 9.5f) { Subpixel = true };
+
+        private static readonly SKPaint _infoPaint = new()
+        {
+            Color = new SKColor(200, 200, 200, 190),
+            IsStroke = false,
+            IsAntialias = true,
+        };
+
+        private static readonly SKPaint _infoOutline = new()
+        {
+            Color = new SKColor(0, 0, 0, 160),
+            IsStroke = true,
+            StrokeWidth = 1.2f,
+            StrokeJoin = SKStrokeJoin.Round,
+            IsAntialias = true,
+        };
+
+        #endregion
+
         public string Name { get; set; } = string.Empty;
-        public PlayerType Type { get; set; }
+
+        private PlayerType _type;
+        public PlayerType Type
+        {
+            get => _type;
+            set
+            {
+                _type = value;
+                DrawPriority = value switch
+                {
+                    PlayerType.SpecialPlayer => 7,
+                    PlayerType.USEC or PlayerType.BEAR => 5,
+                    PlayerType.PScav => 4,
+                    PlayerType.AIBoss => 3,
+                    PlayerType.AIRaider => 2,
+                    _ => 1
+                };
+            }
+        }
+
         public Vector3 Position { get; set; }
-        public float RotationYaw { get; set; }
+
+        /// <summary>
+        /// True after the first successful position read from DMA.
+        /// Players with HasValidPosition=false are not rendered on the radar.
+        /// </summary>
+        public bool HasValidPosition { get; set; }
+
+        private float _rotationYaw;
+        /// <summary>
+        /// Player yaw in degrees [0..360].
+        /// Setting this also pre-computes <see cref="MapRotation"/>.
+        /// </summary>
+        public float RotationYaw
+        {
+            get => _rotationYaw;
+            set
+            {
+                _rotationYaw = value;
+                float mapRot = value - 90f;
+                MapRotation = ((mapRot % 360f) + 360f) % 360f;
+            }
+        }
+
+        /// <summary>
+        /// Pre-computed map rotation (yaw - 90°, normalized).
+        /// </summary>
+        public float MapRotation { get; private set; }
+
         public int GroupID { get; set; }
         public int SpawnGroupID { get; set; }
         public bool IsAlive { get; set; } = true;
         public bool IsActive { get; set; } = true;
+        public bool IsError { get; set; }
         public virtual bool IsLocalPlayer => false;
 
         public bool IsHuman => Type is PlayerType.Default or PlayerType.Teammate
@@ -24,42 +150,97 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 
         /// <summary>
         /// Draw priority for Z-ordering on the radar. Higher = drawn later (on top).
+        /// Cached on <see cref="Type"/> assignment to avoid per-sort switch overhead.
         /// </summary>
-        public int DrawPriority => Type switch
-        {
-            PlayerType.SpecialPlayer => 7,
-            PlayerType.USEC or PlayerType.BEAR => 5,
-            PlayerType.PScav => 4,
-            PlayerType.AIBoss => 3,
-            PlayerType.AIRaider => 2,
-            _ => 1
-        };
+        public int DrawPriority { get; private set; } = 1;
 
         /// <summary>
         /// Draws this player on the radar canvas.
         /// </summary>
-        internal virtual void Draw(SKCanvas canvas, MapParams mapParams, MapConfig mapConfig)
+        internal virtual void Draw(SKCanvas canvas, MapParams mapParams, MapConfig mapConfig, Player? localPlayer = null)
         {
             var pos = mapParams.ToScreenPos(MapParams.ToMapPos(Position, mapConfig));
 
-            var (dotPaint, textPaint) = GetPaints();
+            if (!IsAlive)
+            {
+                DrawDeathMarker(canvas, pos);
+                return;
+            }
 
-            const float dotRadius = 5f;
-            canvas.DrawCircle(pos.X, pos.Y, dotRadius, dotPaint);
+            var (fillPaint, textPaint) = GetPaints();
 
-            // Directional arrow — rotate by yaw
-            float yawRad = MathF.PI * RotationYaw / 180f;
-            float arrowLen = 10f;
-            var tip = new SKPoint(
-                pos.X + arrowLen * MathF.Sin(yawRad),
-                pos.Y - arrowLen * MathF.Cos(yawRad));
-            canvas.DrawLine(pos, tip, dotPaint);
+            DrawMarker(canvas, pos, fillPaint);
 
-            // Name label (skip for local player)
             if (!IsLocalPlayer)
             {
-                canvas.DrawText(Name, pos.X + 7f, pos.Y + 4f, SKTextAlign.Left,
-                    SKPaints.FontRegular12, textPaint);
+                string name = IsError ? "ERROR" : Name;
+
+                if (localPlayer is not null)
+                {
+                    float height = Position.Y - localPlayer.Position.Y;
+                    float dist = Vector3.Distance(localPlayer.Position, Position);
+                    DrawLabel(canvas, pos, textPaint, name, height, dist);
+                }
+                else
+                {
+                    DrawLabel(canvas, pos, textPaint, name, null, null);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Draws a filled circle + directional chevron tick.
+        /// </summary>
+        private void DrawMarker(SKCanvas canvas, SKPoint point, SKPaint fillPaint)
+        {
+            canvas.Save();
+            canvas.Translate(point.X, point.Y);
+
+            // Filled dot with thin dark border
+            canvas.DrawCircle(0, 0, DotRadius, SKPaints.ShapeBorder);
+            canvas.DrawCircle(0, 0, DotRadius - 0.6f, fillPaint);
+
+            // Directional chevron — rotated to face direction
+            canvas.RotateDegrees(MapRotation);
+            canvas.DrawPath(_chevron, _chevronOutline);
+            _chevronStroke.Color = fillPaint.Color;
+            canvas.DrawPath(_chevron, _chevronStroke);
+
+            canvas.Restore();
+        }
+
+        /// <summary>
+        /// Draws a small X for dead players.
+        /// </summary>
+        private static void DrawDeathMarker(SKCanvas canvas, SKPoint point)
+        {
+            canvas.Save();
+            canvas.Translate(point.X, point.Y);
+            canvas.DrawPath(_deathMarker, SKPaints.PaintDeathMarker);
+            canvas.Restore();
+        }
+
+        /// <summary>
+        /// Draws the player name + optional compact H/D info line.
+        /// </summary>
+        private static void DrawLabel(SKCanvas canvas, SKPoint point, SKPaint textPaint, string name, float? height, float? dist)
+        {
+            float x = point.X + DotRadius + 4f;
+            float y = point.Y + 3.5f;
+
+            // Name
+            canvas.DrawText(name, x, y, SKTextAlign.Left, SKPaints.FontMedium11, SKPaints.TextOutline);
+            canvas.DrawText(name, x, y, SKTextAlign.Left, SKPaints.FontMedium11, textPaint);
+
+            // Compact H/D on second line in a smaller, dimmer font
+            if (height.HasValue && dist.HasValue)
+            {
+                float y2 = y + 11f;
+                int h = (int)height.Value;
+                int d = (int)dist.Value;
+                string info = string.Create(null, stackalloc char[32], $"{h:+0;-0}m  {d:N0}m");
+                canvas.DrawText(info, x, y2, SKTextAlign.Left, _infoFont, _infoOutline);
+                canvas.DrawText(info, x, y2, SKTextAlign.Left, _infoFont, _infoPaint);
             }
         }
 

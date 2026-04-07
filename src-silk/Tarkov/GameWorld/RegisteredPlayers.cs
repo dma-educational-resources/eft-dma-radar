@@ -33,6 +33,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         // Spawn-group proximity threshold (squared distance, meters²)
         private const float SpawnGroupDistanceSqr = 25f; // 5m radius
 
+        // Number of consecutive realtime failures before entering error state
+        private const int ErrorThreshold = 3;
+
+        // Maximum transform/rotation init retries before giving up (exponential backoff)
+        private const int MaxInitRetries = 10;
+
         #endregion
 
         #region Fields
@@ -41,6 +47,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private readonly string _mapId;
         private readonly ConcurrentDictionary<ulong, PlayerEntry> _players = new();
         private HashSet<ulong> _seenSet = new(MaxPlayerCount);
+
+        // Reusable list for active entries — avoids per-tick allocation on the 8ms realtime path
+        private readonly List<PlayerEntry> _activeEntries = new(MaxPlayerCount);
+
+        // Reusable list for ValidateTransforms — avoids LINQ/ToArray allocation
+        private readonly List<PlayerEntry> _validateEntries = new(MaxPlayerCount);
+
+        // Backoff for repeated invalid player counts (e.g., after raid ends)
+        private int _invalidCountStreak;
 
         // Spawn-group tracking (position-proximity-based)
         private readonly List<SpawnGroupEntry> _spawnGroups = [];
@@ -51,6 +66,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         #region Properties
 
         public Player.Player? LocalPlayer { get; private set; }
+        public ulong LocalPlayerAddr { get; private set; }
         public int Count => _players.Count;
 
         #endregion
@@ -68,20 +84,31 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             public readonly bool IsObserved;
 
             // Cached transform state (populated once, re-validated periodically)
+            // Written by registration thread, read by realtime thread — volatile ensures cross-core visibility.
+            // The volatile write on TransformReady/RotationReady acts as a release fence, guaranteeing
+            // that all preceding data writes (TransformInternal, VerticesAddr, etc.) are visible
+            // to the realtime thread that reads the volatile flag as an acquire fence.
             public ulong TransformInternal;
             public ulong VerticesAddr;
             public int TransformIndex;
-            public bool TransformReady;
+            public volatile bool TransformReady;
 
             // Indices never change for the life of the transform — cache once
             public int[]? CachedIndices;
 
             // Cached rotation address
             public ulong RotationAddr;
-            public bool RotationReady;
+            public volatile bool RotationReady;
 
-            // Error tracking for realtime loop
+            // Error tracking for realtime loop — debounce transient failures
+            public int ConsecutiveErrors;
             public bool HasError;
+
+            // Transform init retry tracking — exponential backoff for persistent failures
+            public int TransformInitFailures;
+            public DateTime NextTransformRetry;
+            public int RotationInitFailures;
+            public DateTime NextRotationRetry;
 
             public PlayerEntry(ulong playerBase, Player.Player player, bool isObserved)
             {
@@ -120,10 +147,23 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         #region IReadOnlyCollection
 
         public IEnumerator<Player.Player> GetEnumerator() =>
-            _players.Values.Select(static e => e.Player).GetEnumerator();
+            new PlayerEnumerator(_players.GetEnumerator());
 
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() =>
             GetEnumerator();
+
+        /// <summary>
+        /// Projecting enumerator: wraps ConcurrentDictionary's enumerator and projects
+        /// KeyValuePair → Player. Avoids the extra LINQ Select iterator allocation.
+        /// </summary>
+        private struct PlayerEnumerator(IEnumerator<KeyValuePair<ulong, PlayerEntry>> inner) : IEnumerator<Player.Player>
+        {
+            public Player.Player Current => inner.Current.Value.Player;
+            object System.Collections.IEnumerator.Current => Current;
+            public bool MoveNext() => inner.MoveNext();
+            public void Reset() => inner.Reset();
+            public void Dispose() => inner.Dispose();
+        }
 
         #endregion
 
@@ -160,6 +200,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     if (entry is not null)
                     {
                         LocalPlayer = entry.Player;
+                        LocalPlayerAddr = mainPlayerPtr;
                         _players[mainPlayerPtr] = entry;
                         Log.WriteLine($"[RegisteredPlayers] LocalPlayer found: {entry.Player.Name} (class='{className ?? "<null>"}')");
                         return;
@@ -200,7 +241,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             }
 
             if (count < 1 || count > MaxPlayerCount)
+            {
+                _invalidCountStreak++;
+                Log.WriteRateLimited(AppLogLevel.Warning, "rp_count", TimeSpan.FromSeconds(10),
+                    $"[RegisteredPlayers] Invalid player count: {count} (addr=0x{rgtPlayersAddr:X}), streak={_invalidCountStreak}");
+
+                // Exponential backoff: sleep longer when we keep getting invalid counts (e.g., after raid ends)
+                if (_invalidCountStreak > 3)
+                {
+                    int backoffMs = Math.Min(1000 * _invalidCountStreak, 10_000);
+                    Thread.Sleep(backoffMs);
+                }
                 return;
+            }
+
+            _invalidCountStreak = 0;
 
             ulong[] ptrs;
             try
@@ -219,11 +274,18 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             seen.Clear();
             seen.EnsureCapacity(count);
 
+            int invalidPtrs = 0;
+            int newDiscovered = 0;
+            int newFailed = 0;
+
             // Discover new players
             foreach (var ptr in ptrs)
             {
                 if (!ptr.IsValidVirtualAddress())
+                {
+                    invalidPtrs++;
                     continue;
+                }
 
                 seen.Add(ptr);
 
@@ -232,7 +294,20 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                 var entry = CreatePlayerEntry(ptr, isLocal: false);
                 if (entry is not null)
+                {
                     _players.TryAdd(ptr, entry);
+                    newDiscovered++;
+                }
+                else
+                {
+                    newFailed++;
+                }
+            }
+
+            if (newDiscovered > 0 || newFailed > 0 || invalidPtrs > 0)
+            {
+                Log.WriteLine($"[RegisteredPlayers] Refresh: list={count}, valid={seen.Count}, invalidPtrs={invalidPtrs}, " +
+                    $"new={newDiscovered}, failed={newFailed}, total={_players.Count}");
             }
 
             // Update existing players — mark active/inactive based on registration
@@ -250,18 +325,29 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             using var scatter = Memory.GetScatter(VmmFlags.NOCACHE);
 
-            // Prepare all reads
+            // Collect active entries and prepare scatter reads (no delegates, no allocation)
+            _activeEntries.Clear();
             foreach (var kvp in _players)
             {
                 var entry = kvp.Value;
                 if (!entry.Player.IsActive)
                     continue;
 
-                OnRealtimeLoop(scatter, entry);
+                _activeEntries.Add(entry);
+                PrepareScatterReads(scatter, entry);
             }
 
-            // Execute single DMA round-trip — fires all Completed callbacks
+            if (_activeEntries.Count == 0)
+                return;
+
+            // Execute single DMA round-trip
             scatter.Execute();
+
+            // Process results inline — no delegate allocation
+            foreach (var entry in _activeEntries)
+            {
+                ProcessScatterResults(scatter, entry);
+            }
         }
 
         #endregion
@@ -286,11 +372,49 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     entry.Player.IsActive = true;
                     entry.Player.IsAlive = true;
 
-                    // Re-init transform/rotation if they were invalidated
-                    if (!entry.TransformReady)
+                    var now = DateTime.UtcNow;
+
+                    // Re-init transform if invalidated (with exponential backoff)
+                    if (!entry.TransformReady && entry.TransformInitFailures < MaxInitRetries && now >= entry.NextTransformRetry)
+                    {
                         TryInitTransform(entry.Base, entry);
-                    if (!entry.RotationReady)
+                        if (!entry.TransformReady)
+                        {
+                            entry.TransformInitFailures++;
+                            int backoffSec = Math.Min(1 << entry.TransformInitFailures, 30); // 2s, 4s, 8s, … 30s
+                            entry.NextTransformRetry = now.AddSeconds(backoffSec);
+                            Log.WriteRateLimited(AppLogLevel.Warning,
+                                $"reinit_tfm_{kvp.Key:X}", TimeSpan.FromSeconds(5),
+                                $"[RegisteredPlayers] Transform init failed for '{entry.Player.Name}' (attempt {entry.TransformInitFailures}/{MaxInitRetries}, next retry in {backoffSec}s)");
+                        }
+                        else
+                        {
+                            if (entry.TransformInitFailures > 0)
+                                Log.WriteLine($"[RegisteredPlayers] Transform re-init succeeded for '{entry.Player.Name}' after {entry.TransformInitFailures} failures");
+                            entry.TransformInitFailures = 0;
+                        }
+                    }
+
+                    // Re-init rotation if invalidated (with exponential backoff)
+                    if (!entry.RotationReady && entry.RotationInitFailures < MaxInitRetries && now >= entry.NextRotationRetry)
+                    {
                         TryInitRotation(entry.Base, entry);
+                        if (!entry.RotationReady)
+                        {
+                            entry.RotationInitFailures++;
+                            int backoffSec = Math.Min(1 << entry.RotationInitFailures, 30);
+                            entry.NextRotationRetry = now.AddSeconds(backoffSec);
+                            Log.WriteRateLimited(AppLogLevel.Warning,
+                                $"reinit_rot_{kvp.Key:X}", TimeSpan.FromSeconds(5),
+                                $"[RegisteredPlayers] Rotation init failed for '{entry.Player.Name}' (attempt {entry.RotationInitFailures}/{MaxInitRetries}, next retry in {backoffSec}s)");
+                        }
+                        else
+                        {
+                            if (entry.RotationInitFailures > 0)
+                                Log.WriteLine($"[RegisteredPlayers] Rotation re-init succeeded for '{entry.Player.Name}' after {entry.RotationInitFailures} failures");
+                            entry.RotationInitFailures = 0;
+                        }
+                    }
                 }
                 else
                 {
@@ -304,7 +428,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             if (toRemove is not null)
             {
                 foreach (var key in toRemove)
-                    _players.TryRemove(key, out _);
+                {
+                    if (_players.TryRemove(key, out var removed))
+                        Log.WriteLine($"[RegisteredPlayers] Removed '{removed.Player.Name}' ({removed.Player.Type}) @ 0x{key:X} — no longer registered");
+                }
             }
         }
 
@@ -314,59 +441,110 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>
         /// Prepares scatter reads for a single player's position + rotation.
-        /// Results are processed via the <see cref="VmmScatter.Completed"/> event callback.
+        /// No delegates or callbacks — results are read inline after Execute().
         /// </summary>
-        private static void OnRealtimeLoop(VmmScatter scatter, PlayerEntry entry)
+        private static void PrepareScatterReads(VmmScatter scatter, PlayerEntry entry)
         {
-            // Prepare rotation read
             if (entry.RotationReady)
-            {
                 scatter.PrepareReadValue<Vector2>(entry.RotationAddr);
-            }
 
-            // Prepare position read (vertices array for hierarchy walk)
             if (entry.TransformReady)
             {
                 int vertexCount = entry.TransformIndex + 1;
                 scatter.PrepareReadArray<TrsX>(entry.VerticesAddr, vertexCount);
             }
+        }
 
-            // Register callback — fires after scatter.Execute()
-            scatter.Completed += (_, s) =>
+        /// <summary>
+        /// Processes scatter results for a single player after Execute().
+        /// Uses consecutive error counting to debounce transient failures.
+        /// </summary>
+        private static void ProcessScatterResults(VmmScatter scatter, PlayerEntry entry)
+        {
+            bool rotOk = true;
+            bool posOk = true;
+
+            // --- Rotation ---
+            if (entry.RotationReady)
             {
-                bool rotOk = true;
-                bool posOk = true;
-
-                // --- Rotation ---
-                if (entry.RotationReady)
+                if (scatter.ReadValue<Vector2>(entry.RotationAddr, out var rot))
                 {
-                    if (s.ReadValue<Vector2>(entry.RotationAddr, out var rot))
+                    rotOk = SetRotation(entry, rot);
+                    if (!rotOk)
                     {
-                        rotOk = SetRotation(entry, rot);
-                    }
-                    else
-                    {
-                        rotOk = false;
+                        Log.WriteRateLimited(AppLogLevel.Warning,
+                            $"rot_bad_{entry.Base:X}", TimeSpan.FromSeconds(3),
+                            $"[RegisteredPlayers] Bad rotation for '{entry.Player.Name}': X={rot.X:F2} Y={rot.Y:F2} (addr=0x{entry.RotationAddr:X})");
                     }
                 }
-
-                // --- Position ---
-                if (entry.TransformReady)
+                else
                 {
-                    int vertexCount = entry.TransformIndex + 1;
-                    var vertices = s.ReadArray<TrsX>(entry.VerticesAddr, vertexCount);
-                    if (vertices is not null)
+                    rotOk = false;
+                    Log.WriteRateLimited(AppLogLevel.Warning,
+                        $"rot_read_{entry.Base:X}", TimeSpan.FromSeconds(5),
+                        $"[RegisteredPlayers] Rotation scatter read failed for '{entry.Player.Name}' (addr=0x{entry.RotationAddr:X})");
+                }
+            }
+            else
+            {
+                Log.WriteRateLimited(AppLogLevel.Debug,
+                    $"rot_notready_{entry.Base:X}", TimeSpan.FromSeconds(10),
+                    $"[RegisteredPlayers] Rotation not ready for '{entry.Player.Name}' — skipping");
+            }
+
+            // --- Position ---
+            if (entry.TransformReady)
+            {
+                int vertexCount = entry.TransformIndex + 1;
+                var vertices = scatter.ReadArray<TrsX>(entry.VerticesAddr, vertexCount);
+                if (vertices is not null)
+                {
+                    posOk = ComputeAndSetPosition(entry, vertices);
+                    if (!posOk)
                     {
-                        posOk = ComputeAndSetPosition(entry, vertices);
-                    }
-                    else
-                    {
-                        posOk = false;
+                        Log.WriteRateLimited(AppLogLevel.Warning,
+                            $"pos_bad_{entry.Base:X}", TimeSpan.FromSeconds(3),
+                            $"[RegisteredPlayers] Position compute failed for '{entry.Player.Name}' (idx={entry.TransformIndex}, verts=0x{entry.VerticesAddr:X})");
                     }
                 }
+                else
+                {
+                    posOk = false;
+                    Log.WriteRateLimited(AppLogLevel.Warning,
+                        $"pos_read_{entry.Base:X}", TimeSpan.FromSeconds(5),
+                        $"[RegisteredPlayers] Position scatter read failed for '{entry.Player.Name}' (verts=0x{entry.VerticesAddr:X}, count={vertexCount})");
+                }
+            }
+            else
+            {
+                posOk = false;
+                Log.WriteRateLimited(AppLogLevel.Debug,
+                    $"pos_notready_{entry.Base:X}", TimeSpan.FromSeconds(10),
+                    $"[RegisteredPlayers] Transform not ready for '{entry.Player.Name}' — skipping");
+            }
 
-                entry.HasError = !rotOk || !posOk;
-            };
+            // --- Error state with debounce ---
+            bool tickFailed = !rotOk || !posOk;
+            if (tickFailed)
+            {
+                entry.ConsecutiveErrors++;
+                if (entry.ConsecutiveErrors >= ErrorThreshold && !entry.HasError)
+                {
+                    entry.HasError = true;
+                    entry.Player.IsError = true;
+                    Log.WriteLine($"[RegisteredPlayers] Player '{entry.Player.Name}' entered error state after {entry.ConsecutiveErrors} consecutive failures (rot={rotOk}, pos={posOk})");
+                }
+            }
+            else
+            {
+                if (entry.HasError)
+                {
+                    Log.WriteLine($"[RegisteredPlayers] Player '{entry.Player.Name}' recovered from error state");
+                }
+                entry.ConsecutiveErrors = 0;
+                entry.HasError = false;
+                entry.Player.IsError = false;
+            }
         }
 
         /// <summary>
@@ -377,10 +555,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             if (!float.IsFinite(rotation.X) || !float.IsFinite(rotation.Y))
                 return false;
 
+            // Normalize accumulated yaw to [0, 360)
             float x = rotation.X % 360f;
             if (x < 0f) x += 360f;
-            if (x > 360f || MathF.Abs(rotation.Y) > 90f)
-                return false;
 
             entry.Player.RotationYaw = x;
             return true;
@@ -414,13 +591,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 if (float.IsFinite(worldPos.X) && float.IsFinite(worldPos.Y) && float.IsFinite(worldPos.Z))
                 {
                     entry.Player.Position = worldPos;
+                    entry.Player.HasValidPosition = true;
                     return true;
                 }
 
                 return false;
             }
+            catch (IndexOutOfRangeException)
+            {
+                // Transient: DMA returned garbage vertices but the transform cache is likely still valid.
+                // The error counter in ProcessScatterResults will handle repeated failures.
+                return false;
+            }
             catch
             {
+                // Structural failure (e.g., null CachedIndices) — invalidate transform cache.
                 entry.TransformReady = false;
                 return false;
             }
@@ -438,39 +623,60 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// </summary>
         internal void ValidateTransforms()
         {
-            var activePlayers = _players.Values.Where(e => e.Player.IsActive && e.TransformReady).ToArray();
-            if (activePlayers.Length == 0)
-                return;
-
-            using var round1 = Memory.GetScatter(VmmFlags.NOCACHE);
-            using var round2 = Memory.GetScatter(VmmFlags.NOCACHE);
-
-            foreach (var entry in activePlayers)
+            // Collect active+transform-ready entries without LINQ allocation
+            _validateEntries.Clear();
+            foreach (var kvp in _players)
             {
-                round1.PrepareReadPtr(entry.TransformInternal + TransformAccess.HierarchyOffset);
-                round1.Completed += (_, r1) =>
-                {
-                    if (!r1.ReadPtr(entry.TransformInternal + TransformAccess.HierarchyOffset, out var hierarchy))
-                        return;
-
-                    round2.PrepareReadPtr(hierarchy + TransformHierarchy.VerticesOffset);
-                    round2.Completed += (_, r2) =>
-                    {
-                        if (!r2.ReadPtr(hierarchy + TransformHierarchy.VerticesOffset, out var verticesPtr))
-                            return;
-
-                        if ((ulong)verticesPtr != entry.VerticesAddr)
-                        {
-                            Log.WriteLine($"[RegisteredPlayers] Transform changed for '{entry.Player.Name}' — re-initializing");
-                            entry.TransformReady = false;
-                            TryInitTransform(entry.Base, entry);
-                        }
-                    };
-                };
+                var entry = kvp.Value;
+                if (entry.Player.IsActive && entry.TransformReady)
+                    _validateEntries.Add(entry);
             }
 
+            if (_validateEntries.Count == 0)
+                return;
+
+            // Round 1: read Hierarchy ptr for each entry — inline, no delegate closures
+            using var round1 = Memory.GetScatter(VmmFlags.NOCACHE);
+            foreach (var entry in _validateEntries)
+                round1.PrepareReadValue<ulong>(entry.TransformInternal + TransformAccess.HierarchyOffset);
             round1.Execute();
+
+            // Collect hierarchy results and prepare round 2
+            using var round2 = Memory.GetScatter(VmmFlags.NOCACHE);
+            Span<ulong> hierarchies = _validateEntries.Count <= 256
+                ? stackalloc ulong[_validateEntries.Count]
+                : new ulong[_validateEntries.Count];
+
+            for (int i = 0; i < _validateEntries.Count; i++)
+            {
+                var entry = _validateEntries[i];
+                if (round1.ReadValue<ulong>(entry.TransformInternal + TransformAccess.HierarchyOffset, out var hierarchy)
+                    && hierarchy.IsValidVirtualAddress())
+                {
+                    hierarchies[i] = hierarchy;
+                    round2.PrepareReadValue<ulong>(hierarchy + TransformHierarchy.VerticesOffset);
+                }
+            }
             round2.Execute();
+
+            // Process round 2 results — compare vertices with cached value
+            for (int i = 0; i < _validateEntries.Count; i++)
+            {
+                var hierarchy = hierarchies[i];
+                if (hierarchy == 0)
+                    continue;
+
+                var entry = _validateEntries[i];
+                if (round2.ReadValue<ulong>(hierarchy + TransformHierarchy.VerticesOffset, out var verticesPtr)
+                    && verticesPtr != entry.VerticesAddr)
+                {
+                    Log.WriteLine($"[RegisteredPlayers] Transform changed for '{entry.Player.Name}' — re-initializing");
+                    entry.TransformReady = false;
+                    entry.TransformInitFailures = 0;
+                    entry.NextTransformRetry = default;
+                    TryInitTransform(entry.Base, entry);
+                }
+            }
         }
 
         #endregion
@@ -488,6 +694,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             {
                 var className = ReadClassName(playerBase);
                 bool isObserved = !isLocal && className is not (null or "ClientPlayer" or "LocalPlayer");
+
+                Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] CreatePlayerEntry 0x{playerBase:X} isLocal={isLocal} class='{className ?? "<null>"}' isObserved={isObserved}");
 
                 string name;
                 int sideRaw;
@@ -509,6 +717,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                             var role = GetInitialAIRole(voice);
                             name = role.Name;
                             type = role.Type;
+                            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers]   AI scav: voice='{voice ?? "<null>"}' → {role.Name} ({role.Type})");
                         }
                         else
                         {
@@ -516,6 +725,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                             var id = Memory.ReadValue<int>(playerBase + Offsets.ObservedPlayerView.Id, false);
                             name = $"PScav{id}";
                             type = PlayerType.PScav;
+                            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers]   Player scav: id={id}");
                         }
                     }
                     else
@@ -525,6 +735,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         var side = sideRaw == 1 ? "Usec" : "Bear";
                         name = $"{side}{id}";
                         type = sideRaw == 1 ? PlayerType.USEC : PlayerType.BEAR;
+                        Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers]   PMC: side={sideRaw} ({side}), id={id}");
                     }
                 }
                 else
@@ -536,10 +747,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     name = Memory.ReadUnityString(nicknamePtr, 64, false);
                     sideRaw = Memory.ReadValue<int>(infoPtr + Offsets.PlayerInfo.Side, false);
                     type = isLocal ? PlayerType.Default : ResolveClientPlayerType(sideRaw);
+                    Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers]   Client player: name='{name}' side={sideRaw} type={type}");
                 }
 
                 if (string.IsNullOrWhiteSpace(name))
+                {
+                    Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] Rejected player 0x{playerBase:X}: empty name (class='{className}', observed={isObserved})");
                     return null;
+                }
 
                 Player.Player player = isLocal
                     ? new LocalPlayer { Name = name, Type = type, IsAlive = true, IsActive = true }
@@ -555,13 +770,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 if (!isLocal && player.IsHuman && entry.TransformReady)
                     player.SpawnGroupID = GetOrAssignSpawnGroup(player.Position);
 
-                Log.WriteLine($"[RegisteredPlayers] Discovered player: {player} @ 0x{playerBase:X} (class='{className}')");
+                Log.WriteLine($"[RegisteredPlayers] Discovered: {player} @ 0x{playerBase:X} (class='{className}', observed={isObserved}, " +
+                    $"transformReady={entry.TransformReady}, rotationReady={entry.RotationReady}, pos={player.Position})");
 
                 return entry;
             }
             catch (Exception ex)
             {
-                Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] CreatePlayerEntry 0x{playerBase:X} isLocal={isLocal}: {ex.Message}");
+                Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] CreatePlayerEntry FAILED 0x{playerBase:X} isLocal={isLocal}: {ex.Message}");
                 return null;
             }
         }
@@ -591,17 +807,29 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 var taHierarchy = Memory.ReadPtr(transformInternal + TransformAccess.HierarchyOffset, false);
 
                 if (taIndex < 0 || taIndex > 128_000)
+                {
+                    Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitTransform '{entry.Player.Name}' 0x{playerBase:X}: bad taIndex={taIndex}");
                     return;
+                }
                 if (!taHierarchy.IsValidVirtualAddress())
+                {
+                    Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitTransform '{entry.Player.Name}' 0x{playerBase:X}: invalid hierarchy ptr 0x{taHierarchy:X}");
                     return;
+                }
 
                 var verticesAddr = Memory.ReadPtr(taHierarchy + TransformHierarchy.VerticesOffset, false);
                 var indicesAddr = Memory.ReadPtr(taHierarchy + TransformHierarchy.IndicesOffset, false);
 
                 if (!verticesAddr.IsValidVirtualAddress())
+                {
+                    Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitTransform '{entry.Player.Name}' 0x{playerBase:X}: invalid vertices ptr 0x{verticesAddr:X}");
                     return;
+                }
                 if (!indicesAddr.IsValidVirtualAddress())
+                {
+                    Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitTransform '{entry.Player.Name}' 0x{playerBase:X}: invalid indices ptr 0x{indicesAddr:X}");
                     return;
+                }
 
                 // Cache indices once — they never change for the life of the transform
                 int count = taIndex + 1;
@@ -612,10 +840,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 entry.VerticesAddr = verticesAddr;
                 entry.CachedIndices = indices;
                 entry.TransformReady = true;
+
+                Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitTransform OK '{entry.Player.Name}': " +
+                    $"transformInternal=0x{transformInternal:X}, idx={taIndex}, verts=0x{verticesAddr:X}");
             }
             catch (Exception ex)
             {
-                Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitTransform 0x{playerBase:X}: {ex.Message}");
+                Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitTransform FAILED '{entry.Player.Name}' 0x{playerBase:X}: {ex.Message}");
                 entry.TransformReady = false;
             }
         }
@@ -630,26 +861,30 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     var opc = Memory.ReadPtr(playerBase + Offsets.ObservedPlayerView.ObservedPlayerController, false);
                     var mc = Memory.ReadPtrChain(opc, Offsets.ObservedPlayerController.MovementController, false);
                     rotAddr = mc + GameSDK.Rotation.Observed;
+                    Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitRotation '{entry.Player.Name}': observed opc=0x{opc:X} mc=0x{mc:X} rotAddr=0x{rotAddr:X}");
                 }
                 else
                 {
                     var movCtx = Memory.ReadPtr(playerBase + Offsets.Player.MovementContext, false);
                     rotAddr = movCtx + GameSDK.Rotation.Client;
+                    Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitRotation '{entry.Player.Name}': client movCtx=0x{movCtx:X} rotAddr=0x{rotAddr:X}");
                 }
 
-                // Validate rotation is sane before caching
+                // Validate rotation is sane before caching (only reject non-finite; game yaw accumulates beyond ±360°)
                 var rot = Memory.ReadValue<Vector2>(rotAddr, false);
                 if (!float.IsFinite(rot.X) || !float.IsFinite(rot.Y))
+                {
+                    Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitRotation '{entry.Player.Name}': non-finite rotation X={rot.X} Y={rot.Y} (addr=0x{rotAddr:X})");
                     return;
-                if (MathF.Abs(rot.X) > 360f || MathF.Abs(rot.Y) > 90f)
-                    return;
+                }
 
                 entry.RotationAddr = rotAddr;
                 entry.RotationReady = true;
+                Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitRotation OK '{entry.Player.Name}': initial rot=({rot.X:F1}, {rot.Y:F1})");
             }
             catch (Exception ex)
             {
-                Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitRotation 0x{playerBase:X}: {ex.Message}");
+                Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitRotation FAILED '{entry.Player.Name}' 0x{playerBase:X}: {ex.Message}");
                 entry.RotationReady = false;
             }
         }

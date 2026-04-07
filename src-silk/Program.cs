@@ -11,7 +11,7 @@ using System.Runtime.Versioning;
 
 namespace eft_dma_radar.Silk
 {
-    internal static class SilkProgram
+    internal static partial class SilkProgram
     {
         internal const string Name = "EFT DMA Radar (Silk.NET)";
 
@@ -34,6 +34,8 @@ namespace eft_dma_radar.Silk
                 Config = SilkConfig.Load();
                 Log.WriteLine("[SilkProgram] Config loaded OK.");
 
+                SetHighPerformanceMode();
+
                 Memory.ModuleInit(Config);
                 Log.WriteLine("[SilkProgram] Memory module initialized.");
 
@@ -55,6 +57,29 @@ namespace eft_dma_radar.Silk
             }
         }
 
+        /// <summary>
+        /// Sets High Performance mode: process priority, timer resolution, power plan, and MMCSS thread characteristics.
+        /// </summary>
+        private static void SetHighPerformanceMode()
+        {
+            Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
+
+            if (SetThreadExecutionState(EXECUTION_STATE.ES_CONTINUOUS | EXECUTION_STATE.ES_SYSTEM_REQUIRED | EXECUTION_STATE.ES_DISPLAY_REQUIRED) == 0)
+                Log.WriteLine($"WARNING: Unable to set Thread Execution State. ERROR {Marshal.GetLastWin32Error()}");
+
+            Guid highPerformanceGuid = new("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c");
+            if (PowerSetActiveScheme(IntPtr.Zero, ref highPerformanceGuid) != 0)
+                Log.WriteLine($"WARNING: Unable to set High Performance Power Plan. ERROR {Marshal.GetLastWin32Error()}");
+
+            if (TimeBeginPeriod(5) != 0)
+                Log.WriteLine($"WARNING: Unable to set timer resolution to 5ms. ERROR {Marshal.GetLastWin32Error()}");
+
+            if (AvSetMmThreadCharacteristicsW("Games", out _) == 0)
+                Log.WriteLine($"WARNING: Unable to set Multimedia thread characteristics to 'Games'. ERROR {Marshal.GetLastWin32Error()}");
+
+            Log.WriteLine("[SilkProgram] High performance mode set.");
+        }
+
         private static void HandleFatalError(Exception ex)
         {
             string error = $"FATAL ERROR -> {ex}";
@@ -63,6 +88,30 @@ namespace eft_dma_radar.Silk
             catch { }
             Environment.FailFast(error);
         }
+
+        #region P/Invoke
+
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        private static partial EXECUTION_STATE SetThreadExecutionState(EXECUTION_STATE esFlags);
+
+        [Flags]
+        private enum EXECUTION_STATE : uint
+        {
+            ES_CONTINUOUS = 0x80000000,
+            ES_DISPLAY_REQUIRED = 0x00000002,
+            ES_SYSTEM_REQUIRED = 0x00000001,
+        }
+
+        [LibraryImport("avrt.dll", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+        private static partial IntPtr AvSetMmThreadCharacteristicsW(string taskName, out uint taskIndex);
+
+        [LibraryImport("powrprof.dll", SetLastError = true)]
+        private static partial uint PowerSetActiveScheme(IntPtr userRootPowerKey, ref Guid schemeGuid);
+
+        [LibraryImport("winmm.dll", EntryPoint = "timeBeginPeriod", SetLastError = true)]
+        private static partial uint TimeBeginPeriod(uint uMilliseconds);
+
+        #endregion
     }
 }
 

@@ -48,7 +48,16 @@ namespace eft_dma_radar.Silk.Misc.Pools
             Count = 0;
         }
 
-        protected virtual void Dispose(bool disposing) => IPooledObject<SharedArray<T>>.Return(this);
-        public void Dispose() => Dispose(true);
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+                IPooledObject<SharedArray<T>>.Return(this);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
     }
 }

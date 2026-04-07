@@ -9,41 +9,81 @@ namespace eft_dma_radar.Silk.UI
         #region Fonts
 
         public static SKFont FontRegular12 { get; } = new(CustomFonts.Regular, 12) { Subpixel = true };
+        public static SKFont FontMedium11 { get; } = new(CustomFonts.Medium, 11) { Subpixel = true };
         public static SKFont FontRegular48 { get; } = new(CustomFonts.Regular, 48) { Subpixel = true };
+
+        #endregion
+
+        #region Shape/Text Outlines
+
+        /// <summary>
+        /// Thin border around filled player dot for contrast.
+        /// </summary>
+        public static SKPaint ShapeBorder { get; } = new()
+        {
+            Color = new SKColor(0, 0, 0, 180),
+            StrokeWidth = 1.2f,
+            Style = SKPaintStyle.Stroke,
+            IsAntialias = true,
+        };
+
+        /// <summary>
+        /// Subtle drop-shadow behind text labels for readability.
+        /// </summary>
+        public static SKPaint TextOutline { get; } = new()
+        {
+            Color = new SKColor(0, 0, 0, 200),
+            IsStroke = true,
+            StrokeWidth = 1.6f,
+            StrokeJoin = SKStrokeJoin.Round,
+            IsAntialias = true,
+        };
+
+        /// <summary>
+        /// Death marker paint — small X for dead players.
+        /// </summary>
+        public static SKPaint PaintDeathMarker { get; } = new()
+        {
+            Color = new SKColor(160, 160, 160, 140),
+            StrokeWidth = 1.5f,
+            Style = SKPaintStyle.Stroke,
+            StrokeCap = SKStrokeCap.Round,
+            IsAntialias = true,
+        };
 
         #endregion
 
         #region Player Paints
 
-        public static SKPaint PaintLocalPlayer { get; } = NewStrokePaint(SKColors.Green);
-        public static SKPaint TextLocalPlayer { get; } = NewTextPaint(SKColors.Green);
+        public static SKPaint PaintLocalPlayer { get; } = NewFillPaint(new SKColor(50, 205, 50));
+        public static SKPaint TextLocalPlayer { get; } = NewTextPaint(new SKColor(50, 205, 50));
 
-        public static SKPaint PaintTeammate { get; } = NewStrokePaint(SKColors.LimeGreen);
-        public static SKPaint TextTeammate { get; } = NewTextPaint(SKColors.LimeGreen);
+        public static SKPaint PaintTeammate { get; } = NewFillPaint(new SKColor(80, 220, 80));
+        public static SKPaint TextTeammate { get; } = NewTextPaint(new SKColor(80, 220, 80));
 
-        public static SKPaint PaintUSEC { get; } = NewStrokePaint(SKColors.Red);
-        public static SKPaint TextUSEC { get; } = NewTextPaint(SKColors.Red);
+        public static SKPaint PaintUSEC { get; } = NewFillPaint(new SKColor(230, 60, 60));
+        public static SKPaint TextUSEC { get; } = NewTextPaint(new SKColor(230, 60, 60));
 
-        public static SKPaint PaintBEAR { get; } = NewStrokePaint(SKColors.Blue);
-        public static SKPaint TextBEAR { get; } = NewTextPaint(SKColors.Blue);
+        public static SKPaint PaintBEAR { get; } = NewFillPaint(new SKColor(70, 130, 230));
+        public static SKPaint TextBEAR { get; } = NewTextPaint(new SKColor(70, 130, 230));
 
-        public static SKPaint PaintScav { get; } = NewStrokePaint(SKColors.Yellow);
-        public static SKPaint TextScav { get; } = NewTextPaint(SKColors.Yellow);
+        public static SKPaint PaintScav { get; } = NewFillPaint(new SKColor(240, 230, 60));
+        public static SKPaint TextScav { get; } = NewTextPaint(new SKColor(240, 230, 60));
 
-        public static SKPaint PaintRaider { get; } = NewStrokePaint(SKColor.Parse("ffc70f"));
-        public static SKPaint TextRaider { get; } = NewTextPaint(SKColor.Parse("ffc70f"));
+        public static SKPaint PaintRaider { get; } = NewFillPaint(new SKColor(255, 180, 30));
+        public static SKPaint TextRaider { get; } = NewTextPaint(new SKColor(255, 180, 30));
 
-        public static SKPaint PaintBoss { get; } = NewStrokePaint(SKColors.Fuchsia);
-        public static SKPaint TextBoss { get; } = NewTextPaint(SKColors.Fuchsia);
+        public static SKPaint PaintBoss { get; } = NewFillPaint(new SKColor(230, 50, 230));
+        public static SKPaint TextBoss { get; } = NewTextPaint(new SKColor(230, 50, 230));
 
-        public static SKPaint PaintPScav { get; } = NewStrokePaint(SKColors.White);
-        public static SKPaint TextPScav { get; } = NewTextPaint(SKColors.White);
+        public static SKPaint PaintPScav { get; } = NewFillPaint(new SKColor(220, 220, 220));
+        public static SKPaint TextPScav { get; } = NewTextPaint(new SKColor(220, 220, 220));
 
-        public static SKPaint PaintSpecial { get; } = NewStrokePaint(SKColors.HotPink);
-        public static SKPaint TextSpecial { get; } = NewTextPaint(SKColors.HotPink);
+        public static SKPaint PaintSpecial { get; } = NewFillPaint(new SKColor(255, 90, 160));
+        public static SKPaint TextSpecial { get; } = NewTextPaint(new SKColor(255, 90, 160));
 
-        public static SKPaint PaintStreamer { get; } = NewStrokePaint(SKColors.MediumPurple);
-        public static SKPaint TextStreamer { get; } = NewTextPaint(SKColors.MediumPurple);
+        public static SKPaint PaintStreamer { get; } = NewFillPaint(new SKColor(170, 120, 255));
+        public static SKPaint TextStreamer { get; } = NewTextPaint(new SKColor(170, 120, 255));
 
         #endregion
 
@@ -61,27 +101,12 @@ namespace eft_dma_radar.Silk.UI
 
         #endregion
 
-        #region Pulsing Asterisk
-
-        private static readonly Stopwatch _pulseTimer = Stopwatch.StartNew();
-
-        public static void UpdatePulsingAsteriskColor()
-        {
-            var time = _pulseTimer.ElapsedMilliseconds / 1000.0;
-            var pulseFactor = (Math.Sin(time * 4) + 1) / 2;
-            var greenValue = (byte)(pulseFactor * 100);
-            // Future: apply to pulsing paint if needed
-        }
-
-        #endregion
-
         #region Helpers
 
-        private static SKPaint NewStrokePaint(SKColor color) => new()
+        private static SKPaint NewFillPaint(SKColor color) => new()
         {
             Color = color,
-            StrokeWidth = 3,
-            Style = SKPaintStyle.Stroke,
+            Style = SKPaintStyle.Fill,
             IsAntialias = true,
         };
 

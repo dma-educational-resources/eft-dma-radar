@@ -164,6 +164,9 @@ namespace eft_dma_radar.Silk.Misc
         #region Rate-limit helpers
 
         private static readonly ConcurrentDictionary<string, DateTime> _rateLimitCache = new();
+        private static long _lastRateLimitCleanupTick;
+        private const long RateLimitCleanupIntervalMs = 300_000; // 5 minutes
+        private static readonly TimeSpan RateLimitStaleThreshold = TimeSpan.FromMinutes(5);
 
         public static void WriteRateLimited(AppLogLevel level, string key, TimeSpan interval, string message, string category = "")
         {
@@ -174,6 +177,18 @@ namespace eft_dma_radar.Silk.Misc
                 return;
             _rateLimitCache[key] = now;
             Write(level, message, category);
+
+            // Periodic eviction of stale entries to prevent unbounded growth
+            var nowTick = Environment.TickCount64;
+            if (nowTick - Interlocked.Read(ref _lastRateLimitCleanupTick) > RateLimitCleanupIntervalMs)
+            {
+                Interlocked.Exchange(ref _lastRateLimitCleanupTick, nowTick);
+                foreach (var kvp in _rateLimitCache)
+                {
+                    if (now - kvp.Value > RateLimitStaleThreshold)
+                        _rateLimitCache.TryRemove(kvp.Key, out _);
+                }
+            }
         }
 
         #endregion

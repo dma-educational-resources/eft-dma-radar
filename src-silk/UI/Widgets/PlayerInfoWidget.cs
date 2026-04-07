@@ -8,6 +8,9 @@ namespace eft_dma_radar.Silk.UI.Widgets
         private const float MIN_HEIGHT = 200f;
         private const float MAX_HEIGHT = 800f;
 
+        // Reusable list — avoids per-frame allocation
+        private static readonly List<Player> _hostilePlayers = new(32);
+
         /// <summary>Whether the player info widget is open.</summary>
         public static bool IsOpen { get; set; } = true;
 
@@ -34,12 +37,12 @@ namespace eft_dma_radar.Silk.UI.Widgets
             var localPos = localPlayer.Position;
 
             // One-pass build: count + collect human hostiles
-            var hostilePlayers = new List<Player>();
+            _hostilePlayers.Clear();
             int pmcCount = 0, pscavCount = 0, aiCount = 0, bossCount = 0;
 
             foreach (var p in allPlayers)
             {
-                if (p.IsLocalPlayer || !p.IsActive || !p.IsAlive)
+                if (p.IsLocalPlayer || !p.IsActive || !p.IsAlive || !p.HasValidPosition)
                     continue;
 
                 switch (p.Type)
@@ -51,17 +54,17 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 }
 
                 if (p.IsHuman && p.IsHostile)
-                    hostilePlayers.Add(p);
+                    _hostilePlayers.Add(p);
             }
 
-            hostilePlayers.Sort((a, b) =>
-                Vector3.Distance(localPos, a.Position).CompareTo(Vector3.Distance(localPos, b.Position)));
+            _hostilePlayers.Sort((a, b) =>
+                Vector3.DistanceSquared(localPos, a.Position).CompareTo(Vector3.DistanceSquared(localPos, b.Position)));
 
             ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f),
                 $"PMC: {pmcCount}  PScav: {pscavCount}  AI: {aiCount}  Boss: {bossCount}");
             ImGui.Separator();
 
-            if (hostilePlayers.Count == 0)
+            if (_hostilePlayers.Count == 0)
             {
                 ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), "No human hostiles detected");
                 ImGui.End();
@@ -82,7 +85,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 ImGui.TableSetupScrollFreeze(0, 1);
                 ImGui.TableHeadersRow();
 
-                foreach (var player in hostilePlayers)
+                foreach (var player in _hostilePlayers)
                 {
                     ImGui.TableNextRow();
                     var color = GetPlayerColor(player.Type);

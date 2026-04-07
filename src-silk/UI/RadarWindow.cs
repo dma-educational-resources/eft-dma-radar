@@ -44,6 +44,13 @@ namespace eft_dma_radar.Silk.UI
         private static int _zoom = 100;
         private static int _statusOrder = 1;
         private static readonly Stopwatch _statusSw = Stopwatch.StartNew();
+        private static readonly string[] _statusDots = ["", ".", "..", "..."];
+
+        // Reusable render collections — avoids per-frame allocation
+        private static readonly List<Player> _renderPlayers = new(64);
+        private static readonly Dictionary<int, List<SKPoint>> _connectorGroups = new(8);
+        private static readonly List<List<SKPoint>> _connectorPointPool = [];
+        private static int _connectorPoolIndex;
 
         // Ping effects
         private static readonly List<PingEffect> _activePings = [];
@@ -338,7 +345,7 @@ namespace eft_dma_radar.Silk.UI
                         MapManager.LoadMap(mapID);
 
                     var map = MapManager.Map;
-                    if (map is not null)
+                    if (map is not null && localPlayer.HasValidPosition)
                     {
                         DrawRadar(canvas, localPlayer, map, scale);
                     }
@@ -388,21 +395,23 @@ namespace eft_dma_radar.Silk.UI
 
             map.Draw(canvas, localPlayerPos.Y, mapParams.Bounds, mapCanvasBounds);
 
-            SKPaints.UpdatePulsingAsteriskColor();
-
             // Snapshot players
             var allPlayersSnapshot = AllPlayers;
 
             List<Player>? normalPlayers = null;
             if (allPlayersSnapshot is not null)
             {
-                normalPlayers = new List<Player>(allPlayersSnapshot.Count);
+                _renderPlayers.Clear();
                 foreach (var p in allPlayersSnapshot)
                 {
-                    if (p.IsActive && p.IsAlive)
-                        normalPlayers.Add(p);
+                    if (!p.HasValidPosition)
+                        continue; // Skip players that haven't had a valid position read yet
+
+                    if (p.IsActive || !p.IsAlive) // Active players + dead players (for death markers)
+                        _renderPlayers.Add(p);
                 }
-                normalPlayers.Sort(static (a, b) => a.DrawPriority.CompareTo(b.DrawPriority));
+                _renderPlayers.Sort(static (a, b) => a.DrawPriority.CompareTo(b.DrawPriority));
+                normalPlayers = _renderPlayers;
             }
 
             // Group connectors
@@ -410,25 +419,15 @@ namespace eft_dma_radar.Silk.UI
                 DrawGroupConnectors(canvas, normalPlayers, map, mapParams);
 
             // Draw local player
-            localPlayer.Draw(canvas, mapParams, map.Config);
+            localPlayer.Draw(canvas, mapParams, map.Config, localPlayer);
 
-            // Players (bottom layer)
-            if (!Config.PlayersOnTop && normalPlayers is not null)
+            // Other players
+            if (normalPlayers is not null)
             {
                 foreach (var player in normalPlayers)
                 {
                     if (!player.IsLocalPlayer)
-                        player.Draw(canvas, mapParams, map.Config);
-                }
-            }
-
-            // Players (top layer)
-            if (Config.PlayersOnTop && normalPlayers is not null)
-            {
-                foreach (var player in normalPlayers)
-                {
-                    if (!player.IsLocalPlayer)
-                        player.Draw(canvas, mapParams, map.Config);
+                        player.Draw(canvas, mapParams, map.Config, localPlayer);
                 }
             }
 
@@ -438,23 +437,36 @@ namespace eft_dma_radar.Silk.UI
 
         private static void DrawGroupConnectors(SKCanvas canvas, List<Player> players, RadarMap map, MapParams mapParams)
         {
-            Dictionary<int, List<SKPoint>>? groups = null;
+            // Reset pooled collections instead of allocating new ones each frame
+            _connectorGroups.Clear();
+            _connectorPoolIndex = 0;
+
             foreach (var p in players)
             {
                 if (p.IsHuman && p.IsHostile && p.SpawnGroupID != -1)
                 {
-                    groups ??= new Dictionary<int, List<SKPoint>>(8);
-                    if (!groups.TryGetValue(p.SpawnGroupID, out var list))
+                    if (!_connectorGroups.TryGetValue(p.SpawnGroupID, out var list))
                     {
-                        list = new List<SKPoint>(4);
-                        groups[p.SpawnGroupID] = list;
+                        // Reuse pooled list or create a new one
+                        if (_connectorPoolIndex < _connectorPointPool.Count)
+                        {
+                            list = _connectorPointPool[_connectorPoolIndex];
+                            list.Clear();
+                        }
+                        else
+                        {
+                            list = new List<SKPoint>(4);
+                            _connectorPointPool.Add(list);
+                        }
+                        _connectorPoolIndex++;
+                        _connectorGroups[p.SpawnGroupID] = list;
                     }
                     list.Add(mapParams.ToScreenPos(MapParams.ToMapPos(p.Position, map.Config)));
                 }
             }
-            if (groups is null)
+            if (_connectorGroups.Count == 0)
                 return;
-            foreach (var grp in groups.Values)
+            foreach (var grp in _connectorGroups.Values)
             {
                 if (grp.Count <= 1)
                     continue;
@@ -506,7 +518,7 @@ namespace eft_dma_radar.Silk.UI
                     _statusOrder = (_statusOrder % 3) + 1;
                     _statusSw.Restart();
                 }
-                dots = new string('.', _statusOrder);
+                dots = _statusDots[_statusOrder];
             }
 
             string text = message + dots;
@@ -677,18 +689,21 @@ namespace eft_dma_radar.Silk.UI
             var players = AllPlayers;
             if (players is not null)
             {
-                foreach (var p in players)
+                var curParams = GetCurrentMapParams();
+                if (curParams is not null)
                 {
-                    if (p.IsLocalPlayer || !p.IsActive || !p.IsAlive)
-                        continue;
-                    var curParams = GetCurrentMapParams();
-                    if (curParams is null) break;
-                    var screenPos = curParams.Value.ToScreenPos(MapParams.ToMapPos(p.Position, curParams.Value.Config));
-                    float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
-                    if (dist < closestDist)
+                    var mp = curParams.Value;
+                    foreach (var p in players)
                     {
-                        closestDist = dist;
-                        closest = p;
+                        if (p.IsLocalPlayer || !p.IsActive || !p.IsAlive)
+                            continue;
+                        var screenPos = mp.ToScreenPos(MapParams.ToMapPos(p.Position, mp.Config));
+                        float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
+                        if (dist < closestDist)
+                        {
+                            closestDist = dist;
+                            closest = p;
+                        }
                     }
                 }
             }
@@ -792,6 +807,7 @@ namespace eft_dma_radar.Silk.UI
             Memory.Close();
 
             // Dispose GPU/UI resources
+            _fpsTimer.Dispose();
             _imgui?.Dispose();
             _skSurface?.Dispose();
             _skBackendRenderTarget?.Dispose();

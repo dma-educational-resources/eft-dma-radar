@@ -14,6 +14,8 @@ namespace eft_dma_radar.Silk.Config
         private static readonly string _configPath =
             Path.Combine(_configDir, "config.json");
 
+        private static readonly JsonSerializerOptions _jsonWriteOptions = new() { WriteIndented = true };
+
         // ── DMA ─────────────────────────────────────────────────────────────────
 
         /// <summary>FPGA device string passed to MemProcFS (e.g. "fpga", "usb3380").</summary>
@@ -90,7 +92,7 @@ namespace eft_dma_radar.Silk.Config
             try
             {
                 Directory.CreateDirectory(_configDir);
-                var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
+                var json = JsonSerializer.Serialize(this, _jsonWriteOptions);
                 File.WriteAllText(_configPath, json);
             }
             catch (Exception ex)

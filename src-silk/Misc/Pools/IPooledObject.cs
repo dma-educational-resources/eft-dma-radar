@@ -29,6 +29,7 @@ namespace eft_dma_radar.Silk.Misc.Pools
 
         private static class ObjectPool
         {
+            private const int MaxPoolSize = 256;
             private static readonly ConcurrentStack<T> _pool = new();
             private static readonly Func<T> _factory =
                 System.Linq.Expressions.Expression.Lambda<Func<T>>(
@@ -39,7 +40,11 @@ namespace eft_dma_radar.Silk.Misc.Pools
                 _pool.TryPop(out var obj) ? obj : _factory();
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal static void Return(T obj) => _pool.Push(obj);
+            internal static void Return(T obj)
+            {
+                if (_pool.Count < MaxPoolSize)
+                    _pool.Push(obj);
+            }
         }
     }
 }

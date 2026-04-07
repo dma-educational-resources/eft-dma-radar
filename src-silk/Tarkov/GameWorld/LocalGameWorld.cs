@@ -1,5 +1,8 @@
 using eft_dma_radar.Silk.Misc.Workers;
 using eft_dma_radar.Silk.Tarkov.Unity;
+using VmmSharpEx;
+
+using static eft_dma_radar.Silk.Tarkov.Unity.UnitySDK;
 
 namespace eft_dma_radar.Silk.Tarkov.GameWorld
 {
@@ -28,10 +31,25 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private WorkerThread? _realtimeWorker;
         private WorkerThread? _registrationWorker;
 
+        // The address of the LocalPlayer at raid start — used to detect extraction/death
+        private ulong _localPlayerAddr;
+
+        // Stale GameWorld rejection: after a raid ends, the GameWorld persists in Unity
+        // while the player views stats/loading. Reject it until a new one appears.
+        private static ulong _lastDisposedBase;
+
+        /// <summary>
+        /// Cached GamePlayerOwner Il2CppClass pointer — resolved once from the TypeInfoTable.
+        /// </summary>
+        private static ulong _cachedGamePlayerOwnerKlass;
+
+        // Cooldown after raid ends — prevents rapid re-detection of stale GameWorld
+        private static long _raidCooldownUntilTicks;
+
         private static readonly TimeSpan TransformValidationInterval = TimeSpan.FromSeconds(30);
-        private static readonly TimeSpan RaidEndedCheckInterval = TimeSpan.FromSeconds(5);
-        private DateTime _lastRaidEndedCheck = DateTime.MinValue;
-        private DateTime _lastTransformValidation = DateTime.UtcNow;
+        private static readonly TimeSpan RaidEndedCheckInterval = TimeSpan.FromSeconds(3);
+        private DateTime _lastRaidEndedCheck;   // set in Start() so first check has a grace period
+        private DateTime _lastTransformValidation;
 
         #endregion
 
@@ -42,16 +60,56 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         public RegisteredPlayers RegisteredPlayers => _registeredPlayers;
         public Player.Player? LocalPlayer => _registeredPlayers.LocalPlayer;
 
+        /// <summary>
+        /// Clears the stale GameWorld guard and cooldown so a user-initiated restart
+        /// can re-detect the same (still-live) GameWorld.
+        /// </summary>
+        public static void ClearStaleGuard()
+        {
+            Interlocked.Exchange(ref _lastDisposedBase, 0);
+            Interlocked.Exchange(ref _raidCooldownUntilTicks, 0);
+        }
+
+        /// <summary>
+        /// Begins a post-raid cooldown period. <see cref="Create"/> will block until
+        /// the cooldown expires, preventing rapid re-detection of the stale GameWorld.
+        /// </summary>
+        private static void BeginCooldown(int seconds = 12)
+        {
+            Interlocked.Exchange(ref _raidCooldownUntilTicks,
+                DateTime.UtcNow.AddSeconds(seconds).Ticks);
+        }
+
+        /// <summary>
+        /// Blocks until the post-raid cooldown expires (if active).
+        /// </summary>
+        private static void WaitForCooldown(CancellationToken ct)
+        {
+            var deadlineTicks = Interlocked.Read(ref _raidCooldownUntilTicks);
+            if (deadlineTicks <= 0) return;
+
+            var remaining = new DateTime(deadlineTicks, DateTimeKind.Utc) - DateTime.UtcNow;
+            if (remaining <= TimeSpan.Zero) return;
+
+            Log.WriteLine($"[LocalGameWorld] Cooldown active — waiting {(int)remaining.TotalMilliseconds}ms before next raid detection...");
+            ct.WaitHandle.WaitOne(remaining);
+        }
+
         #endregion
 
         #region Factory
 
         /// <summary>
-        /// Scans the GOM for a live LocalGameWorld and creates a LocalGameWorld from it.
+        /// Resolves a live LocalGameWorld via IL2CPP direct path (primary) or GOM scan (fallback),
+        /// validates it is a real in-progress raid (not a stale post-raid GameWorld),
+        /// then returns a fully-initialised instance.
         /// Blocks until found or throws if the game process is gone.
         /// </summary>
         public static LocalGameWorld Create(CancellationToken ct)
         {
+            // Wait for post-raid cooldown before scanning for a new GameWorld
+            WaitForCooldown(ct);
+
             var processCheckSw = Stopwatch.StartNew();
 
             while (true)
@@ -74,6 +132,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         continue;
                     }
 
+                    // Reject stale GameWorld from a previous raid (Unity keeps it alive on stats/loading screen)
+                    if (gameWorld == Interlocked.Read(ref _lastDisposedBase))
+                    {
+                        Log.WriteRateLimited(AppLogLevel.Debug, "gw_stale", TimeSpan.FromSeconds(10),
+                            $"[LocalGameWorld] Stale GameWorld @ 0x{gameWorld:X} — waiting for new raid...");
+                        Thread.Sleep(1000);
+                        continue;
+                    }
+
                     // Validate we are actually in a raid: MainPlayer must be a valid pointer
                     if (!Memory.TryReadPtr(gameWorld + Offsets.ClientLocalGameWorld.MainPlayer, out var mainPlayerPtr, false)
                         || mainPlayerPtr == 0)
@@ -84,8 +151,33 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         continue;
                     }
 
+                    // ── Phase 1: Structural validation ──────────────────────────
+                    // A stale post-raid GameWorld still has valid MainPlayer pointer
+                    // and LocationId, but RegisteredPlayers and transforms are dead.
+                    // Validate BEFORE constructing the instance (which spawns workers).
+                    if (!IsLocalPlayerInRaid(gameWorld))
+                    {
+                        Log.WriteRateLimited(AppLogLevel.Debug, "gw_noraid", TimeSpan.FromSeconds(5),
+                            "[LocalGameWorld] GameWorld found but player data not ready — waiting...");
+                        Thread.Sleep(500);
+                        continue;
+                    }
+
+                    if (!ValidateTransformReadable(gameWorld, mainPlayerPtr))
+                    {
+                        Log.WriteRateLimited(AppLogLevel.Debug, "gw_stale_xform", TimeSpan.FromSeconds(5),
+                            $"[LocalGameWorld] GameWorld @ 0x{gameWorld:X} — transform unreadable (stale). Waiting...");
+                        Thread.Sleep(1000);
+                        continue;
+                    }
+
+                    // ── Phase 2: Accept — construct instance ────────────────────
+                    // Accepted — clear the stale guard so we don't reject this address
+                    // if the user later restarts manually.
+                    Interlocked.Exchange(ref _lastDisposedBase, 0);
+
                     var mapId = ReadMapID(gameWorld);
-                    Log.WriteLine($"[LocalGameWorld] Found GameWorld @ 0x{gameWorld:X}, map = '{mapId}'");
+                    Log.WriteLine($"[LocalGameWorld] Found live GameWorld @ 0x{gameWorld:X}, map = '{mapId}'");
                     return new LocalGameWorld(gameWorld, mapId, ct);
                 }
                 catch (Memory.GameNotRunningException)
@@ -131,10 +223,22 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         #region Lifecycle
 
-        /// <summary>Starts the background worker threads.</summary>
+        /// <summary>
+        /// Waits for the local player to be fully initialised, then starts worker threads.
+        /// </summary>
         public void Start()
         {
             _registeredPlayers.WaitForLocalPlayer(_ct);
+
+            // Capture the LocalPlayer's address for raid-ended detection
+            _localPlayerAddr = _registeredPlayers.LocalPlayerAddr;
+
+            // Initialise timing baselines — give the raid a grace period before
+            // firing raid-ended and transform-validation checks.
+            var now = DateTime.UtcNow;
+            _lastRaidEndedCheck = now;
+            _lastTransformValidation = now;
+
             _realtimeWorker?.Start();
             _registrationWorker?.Start();
         }
@@ -146,6 +250,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         {
             if (_disposed) return;
             _disposed = true;
+
+            // Record stale GameWorld address so Create() rejects it
+            Interlocked.Exchange(ref _lastDisposedBase, _base);
+
+            // Start cooldown to prevent rapid re-detection of the stale GameWorld
+            BeginCooldown(12);
+
             _realtimeWorker?.Dispose();
             _registrationWorker?.Dispose();
             _realtimeWorker = null;
@@ -163,7 +274,18 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private void RealtimeWorker_PerformWork(CancellationToken ct)
         {
             if (_disposed) return;
-            _registeredPlayers.UpdateRealtimeData();
+            try
+            {
+                _registeredPlayers.UpdateRealtimeData();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Race: Vmm handle disposed during scatter.Execute() — raid is ending, safe to ignore.
+            }
+            catch (VmmException) when (_disposed)
+            {
+                // Race: scatter failed because we're shutting down.
+            }
         }
 
         /// <summary>
@@ -184,12 +306,175 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 _registeredPlayers.ValidateTransforms();
             }
 
-            // Periodic raid-ended check
+            // Periodic raid-ended check (detects death, extraction, stats screen, map change)
             if ((now - _lastRaidEndedCheck) >= RaidEndedCheckInterval)
             {
                 _lastRaidEndedCheck = now;
-                try { Memory.ThrowIfNotInGame(); }
-                catch (Memory.GameNotRunningException) { _disposed = true; }
+                if (!IsRaidActive())
+                {
+                    Log.WriteLine("[LocalGameWorld] Raid is no longer active — disposing.");
+                    Memory.ShowNotification?.Invoke("Raid has ended", NotificationLevel.Info);
+                    Dispose();
+                }
+            }
+        }
+
+        #endregion
+
+        #region Raid Active Check
+
+        /// <summary>
+        /// Checks whether the current raid is still active by validating:
+        /// <list type="number">
+        ///   <item>The game process is still running.</item>
+        ///   <item>MainPlayer pointer still matches our LocalPlayer (disappears on extract/death → stats → menu).</item>
+        ///   <item>RegisteredPlayers count is > 0 (drops to 0 when GameWorld is torn down).</item>
+        ///   <item>Map ID hasn't changed (detects map transitions).</item>
+        /// </list>
+        /// Retries up to 5 times for transient DMA read failures.
+        /// </summary>
+        private bool IsRaidActive()
+        {
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                try
+                {
+                    // 1. MainPlayer pointer still valid and matches our LocalPlayer?
+                    if (!Memory.TryReadPtr(_base + Offsets.ClientLocalGameWorld.MainPlayer, out var mainPlayer, false)
+                        || mainPlayer == 0
+                        || mainPlayer != _localPlayerAddr)
+                    {
+                        if (attempt == 0)
+                            Log.Write(AppLogLevel.Debug, $"[LocalGameWorld] IsRaidActive: MainPlayer mismatch " +
+                                $"(read=0x{mainPlayer:X}, expected=0x{_localPlayerAddr:X})");
+                        Thread.Sleep(50);
+                        continue;
+                    }
+
+                    // 2. Player count > 0?
+                    var rgtPlayersAddr = Memory.ReadPtr(_base + Offsets.ClientLocalGameWorld.RegisteredPlayers, false);
+                    var count = Memory.ReadValue<int>(rgtPlayersAddr + 0x18, false);
+                    if (count <= 0)
+                    {
+                        if (attempt == 0)
+                            Log.Write(AppLogLevel.Debug, $"[LocalGameWorld] IsRaidActive: player count={count}");
+                        Thread.Sleep(50);
+                        continue;
+                    }
+
+                    // 3. Map hasn't changed?
+                    var currentMapId = ReadMapID(_base);
+                    if (!string.IsNullOrEmpty(currentMapId) &&
+                        !string.IsNullOrEmpty(MapID) &&
+                        !string.Equals(currentMapId, MapID, StringComparison.Ordinal))
+                    {
+                        Log.WriteLine($"[LocalGameWorld] Map changed: '{MapID}' → '{currentMapId}'. Ending raid.");
+                        return false;
+                    }
+
+                    return true; // All checks passed
+                }
+                catch (Memory.GameNotRunningException)
+                {
+                    return false; // Game process gone
+                }
+                catch (Exception ex)
+                {
+                    if (attempt == 0)
+                        Log.Write(AppLogLevel.Debug, $"[LocalGameWorld] IsRaidActive attempt {attempt}: {ex.Message}");
+                    Thread.Sleep(50);
+                }
+            }
+
+            // All 5 attempts failed — raid has ended
+            return false;
+        }
+
+        #endregion
+
+        #region Raid Validation
+
+        /// <summary>
+        /// Validates that a GameWorld has a populated RegisteredPlayers list with at least
+        /// one valid player entry. A stale post-raid GameWorld often has count == 1 (the
+        /// local player) but the entry pointer is garbage, or count drops to 0.
+        /// </summary>
+        private static bool IsLocalPlayerInRaid(ulong gameWorld)
+        {
+            try
+            {
+                // Read MainPlayer
+                if (!Memory.TryReadPtr(gameWorld + Offsets.ClientLocalGameWorld.MainPlayer, out var playerBase, false)
+                    || playerBase == 0)
+                    return false;
+
+                // Read RegisteredPlayers list
+                if (!Memory.TryReadPtr(gameWorld + Offsets.ClientLocalGameWorld.RegisteredPlayers, out var rgtPlayersAddr, false)
+                    || rgtPlayersAddr == 0)
+                    return false;
+
+                // Count must be in sane range (List<T>._size at +0x18)
+                if (!Memory.TryReadValue<int>(rgtPlayersAddr + 0x18, out var count, false))
+                    return false;
+                if (count < 1 || count > 100)
+                    return false;
+
+                // First player entry must be a valid pointer
+                // List<T>._items at +0x10 → array, first element at array + 0x20
+                if (!Memory.TryReadPtr(rgtPlayersAddr + UnityList.ArrOffset, out var listBase, false)
+                    || listBase == 0)
+                    return false;
+                if (!Memory.TryReadPtr(listBase + UnityList.ArrStartOffset, out var firstPlayer, false)
+                    || firstPlayer == 0)
+                    return false;
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to walk the LocalPlayer's transform pointer chain (PlayerBody → skeleton
+        /// → bone[0] → TransformInternal → vertices). If any read fails the GameWorld is
+        /// stale — Unity hasn't fully torn it down but the underlying data is garbage.
+        /// </summary>
+        private static bool ValidateTransformReadable(ulong gameWorld, ulong mainPlayerPtr)
+        {
+            try
+            {
+                // Walk: MainPlayer → PlayerBody → SkeletonRootJoint → _values → arr → bone[0] → TransformInternal
+                if (!Memory.TryReadPtr(mainPlayerPtr + Offsets.Player._playerBody, out var body, false) || body == 0)
+                    return false;
+                if (!Memory.TryReadPtr(body + Offsets.PlayerBody.SkeletonRootJoint, out var skelRoot, false) || skelRoot == 0)
+                    return false;
+                if (!Memory.TryReadPtr(skelRoot + Offsets.DizSkinningSkeleton._values, out var dizValues, false) || dizValues == 0)
+                    return false;
+                if (!Memory.TryReadPtr(dizValues + UnityList.ArrOffset, out var arrPtr, false) || arrPtr == 0)
+                    return false;
+                if (!Memory.TryReadPtr(arrPtr + UnityList.ArrStartOffset, out var boneEntry, false) || boneEntry == 0)
+                    return false;
+                if (!Memory.TryReadPtr(boneEntry + 0x10, out var transformInternal, false) || transformInternal == 0)
+                    return false;
+
+                // Read TransformAccess index — must be sane
+                if (!Memory.TryReadValue<int>(transformInternal + TransformAccess.IndexOffset, out var taIndex, false))
+                    return false;
+                if (taIndex < 0 || taIndex > 128_000)
+                    return false;
+
+                // Read hierarchy pointer — must be valid
+                if (!Memory.TryReadPtr(transformInternal + TransformAccess.HierarchyOffset, out var hierarchy, false)
+                    || hierarchy == 0)
+                    return false;
+
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -197,35 +482,153 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         #region Game World Scan
 
+        /// <summary>
+        /// Primary: IL2CPP direct path via GamePlayerOwner → _myPlayer → GameWorld.
+        /// Fallback: GOM name-based scan.
+        /// </summary>
         private static ulong FindGameWorld()
+        {
+            // Primary: IL2CPP direct path (fastest — ~5 reads)
+            if (TryGetGameWorldViaIL2CPP(out var gameWorld))
+                return gameWorld;
+
+            // Fallback: GOM name-based scan
+            return FindGameWorldViaGOM();
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // IL2CPP DIRECT PATH (GamePlayerOwner → _myPlayer → GameWorld)
+        // ────────────────────────────────────────────────────────────────
+
+        private static bool TryGetGameWorldViaIL2CPP(out ulong gameWorld)
+        {
+            gameWorld = 0;
+
+            // Resolve GamePlayerOwner class pointer from TypeInfoTable (once)
+            var klassPtr = _cachedGamePlayerOwnerKlass;
+            if (!klassPtr.IsValidVirtualAddress())
+            {
+                klassPtr = ResolveGamePlayerOwnerKlass();
+                if (!klassPtr.IsValidVirtualAddress())
+                    return false;
+
+                _cachedGamePlayerOwnerKlass = klassPtr;
+                Log.WriteLine($"[IL2CPP] GamePlayerOwner class resolved @ 0x{klassPtr:X}");
+            }
+
+            // Read static_fields from the Il2CppClass struct
+            if (!Memory.TryReadValue<ulong>(
+                klassPtr + Offsets.Il2CppClass.StaticFields, out var staticFields))
+                return false;
+
+            if (!staticFields.IsValidVirtualAddress())
+                return false;
+
+            // Read _myPlayer from static fields
+            if (!Memory.TryReadPtr(
+                staticFields + Offsets.GamePlayerOwner._myPlayer, out var myPlayer))
+                return false;
+
+            // Read GameWorld from the player
+            if (!Memory.TryReadPtr(
+                myPlayer + Offsets.Player.GameWorld, out gameWorld))
+                return false;
+
+            return gameWorld.IsValidVirtualAddress();
+        }
+
+        /// <summary>
+        /// Resolves the EFT.GamePlayerOwner Il2CppClass pointer from the TypeInfoTable.
+        /// Uses the TypeIndex if available, otherwise falls back to scanning by class name.
+        /// </summary>
+        private static ulong ResolveGamePlayerOwnerKlass()
+        {
+            var gaBase = Memory.GameAssemblyBase;
+            if (!gaBase.IsValidVirtualAddress() || Offsets.Special.TypeInfoTableRva == 0)
+                return 0;
+
+            if (!Memory.TryReadPtr(gaBase + Offsets.Special.TypeInfoTableRva, out var tablePtr, false))
+                return 0;
+
+            // Fast path: use cached TypeIndex
+            var typeIndex = Offsets.Special.GamePlayerOwner_TypeIndex;
+            if (typeIndex != 0)
+            {
+                if (Memory.TryReadValue<ulong>(
+                    tablePtr + (ulong)typeIndex * 8, out var ptr) && ptr.IsValidVirtualAddress())
+                    return ptr;
+            }
+
+            // Slow fallback: scan first N entries for class named "GamePlayerOwner"
+            Log.WriteLine("[IL2CPP] GamePlayerOwner TypeIndex not cached, scanning TypeInfoTable...");
+            const int maxEntries = 20_000;
+            for (int i = 0; i < maxEntries; i++)
+            {
+                if (!Memory.TryReadValue<ulong>(tablePtr + (ulong)i * 8, out var ptr) || !ptr.IsValidVirtualAddress())
+                    continue;
+
+                if (!Memory.TryReadValue<ulong>(ptr + Offsets.Il2CppClass.Name, out var namePtr) || !namePtr.IsValidVirtualAddress())
+                    continue;
+
+                if (!Memory.TryReadString(namePtr, out var name, 64, useCache: false) || name is null)
+                    continue;
+
+                if (name == "GamePlayerOwner")
+                {
+                    Log.WriteLine($"[IL2CPP] GamePlayerOwner found at TypeIndex {i}");
+                    Offsets.Special.GamePlayerOwner_TypeIndex = (uint)i;
+                    return ptr;
+                }
+            }
+
+            return 0;
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // GOM FALLBACK — Name-based scan
+        // ────────────────────────────────────────────────────────────────
+
+        private static ulong FindGameWorldViaGOM()
         {
             var gom = Memory.ReadValue<SilkGOM>(Memory.GOM, false);
             var gameObject = gom.GetGameObjectByName("GameWorld");
             if (gameObject == 0) return 0;
 
             // GameObject → ComponentArray → entry → ObjectClass (GameWorld instance)
-            ulong step1, step2, step3;
-            try { step1 = Memory.ReadPtr(gameObject + 0x58, false); }
-            catch { return 0; }
-            try { step2 = Memory.ReadPtr(step1 + 0x18, false); }
-            catch { return 0; }
-            try { step3 = Memory.ReadPtr(step2 + 0x20, false); }
-            catch { return 0; }
+            if (!Memory.TryReadPtr(gameObject + 0x58, out var step1, false)) return 0;
+            if (!Memory.TryReadPtr(step1 + 0x18, out var step2, false)) return 0;
+            if (!Memory.TryReadPtr(step2 + 0x20, out var step3, false)) return 0;
 
             return step3;
         }
+
+        // ────────────────────────────────────────────────────────────────
+        // MAP RESOLUTION
+        // ────────────────────────────────────────────────────────────────
 
         private static string ReadMapID(ulong gameWorld)
         {
             try
             {
-                var locationIdPtr = Memory.ReadPtr(gameWorld + Offsets.ClientLocalGameWorld.LocationId, false);
-                return Memory.ReadUnityString(locationIdPtr, 64, false);
+                // Primary: LocationId directly from GameWorld
+                if (Memory.TryReadPtr(gameWorld + Offsets.ClientLocalGameWorld.LocationId, out var locationIdPtr, false)
+                    && locationIdPtr != 0)
+                {
+                    return Memory.ReadUnityString(locationIdPtr, 64, false);
+                }
+
+                // Fallback: read Location from MainPlayer
+                if (Memory.TryReadPtr(gameWorld + Offsets.ClientLocalGameWorld.MainPlayer, out var lp, false)
+                    && lp != 0
+                    && Memory.TryReadPtr(lp + Offsets.Player.Location, out var mapPtr, false)
+                    && mapPtr != 0)
+                {
+                    return Memory.ReadUnityString(mapPtr, 64, false);
+                }
             }
-            catch
-            {
-                return "unknown";
-            }
+            catch { }
+
+            return "unknown";
         }
 
         #endregion

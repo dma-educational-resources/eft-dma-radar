@@ -42,14 +42,14 @@ namespace eft_dma_radar.Silk.Misc
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ThrowIfAbnormal(this Vector3 v)
         {
-            if (!float.IsNormal(v.X) || !float.IsNormal(v.Y) || !float.IsNormal(v.Z))
+            if (!float.IsFinite(v.X) || !float.IsFinite(v.Y) || !float.IsFinite(v.Z))
                 throw new ArgumentOutOfRangeException(nameof(v));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ThrowIfAbnormal(this Quaternion q)
         {
-            if (!float.IsNormal(q.X) || !float.IsNormal(q.Y) || !float.IsNormal(q.Z) || !float.IsNormal(q.W))
+            if (!float.IsFinite(q.X) || !float.IsFinite(q.Y) || !float.IsFinite(q.Z) || !float.IsFinite(q.W))
                 throw new ArgumentOutOfRangeException(nameof(q));
         }
     }

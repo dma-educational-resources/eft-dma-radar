@@ -22,7 +22,7 @@ namespace eft_dma_radar.Silk.DMA
         private const string MemMapFile = "mmap.txt";
         public const uint MAX_READ_SIZE = 0x1000u * 1500u;
 
-        private static Vmm _vmm;
+        private static Vmm? _vmm;
         private static uint _pid;
         private static readonly Lock _restartLock = new();
         private static CancellationTokenSource _cts = new();
@@ -40,6 +40,11 @@ namespace eft_dma_radar.Silk.DMA
         private static VmmFlags ToFlags(bool useCache) =>
             useCache ? VmmFlags.NONE : VmmFlags.NOCACHE;
 
+        /// <summary>Returns the active VMM handle or throws if disposed.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Vmm VmmOrThrow() =>
+            _vmm ?? throw new ObjectDisposedException(nameof(Memory));
+
         #endregion
 
         #region Public State
@@ -49,7 +54,7 @@ namespace eft_dma_radar.Silk.DMA
         public static ulong GOM { get; private set; }
         public static ulong GameAssemblyBase { get; private set; }
         public static uint ProcessPID => _pid;
-        public static Vmm VmmHandle => _vmm;
+        public static Vmm? VmmHandle => _vmm;
         public static bool IsDisposed => _vmm is null;
         public static bool Ready => _state is MemoryState.ProcessFound or MemoryState.InRaid;
         public static bool InRaid => _state is MemoryState.InRaid;
@@ -303,9 +308,12 @@ namespace eft_dma_radar.Silk.DMA
                             break;
                         }
 
-                        game.Refresh();
+                        // Check if game process is still alive (expensive, rate-limited)
                         Thread.Sleep(133);
                     }
+
+                    if (!game.InRaid)
+                        Log.WriteLine("[Memory] Raid ended (player extracted, died, or left).");
                 }
                 catch (OperationCanceledException)
                 {
@@ -349,6 +357,8 @@ namespace eft_dma_radar.Silk.DMA
         /// </summary>
         public static void RequestRestart()
         {
+            // Allow re-detection of the same GameWorld on user-initiated restart
+            LocalGameWorld.ClearStaleGuard();
             lock (_restartLock)
             {
                 var old = Interlocked.Exchange(ref _cts, new CancellationTokenSource());
@@ -363,18 +373,19 @@ namespace eft_dma_radar.Silk.DMA
 
         private static void LoadProcess()
         {
-            if (!_vmm.PidGetFromName(ProcessName, out uint pid))
+            if (!VmmOrThrow().PidGetFromName(ProcessName, out uint pid))
                 throw new Exception($"Process '{ProcessName}' not found.");
             _pid = pid;
         }
 
         private static void LoadModules()
         {
-            var unityBase = _vmm.ProcessGetModuleBase(_pid, "UnityPlayer.dll");
+            var vmm = VmmOrThrow();
+            var unityBase = vmm.ProcessGetModuleBase(_pid, "UnityPlayer.dll");
             ArgumentOutOfRangeException.ThrowIfZero(unityBase, nameof(unityBase));
             UnityBase = unityBase;
 
-            var gaBase = _vmm.ProcessGetModuleBase(_pid, "GameAssembly.dll");
+            var gaBase = vmm.ProcessGetModuleBase(_pid, "GameAssembly.dll");
             if (gaBase != 0)
             {
                 GameAssemblyBase = gaBase;
@@ -446,8 +457,7 @@ namespace eft_dma_radar.Silk.DMA
         public static void ReadScatter(IScatterEntry[] entries, int count, bool useCache = true)
         {
             if (count == 0) return;
-            var vmm = _vmm ?? throw new ObjectDisposedException(nameof(Memory));
-            using var scatter = new VmmScatter(vmm, _pid, ToFlags(useCache));
+            using var scatter = new VmmScatter(VmmOrThrow(), _pid, ToFlags(useCache));
 
             for (int i = 0; i < count; i++)
             {
@@ -481,7 +491,7 @@ namespace eft_dma_radar.Silk.DMA
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T ReadValue<T>(ulong addr, bool useCache = true)
             where T : unmanaged, allows ref struct
-            => _vmm.MemReadValue<T>(_pid, addr, ToFlags(useCache));
+            => VmmOrThrow().MemReadValue<T>(_pid, addr, ToFlags(useCache));
 
         public static ulong ReadPtr(ulong addr, bool useCache = true)
         {
@@ -502,13 +512,13 @@ namespace eft_dma_radar.Silk.DMA
         public static void ReadBuffer<T>(ulong addr, Span<T> buffer, bool useCache = true)
             where T : unmanaged
         {
-            if (!_vmm.MemReadSpan(_pid, addr, buffer, ToFlags(useCache)))
+            if (!VmmOrThrow().MemReadSpan(_pid, addr, buffer, ToFlags(useCache)))
                 throw new VmmException("Memory read failed.");
         }
 
         public static byte[] ReadBuffer(ulong addr, int size, bool useCache = true)
         {
-            var buf = _vmm.MemRead(_pid, addr, (uint)size, out uint cbRead, ToFlags(useCache));
+            var buf = VmmOrThrow().MemRead(_pid, addr, (uint)size, out uint cbRead, ToFlags(useCache));
             if (cbRead != (uint)size)
                 throw new VmmException($"Incomplete read at 0x{addr:X}.");
             return buf ?? [];
@@ -526,14 +536,14 @@ namespace eft_dma_radar.Silk.DMA
         public static string ReadString(ulong addr, int cb = 128, bool useCache = true)
         {
             ArgumentOutOfRangeException.ThrowIfGreaterThan(cb, 0x1000, nameof(cb));
-            return _vmm.MemReadString(_pid, addr, cb, Encoding.UTF8, ToFlags(useCache))
+            return VmmOrThrow().MemReadString(_pid, addr, cb, Encoding.UTF8, ToFlags(useCache))
                 ?? throw new VmmException("String read failed.");
         }
 
         public static string ReadUnityString(ulong addr, int length = 128, bool useCache = true)
         {
             ArgumentOutOfRangeException.ThrowIfGreaterThan(length, 0x1000, nameof(length));
-            return _vmm.MemReadString(_pid, addr + 0x14, length, Encoding.Unicode, ToFlags(useCache))
+            return VmmOrThrow().MemReadString(_pid, addr + 0x14, length, Encoding.Unicode, ToFlags(useCache))
                 ?? throw new VmmException("Unity string read failed.");
         }
 
@@ -541,11 +551,12 @@ namespace eft_dma_radar.Silk.DMA
             where T : unmanaged, allows ref struct
         {
             int cb = sizeof(T);
-            T r1 = _vmm.MemReadValue<T>(_pid, addr, VmmFlags.NOCACHE);
+            var vmm = VmmOrThrow();
+            T r1 = vmm.MemReadValue<T>(_pid, addr, VmmFlags.NOCACHE);
             Thread.SpinWait(5);
-            T r2 = _vmm.MemReadValue<T>(_pid, addr, VmmFlags.NOCACHE);
+            T r2 = vmm.MemReadValue<T>(_pid, addr, VmmFlags.NOCACHE);
             Thread.SpinWait(5);
-            T r3 = _vmm.MemReadValue<T>(_pid, addr, VmmFlags.NOCACHE);
+            T r3 = vmm.MemReadValue<T>(_pid, addr, VmmFlags.NOCACHE);
             if (!new ReadOnlySpan<byte>(&r1, cb).SequenceEqual(new ReadOnlySpan<byte>(&r2, cb)) ||
                 !new ReadOnlySpan<byte>(&r1, cb).SequenceEqual(new ReadOnlySpan<byte>(&r3, cb)))
                 throw new VmmException("Triple-read mismatch.");
@@ -559,7 +570,7 @@ namespace eft_dma_radar.Silk.DMA
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TryReadValue<T>(ulong addr, out T result, bool useCache = true)
             where T : unmanaged, allows ref struct
-            => _vmm.MemReadValue(_pid, addr, out result, ToFlags(useCache));
+            => VmmOrThrow().MemReadValue(_pid, addr, out result, ToFlags(useCache));
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TryReadPtr(ulong addr, out ulong result, bool useCache = true)
@@ -579,13 +590,13 @@ namespace eft_dma_radar.Silk.DMA
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TryReadBuffer<T>(ulong addr, Span<T> buffer, bool useCache = true)
             where T : unmanaged
-            => _vmm.MemReadSpan(_pid, addr, buffer, ToFlags(useCache));
+            => VmmOrThrow().MemReadSpan(_pid, addr, buffer, ToFlags(useCache));
 
         public static bool TryReadString(ulong addr, out string? result, int cb = 128, bool useCache = true)
         {
             result = null;
             if (cb <= 0 || cb > 0x1000) return false;
-            result = _vmm.MemReadString(_pid, addr, cb, Encoding.UTF8, ToFlags(useCache));
+            result = VmmOrThrow().MemReadString(_pid, addr, cb, Encoding.UTF8, ToFlags(useCache));
             return result is not null;
         }
 
@@ -593,7 +604,7 @@ namespace eft_dma_radar.Silk.DMA
         {
             result = null;
             if (length <= 0 || length > 0x1000) return false;
-            result = _vmm.MemReadString(_pid, addr + 0x14, length, Encoding.Unicode, ToFlags(useCache));
+            result = VmmOrThrow().MemReadString(_pid, addr + 0x14, length, Encoding.Unicode, ToFlags(useCache));
             return result is not null;
         }
 
@@ -612,16 +623,17 @@ namespace eft_dma_radar.Silk.DMA
 
         public static ulong FindSignature(string signature, string moduleName)
         {
+            var vmm = VmmOrThrow();
             int tokens = signature.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
             if (tokens <= 32)
-                return _vmm.FindSignature(_pid, signature, moduleName);
-            var results = _vmm.FindSignatures(_pid, signature, moduleName, maxMatches: 1);
+                return vmm.FindSignature(_pid, signature, moduleName);
+            var results = vmm.FindSignatures(_pid, signature, moduleName, maxMatches: 1);
             return results.Length > 0 ? results[0] : 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ulong[] FindSignatures(string signature, string moduleName, int maxMatches = int.MaxValue)
-            => _vmm.FindSignatures(_pid, signature, moduleName, maxMatches);
+            => VmmOrThrow().FindSignatures(_pid, signature, moduleName, maxMatches);
 
         #endregion
 
@@ -632,12 +644,12 @@ namespace eft_dma_radar.Silk.DMA
         {
             Span<byte> buf = stackalloc byte[sizeof(T)];
             Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buf), value);
-            _vmm.MemWriteSpan(_pid, addr, buf);
+            VmmOrThrow().MemWriteSpan(_pid, addr, buf);
         }
 
         public static void WriteBuffer<T>(ulong addr, Span<T> buffer)
             where T : unmanaged
-            => _vmm.MemWriteSpan(_pid, addr, buffer);
+            => VmmOrThrow().MemWriteSpan(_pid, addr, buffer);
 
         public static unsafe void WriteValueEnsure<T>(ulong addr, T value)
             where T : unmanaged, allows ref struct
@@ -674,7 +686,7 @@ namespace eft_dma_radar.Silk.DMA
             {
                 try
                 {
-                    if (_vmm.PidGetFromName(ProcessName, out uint pid) && pid == _pid)
+                    if (VmmOrThrow().PidGetFromName(ProcessName, out uint pid) && pid == _pid)
                         return;
                 }
                 catch { Thread.Sleep(150); }
@@ -684,7 +696,7 @@ namespace eft_dma_radar.Silk.DMA
 
         /// <summary>Creates a new <see cref="VmmScatter"/> against the game process.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static VmmScatter GetScatter(VmmFlags flags) => new(_vmm, _pid, flags);
+        public static VmmScatter GetScatter(VmmFlags flags) => new(VmmOrThrow(), _pid, flags);
 
         /// <summary>Signals the worker to stop and disposes the VMM handle.</summary>
         public static void Close()

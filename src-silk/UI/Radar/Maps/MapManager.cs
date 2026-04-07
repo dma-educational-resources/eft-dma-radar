@@ -21,6 +21,12 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
         private static string MapsDir =>
             Path.Combine(AppContext.BaseDirectory, "wwwroot", "Maps");
 
+        private static readonly JsonSerializerOptions _jsonOpts = new()
+        {
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            AllowTrailingCommas = true,
+        };
+
         /// <summary>Currently active map, or <see langword="null"/> if none loaded.</summary>
         internal static RadarMap? Map => _currentMap;
 
@@ -37,12 +43,6 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
                 return;
             }
 
-            var opts = new JsonSerializerOptions
-            {
-                ReadCommentHandling = JsonCommentHandling.Skip,
-                AllowTrailingCommas = true,
-            };
-
             var builder = new Dictionary<string, MapConfig>(StringComparer.OrdinalIgnoreCase);
             int loaded = 0, skipped = 0;
 
@@ -51,7 +51,7 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
                 try
                 {
                     using var stream = File.OpenRead(jsonFile);
-                    var config = JsonSerializer.Deserialize<MapConfig>(stream, opts);
+                    var config = JsonSerializer.Deserialize<MapConfig>(stream, _jsonOpts);
                     if (config is null || config.MapLayers.Count == 0)
                     {
                         skipped++;
