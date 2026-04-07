@@ -1,12 +1,8 @@
-using eft_dma_radar.UI.Misc;
-using eft_dma_radar.Silk.UI.Radar.Maps;
-
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 {
     /// <summary>
     /// Minimal player representation for Phase 1.
     /// Contains only what's needed to render a dot + direction arrow on the radar.
-    /// Mirrors WPF Player hierarchy structure.
     /// </summary>
     public class Player
     {
@@ -88,7 +84,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
     }
 
     /// <summary>
-    /// Player type enum — mirrors the WPF project's PlayerType for compatibility.
+    /// Player type classification.
     /// </summary>
     public enum PlayerType
     {

@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 namespace eft_dma_radar.Silk.Misc
 {
     public static class Utils

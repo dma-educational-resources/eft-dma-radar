@@ -1,4 +1,3 @@
-using eft_dma_radar.UI.Misc;
 using eft_dma_radar.Silk.UI.Panels;
 using eft_dma_radar.Silk.UI.Widgets;
 using ImGuiNET;
@@ -71,7 +70,7 @@ namespace eft_dma_radar.Silk.UI
         private static float UIScale => Config.UIScale;
         private static string MapID => Memory.MapID ?? "null";
         private static Player? LocalPlayer => Memory.LocalPlayer;
-        private static IReadOnlyCollection<Player>? AllPlayers => Memory.Players;
+        private static RegisteredPlayers? AllPlayers => Memory.Players;
         private static bool InRaid => Memory.InRaid;
         private static bool Ready => Memory.Ready;
 

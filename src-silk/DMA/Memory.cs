@@ -1,11 +1,6 @@
-global using eft_dma_radar.Silk.DMA;
-
 using System.IO;
 using System.Runtime;
-using eft_dma_radar.Silk.Config;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
-using eft_dma_radar.Silk.Tarkov.GameWorld;
-using eft_dma_radar.Silk.Tarkov.GameWorld.Player;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using VmmSharpEx;
 using VmmSharpEx.Extensions;
@@ -61,7 +56,7 @@ namespace eft_dma_radar.Silk.DMA
 
         public static LocalGameWorld? Game { get; private set; }
         public static string? MapID => Game?.MapID;
-        public static IReadOnlyCollection<Player>? Players => Game?.Players;
+        public static RegisteredPlayers? Players => Game?.RegisteredPlayers;
         public static Player? LocalPlayer => Game?.LocalPlayer;
 
         #endregion
@@ -422,7 +417,7 @@ namespace eft_dma_radar.Silk.DMA
                 try
                 {
                     var tablePtr = ReadValue<ulong>(gaBase + rva, false);
-                    if (Misc.Utils.IsValidVirtualAddress(tablePtr))
+                    if (tablePtr.IsValidVirtualAddress())
                     {
                         if (logged)
                             Log.WriteLine($"[Memory] TypeInfoTable ready (waited {sw.ElapsedMilliseconds}ms).");
@@ -491,8 +486,8 @@ namespace eft_dma_radar.Silk.DMA
         public static ulong ReadPtr(ulong addr, bool useCache = true)
         {
             var ptr = ReadValue<ulong>(addr, useCache);
-            if (!eft_dma_radar.Silk.Misc.Utils.IsValidVirtualAddress(ptr))
-                throw new eft_dma_radar.Silk.Misc.BadPtrException(addr, ptr);
+            if (!ptr.IsValidVirtualAddress())
+                throw new BadPtrException(addr, ptr);
             return ptr;
         }
 
@@ -570,7 +565,7 @@ namespace eft_dma_radar.Silk.DMA
         public static bool TryReadPtr(ulong addr, out ulong result, bool useCache = true)
         {
             if (!TryReadValue(addr, out result, useCache)) return false;
-            return eft_dma_radar.Silk.Misc.Utils.IsValidVirtualAddress(result);
+            return result.IsValidVirtualAddress();
         }
 
         public static bool TryReadPtrChain(ulong addr, ReadOnlySpan<uint> offsets, out ulong result, bool useCache = true)

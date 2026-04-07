@@ -1,14 +1,21 @@
-using SDK;
-using eft_dma_radar.Silk.Tarkov.GameWorld.Player;
+using eft_dma_radar.Silk.Misc.Workers;
 using eft_dma_radar.Silk.Tarkov.Unity;
-using System.Diagnostics;
 
 namespace eft_dma_radar.Silk.Tarkov.GameWorld
 {
     /// <summary>
     /// Minimal raid session. Reads players (position + rotation) and raid lifecycle.
     /// Phase 1 — no loot, no exits, no quests.
-    /// Mirrors WPF LocalGameWorld structure.
+    /// <para>
+    /// Worker thread model:
+    /// <list type="bullet">
+    ///   <item><b>RealtimeWorker</b> (8ms target, DynamicSleep, AboveNormal priority) — scatter-batched
+    ///   position + rotation for all active players in a single DMA round-trip.
+    ///   Actual sleep = max(0, 8ms - workTime).</item>
+    ///   <item><b>RegistrationWorker</b> (100ms, BelowNormal priority) — player list discovery,
+    ///   lifecycle management, transform validation, raid-ended checks.</item>
+    /// </list>
+    /// </para>
     /// </summary>
     internal sealed class LocalGameWorld : IDisposable
     {
@@ -18,14 +25,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private readonly CancellationToken _ct;
         private readonly RegisteredPlayers _registeredPlayers;
         private volatile bool _disposed;
-        private Thread? _refreshThread;
+        private WorkerThread? _realtimeWorker;
+        private WorkerThread? _registrationWorker;
 
-        private static readonly TimeSpan RefreshInterval = TimeSpan.FromMilliseconds(133);
+        private static readonly TimeSpan TransformValidationInterval = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan RaidEndedCheckInterval = TimeSpan.FromSeconds(5);
         private DateTime _lastRaidEndedCheck = DateTime.MinValue;
-
-        // GameWorld component extraction chain: GameObject → ComponentArray[0x58] → entry[0x18] → ObjectClass[0x20]
-        private static readonly uint[] GameWorldChain = [0x58, 0x18, 0x20];
+        private DateTime _lastTransformValidation = DateTime.UtcNow;
 
         #endregion
 
@@ -33,7 +39,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         public string MapID { get; }
         public bool InRaid => !_disposed;
-        public IReadOnlyCollection<Player.Player> Players => _registeredPlayers.ToArray();
+        public RegisteredPlayers RegisteredPlayers => _registeredPlayers;
         public Player.Player? LocalPlayer => _registeredPlayers.LocalPlayer;
 
         #endregion
@@ -101,60 +107,90 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             MapID = mapId;
             _ct = ct;
             _registeredPlayers = new RegisteredPlayers(gameWorldBase);
+
+            _realtimeWorker = new WorkerThread
+            {
+                Name = "Realtime Worker",
+                ThreadPriority = ThreadPriority.AboveNormal,
+                SleepDuration = TimeSpan.FromMilliseconds(8),
+                SleepMode = WorkerSleepMode.DynamicSleep
+            };
+            _realtimeWorker.PerformWork += RealtimeWorker_PerformWork;
+
+            _registrationWorker = new WorkerThread
+            {
+                Name = "Registration Worker",
+                ThreadPriority = ThreadPriority.BelowNormal,
+                SleepDuration = TimeSpan.FromMilliseconds(100),
+                SleepMode = WorkerSleepMode.Default
+            };
+            _registrationWorker.PerformWork += RegistrationWorker_PerformWork;
         }
 
         #endregion
 
         #region Lifecycle
 
-        /// <summary>Starts the background player refresh thread.</summary>
+        /// <summary>Starts the background worker threads.</summary>
         public void Start()
         {
             _registeredPlayers.WaitForLocalPlayer(_ct);
-            _refreshThread = new Thread(RefreshWorker) { IsBackground = true, Name = "LocalGameWorld.Refresh" };
-            _refreshThread.Start();
+            _realtimeWorker?.Start();
+            _registrationWorker?.Start();
         }
 
         /// <summary>Single-tick manual refresh (called from the main loop when not using a refresh thread).</summary>
-        public void Refresh() { /* refresh driven by background thread */ }
+        public void Refresh() { /* refresh driven by WorkerThreads */ }
 
         public void Dispose()
         {
+            if (_disposed) return;
             _disposed = true;
+            _realtimeWorker?.Dispose();
+            _registrationWorker?.Dispose();
+            _realtimeWorker = null;
+            _registrationWorker = null;
         }
 
         #endregion
 
         #region Workers
 
-        private void RefreshWorker()
+        /// <summary>
+        /// Realtime work tick (DynamicSleep: 8ms target, AboveNormal priority).
+        /// Scatter-batched position + rotation reads — single DMA round-trip per tick.
+        /// </summary>
+        private void RealtimeWorker_PerformWork(CancellationToken ct)
         {
-            while (!_disposed && !_ct.IsCancellationRequested)
+            if (_disposed) return;
+            _registeredPlayers.UpdateRealtimeData();
+        }
+
+        /// <summary>
+        /// Registration work tick (100ms, BelowNormal priority).
+        /// Player list discovery, lifecycle, transform validation, raid-ended checks.
+        /// </summary>
+        private void RegistrationWorker_PerformWork(CancellationToken ct)
+        {
+            if (_disposed) return;
+
+            _registeredPlayers.RefreshRegistration();
+
+            // Periodic transform validation
+            var now = DateTime.UtcNow;
+            if ((now - _lastTransformValidation) >= TransformValidationInterval)
             {
-                try
-                {
-                    _registeredPlayers.Refresh();
-                    CheckRaidEnded();
-                    Thread.Sleep(RefreshInterval);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch (Memory.GameNotRunningException)
-                {
-                    _disposed = true;
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    Log.WriteRateLimited(AppLogLevel.Warning, "refresh_ex", TimeSpan.FromSeconds(5),
-                        $"[LocalGameWorld] Refresh error ({ex.GetType().Name}): {ex.Message}\n{ex.StackTrace}");
-                    Thread.Sleep(500);
-                }
+                _lastTransformValidation = now;
+                _registeredPlayers.ValidateTransforms();
             }
 
-            _disposed = true;
+            // Periodic raid-ended check
+            if ((now - _lastRaidEndedCheck) >= RaidEndedCheckInterval)
+            {
+                _lastRaidEndedCheck = now;
+                try { Memory.ThrowIfNotInGame(); }
+                catch (Memory.GameNotRunningException) { _disposed = true; }
+            }
         }
 
         #endregion
@@ -167,13 +203,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             var gameObject = gom.GetGameObjectByName("GameWorld");
             if (gameObject == 0) return 0;
 
+            // GameObject → ComponentArray → entry → ObjectClass (GameWorld instance)
             ulong step1, step2, step3;
             try { step1 = Memory.ReadPtr(gameObject + 0x58, false); }
-            catch (Exception ex) { Log.WriteLine($"[GW] Chain[0x58] failed: {ex.Message}"); return 0; }
+            catch { return 0; }
             try { step2 = Memory.ReadPtr(step1 + 0x18, false); }
-            catch (Exception ex) { Log.WriteLine($"[GW] Chain[0x18] failed: {ex.Message}"); return 0; }
+            catch { return 0; }
             try { step3 = Memory.ReadPtr(step2 + 0x20, false); }
-            catch (Exception ex) { Log.WriteLine($"[GW] Chain[0x20] failed: {ex.Message}"); return 0; }
+            catch { return 0; }
 
             return step3;
         }
@@ -189,15 +226,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             {
                 return "unknown";
             }
-        }
-
-        private void CheckRaidEnded()
-        {
-            var now = DateTime.UtcNow;
-            if ((now - _lastRaidEndedCheck) < RaidEndedCheckInterval) return;
-            _lastRaidEndedCheck = now;
-            try { Memory.ThrowIfNotInGame(); }
-            catch (Memory.GameNotRunningException) { _disposed = true; }
         }
 
         #endregion
