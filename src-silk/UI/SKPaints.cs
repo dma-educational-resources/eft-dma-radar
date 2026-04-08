@@ -101,6 +101,16 @@ namespace eft_dma_radar.Silk.UI
 
         #endregion
 
+        #region Loot Paints
+
+        /// <summary>Normal loot — white circle + text.</summary>
+        public static SKPaint LootNormal { get; } = NewTextPaint(new SKColor(200, 200, 200, 200));
+
+        /// <summary>Valuable loot — bright green circle + text.</summary>
+        public static SKPaint LootImportant { get; } = NewTextPaint(new SKColor(50, 255, 50));
+
+        #endregion
+
         #region Helpers
 
         private static SKPaint NewFillPaint(SKColor color) => new()

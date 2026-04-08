@@ -6,15 +6,14 @@ using SilkUtils = eft_dma_radar.Silk.Misc.Utils;
 namespace eft_dma_radar.Silk.Tarkov.Unity
 {
     // ─────────────────────────────────────────────────────────────────────────────
-    // Standalone IL2CPP Unity helpers for the Silk layer.
-    // Self-contained GOM resolution and object class reading.
+    // IL2CPP Unity engine constants, layout structs, and GOM resolution.
     // ─────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Centralized IL2CPP Unity offsets for the Silk layer.
+    /// All Unity engine offsets — both IL2CPP object layout and native transform hierarchy.
     /// Update when game patches break functionality.
     /// </summary>
-    internal static class SilkUnityOffsets
+    internal static class UnityOffsets
     {
         // ── GameObject ──────────────────────────────────────────────────────
         public const uint GO_ObjectClass   = 0x80;  // GameObject → ObjectClass (m_Object)
@@ -32,6 +31,52 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
         // ── ModuleBase (UnityPlayer.dll offsets) ────────────────────────────
         public const uint GomFallback        = 0x1A233A0;  // UnityPlayer.dll Dec 2025
         public const uint AllCamerasFallback = 0x19F3080;   // UnityPlayer.dll Dec 2025
+
+        // ── Il2Cpp generic List<T> layout ────────────────────────────────────
+        public static class List
+        {
+            /// <summary>Offset from List base to _items (the backing array pointer).</summary>
+            public const uint ArrOffset = 0x10;
+
+            /// <summary>Offset from the array base to the first element (element[0]).</summary>
+            public const uint ArrStartOffset = 0x20;
+        }
+
+        // ── TransformInternal native layout ──────────────────────────────────
+        public static class TransformAccess
+        {
+            /// <summary>TransformInternal + 0x70 → pointer to TransformHierarchy.</summary>
+            public const uint HierarchyOffset = 0x70;
+
+            /// <summary>TransformInternal + 0x78 → int index into the hierarchy arrays.</summary>
+            public const uint IndexOffset = 0x78;
+        }
+
+        // ── TransformHierarchy native layout ─────────────────────────────────
+        public static class TransformHierarchy
+        {
+            /// <summary>TransformHierarchy + 0x40 → pointer to indices array (int[]).</summary>
+            public const uint IndicesOffset = 0x40;
+
+            /// <summary>TransformHierarchy + 0x68 → pointer to vertices array (TrsX[]).</summary>
+            public const uint VerticesOffset = 0x68;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// TRS element in a Unity TransformHierarchy vertices array.
+    /// Layout: Translation(Vector3) + pad(float) + Rotation(Quaternion) + Scale(Vector3) + pad(float) = 48 bytes.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal readonly struct TrsX
+    {
+        public readonly Vector3 T;        // translation (12 bytes)
+        private readonly float _pad0;     // padding (4 bytes)
+        public readonly Quaternion Q;     // rotation (16 bytes)
+        public readonly Vector3 S;        // scale (12 bytes)
+        private readonly float _pad1;     // padding (4 bytes)
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -53,10 +98,10 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
     // ─────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// IL2CPP ComponentArray layout — embedded inside a GameObject at offset <see cref="SilkUnityOffsets.GO_Components"/>.
+    /// IL2CPP ComponentArray layout — embedded inside a GameObject at offset <see cref="UnityOffsets.GO_Components"/>.
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal readonly struct SilkComponentArray
+    internal readonly struct ComponentArray
     {
         public readonly ulong ArrayBase;
         public readonly ulong MemLabelId;
@@ -75,29 +120,29 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
 
     /// <summary>
     /// Mirrors the IL2CPP GameObject struct for component iteration.
-    /// Read via <see cref="SilkGameObject.Read(ulong, bool)"/>.
+    /// Read via <see cref="GameObject.Read(ulong, bool)"/>.
     /// </summary>
     [StructLayout(LayoutKind.Explicit)]
-    internal readonly struct SilkGameObject
+    internal readonly struct GameObject
     {
         private const int MaxStackEntries = 32;
 
         [FieldOffset(0x08)]
         public readonly int InstanceID;
 
-        [FieldOffset((int)SilkUnityOffsets.GO_ObjectClass)]
+        [FieldOffset((int)UnityOffsets.GO_ObjectClass)]
         public readonly ulong ObjectClass;
 
-        [FieldOffset((int)SilkUnityOffsets.GO_Components)]
-        public readonly SilkComponentArray Components;
+        [FieldOffset((int)UnityOffsets.GO_Components)]
+        public readonly ComponentArray Components;
 
-        [FieldOffset((int)SilkUnityOffsets.GO_Name)]
+        [FieldOffset((int)UnityOffsets.GO_Name)]
         public readonly ulong NamePtr;
 
-        /// <summary>Reads a <see cref="SilkGameObject"/> from the given pointer.</summary>
+        /// <summary>Reads a <see cref="GameObject"/> from the given pointer.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static SilkGameObject Read(ulong gameObjectPtr, bool useCache = false)
-            => Memory.ReadValue<SilkGameObject>(gameObjectPtr, useCache);
+        public static GameObject Read(ulong gameObjectPtr, bool useCache = false)
+            => Memory.ReadValue<GameObject>(gameObjectPtr, useCache);
 
         /// <summary>Reads the name string from this GameObject.</summary>
         public string GetName(int maxLen = 64)
@@ -109,7 +154,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
 
         // ── Component entries reader (stackalloc fast-path) ──────────────────
 
-        private readonly bool TryReadEntries(out SilkComponentArray.Entry[] entries, out int count)
+        private readonly bool TryReadEntries(out ComponentArray.Entry[] entries, out int count)
         {
             entries = [];
             count = 0;
@@ -119,17 +164,17 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
 
             count = (int)Math.Min(Components.Size, 0x400);
             entries = count <= MaxStackEntries
-                ? new SilkComponentArray.Entry[count]
-                : ArrayPool<SilkComponentArray.Entry>.Shared.Rent(count);
+                ? new ComponentArray.Entry[count]
+                : ArrayPool<ComponentArray.Entry>.Shared.Rent(count);
 
             return Memory.TryReadBuffer(Components.ArrayBase, entries.AsSpan(0, count), false);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void ReturnEntries(SilkComponentArray.Entry[] entries, int count)
+        private static void ReturnEntries(ComponentArray.Entry[] entries, int count)
         {
             if (count > MaxStackEntries)
-                ArrayPool<SilkComponentArray.Entry>.Shared.Return(entries);
+                ArrayPool<ComponentArray.Entry>.Shared.Return(entries);
         }
 
         // ── Component by class name ─────────────────────────────────────────
@@ -154,10 +199,10 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
                     if (!SilkUtils.IsValidVirtualAddress(compPtr))
                         continue;
 
-                    if (!Memory.TryReadPtr(compPtr + SilkUnityOffsets.Comp_ObjectClass, out var objectClass, false))
+                    if (!Memory.TryReadPtr(compPtr + UnityOffsets.Comp_ObjectClass, out var objectClass, false))
                         continue;
 
-                    var name = SilkObjectClass.ReadName(objectClass, 128);
+                    var name = Il2CppClass.ReadName(objectClass, 128);
                     if (name is not null && name.Equals(className, StringComparison.OrdinalIgnoreCase))
                         return objectClass;
                 }
@@ -178,7 +223,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
         {
             if (!SilkUtils.IsValidVirtualAddress(gameObjectPtr))
                 return 0;
-            return Read(gameObjectPtr, false).GetComponent(className);
+            return Read(gameObjectPtr).GetComponent(className);
         }
 
         // ── Component by klass pointer ──────────────────────────────────────
@@ -204,7 +249,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
                     if (!SilkUtils.IsValidVirtualAddress(compPtr))
                         continue;
 
-                    if (!Memory.TryReadPtr(compPtr + SilkUnityOffsets.Comp_ObjectClass, out var objectClass, false))
+                    if (!Memory.TryReadPtr(compPtr + UnityOffsets.Comp_ObjectClass, out var objectClass, false))
                         continue;
 
                     if (Memory.TryReadValue<ulong>(objectClass, out var klass, false) && klass == klassPtr)
@@ -227,7 +272,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
         {
             if (!SilkUtils.IsValidVirtualAddress(gameObjectPtr) || !SilkUtils.IsValidVirtualAddress(klassPtr))
                 return 0;
-            return Read(gameObjectPtr, false).GetComponentByKlassPtr(klassPtr);
+            return Read(gameObjectPtr).GetComponentByKlassPtr(klassPtr);
         }
 
         // ── GetComponentFromBehaviour ────────────────────────────────────────
@@ -242,7 +287,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
             if (!SilkUtils.IsValidVirtualAddress(componentObject))
                 return 0;
 
-            if (!Memory.TryReadPtr(componentObject + SilkUnityOffsets.Comp_GameObject, out var gameObjectPtr, false))
+            if (!Memory.TryReadPtr(componentObject + UnityOffsets.Comp_GameObject, out var gameObjectPtr, false))
                 return 0;
 
             return GetComponent(gameObjectPtr, className);
@@ -257,7 +302,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
     /// [0x28] ActiveNodes     — pointer to first LinkedListObject
     /// </summary>
     [StructLayout(LayoutKind.Explicit)]
-    internal readonly struct SilkGOM
+    internal readonly struct GOM
     {
         private const int MaxWalkNodes = 100_000;
 
@@ -280,8 +325,8 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
 
         /// <summary>Reads the GOM struct from a resolved GOM address.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static SilkGOM Get(ulong gomAddress)
-            => Memory.ReadValue<SilkGOM>(gomAddress, false);
+        public static GOM Get(ulong gomAddress)
+            => Memory.ReadValue<GOM>(gomAddress, false);
 
         // ── GOM address resolution ────────────────────────────────────────────
 
@@ -413,7 +458,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
             // Phase 4: Fallback — hardcoded offset
             try
             {
-                ulong fallback = Memory.ReadPtr(unityBase + SilkUnityOffsets.GomFallback, false);
+                ulong fallback = Memory.ReadPtr(unityBase + UnityOffsets.GomFallback, false);
                 if (SilkUtils.IsValidVirtualAddress(fallback))
                 {
                     Log.WriteLine("[GOM] Located via hardcoded offset");
@@ -444,7 +489,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
             // Fallback: hardcoded offset
             try
             {
-                ulong fallback = Memory.ReadPtr(unityBase + SilkUnityOffsets.AllCamerasFallback, false);
+                ulong fallback = Memory.ReadPtr(unityBase + UnityOffsets.AllCamerasFallback, false);
                 if (SilkUtils.IsValidVirtualAddress(fallback))
                 {
                     Log.WriteLine("[AllCameras] Located via hardcoded offset");
@@ -573,11 +618,11 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
             if (!Memory.TryReadValue<LinkedListObject>(LastActiveNode, out var last, false)) return 0;
 
             ulong result = WalkList(first, last, forward: true,
-                (node) => SilkGameObject.GetComponent(node.ThisObject, className));
+                (node) => GameObject.GetComponent(node.ThisObject, className));
 
             if (result == 0)
                 result = WalkList(last, first, forward: false,
-                    (node) => SilkGameObject.GetComponent(node.ThisObject, className));
+                    (node) => GameObject.GetComponent(node.ThisObject, className));
 
             return result;
         }
@@ -596,11 +641,11 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
             if (!Memory.TryReadValue<LinkedListObject>(LastActiveNode, out var last, false)) return 0;
 
             ulong result = WalkList(first, last, forward: true,
-                (node) => SilkGameObject.GetComponentByKlassPtr(node.ThisObject, klassPtr));
+                (node) => GameObject.GetComponentByKlassPtr(node.ThisObject, klassPtr));
 
             if (result == 0)
                 result = WalkList(last, first, forward: false,
-                    (node) => SilkGameObject.GetComponentByKlassPtr(node.ThisObject, klassPtr));
+                    (node) => GameObject.GetComponentByKlassPtr(node.ThisObject, klassPtr));
 
             return result;
         }
@@ -640,7 +685,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
 
         private static bool MatchName(ulong gameObject, string name, StringComparison comparison)
         {
-            if (!Memory.TryReadValue<ulong>(gameObject + SilkUnityOffsets.GO_Name, out var namePtr, false))
+            if (!Memory.TryReadValue<ulong>(gameObject + UnityOffsets.GO_Name, out var namePtr, false))
                 return false;
             if (!SilkUtils.IsValidVirtualAddress(namePtr))
                 return false;
@@ -656,14 +701,14 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
     /// Reads the IL2CPP class name from a Unity object.
     /// Chain: objectClass → [0x0, 0x10] → name C-string
     /// </summary>
-    internal static class SilkObjectClass
+    internal static class Il2CppClass
     {
         /// <summary>
         /// Returns the IL2CPP class name for <paramref name="objectClass"/>, or null on failure.
         /// </summary>
         public static string? ReadName(ulong objectClass, int maxLength = 64)
         {
-            if (!Memory.TryReadPtrChain(objectClass, SilkUnityOffsets.ObjClass_ToNamePtr, out ulong namePtr, false))
+            if (!Memory.TryReadPtrChain(objectClass, UnityOffsets.ObjClass_ToNamePtr, out ulong namePtr, false))
                 return null;
             if (!SilkUtils.IsValidVirtualAddress(namePtr))
                 return null;

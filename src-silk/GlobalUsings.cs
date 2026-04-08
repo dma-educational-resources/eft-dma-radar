@@ -2,7 +2,6 @@
 global using SDK;
 global using SkiaSharp;
 global using System.Buffers;
-global using System.Collections;
 global using System.Collections.Concurrent;
 global using System.Diagnostics;
 global using System.Numerics;
@@ -15,9 +14,11 @@ global using System.Text.Json.Serialization;
 
 // Silk project namespaces
 global using eft_dma_radar.Silk.Misc;
+global using eft_dma_radar.Silk.Misc.Data;
 global using eft_dma_radar.Silk.Misc.Pools;
 global using eft_dma_radar.Silk.DMA;
 global using eft_dma_radar.Silk.Tarkov.GameWorld;
+global using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 global using eft_dma_radar.Silk.Tarkov.GameWorld.Player;
 global using eft_dma_radar.Silk.Config;
 global using eft_dma_radar.Silk.UI;

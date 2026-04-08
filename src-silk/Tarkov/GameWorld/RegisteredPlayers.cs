@@ -5,7 +5,7 @@ using VmmSharpEx;
 using VmmSharpEx.Options;
 using VmmSharpEx.Scatter;
 
-using static eft_dma_radar.Silk.Tarkov.Unity.UnitySDK;
+using static eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets;
 
 namespace eft_dma_radar.Silk.Tarkov.GameWorld
 {
@@ -65,8 +65,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         #region Properties
 
+        /// <summary>The local player instance, or <c>null</c> if not yet discovered.</summary>
         public Player.Player? LocalPlayer { get; private set; }
+
+        /// <summary>Raw memory address of the local player object (used for raid-ended detection).</summary>
         public ulong LocalPlayerAddr { get; private set; }
+
+        /// <summary>Number of currently tracked players.</summary>
         public int Count => _players.Count;
 
         #endregion
@@ -118,20 +123,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             }
         }
 
-        /// <summary>
-        /// TRS element in a Unity transform hierarchy vertices array.
-        /// Layout: t(Vector3) + pad(float) + q(Quaternion) + s(Vector3) + pad(float) = 48 bytes
-        /// </summary>
-        [StructLayout(LayoutKind.Sequential)]
-        private readonly struct TrsX
-        {
-            public readonly Vector3 t;    // translation (12 bytes)
-            public readonly float _pad0;  // padding (4 bytes)
-            public readonly Quaternion q; // rotation (16 bytes)
-            public readonly Vector3 s;    // scale (12 bytes)
-            public readonly float _pad1;  // padding (4 bytes)
-        }
-
         #endregion
 
         #region Constructor
@@ -170,52 +161,29 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         #region Public Methods
 
         /// <summary>
-        /// Blocks until the local player (MainPlayer) is found.
+        /// Non-blocking single attempt to discover the local player (MainPlayer).
+        /// Called by the registration worker on each tick until successful.
+        /// Returns <c>true</c> once the local player is registered.
         /// </summary>
-        internal void WaitForLocalPlayer(CancellationToken ct)
+        internal bool TryDiscoverLocalPlayer()
         {
-            Log.WriteLine("[RegisteredPlayers] Waiting for LocalPlayer...");
-            const int maxAttempts = 60;
+            if (LocalPlayer is not null)
+                return true;
 
-            for (int i = 0; i < maxAttempts; i++)
-            {
-                ct.ThrowIfCancellationRequested();
+            var mainPlayerPtr = Memory.ReadPtr(_gameWorldBase + Offsets.ClientLocalGameWorld.MainPlayer, false);
+            if (!mainPlayerPtr.IsValidVirtualAddress())
+                return false;
 
-                try
-                {
-                    var mainPlayerPtr = Memory.ReadPtr(_gameWorldBase + Offsets.ClientLocalGameWorld.MainPlayer, false);
-                    if (!mainPlayerPtr.IsValidVirtualAddress())
-                    {
-                        if (i == 0 || i % 10 == 0)
-                            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] MainPlayer ptr invalid: 0x{mainPlayerPtr:X}");
-                        ct.WaitHandle.WaitOne(500);
-                        continue;
-                    }
+            var className = ReadClassName(mainPlayerPtr);
+            var entry = CreatePlayerEntry(mainPlayerPtr, isLocal: true);
+            if (entry is null)
+                return false;
 
-                    var className = ReadClassName(mainPlayerPtr);
-                    if (i == 0 || i % 10 == 0)
-                        Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] MainPlayer=0x{mainPlayerPtr:X} class='{className ?? "<null>"}'");
-
-                    var entry = CreatePlayerEntry(mainPlayerPtr, isLocal: true);
-                    if (entry is not null)
-                    {
-                        LocalPlayer = entry.Player;
-                        LocalPlayerAddr = mainPlayerPtr;
-                        _players[mainPlayerPtr] = entry;
-                        Log.WriteLine($"[RegisteredPlayers] LocalPlayer found: {entry.Player.Name} (class='{className ?? "<null>"}')");
-                        return;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    if (i == 0 || i % 10 == 0)
-                        Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] WaitForLocalPlayer attempt {i}: {ex.Message}");
-                }
-
-                ct.WaitHandle.WaitOne(500);
-            }
-
-            Log.WriteLine("[RegisteredPlayers] Timeout waiting for LocalPlayer, proceeding anyway.");
+            LocalPlayer = entry.Player;
+            LocalPlayerAddr = mainPlayerPtr;
+            _players[mainPlayerPtr] = entry;
+            Log.WriteLine($"[RegisteredPlayers] LocalPlayer found: {entry.Player.Name} (class='{className ?? "<null>"}')");
+            return true;
         }
 
         /// <summary>
@@ -230,7 +198,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             try
             {
                 rgtPlayersAddr = Memory.ReadPtr(_gameWorldBase + Offsets.ClientLocalGameWorld.RegisteredPlayers, false);
-                listItemsPtr = Memory.ReadPtr(rgtPlayersAddr + UnityList.ArrOffset, false);
+                listItemsPtr = Memory.ReadPtr(rgtPlayersAddr + List.ArrOffset, false);
                 count = Memory.ReadValue<int>(rgtPlayersAddr + 0x18, false);
             }
             catch (Exception ex)
@@ -260,7 +228,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             ulong[] ptrs;
             try
             {
-                ptrs = Memory.ReadArray<ulong>(listItemsPtr + UnityList.ArrStartOffset, count, false);
+                ptrs = Memory.ReadArray<ulong>(listItemsPtr + List.ArrStartOffset, count, false);
             }
             catch (Exception ex)
             {
@@ -571,7 +539,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             try
             {
                 var indices = entry.CachedIndices!;
-                var worldPos = vertices[entry.TransformIndex].t;
+                var worldPos = vertices[entry.TransformIndex].T;
                 int idx = indices[entry.TransformIndex];
                 int iterations = 0;
 
@@ -581,9 +549,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         return false;
 
                     var parent = vertices[idx];
-                    worldPos = Vector3.Transform(worldPos, parent.q);
-                    worldPos *= parent.s;
-                    worldPos += parent.t;
+                    worldPos = Vector3.Transform(worldPos, parent.Q);
+                    worldPos *= parent.S;
+                    worldPos += parent.T;
 
                     idx = indices[idx];
                 }
@@ -798,8 +766,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 var bodyPtr = Memory.ReadPtr(playerBase + bodyOffset, false);
                 var skelRootJoint = Memory.ReadPtr(bodyPtr + Offsets.PlayerBody.SkeletonRootJoint, false);
                 var dizValues = Memory.ReadPtr(skelRootJoint + Offsets.DizSkinningSkeleton._values, false);
-                var arrPtr = Memory.ReadPtr(dizValues + UnityList.ArrOffset, false);
-                var boneEntryPtr = Memory.ReadPtr(arrPtr + UnityList.ArrStartOffset, false);
+                var arrPtr = Memory.ReadPtr(dizValues + List.ArrOffset, false);
+                var boneEntryPtr = Memory.ReadPtr(arrPtr + List.ArrStartOffset, false);
                 var transformInternal = Memory.ReadPtr(boneEntryPtr + 0x10, false);
 
                 // TransformAccess fields are embedded directly in TransformInternal
@@ -860,13 +828,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 {
                     var opc = Memory.ReadPtr(playerBase + Offsets.ObservedPlayerView.ObservedPlayerController, false);
                     var mc = Memory.ReadPtrChain(opc, Offsets.ObservedPlayerController.MovementController, false);
-                    rotAddr = mc + GameSDK.Rotation.Observed;
+                    rotAddr = mc + Offsets.ObservedMovementController.Rotation;
                     Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitRotation '{entry.Player.Name}': observed opc=0x{opc:X} mc=0x{mc:X} rotAddr=0x{rotAddr:X}");
                 }
                 else
                 {
                     var movCtx = Memory.ReadPtr(playerBase + Offsets.Player.MovementContext, false);
-                    rotAddr = movCtx + GameSDK.Rotation.Client;
+                    rotAddr = movCtx + Offsets.MovementContext._rotation;
                     Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitRotation '{entry.Player.Name}': client movCtx=0x{movCtx:X} rotAddr=0x{rotAddr:X}");
                 }
 
@@ -897,7 +865,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         {
             try
             {
-                return SilkObjectClass.ReadName(playerBase, 64);
+                return Il2CppClass.ReadName(playerBase, 64);
             }
             catch
             {

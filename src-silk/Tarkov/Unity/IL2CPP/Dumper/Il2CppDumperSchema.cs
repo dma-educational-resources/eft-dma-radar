@@ -654,6 +654,9 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             C("MatchingProgressView", [
                 F("_matchingProgress"),
             ], ti: Offsets.Special.MatchingProgressView_TypeIndex),
+
+            // GamePlayerOwner (resolved via TypeIndex — singleton statics)
+            C("GamePlayerOwner", [F("_myPlayer")], s: true, ti: Offsets.Special.GamePlayerOwner_TypeIndex),
         ];
     }
 }

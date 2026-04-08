@@ -39,6 +39,8 @@ namespace eft_dma_radar.Silk
                 Memory.ModuleInit(Config);
                 Log.WriteLine("[SilkProgram] Memory module initialized.");
 
+                EftDataManager.ModuleInit();
+
                 MapManager.ModuleInit();
                 Log.WriteLine("[SilkProgram] Map manager initialized, starting RadarWindow...");
 

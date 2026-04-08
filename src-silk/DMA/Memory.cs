@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
 using eft_dma_radar.Silk.Tarkov.Unity;
+using GameObjectManager = eft_dma_radar.Silk.Tarkov.Unity.GOM;
 using VmmSharpEx;
 using VmmSharpEx.Extensions;
 using VmmSharpEx.Options;
@@ -63,6 +64,7 @@ namespace eft_dma_radar.Silk.DMA
         public static string? MapID => Game?.MapID;
         public static RegisteredPlayers? Players => Game?.RegisteredPlayers;
         public static Player? LocalPlayer => Game?.LocalPlayer;
+        public static IReadOnlyList<LootItem>? Loot => Game?.Loot;
 
         #endregion
 
@@ -92,7 +94,7 @@ namespace eft_dma_radar.Silk.DMA
             GOM = default;
             GameAssemblyBase = default;
             _pid = default;
-            SilkGOM.ResetCachedAddresses();
+            GameObjectManager.ResetCachedAddresses();
             GameStopped?.Invoke(null, EventArgs.Empty);
         }
 
@@ -396,7 +398,7 @@ namespace eft_dma_radar.Silk.DMA
                 Log.WriteLine("[Memory] WARNING: GameAssembly.dll not found.");
             }
 
-            GOM = SilkGOM.GetAddr(unityBase);
+            GOM = GameObjectManager.GetAddr(unityBase);
             ArgumentOutOfRangeException.ThrowIfZero(GOM, nameof(GOM));
             Log.WriteLine($"[Memory] GOM: 0x{GOM:X}");
         }

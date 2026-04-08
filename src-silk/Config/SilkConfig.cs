@@ -50,6 +50,23 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Draw lines connecting squad members.</summary>
         public bool ConnectGroups { get; set; } = true;
 
+        // ── Loot ────────────────────────────────────────────────────────────────
+
+        /// <summary>Master toggle for loot rendering on the radar.</summary>
+        public bool ShowLoot { get; set; } = true;
+
+        /// <summary>Minimum price (roubles) below which loot is hidden from the radar.</summary>
+        public int LootMinPrice { get; set; } = 50_000;
+
+        /// <summary>Price threshold (roubles) above which loot is highlighted as important.</summary>
+        public int LootImportantPrice { get; set; } = 200_000;
+
+        /// <summary>Show prices as price-per-slot instead of total price.</summary>
+        public bool LootPricePerSlot { get; set; } = false;
+
+        /// <summary>Price source for loot values (0 = Best, 1 = Flea, 2 = Trader).</summary>
+        public int LootPriceSource { get; set; } = 0;
+
         // ── Memory Writes ───────────────────────────────────────────────────────
 
         /// <summary>Master toggle for all memory write features.</summary>

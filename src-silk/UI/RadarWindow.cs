@@ -414,6 +414,26 @@ namespace eft_dma_radar.Silk.UI
                 normalPlayers = _renderPlayers;
             }
 
+            // Loot (skip in battle mode or if loot is disabled)
+            if (!Config.BattleMode && Config.ShowLoot)
+            {
+                var loot = Memory.Loot;
+                LootFilter.UpdateCounts(loot);
+
+                if (loot is not null)
+                {
+                    foreach (var item in loot)
+                    {
+                        if (item.ShouldDraw())
+                            item.Draw(canvas, mapParams, map.Config, localPlayer);
+                    }
+                }
+            }
+            else
+            {
+                LootFilter.UpdateCounts(null);
+            }
+
             // Group connectors
             if (Config.ConnectGroups && normalPlayers is not null)
                 DrawGroupConnectors(canvas, normalPlayers, map, mapParams);
@@ -580,6 +600,9 @@ namespace eft_dma_radar.Silk.UI
                     if (ImGui.MenuItem("Players", null, PlayerInfoWidget.IsOpen))
                         PlayerInfoWidget.IsOpen = !PlayerInfoWidget.IsOpen;
 
+                    if (ImGui.MenuItem("Loot", null, LootWidget.IsOpen))
+                        LootWidget.IsOpen = !LootWidget.IsOpen;
+
                     // Right-aligned: Map name + FPS
                     string mapName = MapManager.Map?.Config?.Name ?? "No Map";
                     string rightText = $"{mapName} | {_fps} FPS";
@@ -609,6 +632,9 @@ namespace eft_dma_radar.Silk.UI
 
             if (PlayerInfoWidget.IsOpen && InRaid)
                 PlayerInfoWidget.Draw();
+
+            if (LootWidget.IsOpen && InRaid)
+                LootWidget.Draw();
         }
 
         private static void ApplyImGuiDarkStyle()
@@ -781,6 +807,7 @@ namespace eft_dma_radar.Silk.UI
                     SettingsPanel.IsOpen = false;
                     LootFiltersPanel.IsOpen = false;
                     PlayerInfoWidget.IsOpen = false;
+                    LootWidget.IsOpen = false;
                     break;
             }
         }

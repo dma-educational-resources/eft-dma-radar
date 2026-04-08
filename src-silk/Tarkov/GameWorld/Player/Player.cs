@@ -85,9 +85,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 
         #endregion
 
+        /// <summary>Player display name (in-game nickname or AI template name).</summary>
         public string Name { get; set; } = string.Empty;
 
         private PlayerType _type;
+
+        /// <summary>
+        /// Player type classification. Setting this also updates <see cref="DrawPriority"/>.
+        /// </summary>
         public PlayerType Type
         {
             get => _type;
@@ -106,6 +111,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             }
         }
 
+        /// <summary>World position updated each realtime tick via DMA scatter read.</summary>
         public Vector3 Position { get; set; }
 
         /// <summary>
@@ -135,17 +141,30 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// </summary>
         public float MapRotation { get; private set; }
 
+        /// <summary>BSG group ID (party/squad). Players in the same group are teammates.</summary>
         public int GroupID { get; set; }
+
+        /// <summary>Position-based spawn group ID assigned at first sighting.</summary>
         public int SpawnGroupID { get; set; }
+
+        /// <summary>Whether this player is alive (false after death).</summary>
         public bool IsAlive { get; set; } = true;
+
+        /// <summary>Whether this player is actively tracked (false = no longer in registered players).</summary>
         public bool IsActive { get; set; } = true;
+
+        /// <summary>Whether this player is in a DMA error state (transform read failures).</summary>
         public bool IsError { get; set; }
+
+        /// <summary>Whether this player is the local (MainPlayer) player.</summary>
         public virtual bool IsLocalPlayer => false;
 
+        /// <summary>Whether this player is a human-controlled PMC or player scav.</summary>
         public bool IsHuman => Type is PlayerType.Default or PlayerType.Teammate
             or PlayerType.USEC or PlayerType.BEAR or PlayerType.PScav
             or PlayerType.Streamer or PlayerType.SpecialPlayer;
 
+        /// <summary>Whether this player is a hostile human (PMC/PScav, not a teammate).</summary>
         public bool IsHostile => IsHuman && Type is not PlayerType.Teammate;
 
         /// <summary>
@@ -268,19 +287,29 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
     }
 
     /// <summary>
-    /// Player type classification.
+    /// Player type classification — determines radar color, draw priority, and hostility.
     /// </summary>
     public enum PlayerType
     {
+        /// <summary>Unclassified / fallback.</summary>
         Default,
+        /// <summary>Same-group teammate (not drawn as hostile).</summary>
         Teammate,
+        /// <summary>USEC PMC.</summary>
         USEC,
+        /// <summary>BEAR PMC.</summary>
         BEAR,
+        /// <summary>AI-controlled scav.</summary>
         AIScav,
+        /// <summary>AI raider (e.g. labs, reserve).</summary>
         AIRaider,
+        /// <summary>AI boss (Killa, Reshala, etc.).</summary>
         AIBoss,
+        /// <summary>Player-controlled scav.</summary>
         PScav,
+        /// <summary>Special player (dev, sherpa, etc.).</summary>
         SpecialPlayer,
+        /// <summary>Known streamer.</summary>
         Streamer
     }
 }

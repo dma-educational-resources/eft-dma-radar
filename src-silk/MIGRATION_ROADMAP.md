@@ -1,34 +1,44 @@
 # WPF → Silk.NET Migration Roadmap
 
 ## Current State
-**Phase 1 complete (including structural restructuring).** `src-silk` is a fully standalone executable — no runtime dependency
-on the WPF project's `Memory.cs`, `Player.cs`, or `LocalGameWorld.cs`.
+**Phase 1 complete + SDK independence + loot system + code quality pass.** `src-silk` is a fully standalone
+executable with zero runtime dependency on the WPF project — no `ProjectReference`, no shared types.
 
 - **Silk.NET project** (`src-silk`): Silk.NET + SkiaSharp + ImGui window — **running independently**
   - Own `Memory.cs` (DMA layer): state machine, worker thread, full scatter read/write API
   - Own IL2CPP dumper (`src-silk/Tarkov/Unity/IL2CPP/Dumper/`) — silk-native namespace,
     isolated cache at `%AppData%\eft-dma-radar-silk\il2cpp_offsets.json`
-  - Own game model mirroring WPF structure:
+  - Own `Offsets.cs` (game SDK) — all 379 offsets, fully independent from WPF `SDK.cs`
+  - Own `Unity.cs` — IL2CPP engine constants, `GOM`, `ComponentArray`, `GameObject`, `TrsX`,
+    `UnityOffsets` (named constants replacing magic numbers throughout)
+  - Own game model:
     - `Tarkov/GameWorld/Player/Player.cs` — base player class with `Draw()`, `DrawPriority`
     - `Tarkov/GameWorld/Player/LocalPlayer.cs` — sealed subclass, `IsLocalPlayer => true`
-    - `Tarkov/GameWorld/RegisteredPlayers.cs` — player collection with refresh logic
-    - `Tarkov/GameWorld/LocalGameWorld.cs` — raid lifecycle, background refresh thread
+    - `Tarkov/GameWorld/RegisteredPlayers.cs` — player collection with scatter-batched refresh
+    - `Tarkov/GameWorld/LocalGameWorld.cs` — raid lifecycle, non-blocking startup, two-tier workers
+    - `Tarkov/GameWorld/Loot/LootManager.cs` — loose loot via 6-round scatter chain
+    - `Tarkov/GameWorld/Loot/LootItem.cs` — loot rendering with price tiers
+  - Own data layer:
+    - `Misc/Data/EftDataManager.cs` — embedded item database (FrozenDictionary)
+    - `Misc/Data/TarkovMarketItem.cs` — minimal item model
   - Own map system mirroring WPF structure:
     - `UI/Radar/Maps/IRadarMap.cs`, `IMapEntity.cs` — interfaces
     - `UI/Radar/Maps/MapConfig.cs`, `MapParams.cs`, `MapManager.cs`, `RadarMap.cs`
   - Own `SilkConfig` (`%AppData%\eft-dma-radar-silk\config.json`)
+  - Own `SKPaints.cs`, `CustomFonts.cs` — no WPF paint/font references
   - `RadarWindow` draws via `Player.Draw()` — rendering logic lives on the player, not the window
-  - `WPF ProjectReference` still present in `.csproj` — referenced only for shared SDK types
-    (`Offsets`, `EftDataManager`, `SKPaints`) that have not yet been ported; no WPF runtime types used
-- **WPF project** (`src`): unchanged, still fully functional in parallel
+  - **No WPF ProjectReference** — fully standalone
+- **WPF project** (`src-wpf`): renamed from `src`, removed from solution, still functional standalone
 
 ## Architecture Goals
-- **Standalone `src-silk`**: Own `Memory.cs` + minimal game types, no WPF project reference
-- **Start minimal**: Map render, player positions/rotations, raid begin/end — nothing more
-- **Separation of concerns**: DMA layer, game model, UI are distinct layers
-- **Graceful lifecycle**: Proper state machine, error recovery, clean restart
+- **Standalone `src-silk`**: Own `Memory.cs`, `Offsets.cs`, `Unity.cs`, loot, data — no WPF reference ✅
+- **Non-blocking startup**: Workers start immediately; local player discovered in background;
+  radar shows "Waiting for Raid Start" until position available, then transitions seamlessly ✅
+- **Start minimal**: Map render, player positions/rotations, raid begin/end — nothing more ✅
+- **Separation of concerns**: DMA layer, game model, UI are distinct layers ✅
+- **Graceful lifecycle**: Proper state machine, error recovery, clean restart ✅
 - **Incremental migration**: Pull features from WPF project one at a time as needed
-- **Shared `VmmSharpEx`**: Both projects keep referencing `lib/VmmSharpEx` directly
+- **Shared `VmmSharpEx`**: Both projects keep referencing `lib/VmmSharpEx` directly ✅
 
 ---
 
@@ -111,7 +121,8 @@ on the WPF project's `Memory.cs`, `Player.cs`, or `LocalGameWorld.cs`.
 - [x] `GameSession` split into:
   - `LocalGameWorld` in `Tarkov/GameWorld/LocalGameWorld.cs` — raid lifecycle, factory, worker thread
   - `RegisteredPlayers` in `Tarkov/GameWorld/RegisteredPlayers.cs` — player collection, refresh, transform reads
-- [x] `RegisteredPlayers : IReadOnlyCollection<Player>` — owns PlayerEntry, TrsX, all offset constants
+- [x] `RegisteredPlayers : IReadOnlyCollection<Player>` — owns PlayerEntry, all offset constants
+  - `TrsX` shared struct extracted to `Unity.cs` (used by both RegisteredPlayers and LootManager)
 
 **Map system** (mirrors `src/UI/Radar/Maps/`):
 - [x] `UI/Map/*.cs` → `UI/Radar/Maps/*.cs` with namespace `eft_dma_radar.Silk.UI.Radar.Maps`
@@ -126,7 +137,7 @@ on the WPF project's `Memory.cs`, `Player.cs`, or `LocalGameWorld.cs`.
 - [x] `GlobalUsings.cs` / `Program.cs` — updated namespace imports
 
 ### 1D. Update `SilkProgram` (entry point) ✅
-- [x] WPF `ProjectReference` kept for now (types still needed by RadarWindow draw code)
+- [x] ~~WPF `ProjectReference`~~ — removed (SDK independence achieved in Phase 1I)
 - [x] `SilkConfig` — own JSON config: `DeviceStr`, `MemMapEnabled`, `UIScale`, `TargetFps`, `MemWritesEnabled`
 - [x] Startup: Load `SilkConfig` → `Memory.ModuleInit(config)` → `RadarWindow.Run()` → `Memory.Close()`
 - [x] `SilkProgram.Config` is now `SilkConfig` (not WPF `Config`)
@@ -180,19 +191,89 @@ on the WPF project's `Memory.cs`, `Player.cs`, or `LocalGameWorld.cs`.
 - [x] **Per-tick `[GW] ClientLocalGameWorld` log removed** — was flooding output every ~780 ms;
   chain-failure logs (`[GW] Chain[0xNN] failed`) are kept
 
+### 1I. SDK Independence & WPF Decoupling ✅
+> Full separation from the WPF project — no `ProjectReference`, no shared types.
+
+- [x] **Own `Offsets.cs`** (`Tarkov/Offsets.cs`) — `GameSDK` struct with all game offsets,
+  renamed from `SDK.cs` to avoid collision; 379 offsets updated from `il2cpp_offsets.json`
+- [x] **Own `Unity.cs`** (`Tarkov/Unity/Unity.cs`) — `UnityOffsets` static class with named
+  constants for all IL2CPP engine offsets (`Comp_ObjectClass`, `GO_Components`, `List.*`,
+  `TransformAccess.*`, `TransformHierarchy.*`); `GOM`, `ComponentArray`, `GameObject`,
+  `LinkedListObject` structs; `TrsX` shared transform vertex struct
+- [x] **Own `SKPaints.cs`** + **`CustomFonts.cs`** — silk-native paint/font definitions
+- [x] **WPF `ProjectReference` removed** from `eft-dma-radar-silk.csproj`
+- [x] **WPF project renamed** `src/` → `src-wpf/` and removed from solution
+  (still functional standalone, just not co-built)
+- [x] **`global using SDK = ...Offsets`** added to `GlobalUsings.cs` for compatibility
+- [x] **Naming cleanup** — `SilkUnity` → `Unity`, `GameSDK` → `Offsets`, `SilkGOM` → `GOM`,
+  `SilkGameObject` → `GameObject`, etc.
+
+### 1J. Loot System Port ✅
+> Loose loot reading and rendering — pulled from Phase 3 since dependencies were ready.
+
+- [x] **`LootManager`** (`Tarkov/GameWorld/Loot/LootManager.cs`) — 6-round scatter chain
+  reading `ObservedLootItem` objects from the `GameWorld.LootList`; rate-limited refresh (5s)
+- [x] **`LootItem`** (`Tarkov/GameWorld/Loot/LootItem.cs`) — minimal loot representation
+  with position, name, price, and `IsValuable` threshold from config
+- [x] **`EftDataManager`** (`Misc/Data/EftDataManager.cs`) — loads embedded `DEFAULT_DATA.json`
+  into a `FrozenDictionary<string, TarkovMarketItem>` at startup
+- [x] **`TarkovMarketItem`** (`Misc/Data/TarkovMarketItem.cs`) — BSG ID, name, short name,
+  trader/flea prices, best price
+- [x] **Radar integration** — loot drawn on radar with price labels; `BattleMode` hides loot;
+  `LootPriceThreshold` config controls "important" highlighting
+
+### 1K. IL2CPP Dumper Audit & Offset Cleanup ✅
+> Verified all 5 dumper files (~2100 lines) and offset definitions for correctness.
+
+- [x] **Removed `To_FirePortTransformInternal` / `To_FirePortVertices`** from `Offsets.cs` —
+  present in code but not in IL2CPP schema, wrong containing type, never used in Silk
+- [x] **Added `GamePlayerOwner`** to IL2CPP dumper schema with `TypeIndex` — enables
+  direct IL2CPP class resolution for the primary GameWorld discovery path
+- [x] **Verified `_afkMonitor` fallback** is harmless (field renamed in game, not used in Silk)
+- [x] **55 offset updates** applied from `il2cpp_offsets.json` + 2 new fields + Special type indices
+
+### 1L. Non-Blocking Startup Architecture ✅
+> Radar becomes responsive immediately — no blocking wait for local player.
+
+- [x] **`LocalGameWorld.Start()`** — starts both workers immediately, no blocking call
+- [x] **`RegistrationWorker`** — discovers local player on first tick(s); skips other work
+  until found; radar shows "Waiting for Raid Start" and transitions seamlessly
+- [x] **`RegisteredPlayers.TryDiscoverLocalPlayer()`** — non-blocking single-attempt method
+  replacing the old blocking `WaitForLocalPlayer()` loop
+- [x] **`RadarWindow`** — already handles `LocalPlayer == null` gracefully (shows status message)
+
+### 1M. Code Quality & Documentation Pass ✅
+> Comprehensive cleanup across the entire codebase.
+
+- [x] **XML doc comments** added to all undocumented public/internal members:
+  `Utils`, `Extensions` (8 methods), `Player` (12 properties), `PlayerType` (10 enum values),
+  `LocalGameWorld` (6 properties + `Dispose`), `RegisteredPlayers` (3 properties),
+  `LootManager`, `LootItem`
+- [x] **`TrsX` struct deduplicated** — extracted from `RegisteredPlayers` and `LootManager`
+  into shared `Unity.cs`; both files now reference the single definition
+- [x] **`MultiplyQuaternionVector3` removed** from `LootManager` — replaced with standard
+  `Vector3.Transform(Vector3, Quaternion)` (already used by `RegisteredPlayers`)
+- [x] **Dead code removed** — unused `heightDiff` variable in `LootItem.Draw()`
+- [x] **Magic numbers replaced** — `FindGameWorldViaGOM` now uses `GO_Components` /
+  `Comp_ObjectClass` instead of raw hex; LootManager scatter chain uses `UnityOffsets.*`
+  for all applicable offsets with inline comments for Unity-internal ones
+- [x] **Removed unused NuGet packages** — `Collections.Pooled.V2`, `System.Management`,
+  ASP.NET framework ref, `wwwroot` content
+- [x] **Removed unused global using** — `System.Collections` (non-generic)
+
 ### What gets left behind (pulled in later phases)
-| WPF Feature | Silk Phase |
-|---|---|
-| Full Player model (Gear, Hands, Health) | Phase 2 |
-| Loot system (LootManager, FilteredLoot) | Phase 3 |
-| Exits, Explosives, Quests | Phase 3 |
-| EftDataManager (item database) | Phase 3 |
-| FeatureManager (chams, memory writes) | Phase 5+ |
-| Config system (multi-profile, IConfig) | Phase 2 |
-| Own SKPaints (remove WPF project ref) | Phase 2 |
-| ResourceJanitor (GC pressure mgmt) | Phase 4+ |
-| HideoutManager | Phase 6+ |
-| InputManager (DMA-based input) | Phase 5 |
+| WPF Feature | Silk Phase | Status |
+|---|---|---|
+| Full Player model (Gear, Hands, Health) | Phase 2 | ❌ Not started |
+| ~~Loot system (LootManager, FilteredLoot)~~ | ~~Phase 3~~ | ✅ Done (Phase 1) |
+| Exits, Explosives, Quests | Phase 3 | ❌ Not started |
+| ~~EftDataManager (item database)~~ | ~~Phase 3~~ | ✅ Done (Phase 1) |
+| FeatureManager (chams, memory writes) | Phase 5+ | ❌ Not started |
+| Config system (multi-profile, IConfig) | Phase 2 | ❌ Not started |
+| ~~Own SKPaints (remove WPF project ref)~~ | ~~Phase 2~~ | ✅ Done (Phase 1) |
+| ResourceJanitor (GC pressure mgmt) | Phase 4+ | ❌ Not started |
+| HideoutManager | Phase 6+ | ❌ Not started |
+| InputManager (DMA-based input) | Phase 5 | ❌ Not started |
 
 ---
 
@@ -201,15 +282,18 @@ on the WPF project's `Memory.cs`, `Player.cs`, or `LocalGameWorld.cs`.
 
 - [ ] Full `Player` model: Hands (CurrentItem), Gear (Value, Equipment), Health, Skills
 - [ ] `XMMapManager` port or simplified map loader for SkiaSharp
-- [ ] `EftDataManager` for item names/prices (needed for loot in Phase 3)
+- [x] ~~`EftDataManager` for item names/prices~~ — done (embedded `DEFAULT_DATA.json`, `FrozenDictionary`)
 - [ ] Silk's own `Config` system: JSON-based, multi-profile, matching WPF feature set
 - [ ] Settings Panel: full tabs (General, Players, Map) with real config bindings
 - [ ] `CameraManager` for aimview prep
+- [x] ~~Own `SKPaints`~~ — done (silk-native `SKPaints.cs` + `CustomFonts.cs`)
 
-## Phase 3 — Loot, Exits & Game World
-> Complete game world state.
+## Phase 3 — Exits, Containers & Advanced Loot
+> Complete game world state beyond loose loot.
 
-- [ ] `LootManager`, `FilteredLoot`, `StaticLootContainers`
+- [x] ~~`LootManager` (loose loot)~~ — done (6-round scatter chain, ObservedLootItem)
+- [ ] `StaticLootContainers` — containers with item lists
+- [ ] `FilteredLoot` — configurable price/type filtering
 - [ ] `ExitPoints`, `Explosives`
 - [ ] `QuestManager` & quest rendering on radar
 - [ ] Loot Filters Panel (full ImGui editor)
@@ -259,37 +343,73 @@ on the WPF project's `Memory.cs`, `Player.cs`, or `LocalGameWorld.cs`.
 - [ ] Feature parity checklist vs WPF MainWindow
 - [ ] ESP overlay (if applicable)
 - [ ] Web Radar panel
-- [ ] Remove WPF ProjectReference from silk `.csproj`
-- [ ] Remove WPF project from solution (or mark as legacy)
+- [x] ~~Remove WPF ProjectReference from silk `.csproj`~~ — done (Phase 1I)
+- [x] ~~Remove WPF project from solution~~ — done (Phase 1I, renamed `src/` → `src-wpf/`)
+- [ ] Delete `src-wpf/` entirely once feature parity confirmed
 
 ---
 
-## File Structure Target (after Phase 1)
+## File Structure (current)
 
 ```
 src-silk/
 ├── DMA/
-│   ├── Memory.cs               ← NEW: standalone, ~300-400 lines
-│   └── ScatterAPI/             ← IMPORTED: IScatterEntry + scatter types
+│   ├── Memory.cs                         ← Standalone DMA layer (~750 lines)
+│   └── ScatterAPI/                       ← Scatter read/write API
+│       ├── IScatterEntry.cs
+│       ├── MemPointer.cs
+│       ├── ScatterReadMap.cs
+│       ├── ScatterReadRound.cs
+│       ├── ScatterReadIndex.cs
+│       └── ScatterReadEntry.cs
 ├── Tarkov/
-│   ├── SDK.cs                  ← IMPORTED: Offsets (minimal subset for Phase 1)
-│   ├── Unity/IL2CPP/           ← IMPORTED: dumper, Il2CppClass, GameObjectManager
-│   │   ├── Dumper/             ← Il2CppDumper (4 partial files, no changes needed)
-│   │   ├── Il2CppClass.cs
-│   │   ├── TypeInfoTableResolver.cs
-│   │   └── UnityStructures.cs  ← GameObjectManager.GetAddr()
-│   ├── PlayerBase.cs           ← NEW: minimal player (pos, rot, type, name)
-│   └── GameSession.cs          ← NEW: minimal raid state (map, players, lifecycle)
+│   ├── Offsets.cs                        ← Game SDK offsets (379 fields, IL2CPP-updated)
+│   ├── Unity/
+│   │   ├── Unity.cs                      ← UnityOffsets, GOM, ComponentArray, GameObject, TrsX
+│   │   └── IL2CPP/Dumper/                ← IL2CPP dumper (5 partial files)
+│   │       ├── Il2CppDumper.cs
+│   │       ├── Il2CppDumperCache.cs
+│   │       ├── Il2CppDumperFull.cs
+│   │       ├── Il2CppDumperSchema.cs
+│   │       └── TypeInfoTableResolver.cs
+│   └── GameWorld/
+│       ├── LocalGameWorld.cs             ← Raid lifecycle, non-blocking startup, two-tier workers
+│       ├── RegisteredPlayers.cs          ← Player management, scatter-batched transforms
+│       ├── Player/
+│       │   ├── Player.cs                 ← Base player with Draw(), DrawPriority, GetPaints()
+│       │   └── LocalPlayer.cs            ← Sealed subclass (IsLocalPlayer => true)
+│       └── Loot/
+│           ├── LootManager.cs            ← 6-round scatter chain for loose loot
+│           └── LootItem.cs               ← Loot rendering with price tiers
 ├── Config/
-│   └── SilkConfig.cs           ← NEW: simple JSON config (device, memmap, UI prefs)
+│   └── SilkConfig.cs                     ← JSON config (%AppData%\eft-dma-radar-silk\)
+├── Misc/
+│   ├── Misc.cs                           ← Utils, UTF8String, UnicodeString, BadPtrException
+│   ├── Extensions.cs                     ← VA validation, angle math, vector checks
+│   ├── Log.cs                            ← Rate-limited logger
+│   ├── SizeChecker.cs                    ← Struct size validation
+│   ├── Workers/WorkerThread.cs           ← Background worker with DynamicSleep
+│   ├── Pools/                            ← IPooledObject, SharedArray (used by ScatterAPI)
+│   └── Data/
+│       ├── EftDataManager.cs             ← Embedded item database (FrozenDictionary)
+│       └── TarkovMarketItem.cs           ← Minimal item model (BSG ID, name, prices)
 ├── UI/
-│   ├── RadarWindow.cs          ← UPDATED: uses new types, no WPF dependencies
+│   ├── RadarWindow.cs                    ← Silk.NET window, SkiaSharp GPU + ImGui overlay
+│   ├── SKPaints.cs                       ← Shared paint instances (player/loot/UI colors)
+│   ├── CustomFonts.cs                    ← Embedded font loading
 │   ├── Panels/
-│   │   ├── SettingsPanel.cs    ← UPDATED: binds to SilkConfig
-│   │   └── LootFiltersPanel.cs ← placeholder (Phase 3)
-│   └── Widgets/
-│       └── PlayerInfoWidget.cs ← UPDATED: uses PlayerBase instead of Player
-├── Program.cs                  ← UPDATED: no WPF project reference in startup
+│   │   ├── SettingsPanel.cs              ← ImGui settings (binds to SilkConfig)
+│   │   └── LootFiltersPanel.cs           ← Placeholder (Phase 3)
+│   ├── Widgets/
+│   │   └── PlayerInfoWidget.cs           ← Human hostile table (ImGui)
+│   └── Radar/Maps/
+│       ├── IRadarMap.cs, IMapEntity.cs   ← Interfaces
+│       ├── MapConfig.cs, MapParams.cs    ← Map math
+│       ├── MapManager.cs                 ← Map loading
+│       └── RadarMap.cs                   ← Map rendering
+├── GlobalUsings.cs                       ← SkiaSharp, System.Numerics, SDK alias
+├── Program.cs                            ← Entry point, high-perf mode, P/Invoke
+├── DEFAULT_DATA.json                     ← Embedded item database resource
 └── MIGRATION_ROADMAP.md
 ```
 
@@ -303,7 +423,8 @@ src-silk/
 6. **The WPF project stays working** — silk migration doesn't break the existing app
 
 ## Reference
-- WPF `Memory.cs`: `src/DMA/Memory.cs` (~918 lines) — reference for read/write API surface
-- WPF `Player.cs`: `src/Tarkov/GameWorld/Player/Player.cs` — reference for full player model
-- WPF `LocalGameWorld.cs`: `src/Tarkov/GameWorld/LocalGameWorld.cs` — reference for raid lifecycle
+- WPF project: `src-wpf/` (renamed from `src/`, removed from solution, still functional standalone)
+- WPF `Memory.cs`: `src-wpf/DMA/Memory.cs` — reference for read/write API surface
+- WPF `Player.cs`: `src-wpf/Tarkov/GameWorld/Player/Player.cs` — reference for full player model
+- WPF `LocalGameWorld.cs`: `src-wpf/Tarkov/GameWorld/LocalGameWorld.cs` — reference for raid lifecycle
 - ImGui.NET docs: https://github.com/ImGuiNET/ImGui.NET

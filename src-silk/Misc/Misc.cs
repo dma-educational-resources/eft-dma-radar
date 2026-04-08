@@ -1,7 +1,14 @@
 namespace eft_dma_radar.Silk.Misc
 {
+    /// <summary>
+    /// Low-level utility helpers.
+    /// </summary>
     public static class Utils
     {
+        /// <summary>
+        /// Returns <c>true</c> if <paramref name="va"/> falls within the valid user-mode
+        /// virtual address range (0x100000 – 0x7FFFFFFFFFFF).
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsValidVirtualAddress(ulong va) =>
             va >= 0x100000 && va < 0x7FFFFFFFFFFF;

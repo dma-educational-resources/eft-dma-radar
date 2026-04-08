@@ -2,21 +2,33 @@ using eft_dma_radar.Silk.Misc.Workers;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using VmmSharpEx;
 
-using static eft_dma_radar.Silk.Tarkov.Unity.UnitySDK;
+using static eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets;
 
 namespace eft_dma_radar.Silk.Tarkov.GameWorld
 {
     /// <summary>
     /// Minimal raid session. Reads players (position + rotation) and raid lifecycle.
-    /// Phase 1 — no loot, no exits, no quests.
     /// <para>
-    /// Worker thread model:
+    /// <b>Startup model:</b> Once a valid GameWorld is detected, workers start immediately.
+    /// The registration worker discovers the local player on its first tick(s) — no blocking.
+    /// The radar shows "Waiting for Raid Start" until the local player's position is available,
+    /// then seamlessly transitions to the live radar view. Loot and other players load in
+    /// the background and appear as they become ready.
+    /// </para>
+    /// <para>
+    /// <b>Worker thread model:</b>
     /// <list type="bullet">
     ///   <item><b>RealtimeWorker</b> (8ms target, DynamicSleep, AboveNormal priority) — scatter-batched
     ///   position + rotation for all active players in a single DMA round-trip.
-    ///   Actual sleep = max(0, 8ms - workTime).</item>
-    ///   <item><b>RegistrationWorker</b> (100ms, BelowNormal priority) — player list discovery,
-    ///   lifecycle management, transform validation, raid-ended checks.</item>
+    ///   Actual sleep = max(0, 8ms - workTime). <b>Never</b> touches loot or registration.</item>
+    ///   <item><b>RegistrationWorker</b> (100ms, BelowNormal priority) — strict priority ordering:
+    ///     <list type="number">
+    ///       <item><b>Local player discovery</b> — blocks everything until found.</item>
+    ///       <item><b>Player list refresh</b> — always runs every tick.</item>
+    ///       <item><b>Secondary work</b> (loot, transforms, raid-ended) — runs only after
+    ///         players are handled; cannot starve player work.</item>
+    ///     </list>
+    ///   </item>
     /// </list>
     /// </para>
     /// </summary>
@@ -27,6 +39,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private readonly ulong _base;
         private readonly CancellationToken _ct;
         private readonly RegisteredPlayers _registeredPlayers;
+        private readonly LootManager _lootManager;
         private volatile bool _disposed;
         private WorkerThread? _realtimeWorker;
         private WorkerThread? _registrationWorker;
@@ -55,10 +68,20 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         #region Properties
 
+        /// <summary>Map identifier for the current raid (e.g. "factory4_night", "bigmap").</summary>
         public string MapID { get; }
+
+        /// <summary>Whether the raid is still active (becomes <c>false</c> after disposal).</summary>
         public bool InRaid => !_disposed;
+
+        /// <summary>The registered players manager for this raid session.</summary>
         public RegisteredPlayers RegisteredPlayers => _registeredPlayers;
+
+        /// <summary>The local (MainPlayer) player, or <c>null</c> if not yet discovered.</summary>
         public Player.Player? LocalPlayer => _registeredPlayers.LocalPlayer;
+
+        /// <summary>Current snapshot of loose loot items in the raid.</summary>
+        public IReadOnlyList<LootItem> Loot => _lootManager.Loot;
 
         /// <summary>
         /// Clears the stale GameWorld guard and cooldown so a user-initiated restart
@@ -199,6 +222,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             MapID = mapId;
             _ct = ct;
             _registeredPlayers = new RegisteredPlayers(gameWorldBase, mapId);
+            _lootManager = new LootManager(gameWorldBase);
 
             _realtimeWorker = new WorkerThread
             {
@@ -224,28 +248,33 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         #region Lifecycle
 
         /// <summary>
-        /// Waits for the local player to be fully initialised, then starts worker threads.
+        /// Starts worker threads immediately. The registration worker will discover
+        /// the local player on its first tick — no blocking wait. The radar shows
+        /// "Waiting for Raid Start" until the local player's position is available,
+        /// then seamlessly transitions to the live radar view.
         /// </summary>
         public void Start()
         {
-            _registeredPlayers.WaitForLocalPlayer(_ct);
-
-            // Capture the LocalPlayer's address for raid-ended detection
-            _localPlayerAddr = _registeredPlayers.LocalPlayerAddr;
-
             // Initialise timing baselines — give the raid a grace period before
             // firing raid-ended and transform-validation checks.
             var now = DateTime.UtcNow;
             _lastRaidEndedCheck = now;
             _lastTransformValidation = now;
 
-            _realtimeWorker?.Start();
+            // Start workers immediately — registration worker discovers the
+            // local player in the background, realtime worker starts reading
+            // positions as soon as players are registered.
             _registrationWorker?.Start();
+            _realtimeWorker?.Start();
         }
 
         /// <summary>Single-tick manual refresh (called from the main loop when not using a refresh thread).</summary>
         public void Refresh() { /* refresh driven by WorkerThreads */ }
 
+        /// <summary>
+        /// Tears down the raid session — stops worker threads, marks the GameWorld as stale,
+        /// and begins a cooldown to prevent re-detection of the same GameWorld address.
+        /// </summary>
         public void Dispose()
         {
             if (_disposed) return;
@@ -290,13 +319,46 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>
         /// Registration work tick (100ms, BelowNormal priority).
-        /// Player list discovery, lifecycle, transform validation, raid-ended checks.
+        /// <para>
+        /// <b>Priority order (guaranteed):</b>
+        /// <list type="number">
+        ///   <item>Local player discovery (blocks everything else until found).</item>
+        ///   <item>Player list refresh — always runs every tick.</item>
+        ///   <item>Secondary work (loot, transform validation, raid-ended) — runs only
+        ///         after players are handled. New features added here will never starve
+        ///         player discovery or registration.</item>
+        /// </list>
+        /// </para>
         /// </summary>
         private void RegistrationWorker_PerformWork(CancellationToken ct)
         {
             if (_disposed) return;
 
+            // ── Priority 1: Local player discovery ─────────────────────────────
+            // Until the local player is found, skip ALL other work. The radar shows
+            // "Waiting for Raid Start" and transitions seamlessly once position is available.
+            if (_localPlayerAddr == 0)
+            {
+                if (!TryDiscoverLocalPlayer())
+                    return;
+            }
+
+            // ── Priority 2: Player registration (always runs every tick) ───────
             _registeredPlayers.RefreshRegistration();
+
+            // ── Priority 3: Secondary work (never starves player registration) ─
+            DoSecondaryWork();
+        }
+
+        /// <summary>
+        /// Secondary work that runs after player registration is complete each tick.
+        /// All lower-priority tasks go here — loot, transform validation, raid-ended checks.
+        /// Adding new features here guarantees they cannot delay player discovery or registration.
+        /// </summary>
+        private void DoSecondaryWork()
+        {
+            // Loot refresh (rate-limited internally to once per 5s)
+            _lootManager.Refresh();
 
             // Periodic transform validation
             var now = DateTime.UtcNow;
@@ -316,6 +378,37 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     Memory.ShowNotification?.Invoke("Raid has ended", NotificationLevel.Info);
                     Dispose();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Attempts to discover and register the local player. Called from the registration
+        /// worker on each tick until successful. Once found, captures the player address
+        /// for raid-ended detection and refreshes timing baselines.
+        /// </summary>
+        private bool TryDiscoverLocalPlayer()
+        {
+            try
+            {
+                if (!_registeredPlayers.TryDiscoverLocalPlayer())
+                    return false;
+
+                _localPlayerAddr = _registeredPlayers.LocalPlayerAddr;
+
+                // Reset timing baselines now that the local player is confirmed —
+                // gives raid-ended and transform checks a fresh grace period.
+                var now = DateTime.UtcNow;
+                _lastRaidEndedCheck = now;
+                _lastTransformValidation = now;
+
+                Log.WriteLine($"[LocalGameWorld] Local player discovered — radar is live.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.WriteRateLimited(AppLogLevel.Debug, "lgw_lp_discover", TimeSpan.FromSeconds(3),
+                    $"[LocalGameWorld] Waiting for local player... ({ex.Message})");
+                return false;
             }
         }
 
@@ -421,10 +514,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                 // First player entry must be a valid pointer
                 // List<T>._items at +0x10 → array, first element at array + 0x20
-                if (!Memory.TryReadPtr(rgtPlayersAddr + UnityList.ArrOffset, out var listBase, false)
+                if (!Memory.TryReadPtr(rgtPlayersAddr + List.ArrOffset, out var listBase, false)
                     || listBase == 0)
                     return false;
-                if (!Memory.TryReadPtr(listBase + UnityList.ArrStartOffset, out var firstPlayer, false)
+                if (!Memory.TryReadPtr(listBase + List.ArrStartOffset, out var firstPlayer, false)
                     || firstPlayer == 0)
                     return false;
 
@@ -452,9 +545,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     return false;
                 if (!Memory.TryReadPtr(skelRoot + Offsets.DizSkinningSkeleton._values, out var dizValues, false) || dizValues == 0)
                     return false;
-                if (!Memory.TryReadPtr(dizValues + UnityList.ArrOffset, out var arrPtr, false) || arrPtr == 0)
+                if (!Memory.TryReadPtr(dizValues + List.ArrOffset, out var arrPtr, false) || arrPtr == 0)
                     return false;
-                if (!Memory.TryReadPtr(arrPtr + UnityList.ArrStartOffset, out var boneEntry, false) || boneEntry == 0)
+                if (!Memory.TryReadPtr(arrPtr + List.ArrStartOffset, out var boneEntry, false) || boneEntry == 0)
                     return false;
                 if (!Memory.TryReadPtr(boneEntry + 0x10, out var transformInternal, false) || transformInternal == 0)
                     return false;
@@ -588,18 +681,22 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         // GOM FALLBACK — Name-based scan
         // ────────────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Scans the GOM (Game Object Manager) for a GameObject named "GameWorld"
+        /// and walks its component chain to find the ClientLocalGameWorld instance.
+        /// </summary>
         private static ulong FindGameWorldViaGOM()
         {
-            var gom = Memory.ReadValue<SilkGOM>(Memory.GOM, false);
+            var gom = Memory.ReadValue<GOM>(Memory.GOM, false);
             var gameObject = gom.GetGameObjectByName("GameWorld");
             if (gameObject == 0) return 0;
 
-            // GameObject → ComponentArray → entry → ObjectClass (GameWorld instance)
-            if (!Memory.TryReadPtr(gameObject + 0x58, out var step1, false)) return 0;
-            if (!Memory.TryReadPtr(step1 + 0x18, out var step2, false)) return 0;
-            if (!Memory.TryReadPtr(step2 + 0x20, out var step3, false)) return 0;
+            // Walk: GameObject → ComponentArray → entry[1].Component → ObjectClass
+            if (!Memory.TryReadPtr(gameObject + GO_Components, out var compArray, false)) return 0;
+            if (!Memory.TryReadPtr(compArray + 0x18, out var component, false)) return 0;
+            if (!Memory.TryReadPtr(component + Comp_ObjectClass, out var objectClass, false)) return 0;
 
-            return step3;
+            return objectClass;
         }
 
         // ────────────────────────────────────────────────────────────────

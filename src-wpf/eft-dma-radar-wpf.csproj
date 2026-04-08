@@ -4,7 +4,7 @@
 		<StartupObject>eft_dma_radar.Program</StartupObject>
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
-		<AssemblyName>eft-dma-radar</AssemblyName>
+		<AssemblyName>eft-dma-radar-wpf</AssemblyName>
 		<RootNamespace>eft_dma_radar</RootNamespace>
 		<ApplicationIcon>lone-icon.ico</ApplicationIcon>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
