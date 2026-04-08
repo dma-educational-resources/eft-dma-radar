@@ -1,8 +1,8 @@
 # WPF → Silk.NET Migration Roadmap
 
 ## Current State
-**Phase 1 complete + SDK independence + loot system + code quality pass.** `src-silk` is a fully standalone
-executable with zero runtime dependency on the WPF project — no `ProjectReference`, no shared types.
+**Phase 2 complete.** `src-silk` is a fully standalone executable with a full player model
+(gear, dogtag identity, profile lookups), aimlines, hover tooltips, and polished rendering.
 
 - **Silk.NET project** (`src-silk`): Silk.NET + SkiaSharp + ImGui window — **running independently**
   - Own `Memory.cs` (DMA layer): state machine, worker thread, full scatter read/write API
@@ -12,12 +12,21 @@ executable with zero runtime dependency on the WPF project — no `ProjectRefere
   - Own `Unity.cs` — IL2CPP engine constants, `GOM`, `ComponentArray`, `GameObject`, `TrsX`,
     `UnityOffsets` (named constants replacing magic numbers throughout)
   - Own game model:
-    - `Tarkov/GameWorld/Player/Player.cs` — base player class with `Draw()`, `DrawPriority`
+    - `Tarkov/GameWorld/Player/Player.cs` — base player class with identity, gear, profile stats
+    - `Tarkov/GameWorld/Player/Player.Draw.cs` — rendering: dot, chevron, aimline, labels
     - `Tarkov/GameWorld/Player/LocalPlayer.cs` — sealed subclass, `IsLocalPlayer => true`
-    - `Tarkov/GameWorld/RegisteredPlayers.cs` — player collection with scatter-batched refresh
+    - `Tarkov/GameWorld/Player/PlayerType.cs` — player type enum (10 types)
+    - `Tarkov/GameWorld/Player/GearManager.cs` — scatter-batched equipment/dogtag reader
+    - `Tarkov/GameWorld/Player/GearItem.cs` — equipment slot model
+    - `Tarkov/GameWorld/RegisteredPlayers.cs` — player collection (partial class)
+    - `Tarkov/GameWorld/RegisteredPlayers.Discovery.cs` — player discovery & classification
+    - `Tarkov/GameWorld/RegisteredPlayers.Scatter.cs` — scatter-batched transform reads
     - `Tarkov/GameWorld/LocalGameWorld.cs` — raid lifecycle, non-blocking startup, two-tier workers
-    - `Tarkov/GameWorld/Loot/LootManager.cs` — loose loot via 6-round scatter chain
-    - `Tarkov/GameWorld/Loot/LootItem.cs` — loot rendering with price tiers
+    - `Tarkov/GameWorld/Loot/LootManager.cs` — loose loot + corpse dogtag extraction
+    - `Tarkov/GameWorld/Loot/LootItem.cs` — loot rendering with price tiers + shadow
+    - `Tarkov/GameWorld/Loot/DogtagCache.cs` — persistent ProfileId→AccountId database
+    - `Tarkov/GameWorld/Loot/LootFilter.cs` — price source, per-slot, threshold filtering
+    - `Tarkov/ProfileService.cs` — tarkov.dev profile fetcher (KD, hours, survival rate)
   - Own data layer:
     - `Misc/Data/EftDataManager.cs` — embedded item database (FrozenDictionary)
     - `Misc/Data/TarkovMarketItem.cs` — minimal item model
@@ -25,8 +34,9 @@ executable with zero runtime dependency on the WPF project — no `ProjectRefere
     - `UI/Radar/Maps/IRadarMap.cs`, `IMapEntity.cs` — interfaces
     - `UI/Radar/Maps/MapConfig.cs`, `MapParams.cs`, `MapManager.cs`, `RadarMap.cs`
   - Own `SilkConfig` (`%AppData%\eft-dma-radar-silk\config.json`)
-  - Own `SKPaints.cs`, `CustomFonts.cs` — no WPF paint/font references
+  - Own `SKPaints.cs`, `CustomFonts.cs` — blur-based text shadows, loot shadows
   - `RadarWindow` draws via `Player.Draw()` — rendering logic lives on the player, not the window
+  - Hover tooltips on radar canvas (SkiaSharp) + PlayerInfoWidget (ImGui) with column-aligned layout
   - **No WPF ProjectReference** — fully standalone
 - **WPF project** (`src-wpf`): renamed from `src`, removed from solution, still functional standalone
 
@@ -264,12 +274,12 @@ executable with zero runtime dependency on the WPF project — no `ProjectRefere
 ### What gets left behind (pulled in later phases)
 | WPF Feature | Silk Phase | Status |
 |---|---|---|
-| Full Player model (Gear, Hands, Health) | Phase 2 | ❌ Not started |
+| ~~Full Player model (Gear, Hands, Health)~~ | ~~Phase 2~~ | ✅ Done (Phase 2) |
 | ~~Loot system (LootManager, FilteredLoot)~~ | ~~Phase 3~~ | ✅ Done (Phase 1) |
 | Exits, Explosives, Quests | Phase 3 | ❌ Not started |
 | ~~EftDataManager (item database)~~ | ~~Phase 3~~ | ✅ Done (Phase 1) |
 | FeatureManager (chams, memory writes) | Phase 5+ | ❌ Not started |
-| Config system (multi-profile, IConfig) | Phase 2 | ❌ Not started |
+| ~~Config system (multi-profile, IConfig)~~ | ~~Phase 2~~ | ✅ Done (Phase 2 — simplified) |
 | ~~Own SKPaints (remove WPF project ref)~~ | ~~Phase 2~~ | ✅ Done (Phase 1) |
 | ResourceJanitor (GC pressure mgmt) | Phase 4+ | ❌ Not started |
 | HideoutManager | Phase 6+ | ❌ Not started |
@@ -277,27 +287,89 @@ executable with zero runtime dependency on the WPF project — no `ProjectRefere
 
 ---
 
-## Phase 2 — Full Game Model & Config
-> Bring over the complete player model, map loading, and config system.
+## Phase 2 — Full Player Model, Gear, Profiles & Rendering Polish ✅ (Done)
+> Complete player model with gear, dogtag identity, tarkov.dev profiles, aimlines, and UI polish.
 
-- [ ] Full `Player` model: Hands (CurrentItem), Gear (Value, Equipment), Health, Skills
-- [ ] `XMMapManager` port or simplified map loader for SkiaSharp
-- [x] ~~`EftDataManager` for item names/prices~~ — done (embedded `DEFAULT_DATA.json`, `FrozenDictionary`)
-- [ ] Silk's own `Config` system: JSON-based, multi-profile, matching WPF feature set
-- [ ] Settings Panel: full tabs (General, Players, Map) with real config bindings
-- [ ] `CameraManager` for aimview prep
-- [x] ~~Own `SKPaints`~~ — done (silk-native `SKPaints.cs` + `CustomFonts.cs`)
+### 2A. Player Refactor & Gear System ✅
+- [x] **Player partial class split** — `Player.cs` (data model) + `Player.Draw.cs` (rendering)
+- [x] **PlayerType enum** — extracted to `PlayerType.cs` (USEC, BEAR, PScav, AIScav, AIRaider, AIBoss, etc.)
+- [x] **GearManager** (`Player/GearManager.cs`) — scatter-batched equipment reader:
+  - 3-round scatter chain reading equipment slots + dogtag ProfileId
+  - Equipment value calculation with EftDataManager price lookup
+  - Thermal/NVG detection from slot items
+  - Dogtag-based identity resolution (ProfileId → DogtagCache → name/level/AccountId)
+- [x] **GearItem** (`Player/GearItem.cs`) — equipment slot model (BSG ID, short name, price)
+- [x] **RegisteredPlayers split** into 3 partial files:
+  - `RegisteredPlayers.cs` — core collection, public API
+  - `RegisteredPlayers.Discovery.cs` — player discovery, classification, registration
+  - `RegisteredPlayers.Scatter.cs` — scatter-batched transform/rotation reads
+
+### 2B. Dogtag Identity & Profile Lookup ✅
+- [x] **DogtagCache** (`Loot/DogtagCache.cs`) — persistent ProfileId→AccountId database
+  - JSON file at `%AppData%\eft-dma-radar-silk\DogtagDb.json`
+  - Compatible format with WPF radar's DogtagDb.json
+  - Per-raid level cache (in-memory only)
+  - Background flush thread (30s interval)
+- [x] **Corpse dogtag extraction** — LootManager reads dogtags from corpse loot,
+  seeds DogtagCache with ProfileId→AccountId→Nickname→Level
+- [x] **ProfileService** (`Tarkov/ProfileService.cs`) — tarkov.dev profile fetcher:
+  - Background worker thread fetching from `https://players.tarkov.dev/profile/{accountId}.json`
+  - ConcurrentDictionary cache, 1.5s rate limiting, 429 backoff (60s)
+  - JSON models: ProfileData, ProfileInfo, ProfileStats, OverAllCounterItem
+  - Computed stats: KD, Kills, Deaths, Sessions, SurvivedRate, Hours, AccountType (STD/EOD/UH)
+  - Lifecycle: starts on GameStarted, stops on GameStopped
+- [x] **Player.Profile** — cached ProfileData reference, populated on first UI access
+
+### 2C. Aimlines & High Alert ✅
+- [x] **DrawAimline** — direction line extending from dot edge in facing direction
+  - Human players: configurable length (default 15px)
+  - AI players: half human length, capped at 10px
+  - Dark outline (2.6px) + colored stroke (1.2px) two-pass rendering
+- [x] **IsFacingTarget** — ported from WPF HighAlert module
+  - 3D yaw→forward vector, dot product angle check
+  - Non-linear distance-based threshold (tight at range, loose close)
+  - Extends aimline to 2000px when hostile aims at local player
+- [x] **Config**: `ShowAimlines`, `AimlineLength` (0–100), `HighAlert`
+
+### 2D. Rendering Polish ✅
+- [x] **Blur-based text shadows** — replaced stroked text outlines (`IsStroke=true`)
+  with `MaskFilter.CreateBlur()` for smoother rendering
+- [x] **Font weight fix** — `FontMedium11` → `FontRegular11` for player/loot labels
+  (Medium weight was too heavy at 11pt)
+- [x] **Loot text shadow** — added `LootShadow` paint (loot had no shadow previously)
+- [x] **Text alignment** — adjusted vertical offsets for player labels (+4.5f) and loot (+4.5f)
+- [x] **Shadow contrast** — increased alpha (140→200) and sigma (0.8→1.0) for readability
+
+### 2E. UI & Tooltip Improvements ✅
+- [x] **Radar hover tooltips** — profile stats line (KD, Raids, SR%, Hours, AccountType)
+- [x] **PlayerInfoWidget K/D column** — 7-column table (Name, Lvl, K/D, Grp, Value, Gear, Dist)
+- [x] **Tooltip column alignment** — `ImGui.SameLine(fixedCol)` for clean label-value pairs
+  (replaced variable-width SameLine that caused jagged text)
+- [x] **Tooltip layout** — three sections (Identity → Profile → Equipment) with separators
+- [x] **Settings Panel** — Aimline section (Show, Length slider, High Alert toggle),
+  Profile section (Profile Lookups toggle)
+
+### 2F. Code Quality ✅
+- [x] **Nullable project-wide** — `Directory.Build.props` upgraded from `warnings` to `enable`,
+  removed 11 per-file `#nullable enable` directives
+- [x] **Bug fixes** — `SpawnGroupID`/`GroupID` default 0→-1 (valid IDs start at 1),
+  `Refresh()` dead code removed, tooltip canvas clamping, FPS timer dispose guard
+- [x] **Copilot instructions** — `.github/copilot-instructions.md` added (no WPF type references)
+- [x] ~~Map loader~~ — already done (Phase 1, MapManager)
+- [x] ~~EftDataManager~~ — already done (Phase 1, embedded FrozenDictionary)
+- [x] ~~Own SKPaints~~ — already done (Phase 1)
 
 ## Phase 3 — Exits, Containers & Advanced Loot
 > Complete game world state beyond loose loot.
 
 - [x] ~~`LootManager` (loose loot)~~ — done (6-round scatter chain, ObservedLootItem)
+- [x] ~~`LootFilter` (price filtering)~~ — done (Phase 1, price source/per-slot/threshold)
+- [x] ~~`LootWidget` (ImGui table)~~ — done (Phase 1, sortable loot table)
+- [x] ~~`LootFiltersPanel` (ImGui editor)~~ — done (Phase 1)
 - [ ] `StaticLootContainers` — containers with item lists
-- [ ] `FilteredLoot` — configurable price/type filtering
 - [ ] `ExitPoints`, `Explosives`
 - [ ] `QuestManager` & quest rendering on radar
-- [ ] Loot Filters Panel (full ImGui editor)
-- [ ] Loot Widget (sortable ImGui table)
+- [ ] `CameraManager` for aimview prep
 
 ## Phase 4 — Aimview Widget
 > FBO-backed SkiaSharp aimview rendered as an ImGui image.
@@ -364,6 +436,7 @@ src-silk/
 │       └── ScatterReadEntry.cs
 ├── Tarkov/
 │   ├── Offsets.cs                        ← Game SDK offsets (379 fields, IL2CPP-updated)
+│   ├── ProfileService.cs                ← tarkov.dev profile fetcher (KD, hours, SR%)
 │   ├── Unity/
 │   │   ├── Unity.cs                      ← UnityOffsets, GOM, ComponentArray, GameObject, TrsX
 │   │   └── IL2CPP/Dumper/                ← IL2CPP dumper (5 partial files)
@@ -374,13 +447,21 @@ src-silk/
 │   │       └── TypeInfoTableResolver.cs
 │   └── GameWorld/
 │       ├── LocalGameWorld.cs             ← Raid lifecycle, non-blocking startup, two-tier workers
-│       ├── RegisteredPlayers.cs          ← Player management, scatter-batched transforms
+│       ├── RegisteredPlayers.cs          ← Player collection (partial — core + public API)
+│       ├── RegisteredPlayers.Discovery.cs ← Player discovery, classification, registration
+│       ├── RegisteredPlayers.Scatter.cs  ← Scatter-batched transform/rotation reads
 │       ├── Player/
-│       │   ├── Player.cs                 ← Base player with Draw(), DrawPriority, GetPaints()
-│       │   └── LocalPlayer.cs            ← Sealed subclass (IsLocalPlayer => true)
+│       │   ├── Player.cs                 ← Data model: identity, gear, profile, properties
+│       │   ├── Player.Draw.cs            ← Rendering: dot, chevron, aimline, labels, shadows
+│       │   ├── LocalPlayer.cs            ← Sealed subclass (IsLocalPlayer => true)
+│       │   ├── PlayerType.cs             ← Player type enum (10 types)
+│       │   ├── GearManager.cs            ← Scatter-batched equipment + dogtag reader
+│       │   └── GearItem.cs               ← Equipment slot model (BSG ID, short name, price)
 │       └── Loot/
-│           ├── LootManager.cs            ← 6-round scatter chain for loose loot
-│           └── LootItem.cs               ← Loot rendering with price tiers
+│           ├── LootManager.cs            ← 6-round scatter chain + corpse dogtag extraction
+│           ├── LootItem.cs               ← Loot rendering with price tiers + shadow
+│           ├── LootFilter.cs             ← Price source, per-slot, threshold filtering
+│           └── DogtagCache.cs            ← Persistent ProfileId→AccountId DB + level cache
 ├── Config/
 │   └── SilkConfig.cs                     ← JSON config (%AppData%\eft-dma-radar-silk\)
 ├── Misc/
@@ -395,13 +476,14 @@ src-silk/
 │       └── TarkovMarketItem.cs           ← Minimal item model (BSG ID, name, prices)
 ├── UI/
 │   ├── RadarWindow.cs                    ← Silk.NET window, SkiaSharp GPU + ImGui overlay
-│   ├── SKPaints.cs                       ← Shared paint instances (player/loot/UI colors)
+│   ├── SKPaints.cs                       ← Shared paint instances (shadows, player/loot colors)
 │   ├── CustomFonts.cs                    ← Embedded font loading
 │   ├── Panels/
-│   │   ├── SettingsPanel.cs              ← ImGui settings (binds to SilkConfig)
-│   │   └── LootFiltersPanel.cs           ← Placeholder (Phase 3)
+│   │   ├── SettingsPanel.cs              ← ImGui settings (General, Players, Map tabs)
+│   │   └── LootFiltersPanel.cs           ← Loot filter editor (ImGui)
 │   ├── Widgets/
-│   │   └── PlayerInfoWidget.cs           ← Human hostile table (ImGui)
+│   │   ├── PlayerInfoWidget.cs           ← Human hostile table + column-aligned tooltips
+│   │   └── LootWidget.cs                 ← Sortable loot table (ImGui)
 │   └── Radar/Maps/
 │       ├── IRadarMap.cs, IMapEntity.cs   ← Interfaces
 │       ├── MapConfig.cs, MapParams.cs    ← Map math
@@ -410,6 +492,7 @@ src-silk/
 ├── GlobalUsings.cs                       ← SkiaSharp, System.Numerics, SDK alias
 ├── Program.cs                            ← Entry point, high-perf mode, P/Invoke
 ├── DEFAULT_DATA.json                     ← Embedded item database resource
+├── .github/copilot-instructions.md       ← Copilot project rules
 └── MIGRATION_ROADMAP.md
 ```
 

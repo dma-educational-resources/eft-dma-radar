@@ -1,90 +1,14 @@
+using System.Collections.Frozen;
+using eft_dma_radar.Silk.Tarkov;
+
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 {
     /// <summary>
-    /// Player representation for radar rendering.
-    /// Renders as a filled circle with a directional chevron tick.
+    /// Player data model — state, classification, and position.
+    /// Rendering is in <c>Player.Draw.cs</c>.
     /// </summary>
-    public class Player
+    public partial class Player
     {
-        #region Marker Geometry
-
-        // Core dot — small filled circle
-        private const float DotRadius = 5f;
-
-        // Directional chevron extending from the dot
-        private static readonly SKPath _chevron = CreateChevron();
-        private static readonly SKPath _deathMarker = CreateDeathMarker();
-
-        /// <summary>
-        /// Small forward-pointing chevron (arrow tick).
-        /// Points right (+X), rotated by MapRotation via canvas transform.
-        /// </summary>
-        private static SKPath CreateChevron()
-        {
-            var path = new SKPath();
-            float tipX = DotRadius + 6f;
-            float baseX = DotRadius + 0.5f;
-            float wingY = 3.2f;
-
-            path.MoveTo(baseX, -wingY);
-            path.LineTo(tipX, 0f);
-            path.LineTo(baseX, wingY);
-            return path;
-        }
-
-        private static SKPath CreateDeathMarker()
-        {
-            const float s = 4f;
-            var path = new SKPath();
-            path.MoveTo(-s, -s);
-            path.LineTo(s, s);
-            path.MoveTo(-s, s);
-            path.LineTo(s, -s);
-            return path;
-        }
-
-        // Chevron stroke paints
-        private static readonly SKPaint _chevronOutline = new()
-        {
-            Color = new SKColor(0, 0, 0, 160),
-            StrokeWidth = 3.2f,
-            Style = SKPaintStyle.Stroke,
-            StrokeCap = SKStrokeCap.Round,
-            StrokeJoin = SKStrokeJoin.Round,
-            IsAntialias = true,
-        };
-
-        // Reused on render thread — Color is set per-draw in DrawMarker()
-        private static readonly SKPaint _chevronStroke = new()
-        {
-            StrokeWidth = 1.8f,
-            Style = SKPaintStyle.Stroke,
-            StrokeCap = SKStrokeCap.Round,
-            StrokeJoin = SKStrokeJoin.Round,
-            IsAntialias = true,
-        };
-
-        // Small font for the compact H/D info line
-        private static readonly SKFont _infoFont = new(CustomFonts.Regular, 9.5f) { Subpixel = true };
-
-        private static readonly SKPaint _infoPaint = new()
-        {
-            Color = new SKColor(200, 200, 200, 190),
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        private static readonly SKPaint _infoOutline = new()
-        {
-            Color = new SKColor(0, 0, 0, 160),
-            IsStroke = true,
-            StrokeWidth = 1.2f,
-            StrokeJoin = SKStrokeJoin.Round,
-            IsAntialias = true,
-        };
-
-        #endregion
-
         /// <summary>Player display name (in-game nickname or AI template name).</summary>
         public string Name { get; set; } = string.Empty;
 
@@ -141,11 +65,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// </summary>
         public float MapRotation { get; private set; }
 
-        /// <summary>BSG group ID (party/squad). Players in the same group are teammates.</summary>
-        public int GroupID { get; set; }
+        /// <summary>BSG group ID (party/squad). Players in the same group are teammates. -1 = unknown.</summary>
+        public int GroupID { get; set; } = -1;
 
-        /// <summary>Position-based spawn group ID assigned at first sighting.</summary>
-        public int SpawnGroupID { get; set; }
+        /// <summary>Position-based spawn group ID assigned at first sighting. -1 = unassigned.</summary>
+        public int SpawnGroupID { get; set; } = -1;
 
         /// <summary>Whether this player is alive (false after death).</summary>
         public bool IsAlive { get; set; } = true;
@@ -173,143 +97,45 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// </summary>
         public int DrawPriority { get; private set; } = 1;
 
-        /// <summary>
-        /// Draws this player on the radar canvas.
-        /// </summary>
-        internal virtual void Draw(SKCanvas canvas, MapParams mapParams, MapConfig mapConfig, Player? localPlayer = null)
-        {
-            var pos = mapParams.ToScreenPos(MapParams.ToMapPos(Position, mapConfig));
+        #region Identity (Dogtag)
 
-            if (!IsAlive)
-            {
-                DrawDeathMarker(canvas, pos);
-                return;
-            }
+        /// <summary>BSG Profile ID resolved from the player's alive dogtag during gear refresh.</summary>
+        public string? ProfileId { get; set; }
 
-            var (fillPaint, textPaint) = GetPaints();
+        /// <summary>BSG Account ID resolved from corpse dogtag cache.</summary>
+        public string? AccountId { get; set; }
 
-            DrawMarker(canvas, pos, fillPaint);
+        /// <summary>Player level resolved from corpse dogtag cache.</summary>
+        public int Level { get; set; }
 
-            if (!IsLocalPlayer)
-            {
-                string name = IsError ? "ERROR" : Name;
+        #endregion
 
-                if (localPlayer is not null)
-                {
-                    float height = Position.Y - localPlayer.Position.Y;
-                    float dist = Vector3.Distance(localPlayer.Position, Position);
-                    DrawLabel(canvas, pos, textPaint, name, height, dist);
-                }
-                else
-                {
-                    DrawLabel(canvas, pos, textPaint, name, null, null);
-                }
-            }
-        }
+        #region Profile (tarkov.dev)
 
-        /// <summary>
-        /// Draws a filled circle + directional chevron tick.
-        /// </summary>
-        private void DrawMarker(SKCanvas canvas, SKPoint point, SKPaint fillPaint)
-        {
-            canvas.Save();
-            canvas.Translate(point.X, point.Y);
+        /// <summary>Cached profile data from tarkov.dev. Null if not yet fetched or unavailable.</summary>
+        internal ProfileService.ProfileData? Profile { get; set; }
 
-            // Filled dot with thin dark border
-            canvas.DrawCircle(0, 0, DotRadius, SKPaints.ShapeBorder);
-            canvas.DrawCircle(0, 0, DotRadius - 0.6f, fillPaint);
+        #endregion
 
-            // Directional chevron — rotated to face direction
-            canvas.RotateDegrees(MapRotation);
-            canvas.DrawPath(_chevron, _chevronOutline);
-            _chevronStroke.Color = fillPaint.Color;
-            canvas.DrawPath(_chevron, _chevronStroke);
+        #region Gear
 
-            canvas.Restore();
-        }
+        /// <summary>Equipment slots keyed by slot name (e.g. "FirstPrimaryWeapon", "Headwear").</summary>
+        internal IReadOnlyDictionary<string, GearItem> Equipment { get; set; } = FrozenDictionary<string, GearItem>.Empty;
 
-        /// <summary>
-        /// Draws a small X for dead players.
-        /// </summary>
-        private static void DrawDeathMarker(SKCanvas canvas, SKPoint point)
-        {
-            canvas.Save();
-            canvas.Translate(point.X, point.Y);
-            canvas.DrawPath(_deathMarker, SKPaints.PaintDeathMarker);
-            canvas.Restore();
-        }
+        /// <summary>Total estimated gear value in roubles.</summary>
+        public int GearValue { get; set; }
 
-        /// <summary>
-        /// Draws the player name + optional compact H/D info line.
-        /// </summary>
-        private static void DrawLabel(SKCanvas canvas, SKPoint point, SKPaint textPaint, string name, float? height, float? dist)
-        {
-            float x = point.X + DotRadius + 4f;
-            float y = point.Y + 3.5f;
+        /// <summary>Whether this player has night vision goggles equipped.</summary>
+        public bool HasNVG { get; set; }
 
-            // Name
-            canvas.DrawText(name, x, y, SKTextAlign.Left, SKPaints.FontMedium11, SKPaints.TextOutline);
-            canvas.DrawText(name, x, y, SKTextAlign.Left, SKPaints.FontMedium11, textPaint);
+        /// <summary>Whether this player has a thermal scope/device equipped.</summary>
+        public bool HasThermal { get; set; }
 
-            // Compact H/D on second line in a smaller, dimmer font
-            if (height.HasValue && dist.HasValue)
-            {
-                float y2 = y + 11f;
-                int h = (int)height.Value;
-                int d = (int)dist.Value;
-                string info = string.Create(null, stackalloc char[32], $"{h:+0;-0}m  {d:N0}m");
-                canvas.DrawText(info, x, y2, SKTextAlign.Left, _infoFont, _infoOutline);
-                canvas.DrawText(info, x, y2, SKTextAlign.Left, _infoFont, _infoPaint);
-            }
-        }
+        /// <summary>Whether gear has been read at least once for this player.</summary>
+        public bool GearReady { get; set; }
 
-        /// <summary>
-        /// Returns the dot and text paints for this player based on type.
-        /// </summary>
-        protected virtual (SKPaint dot, SKPaint text) GetPaints()
-        {
-            return Type switch
-            {
-                PlayerType.Teammate      => (SKPaints.PaintTeammate, SKPaints.TextTeammate),
-                PlayerType.USEC          => (SKPaints.PaintUSEC, SKPaints.TextUSEC),
-                PlayerType.BEAR          => (SKPaints.PaintBEAR, SKPaints.TextBEAR),
-                PlayerType.PScav         => (SKPaints.PaintPScav, SKPaints.TextPScav),
-                PlayerType.AIScav        => (SKPaints.PaintScav, SKPaints.TextScav),
-                PlayerType.AIRaider      => (SKPaints.PaintRaider, SKPaints.TextRaider),
-                PlayerType.AIBoss        => (SKPaints.PaintBoss, SKPaints.TextBoss),
-                PlayerType.SpecialPlayer => (SKPaints.PaintSpecial, SKPaints.TextSpecial),
-                PlayerType.Streamer      => (SKPaints.PaintStreamer, SKPaints.TextStreamer),
-                _                        => (SKPaints.PaintLocalPlayer, SKPaints.TextLocalPlayer)
-            };
-        }
+        #endregion
 
         public override string ToString() => $"{Type} [{Name}]";
-    }
-
-    /// <summary>
-    /// Player type classification — determines radar color, draw priority, and hostility.
-    /// </summary>
-    public enum PlayerType
-    {
-        /// <summary>Unclassified / fallback.</summary>
-        Default,
-        /// <summary>Same-group teammate (not drawn as hostile).</summary>
-        Teammate,
-        /// <summary>USEC PMC.</summary>
-        USEC,
-        /// <summary>BEAR PMC.</summary>
-        BEAR,
-        /// <summary>AI-controlled scav.</summary>
-        AIScav,
-        /// <summary>AI raider (e.g. labs, reserve).</summary>
-        AIRaider,
-        /// <summary>AI boss (Killa, Reshala, etc.).</summary>
-        AIBoss,
-        /// <summary>Player-controlled scav.</summary>
-        PScav,
-        /// <summary>Special player (dev, sherpa, etc.).</summary>
-        SpecialPlayer,
-        /// <summary>Known streamer.</summary>
-        Streamer
     }
 }

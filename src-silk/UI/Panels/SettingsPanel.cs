@@ -1,7 +1,6 @@
 using ImGuiNET;
 using eft_dma_radar.Silk.Config;
 
-#nullable enable
 namespace eft_dma_radar.Silk.UI.Panels
 {
     internal static class SettingsPanel
@@ -98,6 +97,37 @@ namespace eft_dma_radar.Silk.UI.Panels
                 Config.ConnectGroups = connectGroups;
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Draw lines connecting players in the same group");
+
+            ImGui.SeparatorText("Aimline");
+
+            bool showAimlines = Config.ShowAimlines;
+            if (ImGui.Checkbox("Show Aimlines", ref showAimlines))
+                Config.ShowAimlines = showAimlines;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Show facing direction lines extending from player markers");
+
+            if (Config.ShowAimlines)
+            {
+                int aimlineLength = Config.AimlineLength;
+                if (ImGui.SliderInt("Aimline Length", ref aimlineLength, 0, 100))
+                    Config.AimlineLength = aimlineLength;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Length of the aimline in pixels (human players)");
+
+                bool highAlert = Config.HighAlert;
+                if (ImGui.Checkbox("High Alert", ref highAlert))
+                    Config.HighAlert = highAlert;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Extend aimline across the map when an enemy is aiming at you");
+            }
+
+            ImGui.SeparatorText("Profile");
+
+            bool profileLookups = Config.ProfileLookups;
+            if (ImGui.Checkbox("Profile Lookups", ref profileLookups))
+                Config.ProfileLookups = profileLookups;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Fetch player profiles from tarkov.dev (K/D, hours, survival rate)");
 
             ImGui.EndTabItem();
         }

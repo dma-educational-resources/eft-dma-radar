@@ -6,8 +6,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 {
     /// <summary>
     /// Reads loose loot from the GameWorld LootList.
-    /// Only ObservedLootItem (loose loot on the ground).
-    /// No corpses, containers, or quest items.
+    /// Also scans corpses for dogtag identity data (nickname, accountId, profileId).
     /// </summary>
     internal sealed class LootManager
     {
@@ -16,6 +15,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         private volatile IReadOnlyList<LootItem> _loot = [];
         private DateTime _lastRefresh;
         private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(5);
+
+        // Track corpses we've already read dogtags from (by interactiveClass address)
+        private readonly HashSet<ulong> _processedCorpses = [];
 
         /// <summary>Current loot snapshot (thread-safe read).</summary>
         public IReadOnlyList<LootItem> Loot => _loot;
@@ -44,6 +46,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             catch (Exception ex)
             {
                 Log.WriteLine($"[LootManager] Refresh failed: {ex.Message}");
+            }
+
+            try
+            {
+                ReadCorpseDogtags();
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[LootManager] Corpse dogtag scan failed: {ex.Message}");
             }
         }
 
@@ -182,6 +193,131 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             map.Execute();
             return result;
         }
+
+        #region Corpse Dogtag Reading
+
+        /// <summary>
+        /// Iterates the LootList for corpse items, walks their equipment slots,
+        /// finds BarterOther (dogtag) items, reads DogtagComponent fields, and seeds
+        /// <see cref="DogtagCache"/> with victim identity data.
+        /// </summary>
+        private void ReadCorpseDogtags()
+        {
+            if (!Memory.TryReadPtr(_lgw + Offsets.ClientLocalGameWorld.LootList, out var lootListAddr))
+                return;
+
+            if (!Memory.TryReadPtr(lootListAddr + UnityOffsets.List.ArrOffset, out var arrBase))
+                return;
+
+            var count = Memory.ReadValue<int>(lootListAddr + 0x18);
+            if (count <= 0 || count > 4096)
+                return;
+
+            var ptrs = Memory.ReadArray<ulong>(arrBase + UnityOffsets.List.ArrStartOffset, count);
+
+            foreach (var lootBase in ptrs)
+            {
+                if (!lootBase.IsValidVirtualAddress())
+                    continue;
+
+                try
+                {
+                    // Read MonoBehaviour (LootItemPositionClass + 0x10)
+                    if (!Memory.TryReadPtr(lootBase + 0x10, out var monoBehaviour))
+                        continue;
+
+                    // Read InteractiveClass
+                    if (!Memory.TryReadPtr(monoBehaviour + UnityOffsets.Comp_ObjectClass, out var interactiveClass))
+                        continue;
+
+                    if (!interactiveClass.IsValidVirtualAddress())
+                        continue;
+
+                    // Already processed this corpse?
+                    if (_processedCorpses.Contains(interactiveClass))
+                        continue;
+
+                    // Read class name to identify corpses
+                    var className = Il2CppClass.ReadName(lootBase);
+                    if (className is null || !className.Contains("Corpse", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    // Mark as processed
+                    _processedCorpses.Add(interactiveClass);
+
+                    // Corpse: InteractiveLootItem.Item → base item → LootItemMod.Slots → array of slots
+                    if (!Memory.TryReadPtr(interactiveClass + Offsets.InteractiveLootItem.Item, out var itemBase)
+                        || !itemBase.IsValidVirtualAddress())
+                        continue;
+
+                    if (!Memory.TryReadPtr(itemBase + Offsets.LootItemMod.Slots, out var slotsArr)
+                        || !slotsArr.IsValidVirtualAddress())
+                        continue;
+
+                    if (!Memory.TryReadValue<int>(slotsArr + 0x18, out var slotCount) || slotCount < 1 || slotCount > 64)
+                        continue;
+
+                    var slotPtrs = Memory.ReadArray<ulong>(slotsArr + 0x20, slotCount);
+
+                    foreach (var slotPtr in slotPtrs)
+                    {
+                        if (!slotPtr.IsValidVirtualAddress())
+                            continue;
+
+                        if (!Memory.TryReadPtr(slotPtr + Offsets.Slot.ContainedItem, out var slotItem)
+                            || !slotItem.IsValidVirtualAddress())
+                            continue;
+
+                        // Check if this is a BarterOther (dogtag)
+                        var slotClassName = Il2CppClass.ReadName(slotItem);
+                        if (slotClassName is null || !slotClassName.Equals("BarterOther", StringComparison.Ordinal))
+                            continue;
+
+                        // Read DogtagComponent
+                        if (!Memory.TryReadPtr(slotItem + Offsets.BarterOtherOffsets.Dogtag, out var dogtag)
+                            || !dogtag.IsValidVirtualAddress())
+                            continue;
+
+                        // Read victim identity fields
+                        var profileId = ReadDogtagString(dogtag + Offsets.DogtagComponent.ProfileId);
+                        if (string.IsNullOrWhiteSpace(profileId))
+                            continue;
+
+                        var nickname = ReadDogtagString(dogtag + Offsets.DogtagComponent.Nickname);
+                        var accountId = ReadDogtagString(dogtag + Offsets.DogtagComponent.AccountId);
+                        Memory.TryReadValue<int>(dogtag + Offsets.DogtagComponent.Level, out var level);
+
+                        DogtagCache.Seed(profileId, nickname, accountId, level);
+
+                        // Also seed killer identity if available
+                        var killerProfileId = ReadDogtagString(dogtag + Offsets.DogtagComponent.KillerProfileId);
+                        var killerAccountId = ReadDogtagString(dogtag + Offsets.DogtagComponent.KillerAccountId);
+                        var killerName = ReadDogtagString(dogtag + Offsets.DogtagComponent.KillerName);
+
+                        if (!string.IsNullOrWhiteSpace(killerProfileId))
+                            DogtagCache.Seed(killerProfileId, killerName, killerAccountId, 0);
+
+                        break; // Only one dogtag per corpse
+                    }
+                }
+                catch
+                {
+                    // Non-fatal — skip this corpse
+                }
+            }
+        }
+
+        /// <summary>
+        /// Reads a Unity string from a dogtag component field (ptr → Unity string).
+        /// </summary>
+        private static string? ReadDogtagString(ulong fieldAddr)
+        {
+            if (!Memory.TryReadPtr(fieldAddr, out var strPtr) || !strPtr.IsValidVirtualAddress())
+                return null;
+            return Memory.TryReadUnityString(strPtr, out var result) ? result : null;
+        }
+
+        #endregion
 
         /// <summary>
         /// Reads world position from a TransformInternal pointer using the hierarchy walk.

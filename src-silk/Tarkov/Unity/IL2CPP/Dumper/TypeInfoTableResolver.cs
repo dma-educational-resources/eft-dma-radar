@@ -1,6 +1,5 @@
 ﻿#pragma warning disable IDE0130
 using UTF8String = eft_dma_radar.Silk.Misc.UTF8String;
-#nullable enable
 
 namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
 {

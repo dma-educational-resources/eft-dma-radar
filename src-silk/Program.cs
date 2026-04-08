@@ -1,5 +1,6 @@
 using Silk.NET.Input.Glfw;
 using Silk.NET.Windowing.Glfw;
+using eft_dma_radar.Silk.Tarkov;
 using System.Runtime.Versioning;
 
 [assembly: AssemblyTitle("EFT DMA Radar (Silk.NET)")]
@@ -37,6 +38,8 @@ namespace eft_dma_radar.Silk
                 SetHighPerformanceMode();
 
                 Memory.ModuleInit(Config);
+                Memory.GameStarted += (_, _) => ProfileService.Start();
+                Memory.GameStopped += (_, _) => ProfileService.Stop();
                 Log.WriteLine("[SilkProgram] Memory module initialized.");
 
                 EftDataManager.ModuleInit();

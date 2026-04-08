@@ -45,7 +45,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             canvas.DrawCircle(screenPos, 4f, paint);
 
             string label = price > 0 ? $"{ShortName} ({FormatPrice(price)})" : ShortName;
-            canvas.DrawText(label, screenPos.X + 7, screenPos.Y + 4, paint);
+            float lx = screenPos.X + 7;
+            float ly = screenPos.Y + 4.5f;
+            canvas.DrawText(label, lx, ly, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.LootShadow);
+            canvas.DrawText(label, lx, ly, SKTextAlign.Left, SKPaints.FontRegular11, paint);
         }
 
         private static string FormatPrice(int price) => LootFilter.FormatPrice(price);

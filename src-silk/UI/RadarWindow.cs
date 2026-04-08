@@ -1,3 +1,4 @@
+using eft_dma_radar.Silk.Tarkov;
 using eft_dma_radar.Silk.UI.Panels;
 using eft_dma_radar.Silk.UI.Widgets;
 using ImGuiNET;
@@ -8,7 +9,6 @@ using Silk.NET.OpenGL.Extensions.ImGui;
 using Silk.NET.Windowing;
 using SilkWindow = Silk.NET.Windowing.Window;
 
-#nullable enable
 namespace eft_dma_radar.Silk.UI
 {
 
@@ -37,6 +37,7 @@ namespace eft_dma_radar.Silk.UI
         private static bool _mouseDown;
         private static Vector2 _lastMousePosition;
         private static Player? _mouseOverPlayer;
+        private static LootItem? _mouseOverLoot;
 
         // Map state
         private static bool _freeMode;
@@ -453,7 +454,173 @@ namespace eft_dma_radar.Silk.UI
 
             // Pings
             DrawPings(canvas, map, mapParams);
+
+            // Mouseover tooltips — drawn last so they're always on top
+            DrawMouseoverTooltip(canvas, mapParams, map.Config, localPlayer);
         }
+
+        #region Radar Mouseover Tooltip
+
+        // Reusable list for tooltip lines — avoids per-frame allocation
+        private static readonly List<(string text, SKPaint paint)> _tooltipLines = new(16);
+
+        /// <summary>
+        /// Draws a SkiaSharp tooltip near the hovered entity on the radar canvas.
+        /// </summary>
+        private static void DrawMouseoverTooltip(SKCanvas canvas, MapParams mapParams, MapConfig mapConfig, Player localPlayer)
+        {
+            var hoveredPlayer = _mouseOverPlayer;
+            var hoveredLoot = _mouseOverLoot;
+
+            if (hoveredPlayer is not null)
+            {
+                var screenPos = mapParams.ToScreenPos(MapParams.ToMapPos(hoveredPlayer.Position, mapConfig));
+                BuildPlayerTooltipLines(hoveredPlayer, localPlayer);
+                DrawTooltipBox(canvas, screenPos, _tooltipLines);
+            }
+            else if (hoveredLoot is not null)
+            {
+                var screenPos = mapParams.ToScreenPos(MapParams.ToMapPos(hoveredLoot.Position, mapConfig));
+                BuildLootTooltipLines(hoveredLoot, localPlayer);
+                DrawTooltipBox(canvas, screenPos, _tooltipLines);
+            }
+        }
+
+        private static void BuildPlayerTooltipLines(Player player, Player localPlayer)
+        {
+            _tooltipLines.Clear();
+            var textPaint = player.TextPaint;
+            int dist = (int)Vector3.Distance(localPlayer.Position, player.Position);
+
+            // Name + faction
+            string faction = player.Type switch
+            {
+                PlayerType.USEC => "USEC",
+                PlayerType.BEAR => "BEAR",
+                PlayerType.PScav => "PScav",
+                PlayerType.SpecialPlayer => "Special",
+                PlayerType.Streamer => "Streamer",
+                _ => "?"
+            };
+
+            string namePrefix = player.Level > 0 ? $"Lvl {player.Level} " : "";
+            _tooltipLines.Add(($"{faction}: {namePrefix}{player.Name}", textPaint));
+
+            // Profile stats (K/D, hours, survival rate)
+            if (player.Profile is { HasData: true } prof)
+            {
+                _tooltipLines.Add(($"K/D: {prof.KD:F1}  Raids: {prof.Sessions}  SR: {prof.SurvivedRate:F0}%  Hrs: {prof.Hours}  {prof.AccountType}", SKPaints.TooltipLabel));
+            }
+            else if (player.AccountId is not null && player.Profile is null
+                     && ProfileService.TryGetProfile(player.AccountId, out var fetchedProfile)
+                     && fetchedProfile.HasData)
+            {
+                player.Profile = fetchedProfile;
+                _tooltipLines.Add(($"K/D: {fetchedProfile.KD:F1}  Raids: {fetchedProfile.Sessions}  SR: {fetchedProfile.SurvivedRate:F0}%  Hrs: {fetchedProfile.Hours}  {fetchedProfile.AccountType}", SKPaints.TooltipLabel));
+            }
+
+            // Group
+            if (player.SpawnGroupID != -1)
+                _tooltipLines.Add(($"Group: {player.SpawnGroupID}", SKPaints.TooltipText));
+
+            // Distance
+            _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
+
+            // Gear summary
+            if (player.GearReady)
+            {
+                if (player.GearValue > 0)
+                    _tooltipLines.Add(($"Value: {LootFilter.FormatPrice(player.GearValue)}", SKPaints.TooltipAccent));
+
+                if (player.HasThermal && player.HasNVG)
+                    _tooltipLines.Add(("Thermal + NVG", SKPaints.TooltipAccent));
+                else if (player.HasThermal)
+                    _tooltipLines.Add(("Thermal", SKPaints.TooltipAccent));
+                else if (player.HasNVG)
+                    _tooltipLines.Add(("NVG", SKPaints.TooltipAccent));
+
+                // Equipment list — compact
+                foreach (var kvp in player.Equipment)
+                {
+                    string price = kvp.Value.Price > 0 ? $" ({LootFilter.FormatPrice(kvp.Value.Price)})" : "";
+                    _tooltipLines.Add(($"  {kvp.Value.Short}{price}", SKPaints.TooltipText));
+                }
+            }
+        }
+
+        private static void BuildLootTooltipLines(LootItem loot, Player localPlayer)
+        {
+            _tooltipLines.Clear();
+            int dist = (int)Vector3.Distance(localPlayer.Position, loot.Position);
+            var paint = loot.IsImportant ? SKPaints.TooltipAccent : SKPaints.TooltipText;
+
+            _tooltipLines.Add((loot.Name, paint));
+
+            if (loot.DisplayPrice > 0)
+                _tooltipLines.Add(($"Price: {LootFilter.FormatPrice(loot.DisplayPrice)}", SKPaints.TooltipAccent));
+
+            _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
+        }
+
+        /// <summary>
+        /// Draws a rounded-rect tooltip box at an entity screen position, clamped to canvas bounds.
+        /// </summary>
+        private static void DrawTooltipBox(SKCanvas canvas, SKPoint anchor, List<(string text, SKPaint paint)> lines)
+        {
+            if (lines.Count == 0)
+                return;
+
+            const float padX = 6f;
+            const float padY = 4f;
+            const float lineH = 13f;
+            const float offsetX = 14f;
+            const float offsetY = -6f;
+            const float cornerRadius = 4f;
+            const float margin = 4f;
+
+            // Measure max line width
+            float maxWidth = 0;
+            foreach (var (text, paint) in lines)
+            {
+                float w = SKPaints.FontTooltip.MeasureText(text, paint);
+                if (w > maxWidth) maxWidth = w;
+            }
+
+            float boxW = maxWidth + padX * 2;
+            float boxH = lines.Count * lineH + padY * 2;
+
+            float left = anchor.X + offsetX;
+            float top = anchor.Y + offsetY;
+
+            // Clamp to canvas bounds
+            float canvasW = _window.Size.X;
+            float canvasH = _window.Size.Y;
+
+            if (left + boxW > canvasW - margin)
+                left = anchor.X - offsetX - boxW;
+            if (left < margin)
+                left = margin;
+            if (top + boxH > canvasH - margin)
+                top = canvasH - margin - boxH;
+            if (top < margin)
+                top = margin;
+
+            var rect = new SKRect(left, top, left + boxW, top + boxH);
+
+            canvas.DrawRoundRect(rect, cornerRadius, cornerRadius, SKPaints.TooltipBackground);
+            canvas.DrawRoundRect(rect, cornerRadius, cornerRadius, SKPaints.TooltipBorder);
+
+            float textX = rect.Left + padX;
+            float textY = rect.Top + padY + SKPaints.FontTooltip.Size;
+
+            foreach (var (text, paint) in lines)
+            {
+                canvas.DrawText(text, textX, textY, SKTextAlign.Left, SKPaints.FontTooltip, paint);
+                textY += lineH;
+            }
+        }
+
+        #endregion
 
         private static void DrawGroupConnectors(SKCanvas canvas, List<Player> players, RadarMap map, MapParams mapParams)
         {
@@ -703,50 +870,90 @@ namespace eft_dma_radar.Silk.UI
             if (!InRaid)
             {
                 _mouseOverPlayer = null;
+                _mouseOverLoot = null;
                 MouseoverGroup = null;
                 return;
             }
 
-            // Find closest mouseover entity
+            var curParams = GetCurrentMapParams();
+            if (curParams is null)
+            {
+                _mouseOverPlayer = null;
+                _mouseOverLoot = null;
+                MouseoverGroup = null;
+                return;
+            }
+
+            var mp = curParams.Value;
             var mousePos = position;
-            Player? closest = null;
-            float closestDist = float.MaxValue;
+            float hitRadius = 12f * UIScale;
+
+            // Check players
+            Player? closestPlayer = null;
+            float closestPlayerDist = float.MaxValue;
 
             var players = AllPlayers;
             if (players is not null)
             {
-                var curParams = GetCurrentMapParams();
-                if (curParams is not null)
+                foreach (var p in players)
                 {
-                    var mp = curParams.Value;
-                    foreach (var p in players)
+                    if (p.IsLocalPlayer || !p.IsActive || !p.IsAlive)
+                        continue;
+                    var screenPos = mp.ToScreenPos(MapParams.ToMapPos(p.Position, mp.Config));
+                    float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
+                    if (dist < closestPlayerDist)
                     {
-                        if (p.IsLocalPlayer || !p.IsActive || !p.IsAlive)
+                        closestPlayerDist = dist;
+                        closestPlayer = p;
+                    }
+                }
+            }
+
+            if (closestPlayerDist < hitRadius && closestPlayer is not null)
+            {
+                _mouseOverPlayer = closestPlayer;
+                _mouseOverLoot = null;
+                MouseoverGroup = closestPlayer.IsHuman && closestPlayer.IsHostile && closestPlayer.SpawnGroupID != -1
+                    ? closestPlayer.SpawnGroupID
+                    : null;
+                return;
+            }
+
+            // Check loot (only when loot is visible)
+            LootItem? closestLoot = null;
+            float closestLootDist = float.MaxValue;
+
+            if (!Config.BattleMode && Config.ShowLoot)
+            {
+                var loot = Memory.Loot;
+                if (loot is not null)
+                {
+                    foreach (var item in loot)
+                    {
+                        if (!item.ShouldDraw())
                             continue;
-                        var screenPos = mp.ToScreenPos(MapParams.ToMapPos(p.Position, mp.Config));
+                        var screenPos = mp.ToScreenPos(MapParams.ToMapPos(item.Position, mp.Config));
                         float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
-                        if (dist < closestDist)
+                        if (dist < closestLootDist)
                         {
-                            closestDist = dist;
-                            closest = p;
+                            closestLootDist = dist;
+                            closestLoot = item;
                         }
                     }
                 }
             }
 
-            if (closestDist < 12f * UIScale && closest is not null)
+            if (closestLootDist < hitRadius && closestLoot is not null)
             {
-                _mouseOverPlayer = null;
-                if (closest.IsHuman && closest.IsHostile && closest.SpawnGroupID != -1)
-                    MouseoverGroup = closest.SpawnGroupID;
-                else
-                    MouseoverGroup = null;
-            }
-            else
-            {
+                _mouseOverLoot = closestLoot;
                 _mouseOverPlayer = null;
                 MouseoverGroup = null;
+                return;
             }
+
+            _mouseOverPlayer = null;
+            _mouseOverLoot = null;
+            MouseoverGroup = null;
         }
 
         /// <summary>Returns the current map params (approximate — for mouseover hit-testing only).</summary>
@@ -846,10 +1053,14 @@ namespace eft_dma_radar.Silk.UI
 
         private static async Task RunFpsTimerAsync()
         {
-            while (await _fpsTimer.WaitForNextTickAsync())
+            try
             {
-                _fps = Interlocked.Exchange(ref _fpsCounter, 0);
+                while (await _fpsTimer.WaitForNextTickAsync())
+                {
+                    _fps = Interlocked.Exchange(ref _fpsCounter, 0);
+                }
             }
+            catch (ObjectDisposedException) { }
         }
 
         #endregion

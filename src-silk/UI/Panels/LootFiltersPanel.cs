@@ -2,7 +2,6 @@ using ImGuiNET;
 using eft_dma_radar.Silk.Config;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 
-#nullable enable
 namespace eft_dma_radar.Silk.UI.Panels
 {
     /// <summary>

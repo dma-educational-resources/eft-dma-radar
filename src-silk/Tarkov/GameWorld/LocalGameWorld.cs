@@ -1,4 +1,5 @@
 using eft_dma_radar.Silk.Misc.Workers;
+using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using VmmSharpEx;
 
@@ -186,7 +187,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         continue;
                     }
 
-                    if (!ValidateTransformReadable(gameWorld, mainPlayerPtr))
+                    if (!ValidateTransformReadable(mainPlayerPtr))
                     {
                         Log.WriteRateLimited(AppLogLevel.Debug, "gw_stale_xform", TimeSpan.FromSeconds(5),
                             $"[LocalGameWorld] GameWorld @ 0x{gameWorld:X} — transform unreadable (stale). Waiting...");
@@ -268,9 +269,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             _realtimeWorker?.Start();
         }
 
-        /// <summary>Single-tick manual refresh (called from the main loop when not using a refresh thread).</summary>
-        public void Refresh() { /* refresh driven by WorkerThreads */ }
-
         /// <summary>
         /// Tears down the raid session — stops worker threads, marks the GameWorld as stale,
         /// and begins a cooldown to prevent re-detection of the same GameWorld address.
@@ -290,6 +288,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             _registrationWorker?.Dispose();
             _realtimeWorker = null;
             _registrationWorker = null;
+
+            DogtagCache.Clear();
         }
 
         #endregion
@@ -534,7 +534,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// → bone[0] → TransformInternal → vertices). If any read fails the GameWorld is
         /// stale — Unity hasn't fully torn it down but the underlying data is garbage.
         /// </summary>
-        private static bool ValidateTransformReadable(ulong gameWorld, ulong mainPlayerPtr)
+        private static bool ValidateTransformReadable(ulong mainPlayerPtr)
         {
             try
             {

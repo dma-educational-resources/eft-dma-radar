@@ -50,6 +50,15 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Draw lines connecting squad members.</summary>
         public bool ConnectGroups { get; set; } = true;
 
+        /// <summary>Show aimlines extending from player markers indicating facing direction.</summary>
+        public bool ShowAimlines { get; set; } = true;
+
+        /// <summary>Aimline length in pixels for human players (PMC/PScav).</summary>
+        public int AimlineLength { get; set; } = 15;
+
+        /// <summary>Extend aimline when an enemy is facing the local player (High Alert).</summary>
+        public bool HighAlert { get; set; } = true;
+
         // ── Loot ────────────────────────────────────────────────────────────────
 
         /// <summary>Master toggle for loot rendering on the radar.</summary>
@@ -66,6 +75,11 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>Price source for loot values (0 = Best, 1 = Flea, 2 = Trader).</summary>
         public int LootPriceSource { get; set; } = 0;
+
+        // ── Profiles ────────────────────────────────────────────────────────────
+
+        /// <summary>Enable tarkov.dev profile lookups for human players (KD, hours, etc.).</summary>
+        public bool ProfileLookups { get; set; } = true;
 
         // ── Memory Writes ───────────────────────────────────────────────────────
 

@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 
-#nullable enable
 namespace eft_dma_radar.Silk.UI.Radar.Maps
 {
     /// <summary>

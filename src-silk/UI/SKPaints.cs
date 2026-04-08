@@ -9,6 +9,7 @@ namespace eft_dma_radar.Silk.UI
         #region Fonts
 
         public static SKFont FontRegular12 { get; } = new(CustomFonts.Regular, 12) { Subpixel = true };
+        public static SKFont FontRegular11 { get; } = new(CustomFonts.Regular, 11) { Subpixel = true };
         public static SKFont FontMedium11 { get; } = new(CustomFonts.Medium, 11) { Subpixel = true };
         public static SKFont FontRegular48 { get; } = new(CustomFonts.Regular, 48) { Subpixel = true };
 
@@ -29,14 +30,25 @@ namespace eft_dma_radar.Silk.UI
 
         /// <summary>
         /// Subtle drop-shadow behind text labels for readability.
+        /// Uses a blur mask instead of a stroke for smoother rendering.
         /// </summary>
-        public static SKPaint TextOutline { get; } = new()
+        public static SKPaint TextShadow { get; } = new()
         {
             Color = new SKColor(0, 0, 0, 200),
-            IsStroke = true,
-            StrokeWidth = 1.6f,
-            StrokeJoin = SKStrokeJoin.Round,
+            IsStroke = false,
             IsAntialias = true,
+            MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 1.0f),
+        };
+
+        /// <summary>
+        /// Drop-shadow behind loot text labels for readability.
+        /// </summary>
+        public static SKPaint LootShadow { get; } = new()
+        {
+            Color = new SKColor(0, 0, 0, 200),
+            IsStroke = false,
+            IsAntialias = true,
+            MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 1.0f),
         };
 
         /// <summary>
@@ -111,6 +123,39 @@ namespace eft_dma_radar.Silk.UI
 
         #endregion
 
+        #region Tooltip Paints
+
+        /// <summary>Semi-transparent dark background for mouseover tooltips.</summary>
+        public static SKPaint TooltipBackground { get; } = new()
+        {
+            Color = new SKColor(15, 15, 15, 210),
+            Style = SKPaintStyle.Fill,
+            IsAntialias = true,
+        };
+
+        /// <summary>Subtle border around tooltip background.</summary>
+        public static SKPaint TooltipBorder { get; } = new()
+        {
+            Color = new SKColor(120, 120, 120, 140),
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 1f,
+            IsAntialias = true,
+        };
+
+        /// <summary>Primary text inside tooltips.</summary>
+        public static SKPaint TooltipText { get; } = NewTextPaint(new SKColor(220, 220, 220));
+
+        /// <summary>Dimmed label text inside tooltips.</summary>
+        public static SKPaint TooltipLabel { get; } = NewTextPaint(new SKColor(150, 150, 150));
+
+        /// <summary>Accent / money value text inside tooltips.</summary>
+        public static SKPaint TooltipAccent { get; } = NewTextPaint(new SKColor(100, 210, 100));
+
+        /// <summary>Font used for tooltip text.</summary>
+        public static SKFont FontTooltip { get; } = new(CustomFonts.Regular, 11) { Subpixel = true };
+
+        #endregion
+
         #region Helpers
 
         private static SKPaint NewFillPaint(SKColor color) => new()
@@ -123,7 +168,7 @@ namespace eft_dma_radar.Silk.UI
         private static SKPaint NewTextPaint(SKColor color) => new()
         {
             Color = color,
-            IsStroke = false,
+            Style = SKPaintStyle.Fill,
             IsAntialias = true,
         };
 
