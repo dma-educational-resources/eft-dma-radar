@@ -78,7 +78,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             Color = new SKColor(0, 0, 0, 180),
             IsStroke = false,
             IsAntialias = true,
-            MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 0.9f),
         };
 
         // Aimline paint — semi-transparent, thin line extending from the dot
@@ -133,7 +132,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 
             if (!IsLocalPlayer)
             {
-                string name = IsError ? "ERROR" : Name;
+                string name = Name;
 
                 if (localPlayer is not null)
                 {
@@ -252,8 +251,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             float x = point.X + DotRadius + 4f;
             float y = point.Y + 4.5f;
 
-            // Name — shadow then fill for clean contrast
-            canvas.DrawText(name, x, y, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.TextShadow);
+            // Name — offset shadow then fill for clean contrast
+            canvas.DrawText(name, x + 1, y + 1, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.TextShadow);
             canvas.DrawText(name, x, y, SKTextAlign.Left, SKPaints.FontRegular11, textPaint);
 
             // Compact H/D on second line in a smaller, dimmer font
@@ -263,7 +262,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 int h = (int)height.Value;
                 int d = (int)dist.Value;
                 string info = string.Create(null, stackalloc char[32], $"{h:+0;-0}m  {d:N0}m");
-                canvas.DrawText(info, x, y2, SKTextAlign.Left, _infoFont, _infoShadow);
+                canvas.DrawText(info, x + 1, y2 + 1, SKTextAlign.Left, _infoFont, _infoShadow);
                 canvas.DrawText(info, x, y2, SKTextAlign.Left, _infoFont, _infoPaint);
             }
         }

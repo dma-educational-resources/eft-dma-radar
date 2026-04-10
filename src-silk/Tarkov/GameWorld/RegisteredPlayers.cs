@@ -35,6 +35,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         // Number of consecutive realtime failures before entering error state
         private const int ErrorThreshold = 3;
 
+        // Number of consecutive successes required to clear error state (hysteresis prevents flip-flop)
+        private const int RecoveryThreshold = 5;
+
+        // Number of consecutive position failures (while TransformReady) that trigger automatic
+        // transform invalidation — covers cases where the pointer chain is valid but data isn't populated yet.
+        private const int ReinitThreshold = 10;
+
         // Maximum transform/rotation init retries before giving up (exponential backoff)
         private const int MaxInitRetries = 10;
 
@@ -109,6 +116,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             // Error tracking for realtime loop — debounce transient failures
             public int ConsecutiveErrors;
+            public int RecoveryCount;
             public bool HasError;
 
             // Transform init retry tracking — exponential backoff for persistent failures
@@ -347,14 +355,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                     var now = DateTime.UtcNow;
 
-                    // Re-init transform if invalidated (with exponential backoff)
+                    // Re-init transform if invalidated (with backoff — fast initial retry, then exponential)
                     if (!entry.TransformReady && entry.TransformInitFailures < MaxInitRetries && now >= entry.NextTransformRetry)
                     {
                         TryInitTransform(entry.Base, entry);
                         if (!entry.TransformReady)
                         {
                             entry.TransformInitFailures++;
-                            int backoffSec = Math.Min(1 << entry.TransformInitFailures, 30); // 2s, 4s, 8s, … 30s
+                            double backoffSec = entry.TransformInitFailures <= 2
+                                ? 0.5 * entry.TransformInitFailures  // 0.5s, 1s for first two retries
+                                : Math.Min(1 << (entry.TransformInitFailures - 1), 30); // then 4s, 8s, … 30s
                             entry.NextTransformRetry = now.AddSeconds(backoffSec);
                             Log.WriteRateLimited(AppLogLevel.Warning,
                                 $"reinit_tfm_{kvp.Key:X}", TimeSpan.FromSeconds(5),
@@ -368,14 +378,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         }
                     }
 
-                    // Re-init rotation if invalidated (with exponential backoff)
+                    // Re-init rotation if invalidated (with backoff — fast initial retry, then exponential)
                     if (!entry.RotationReady && entry.RotationInitFailures < MaxInitRetries && now >= entry.NextRotationRetry)
                     {
                         TryInitRotation(entry.Base, entry);
                         if (!entry.RotationReady)
                         {
                             entry.RotationInitFailures++;
-                            int backoffSec = Math.Min(1 << entry.RotationInitFailures, 30);
+                            double backoffSec = entry.RotationInitFailures <= 2
+                                ? 0.5 * entry.RotationInitFailures  // 0.5s, 1s for first two retries
+                                : Math.Min(1 << (entry.RotationInitFailures - 1), 30); // then 4s, 8s, … 30s
                             entry.NextRotationRetry = now.AddSeconds(backoffSec);
                             Log.WriteRateLimited(AppLogLevel.Warning,
                                 $"reinit_rot_{kvp.Key:X}", TimeSpan.FromSeconds(5),

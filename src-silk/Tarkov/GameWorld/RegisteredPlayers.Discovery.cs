@@ -1,5 +1,8 @@
-using System.Collections.Frozen;
 using eft_dma_radar.Silk.Tarkov.Unity;
+using eft_dma_radar.Silk.Tarkov.Unity.IL2CPP;
+using System.Collections.Frozen;
+using static eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets;
+using static SDK.Offsets;
 
 namespace eft_dma_radar.Silk.Tarkov.GameWorld
 {
@@ -17,6 +20,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             try
             {
                 var className = ReadClassName(playerBase);
+                //Il2CppDumper.DumpClassFields(playerBase, $"className ({className})");
                 bool isObserved = !isLocal && className is not (null or "ClientPlayer" or "LocalPlayer");
 
                 Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] CreatePlayerEntry 0x{playerBase:X} isLocal={isLocal} class='{className ?? "<null>"}' isObserved={isObserved}");
@@ -27,6 +31,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                 if (isObserved)
                 {
+
                     sideRaw = Memory.ReadValue<int>(playerBase + Offsets.ObservedPlayerView.Side, false);
                     bool isScav = sideRaw == 4; // EPlayerSide.Savage
 
@@ -114,7 +119,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         {
             try
             {
-                return Il2CppClass.ReadName(playerBase, 64);
+                return Unity.Il2CppClass.ReadName(playerBase, 64);
             }
             catch
             {

@@ -38,6 +38,7 @@ namespace eft_dma_radar.Silk.UI
         private static Vector2 _lastMousePosition;
         private static Player? _mouseOverPlayer;
         private static LootItem? _mouseOverLoot;
+        private static LootCorpse? _mouseOverCorpse;
 
         // Map state
         private static bool _freeMode;
@@ -179,6 +180,9 @@ namespace eft_dma_radar.Silk.UI
                     return;
                 }
                 _grContext.SetResourceCacheLimit(512 * 1024 * 1024); // 512 MB
+
+                // Set clear color once — never changes
+                _gl.ClearColor(0f, 0f, 0f, 1f);
 
                 CreateSkiaSurface();
                 if (_skSurface is null)
@@ -329,8 +333,7 @@ namespace eft_dma_radar.Silk.UI
             _gl.Viewport(0, 0, (uint)fbSize.X, (uint)fbSize.Y);
             _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
 
-            _gl.ClearColor(0f, 0f, 0f, 1f);
-            _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.StencilBufferBit | ClearBufferMask.DepthBufferBit);
+            _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.StencilBufferBit);
 
             var canvas = _skSurface.Canvas;
             canvas.Save();
@@ -367,7 +370,6 @@ namespace eft_dma_radar.Silk.UI
             finally
             {
                 canvas.Restore();
-                canvas.Flush();
                 _grContext.Flush();
             }
         }
@@ -419,20 +421,36 @@ namespace eft_dma_radar.Silk.UI
             if (!Config.BattleMode && Config.ShowLoot)
             {
                 var loot = Memory.Loot;
-                LootFilter.UpdateCounts(loot);
 
                 if (loot is not null)
                 {
+                    int visibleCount = 0;
                     foreach (var item in loot)
                     {
                         if (item.ShouldDraw())
+                        {
                             item.Draw(canvas, mapParams, map.Config, localPlayer);
+                            visibleCount++;
+                        }
                     }
+                    LootFilter.SetCounts(visibleCount, loot.Count);
+                }
+                else
+                {
+                    LootFilter.SetCounts(0, 0);
+                }
+
+                // Corpses
+                var corpses = Memory.Corpses;
+                if (corpses is not null)
+                {
+                    foreach (var corpse in corpses)
+                        corpse.Draw(canvas, mapParams, map.Config, localPlayer);
                 }
             }
             else
             {
-                LootFilter.UpdateCounts(null);
+                LootFilter.SetCounts(0, 0);
             }
 
             // Group connectors
@@ -471,11 +489,18 @@ namespace eft_dma_radar.Silk.UI
         {
             var hoveredPlayer = _mouseOverPlayer;
             var hoveredLoot = _mouseOverLoot;
+            var hoveredCorpse = _mouseOverCorpse;
 
             if (hoveredPlayer is not null)
             {
                 var screenPos = mapParams.ToScreenPos(MapParams.ToMapPos(hoveredPlayer.Position, mapConfig));
                 BuildPlayerTooltipLines(hoveredPlayer, localPlayer);
+                DrawTooltipBox(canvas, screenPos, _tooltipLines);
+            }
+            else if (hoveredCorpse is not null)
+            {
+                var screenPos = mapParams.ToScreenPos(MapParams.ToMapPos(hoveredCorpse.Position, mapConfig));
+                BuildCorpseTooltipLines(hoveredCorpse, localPlayer);
                 DrawTooltipBox(canvas, screenPos, _tooltipLines);
             }
             else if (hoveredLoot is not null)
@@ -560,6 +585,28 @@ namespace eft_dma_radar.Silk.UI
                 _tooltipLines.Add(($"Price: {LootFilter.FormatPrice(loot.DisplayPrice)}", SKPaints.TooltipAccent));
 
             _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
+        }
+
+        private static void BuildCorpseTooltipLines(LootCorpse corpse, Player localPlayer)
+        {
+            _tooltipLines.Clear();
+            int dist = (int)Vector3.Distance(localPlayer.Position, corpse.Position);
+
+            _tooltipLines.Add((corpse.Name, SKPaints.TextCorpse));
+
+            if (corpse.TotalValue > 0)
+                _tooltipLines.Add(($"Value: {LootFilter.FormatPrice(corpse.TotalValue)}", SKPaints.TooltipAccent));
+
+            _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
+
+            if (corpse.GearReady && corpse.Equipment.Count > 0)
+            {
+                foreach (var kvp in corpse.Equipment)
+                {
+                    string price = kvp.Value.Price > 0 ? $" ({LootFilter.FormatPrice(kvp.Value.Price)})" : "";
+                    _tooltipLines.Add(($"  {kvp.Value.ShortName}{price}", SKPaints.TooltipText));
+                }
+            }
         }
 
         /// <summary>
@@ -723,8 +770,6 @@ namespace eft_dma_radar.Silk.UI
 
         private static void DrawImGuiUI(ref Vector2D<int> fbSize, double delta)
         {
-            _gl.Viewport(0, 0, (uint)fbSize.X, (uint)fbSize.Y);
-            _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
             _imgui.Update((float)delta);
 
             try
@@ -871,6 +916,7 @@ namespace eft_dma_radar.Silk.UI
             {
                 _mouseOverPlayer = null;
                 _mouseOverLoot = null;
+                _mouseOverCorpse = null;
                 MouseoverGroup = null;
                 return;
             }
@@ -880,6 +926,7 @@ namespace eft_dma_radar.Silk.UI
             {
                 _mouseOverPlayer = null;
                 _mouseOverLoot = null;
+                _mouseOverCorpse = null;
                 MouseoverGroup = null;
                 return;
             }
@@ -913,6 +960,7 @@ namespace eft_dma_radar.Silk.UI
             {
                 _mouseOverPlayer = closestPlayer;
                 _mouseOverLoot = null;
+                _mouseOverCorpse = null;
                 MouseoverGroup = closestPlayer.IsHuman && closestPlayer.IsHostile && closestPlayer.SpawnGroupID != -1
                     ? closestPlayer.SpawnGroupID
                     : null;
@@ -943,16 +991,51 @@ namespace eft_dma_radar.Silk.UI
                 }
             }
 
+            // Check corpses (only when loot is visible)
+            LootCorpse? closestCorpse = null;
+            float closestCorpseDist = float.MaxValue;
+
+            if (!Config.BattleMode && Config.ShowLoot)
+            {
+                var corpses = Memory.Corpses;
+                if (corpses is not null)
+                {
+                    foreach (var c in corpses)
+                    {
+                        var screenPos = mp.ToScreenPos(MapParams.ToMapPos(c.Position, mp.Config));
+                        float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
+                        if (dist < closestCorpseDist)
+                        {
+                            closestCorpseDist = dist;
+                            closestCorpse = c;
+                        }
+                    }
+                }
+            }
+
+            // Pick the closest between loot and corpse
+            if (closestCorpseDist < hitRadius && closestCorpse is not null
+                && closestCorpseDist <= closestLootDist)
+            {
+                _mouseOverCorpse = closestCorpse;
+                _mouseOverLoot = null;
+                _mouseOverPlayer = null;
+                MouseoverGroup = null;
+                return;
+            }
+
             if (closestLootDist < hitRadius && closestLoot is not null)
             {
                 _mouseOverLoot = closestLoot;
                 _mouseOverPlayer = null;
+                _mouseOverCorpse = null;
                 MouseoverGroup = null;
                 return;
             }
 
             _mouseOverPlayer = null;
             _mouseOverLoot = null;
+            _mouseOverCorpse = null;
             MouseoverGroup = null;
         }
 

@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
 using eft_dma_radar.Silk.Misc.Data;
 using eft_dma_radar.Silk.Tarkov.Unity;
@@ -6,21 +7,35 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 {
     /// <summary>
     /// Reads loose loot from the GameWorld LootList.
-    /// Also scans corpses for dogtag identity data (nickname, accountId, profileId).
+    /// Also scans corpses for dogtag identity data and equipment.
     /// </summary>
     internal sealed class LootManager
     {
-
         private readonly ulong _lgw;
         private volatile IReadOnlyList<LootItem> _loot = [];
+        private volatile IReadOnlyList<LootCorpse> _corpses = [];
         private DateTime _lastRefresh;
         private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(5);
 
         // Track corpses we've already read dogtags from (by interactiveClass address)
         private readonly HashSet<ulong> _processedCorpses = [];
 
+        // Track corpses we've already read equipment from (by interactiveClass address)
+        private readonly HashSet<ulong> _processedCorpseGear = [];
+
+        // interactiveClass → dogtag nickname (populated by ReadCorpseDogtags)
+        private readonly ConcurrentDictionary<ulong, string> _corpseNicknames = new();
+
+        // Slot names to skip when reading corpse equipment
+        private static readonly FrozenSet<string> _skipSlots =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Compass", "ArmBand", "SecuredContainer" }
+                .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
         /// <summary>Current loot snapshot (thread-safe read).</summary>
         public IReadOnlyList<LootItem> Loot => _loot;
+
+        /// <summary>Current corpse snapshot (thread-safe read).</summary>
+        public IReadOnlyList<LootCorpse> Corpses => _corpses;
 
         public LootManager(ulong localGameWorld)
         {
@@ -38,10 +53,17 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 return;
             _lastRefresh = now;
 
+            // Read the LootList pointer array once — shared by all phases
+            if (!TryReadLootListPtrs(out var ptrs))
+            {
+                _loot = [];
+                _corpses = [];
+                return;
+            }
+
             try
             {
-                var items = ReadLoot();
-                _loot = items;
+                _loot = ReadLoot(ptrs);
             }
             catch (Exception ex)
             {
@@ -50,34 +72,85 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 
             try
             {
-                ReadCorpseDogtags();
+                var newCorpses = ReadCorpsePositions(ptrs);
+
+                // Carry over previously-read gear/name data to new corpse objects
+                // (ReadCorpsePositions recreates the list each cycle)
+                var oldCorpses = _corpses;
+                if (oldCorpses.Count > 0 && newCorpses.Count > 0)
+                {
+                    foreach (var nc in newCorpses)
+                    {
+                        for (int i = 0; i < oldCorpses.Count; i++)
+                        {
+                            var oc = oldCorpses[i];
+                            if (oc.InteractiveClass == nc.InteractiveClass)
+                            {
+                                nc.Name = oc.Name;
+                                nc.GearReady = oc.GearReady;
+                                nc.Equipment = oc.Equipment;
+                                nc.TotalValue = oc.TotalValue;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                _corpses = newCorpses;
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[LootManager] Corpse position read failed: {ex.Message}");
+            }
+
+            try
+            {
+                ReadCorpseDogtags(ptrs);
             }
             catch (Exception ex)
             {
                 Log.WriteLine($"[LootManager] Corpse dogtag scan failed: {ex.Message}");
             }
+
+            // Resolve corpse display names from dogtag nicknames + read equipment
+            foreach (var corpse in _corpses)
+            {
+                if (_corpseNicknames.TryGetValue(corpse.InteractiveClass, out var nickname))
+                    corpse.Name = nickname;
+
+                if (!corpse.GearReady)
+                    ReadCorpseEquipment(corpse);
+            }
         }
 
-        private List<LootItem> ReadLoot()
-        {
-            // Read LootList (Unity List<LootItemPositionClass>)
-            if (!Memory.TryReadPtr(_lgw + Offsets.ClientLocalGameWorld.LootList, out var lootListAddr))
-                return [];
+        #region LootList Helper
 
-            // Read list backing array + count
+        /// <summary>
+        /// Reads the LootList pointer array once, shared by loot, corpse, and dogtag phases.
+        /// </summary>
+        private bool TryReadLootListPtrs(out ulong[] ptrs)
+        {
+            ptrs = [];
+
+            if (!Memory.TryReadPtr(_lgw + Offsets.ClientLocalGameWorld.LootList, out var lootListAddr))
+                return false;
+
             if (!Memory.TryReadPtr(lootListAddr + UnityOffsets.List.ArrOffset, out var arrBase))
-                return [];
+                return false;
 
             var count = Memory.ReadValue<int>(lootListAddr + 0x18); // List._size
             if (count <= 0 || count > 4096)
-                return [];
+                return false;
 
-            // Read all item pointers
-            var ptrs = Memory.ReadArray<ulong>(arrBase + UnityOffsets.List.ArrStartOffset, count);
-            if (ptrs.Length == 0)
-                return [];
+            ptrs = Memory.ReadArray<ulong>(arrBase + UnityOffsets.List.ArrStartOffset, count);
+            return ptrs.Length > 0;
+        }
 
-            // 6-round scatter chain (same structure as WPF LootManager)
+        #endregion
+
+        private List<LootItem> ReadLoot(ulong[] ptrs)
+        {
+            // 6-round scatter chain
             using var map = ScatterReadMap.Get();
             var round1 = map.AddRound();
             var round2 = map.AddRound();
@@ -86,7 +159,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             var round5 = map.AddRound();
             var round6 = map.AddRound();
 
-            var result = new List<LootItem>(count);
+            var result = new List<LootItem>(ptrs.Length);
 
             for (int ix = 0; ix < ptrs.Length; ix++)
             {
@@ -191,8 +264,63 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             }
 
             map.Execute();
+
             return result;
         }
+
+        #region Corpse Position Reading
+
+        /// <summary>
+        /// Reads corpse positions from the LootList using linear memory reads.
+        /// Returns a list of <see cref="LootCorpse"/> with their world positions.
+        /// Names and equipment are resolved in later phases.
+        /// </summary>
+        private List<LootCorpse> ReadCorpsePositions(ulong[] ptrs)
+        {
+            var corpses = new List<LootCorpse>();
+
+            foreach (var lootBase in ptrs)
+            {
+                if (!lootBase.IsValidVirtualAddress())
+                    continue;
+
+                try
+                {
+                    var className = Il2CppClass.ReadName(lootBase);
+                    if (className is null || !className.Contains("Corpse", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    // MonoBehaviour → InteractiveClass
+                    if (!Memory.TryReadPtr(lootBase + 0x10, out var monoBehaviour))
+                        continue;
+                    if (!Memory.TryReadPtr(monoBehaviour + UnityOffsets.Comp_ObjectClass, out var interactiveClass))
+                        continue;
+
+                    // GameObject → Components → Transform chain
+                    if (!Memory.TryReadPtr(monoBehaviour + UnityOffsets.Comp_GameObject, out var gameObject))
+                        continue;
+                    if (!Memory.TryReadPtr(gameObject + UnityOffsets.GO_Components, out var components))
+                        continue;
+                    if (!Memory.TryReadPtr(components + 0x08, out var t1))
+                        continue;
+                    if (!Memory.TryReadPtr(t1 + UnityOffsets.Comp_ObjectClass, out var t2))
+                        continue;
+                    if (!Memory.TryReadPtr(t2 + 0x10, out var transformInternal))
+                        continue;
+
+                    var pos = ReadTransformPosition(transformInternal);
+                    if (pos == Vector3.Zero)
+                        continue;
+
+                    corpses.Add(new LootCorpse(interactiveClass, pos));
+                }
+                catch { }
+            }
+
+            return corpses;
+        }
+
+        #endregion
 
         #region Corpse Dogtag Reading
 
@@ -201,20 +329,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// finds BarterOther (dogtag) items, reads DogtagComponent fields, and seeds
         /// <see cref="DogtagCache"/> with victim identity data.
         /// </summary>
-        private void ReadCorpseDogtags()
+        private void ReadCorpseDogtags(ulong[] ptrs)
         {
-            if (!Memory.TryReadPtr(_lgw + Offsets.ClientLocalGameWorld.LootList, out var lootListAddr))
-                return;
-
-            if (!Memory.TryReadPtr(lootListAddr + UnityOffsets.List.ArrOffset, out var arrBase))
-                return;
-
-            var count = Memory.ReadValue<int>(lootListAddr + 0x18);
-            if (count <= 0 || count > 4096)
-                return;
-
-            var ptrs = Memory.ReadArray<ulong>(arrBase + UnityOffsets.List.ArrStartOffset, count);
-
             foreach (var lootBase in ptrs)
             {
                 if (!lootBase.IsValidVirtualAddress())
@@ -289,6 +405,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 
                         DogtagCache.Seed(profileId, nickname, accountId, level);
 
+                        // Store nickname for corpse name resolution
+                        if (!string.IsNullOrWhiteSpace(nickname))
+                            _corpseNicknames[interactiveClass] = nickname;
+
                         // Also seed killer identity if available
                         var killerProfileId = ReadDogtagString(dogtag + Offsets.DogtagComponent.KillerProfileId);
                         var killerAccountId = ReadDogtagString(dogtag + Offsets.DogtagComponent.KillerAccountId);
@@ -315,6 +435,120 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             if (!Memory.TryReadPtr(fieldAddr, out var strPtr) || !strPtr.IsValidVirtualAddress())
                 return null;
             return Memory.TryReadUnityString(strPtr, out var result) ? result : null;
+        }
+
+        #endregion
+
+        #region Corpse Equipment Reading
+
+        /// <summary>
+        /// Reads the equipment slots of a corpse and populates its <see cref="LootCorpse.Equipment"/>
+        /// and <see cref="LootCorpse.TotalValue"/>. Only runs once per corpse (tracked by
+        /// <see cref="_processedCorpseGear"/>).
+        /// </summary>
+        private void ReadCorpseEquipment(LootCorpse corpse)
+        {
+            if (_processedCorpseGear.Contains(corpse.InteractiveClass))
+                return;
+
+            _processedCorpseGear.Add(corpse.InteractiveClass);
+
+            try
+            {
+                // InteractiveClass → Item → Slots array
+                if (!Memory.TryReadPtr(corpse.InteractiveClass + Offsets.InteractiveLootItem.Item, out var itemBase)
+                    || !itemBase.IsValidVirtualAddress())
+                    return;
+
+                if (!Memory.TryReadPtr(itemBase + Offsets.LootItemMod.Slots, out var slotsArr)
+                    || !slotsArr.IsValidVirtualAddress())
+                    return;
+
+                if (!Memory.TryReadValue<int>(slotsArr + 0x18, out var slotCount) || slotCount < 1 || slotCount > 64)
+                    return;
+
+                var slotPtrs = Memory.ReadArray<ulong>(slotsArr + 0x20, slotCount);
+                var gear = new Dictionary<string, CorpseGearItem>(slotPtrs.Length, StringComparer.OrdinalIgnoreCase);
+                int totalValue = 0;
+
+                foreach (var slotPtr in slotPtrs)
+                {
+                    if (!slotPtr.IsValidVirtualAddress())
+                        continue;
+
+                    try
+                    {
+                        // Read slot name
+                        if (!Memory.TryReadPtr(slotPtr + Offsets.Slot.ID, out var namePtr)
+                            || !namePtr.IsValidVirtualAddress())
+                            continue;
+
+                        if (!Memory.TryReadUnityString(namePtr, out var slotName) || slotName is null)
+                            continue;
+
+                        if (_skipSlots.Contains(slotName))
+                            continue;
+
+                        // Read contained item
+                        if (!Memory.TryReadPtr(slotPtr + Offsets.Slot.ContainedItem, out var slotItem)
+                            || !slotItem.IsValidVirtualAddress())
+                            continue;
+
+                        // Resolve BSG ID via template → MongoID
+                        if (!TryReadBsgId(slotItem, out var bsgId))
+                            continue;
+
+                        if (!EftDataManager.AllItems.TryGetValue(bsgId, out var marketItem))
+                            continue;
+
+                        gear[slotName] = new CorpseGearItem
+                        {
+                            ShortName = marketItem.ShortName,
+                            Name = marketItem.Name,
+                            Price = marketItem.BestPrice
+                        };
+                        totalValue += marketItem.BestPrice;
+                    }
+                    catch
+                    {
+                        // Skip individual slot failures
+                    }
+                }
+
+                corpse.Equipment = gear.Count > 0
+                    ? gear.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase)
+                    : FrozenDictionary<string, CorpseGearItem>.Empty;
+                corpse.TotalValue = totalValue;
+                corpse.GearReady = true;
+            }
+            catch
+            {
+                // Non-fatal — will retry next refresh
+            }
+        }
+
+        /// <summary>
+        /// Reads a BSG ID string from an item via its template → MongoID chain.
+        /// </summary>
+        private static bool TryReadBsgId(ulong itemAddr, out string bsgId)
+        {
+            bsgId = string.Empty;
+
+            if (!Memory.TryReadPtr(itemAddr + Offsets.LootItem.Template, out var template)
+                || !template.IsValidVirtualAddress())
+                return false;
+
+            if (!Memory.TryReadValue<Types.MongoID>(template + Offsets.ItemTemplate._id, out var mongoId))
+                return false;
+
+            if (!mongoId.StringID.IsValidVirtualAddress())
+                return false;
+
+            if (!Memory.TryReadUnityString(mongoId.StringID, out var id) || string.IsNullOrEmpty(id))
+                return false;
+
+            bsgId = id;
+            return true;
         }
 
         #endregion

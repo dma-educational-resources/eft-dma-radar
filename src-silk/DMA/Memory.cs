@@ -1,6 +1,7 @@
 using System.IO;
 using System.Runtime;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
+using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using GameObjectManager = eft_dma_radar.Silk.Tarkov.Unity.GOM;
 using VmmSharpEx;
@@ -65,6 +66,7 @@ namespace eft_dma_radar.Silk.DMA
         public static RegisteredPlayers? Players => Game?.RegisteredPlayers;
         public static Player? LocalPlayer => Game?.LocalPlayer;
         public static IReadOnlyList<LootItem>? Loot => Game?.Loot;
+        public static IReadOnlyList<LootCorpse>? Corpses => Game?.Corpses;
 
         #endregion
 
@@ -738,8 +740,7 @@ namespace eft_dma_radar.Silk.DMA
         WaitingForProcess,
         Initializing,
         ProcessFound,
-        InRaid,
-        Restarting
+        InRaid
     }
 
     /// <summary>Notification severity used by <see cref="Memory.ShowNotification"/>.</summary>

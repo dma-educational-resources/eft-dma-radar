@@ -53,7 +53,7 @@ namespace eft_dma_radar.Silk.UI.Panels
                 ImGui.SetTooltip("Scale the radar canvas rendering");
 
             int fps = Config.TargetFps;
-            if (ImGui.SliderInt("Target FPS", ref fps, 30, 300))
+            if (ImGui.SliderInt("Target FPS", ref fps, 30, 1500))
             {
                 Config.TargetFps = fps;
                 RadarWindow.Window.FramesPerSecond = fps;

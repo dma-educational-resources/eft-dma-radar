@@ -1,9 +1,8 @@
-using eft_dma_radar.Silk.Misc.Pools;
 using VmmSharpEx.Scatter;
 
 namespace eft_dma_radar.Silk.DMA.ScatterAPI
 {
-    public interface IScatterEntry : IPooledObject<IScatterEntry>
+    public interface IScatterEntry : IDisposable
     {
         ulong Address { get; }
         int CB { get; }

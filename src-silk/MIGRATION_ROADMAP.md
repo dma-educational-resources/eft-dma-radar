@@ -492,7 +492,6 @@ src-silk/
 ├── GlobalUsings.cs                       ← SkiaSharp, System.Numerics, SDK alias
 ├── Program.cs                            ← Entry point, high-perf mode, P/Invoke
 ├── DEFAULT_DATA.json                     ← Embedded item database resource
-├── .github/copilot-instructions.md       ← Copilot project rules
 └── MIGRATION_ROADMAP.md
 ```
 

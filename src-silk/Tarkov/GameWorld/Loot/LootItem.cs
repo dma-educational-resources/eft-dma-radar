@@ -10,6 +10,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
     {
         private readonly TarkovMarketItem _item;
 
+        // Cached label to avoid per-frame string allocation
+        private string? _cachedLabel;
+        private int _cachedLabelPrice = -1;
+
         public string Id { get; }
         public string Name => _item.Name;
         public string ShortName => _item.ShortName;
@@ -44,11 +48,17 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             var paint = LootFilter.IsImportant(price) ? SKPaints.LootImportant : SKPaints.LootNormal;
             canvas.DrawCircle(screenPos, 4f, paint);
 
-            string label = price > 0 ? $"{ShortName} ({FormatPrice(price)})" : ShortName;
+            // Cache label string — only regenerate when price changes
+            if (price != _cachedLabelPrice || _cachedLabel is null)
+            {
+                _cachedLabelPrice = price;
+                _cachedLabel = price > 0 ? $"{ShortName} ({FormatPrice(price)})" : ShortName;
+            }
+
             float lx = screenPos.X + 7;
             float ly = screenPos.Y + 4.5f;
-            canvas.DrawText(label, lx, ly, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.LootShadow);
-            canvas.DrawText(label, lx, ly, SKTextAlign.Left, SKPaints.FontRegular11, paint);
+            canvas.DrawText(_cachedLabel, lx + 1, ly + 1, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.LootShadow);
+            canvas.DrawText(_cachedLabel, lx, ly, SKTextAlign.Left, SKPaints.FontRegular11, paint);
         }
 
         private static string FormatPrice(int price) => LootFilter.FormatPrice(price);

@@ -23,8 +23,6 @@
     <ItemGroup>
         <EmbeddedResource Include="..\resources\NeoSansStdRegular.otf" />
         <EmbeddedResource Include="..\resources\NeoSansStdMedium.otf" />
-        <EmbeddedResource Include="..\resources\NeoSansStdBold.otf" />
-        <EmbeddedResource Include="..\resources\NeoSansStdItalic.otf" />
         <EmbeddedResource Include="..\resources\DEFAULT_DATA.json" />
     </ItemGroup>
 

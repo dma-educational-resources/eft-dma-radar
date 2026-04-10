@@ -92,29 +92,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         // ── Batch helpers ────────────────────────────────────────────────────
 
         /// <summary>
-        /// Update <see cref="VisibleCount"/> and <see cref="TotalCount"/>.
-        /// Called once per frame from the render loop.
+        /// Directly set <see cref="VisibleCount"/> and <see cref="TotalCount"/>.
+        /// Called from the render loop which already evaluates ShouldDraw per item.
         /// </summary>
-        public static void UpdateCounts(IReadOnlyList<LootItem>? loot)
+        public static void SetCounts(int visible, int total)
         {
-            if (loot is null)
-            {
-                VisibleCount = 0;
-                TotalCount = 0;
-                return;
-            }
-
-            int total = loot.Count;
-            int visible = 0;
-
-            for (int i = 0; i < total; i++)
-            {
-                if (loot[i].ShouldDraw())
-                    visible++;
-            }
-
-            TotalCount = total;
             VisibleCount = visible;
+            TotalCount = total;
         }
 
         /// <summary>

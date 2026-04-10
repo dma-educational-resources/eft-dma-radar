@@ -30,26 +30,20 @@ namespace eft_dma_radar.Silk.UI
 
         /// <summary>
         /// Subtle drop-shadow behind text labels for readability.
-        /// Uses a blur mask instead of a stroke for smoother rendering.
+        /// Drawn at a small offset from the main text for a crisp shadow effect.
         /// </summary>
         public static SKPaint TextShadow { get; } = new()
         {
             Color = new SKColor(0, 0, 0, 200),
             IsStroke = false,
             IsAntialias = true,
-            MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 1.0f),
         };
 
         /// <summary>
         /// Drop-shadow behind loot text labels for readability.
+        /// Same paint as <see cref="TextShadow"/> — shared to avoid duplicate allocation.
         /// </summary>
-        public static SKPaint LootShadow { get; } = new()
-        {
-            Color = new SKColor(0, 0, 0, 200),
-            IsStroke = false,
-            IsAntialias = true,
-            MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 1.0f),
-        };
+        public static SKPaint LootShadow => TextShadow;
 
         /// <summary>
         /// Death marker paint — small X for dead players.
@@ -120,6 +114,12 @@ namespace eft_dma_radar.Silk.UI
 
         /// <summary>Valuable loot — bright green circle + text.</summary>
         public static SKPaint LootImportant { get; } = NewTextPaint(new SKColor(50, 255, 50));
+
+        /// <summary>Corpse marker fill — muted orange.</summary>
+        public static SKPaint PaintCorpse { get; } = NewFillPaint(new SKColor(200, 150, 80, 180));
+
+        /// <summary>Corpse label text — muted orange.</summary>
+        public static SKPaint TextCorpse { get; } = NewTextPaint(new SKColor(200, 150, 80, 200));
 
         #endregion
 

@@ -84,6 +84,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <summary>Current snapshot of loose loot items in the raid.</summary>
         public IReadOnlyList<LootItem> Loot => _lootManager.Loot;
 
+        /// <summary>Current snapshot of corpses in the raid.</summary>
+        public IReadOnlyList<LootCorpse> Corpses => _lootManager.Corpses;
+
         /// <summary>
         /// Clears the stale GameWorld guard and cooldown so a user-initiated restart
         /// can re-detect the same (still-live) GameWorld.

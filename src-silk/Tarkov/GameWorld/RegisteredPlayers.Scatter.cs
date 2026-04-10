@@ -95,27 +95,49 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     $"[RegisteredPlayers] Transform not ready for '{entry.Player.Name}' — skipping");
             }
 
-            // --- Error state with debounce ---
+            // --- Error state with debounce + recovery hysteresis ---
             bool tickFailed = !rotOk || !posOk;
             if (tickFailed)
             {
+                entry.RecoveryCount = 0;
                 entry.ConsecutiveErrors++;
-                if (entry.ConsecutiveErrors >= ErrorThreshold && !entry.HasError)
+
+                // Only enter error state for players that previously had a valid position.
+                // Players that never had a valid position (just spawned, game data not ready yet)
+                // are in a "warming up" state — the registration worker will keep retrying.
+                if (entry.ConsecutiveErrors >= ErrorThreshold && !entry.HasError && entry.Player.HasValidPosition)
                 {
                     entry.HasError = true;
                     entry.Player.IsError = true;
                     Log.WriteLine($"[RegisteredPlayers] Player '{entry.Player.Name}' entered error state after {entry.ConsecutiveErrors} consecutive failures (rot={rotOk}, pos={posOk})");
                 }
+
+                // If position keeps failing despite TransformReady, the pointer chain data may not
+                // be populated yet (e.g., player just spawned). Invalidate the transform so the
+                // registration worker re-walks the pointer chain with fresh data.
+                if (!posOk && entry.TransformReady && entry.ConsecutiveErrors >= ReinitThreshold)
+                {
+                    Log.WriteLine($"[RegisteredPlayers] Auto-invalidating transform for '{entry.Player.Name}' after {entry.ConsecutiveErrors} consecutive position failures");
+                    entry.TransformReady = false;
+                    entry.TransformInitFailures = 0;
+                    entry.NextTransformRetry = default;
+                    entry.ConsecutiveErrors = 0; // Reset so we don't immediately re-trigger
+                }
             }
             else
             {
+                entry.ConsecutiveErrors = 0;
                 if (entry.HasError)
                 {
-                    Log.WriteLine($"[RegisteredPlayers] Player '{entry.Player.Name}' recovered from error state");
+                    entry.RecoveryCount++;
+                    if (entry.RecoveryCount >= RecoveryThreshold)
+                    {
+                        Log.WriteLine($"[RegisteredPlayers] Player '{entry.Player.Name}' recovered from error state");
+                        entry.RecoveryCount = 0;
+                        entry.HasError = false;
+                        entry.Player.IsError = false;
+                    }
                 }
-                entry.ConsecutiveErrors = 0;
-                entry.HasError = false;
-                entry.Player.IsError = false;
             }
         }
 
@@ -304,6 +326,18 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 int count = taIndex + 1;
                 var indices = Memory.ReadArray<int>(indicesAddr, count, false);
 
+                // Validate that position data is actually readable before committing.
+                // The pointer chain can be valid while the game hasn't populated vertex data yet
+                // (e.g., player just spawned). Without this check, TransformReady=true but every
+                // position read fails until the game finishes initialization.
+                var testVertices = Memory.ReadArray<TrsX>(verticesAddr, count, false);
+                if (testVertices is null || !TestPositionCompute(taIndex, indices, testVertices))
+                {
+                    Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitTransform '{entry.Player.Name}' 0x{playerBase:X}: " +
+                        $"pointer chain OK but vertex data not ready (idx={taIndex}, verts=0x{verticesAddr:X})");
+                    return; // Leave TransformReady=false — registration worker will retry
+                }
+
                 entry.TransformInternal = transformInternal;
                 entry.TransformIndex = taIndex;
                 entry.VerticesAddr = verticesAddr;
@@ -317,6 +351,40 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             {
                 Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitTransform FAILED '{entry.Player.Name}' 0x{playerBase:X}: {ex.Message}");
                 entry.TransformReady = false;
+            }
+        }
+
+        /// <summary>
+        /// Tests whether vertex data produces a valid world position (no side effects).
+        /// Used during TryInitTransform to verify game data is actually populated.
+        /// </summary>
+        private static bool TestPositionCompute(int transformIndex, int[] indices, TrsX[] vertices)
+        {
+            try
+            {
+                var worldPos = vertices[transformIndex].T;
+                int idx = indices[transformIndex];
+                int iterations = 0;
+
+                while (idx >= 0)
+                {
+                    if (iterations++ > MaxHierarchyIterations)
+                        return false;
+
+                    var parent = vertices[idx];
+                    worldPos = Vector3.Transform(worldPos, parent.Q);
+                    worldPos *= parent.S;
+                    worldPos += parent.T;
+
+                    idx = indices[idx];
+                }
+
+                return float.IsFinite(worldPos.X) && float.IsFinite(worldPos.Y) && float.IsFinite(worldPos.Z)
+                    && (worldPos.X != 0f || worldPos.Y != 0f || worldPos.Z != 0f);
+            }
+            catch
+            {
+                return false;
             }
         }
 
