@@ -86,7 +86,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 }
 
                 Player.Player player = isLocal
-                    ? new LocalPlayer { Name = name, Type = type, IsAlive = true, IsActive = true }
+                    ? CreateLocalPlayer(playerBase, name, type, sideRaw)
                     : new Player.Player { Name = name, Type = type, IsAlive = true, IsActive = true };
 
                 var entry = new PlayerEntry(playerBase, player, isObserved);
@@ -109,6 +109,60 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] CreatePlayerEntry FAILED 0x{playerBase:X} isLocal={isLocal}: {ex.Message}");
                 return null;
             }
+        }
+
+        #endregion
+
+        #region Local Player Factory
+
+        /// <summary>
+        /// Creates a <see cref="LocalPlayer"/> with PMC/Scav identity data for exfil eligibility.
+        /// </summary>
+        private static LocalPlayer CreateLocalPlayer(ulong playerBase, string name, PlayerType type, int sideRaw)
+        {
+            var lp = new LocalPlayer
+            {
+                Name = name,
+                Type = type,
+                IsAlive = true,
+                IsActive = true,
+                IsPmc = sideRaw is 1 or 2,    // USEC=1, BEAR=2
+                IsScav = sideRaw == 4,          // Savage=4
+            };
+
+            try
+            {
+                var profilePtr = Memory.ReadPtr(playerBase + Offsets.Player.Profile, false);
+                var infoPtr = Memory.ReadPtr(profilePtr + Offsets.Profile.Info, false);
+
+                // Entry point (PMC exfil eligibility)
+                if (lp.IsPmc)
+                {
+                    if (Memory.TryReadPtr(infoPtr + Offsets.PlayerInfo.EntryPoint, out var entryPtr)
+                        && Memory.TryReadUnityString(entryPtr, out var entryPoint))
+                    {
+                        lp.EntryPoint = entryPoint;
+                        Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] LocalPlayer entry point: '{entryPoint}'");
+                    }
+                }
+
+                // Profile ID (Scav exfil eligibility)
+                if (lp.IsScav)
+                {
+                    if (Memory.TryReadPtr(profilePtr + Offsets.Profile.Id, out var profileIdPtr)
+                        && Memory.TryReadUnityString(profileIdPtr, out var profileId))
+                    {
+                        lp.LocalProfileId = profileId;
+                        Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] LocalPlayer profile ID: '{profileId}'");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] Failed to read LocalPlayer identity: {ex.Message}");
+            }
+
+            return lp;
         }
 
         #endregion

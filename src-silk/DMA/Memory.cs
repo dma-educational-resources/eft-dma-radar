@@ -1,6 +1,7 @@
 using System.IO;
 using System.Runtime;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
+using eft_dma_radar.Silk.Tarkov.GameWorld.Exits;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using GameObjectManager = eft_dma_radar.Silk.Tarkov.Unity.GOM;
@@ -67,6 +68,7 @@ namespace eft_dma_radar.Silk.DMA
         public static Player? LocalPlayer => Game?.LocalPlayer;
         public static IReadOnlyList<LootItem>? Loot => Game?.Loot;
         public static IReadOnlyList<LootCorpse>? Corpses => Game?.Corpses;
+        public static IReadOnlyList<Exfil>? Exfils => Game?.Exfils;
 
         #endregion
 

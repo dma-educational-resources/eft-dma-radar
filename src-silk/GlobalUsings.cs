@@ -18,6 +18,7 @@ global using eft_dma_radar.Silk.Misc.Data;
 global using eft_dma_radar.Silk.Misc.Pools;
 global using eft_dma_radar.Silk.DMA;
 global using eft_dma_radar.Silk.Tarkov.GameWorld;
+global using eft_dma_radar.Silk.Tarkov.GameWorld.Exits;
 global using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 global using eft_dma_radar.Silk.Tarkov.GameWorld.Player;
 global using eft_dma_radar.Silk.Config;

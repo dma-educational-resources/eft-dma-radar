@@ -39,6 +39,7 @@ namespace eft_dma_radar.Silk.UI
         private static Player? _mouseOverPlayer;
         private static LootItem? _mouseOverLoot;
         private static LootCorpse? _mouseOverCorpse;
+        private static Exfil? _mouseOverExfil;
 
         // Map state
         private static bool _freeMode;
@@ -453,6 +454,22 @@ namespace eft_dma_radar.Silk.UI
                 LootFilter.SetCounts(0, 0);
             }
 
+            // Exfils (drawn before players so player dots render on top)
+            if (Config.ShowExfils)
+            {
+                var exfils = Memory.Exfils;
+                if (exfils is not null)
+                {
+                    var lp = localPlayer as Tarkov.GameWorld.Player.LocalPlayer;
+                    foreach (var exfil in exfils)
+                    {
+                        if (Config.HideInactiveExfils && lp is not null && !exfil.IsAvailableFor(lp))
+                            continue;
+                        exfil.Draw(canvas, mapParams, map.Config, localPlayer);
+                    }
+                }
+            }
+
             // Group connectors
             if (Config.ConnectGroups && normalPlayers is not null)
                 DrawGroupConnectors(canvas, normalPlayers, map, mapParams);
@@ -490,6 +507,7 @@ namespace eft_dma_radar.Silk.UI
             var hoveredPlayer = _mouseOverPlayer;
             var hoveredLoot = _mouseOverLoot;
             var hoveredCorpse = _mouseOverCorpse;
+            var hoveredExfil = _mouseOverExfil;
 
             if (hoveredPlayer is not null)
             {
@@ -507,6 +525,12 @@ namespace eft_dma_radar.Silk.UI
             {
                 var screenPos = mapParams.ToScreenPos(MapParams.ToMapPos(hoveredLoot.Position, mapConfig));
                 BuildLootTooltipLines(hoveredLoot, localPlayer);
+                DrawTooltipBox(canvas, screenPos, _tooltipLines);
+            }
+            else if (hoveredExfil is not null)
+            {
+                var screenPos = mapParams.ToScreenPos(MapParams.ToMapPos(hoveredExfil.Position, mapConfig));
+                BuildExfilTooltipLines(hoveredExfil, localPlayer);
                 DrawTooltipBox(canvas, screenPos, _tooltipLines);
             }
         }
@@ -606,6 +630,41 @@ namespace eft_dma_radar.Silk.UI
                     string price = kvp.Value.Price > 0 ? $" ({LootFilter.FormatPrice(kvp.Value.Price)})" : "";
                     _tooltipLines.Add(($"  {kvp.Value.ShortName}{price}", SKPaints.TooltipText));
                 }
+            }
+        }
+
+        private static void BuildExfilTooltipLines(Exfil exfil, Player localPlayer)
+        {
+            _tooltipLines.Clear();
+            int dist = (int)Vector3.Distance(localPlayer.Position, exfil.Position);
+
+            // Name colored by status
+            var (_, textPaint) = exfil.Status switch
+            {
+                ExfilStatus.Open => (SKPaints.PaintExfilOpen, SKPaints.TextExfilOpen),
+                ExfilStatus.Pending => (SKPaints.PaintExfilPending, SKPaints.TextExfilPending),
+                _ => (SKPaints.PaintExfilClosed, SKPaints.TextExfilClosed),
+            };
+
+            _tooltipLines.Add((exfil.Name, textPaint));
+
+            // Status
+            string statusText = exfil.Status switch
+            {
+                ExfilStatus.Open => "Open",
+                ExfilStatus.Pending => "Pending",
+                _ => "Closed",
+            };
+            _tooltipLines.Add(($"Status: {statusText}", SKPaints.TooltipLabel));
+
+            // Distance
+            _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
+
+            // Availability for local player
+            if (localPlayer is LocalPlayer lp)
+            {
+                if (!exfil.IsAvailableFor(lp))
+                    _tooltipLines.Add(("Not available", SKPaints.TextExfilInactive));
             }
         }
 
@@ -917,6 +976,7 @@ namespace eft_dma_radar.Silk.UI
                 _mouseOverPlayer = null;
                 _mouseOverLoot = null;
                 _mouseOverCorpse = null;
+                _mouseOverExfil = null;
                 MouseoverGroup = null;
                 return;
             }
@@ -927,6 +987,7 @@ namespace eft_dma_radar.Silk.UI
                 _mouseOverPlayer = null;
                 _mouseOverLoot = null;
                 _mouseOverCorpse = null;
+                _mouseOverExfil = null;
                 MouseoverGroup = null;
                 return;
             }
@@ -961,6 +1022,7 @@ namespace eft_dma_radar.Silk.UI
                 _mouseOverPlayer = closestPlayer;
                 _mouseOverLoot = null;
                 _mouseOverCorpse = null;
+                _mouseOverExfil = null;
                 MouseoverGroup = closestPlayer.IsHuman && closestPlayer.IsHostile && closestPlayer.SpawnGroupID != -1
                     ? closestPlayer.SpawnGroupID
                     : null;
@@ -1020,6 +1082,7 @@ namespace eft_dma_radar.Silk.UI
                 _mouseOverCorpse = closestCorpse;
                 _mouseOverLoot = null;
                 _mouseOverPlayer = null;
+                _mouseOverExfil = null;
                 MouseoverGroup = null;
                 return;
             }
@@ -1029,6 +1092,39 @@ namespace eft_dma_radar.Silk.UI
                 _mouseOverLoot = closestLoot;
                 _mouseOverPlayer = null;
                 _mouseOverCorpse = null;
+                _mouseOverExfil = null;
+                MouseoverGroup = null;
+                return;
+            }
+
+            // Check exfils (lowest priority)
+            Exfil? closestExfil = null;
+            float closestExfilDist = float.MaxValue;
+
+            if (Config.ShowExfils)
+            {
+                var exfils = Memory.Exfils;
+                if (exfils is not null)
+                {
+                    foreach (var e in exfils)
+                    {
+                        var screenPos = mp.ToScreenPos(MapParams.ToMapPos(e.Position, mp.Config));
+                        float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
+                        if (dist < closestExfilDist)
+                        {
+                            closestExfilDist = dist;
+                            closestExfil = e;
+                        }
+                    }
+                }
+            }
+
+            if (closestExfilDist < hitRadius && closestExfil is not null)
+            {
+                _mouseOverExfil = closestExfil;
+                _mouseOverPlayer = null;
+                _mouseOverLoot = null;
+                _mouseOverCorpse = null;
                 MouseoverGroup = null;
                 return;
             }
@@ -1036,6 +1132,7 @@ namespace eft_dma_radar.Silk.UI
             _mouseOverPlayer = null;
             _mouseOverLoot = null;
             _mouseOverCorpse = null;
+            _mouseOverExfil = null;
             MouseoverGroup = null;
         }
 

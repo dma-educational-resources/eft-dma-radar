@@ -28,6 +28,20 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
         // ── ObjectClass name chain ──────────────────────────────────────────
         public static readonly uint[] ObjClass_ToNamePtr = [0x0, 0x10];
 
+        /// <summary>
+        /// 6-element pointer chain: C# object → MonoBehaviour → GameObject → Components → Transform → ObjectClass → TransformInternal.
+        /// Works for any MonoBehaviour-derived object (exfils, loot items, etc.).
+        /// </summary>
+        public static readonly uint[] TransformChain =
+        [
+            0x10,               // ObjectClass → MonoBehaviour
+            Comp_GameObject,    // 0x58 — Component → GameObject
+            GO_Components,      // 0x58 — GameObject → ComponentArray
+            0x08,               // First component (Transform)
+            Comp_ObjectClass,   // 0x20 — Transform → ObjectClass
+            0x10,               // ObjectClass → TransformInternal
+        ];
+
         // ── ModuleBase (UnityPlayer.dll offsets) ────────────────────────────
         public const uint GomFallback        = 0x1A233A0;  // UnityPlayer.dll Dec 2025
         public const uint AllCamerasFallback = 0x19F3080;   // UnityPlayer.dll Dec 2025

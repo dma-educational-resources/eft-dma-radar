@@ -123,6 +123,26 @@ namespace eft_dma_radar.Silk.UI
 
         #endregion
 
+        #region Exfil Paints
+
+        /// <summary>Exfil open — green.</summary>
+        public static SKPaint PaintExfilOpen { get; } = NewFillPaint(new SKColor(50, 205, 50));
+        public static SKPaint TextExfilOpen { get; } = NewTextPaint(new SKColor(50, 205, 50));
+
+        /// <summary>Exfil pending — yellow.</summary>
+        public static SKPaint PaintExfilPending { get; } = NewFillPaint(new SKColor(255, 215, 0));
+        public static SKPaint TextExfilPending { get; } = NewTextPaint(new SKColor(255, 215, 0));
+
+        /// <summary>Exfil closed — red.</summary>
+        public static SKPaint PaintExfilClosed { get; } = NewFillPaint(new SKColor(200, 60, 60));
+        public static SKPaint TextExfilClosed { get; } = NewTextPaint(new SKColor(200, 60, 60));
+
+        /// <summary>Exfil inactive (not available for player) — dimmed grey.</summary>
+        public static SKPaint PaintExfilInactive { get; } = NewFillPaint(new SKColor(120, 120, 120, 120));
+        public static SKPaint TextExfilInactive { get; } = NewTextPaint(new SKColor(120, 120, 120, 120));
+
+        #endregion
+
         #region Tooltip Paints
 
         /// <summary>Semi-transparent dark background for mouseover tooltips.</summary>

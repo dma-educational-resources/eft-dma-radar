@@ -147,6 +147,23 @@ namespace eft_dma_radar.Silk.UI.Panels
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Toggle between player-follow and free-pan map mode");
 
+            ImGui.SeparatorText("Exfils");
+
+            bool showExfils = Config.ShowExfils;
+            if (ImGui.Checkbox("Show Exfils", ref showExfils))
+                Config.ShowExfils = showExfils;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Show exfiltration points on the radar");
+
+            if (Config.ShowExfils)
+            {
+                bool hideInactive = Config.HideInactiveExfils;
+                if (ImGui.Checkbox("Hide Inactive Exfils", ref hideInactive))
+                    Config.HideInactiveExfils = hideInactive;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Hide exfils that are closed or not available to you");
+            }
+
             ImGui.EndTabItem();
         }
     }

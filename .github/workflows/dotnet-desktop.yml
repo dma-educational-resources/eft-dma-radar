@@ -7,7 +7,6 @@ on:
       - main
     paths:
       - 'resources/**'
-      - 'src/**'
       - 'src-silk/**'
       - 'lib/**'
       - 'version.json'
@@ -135,7 +134,7 @@ jobs:
 
       - name: Dotnet Publish
         run: |
-          dotnet publish src/eft-dma-radar.csproj `
+          dotnet publish src-silk/eft-dma-radar-silk.csproj `
             -c Release `
             -r win-x64 `
             --self-contained false `

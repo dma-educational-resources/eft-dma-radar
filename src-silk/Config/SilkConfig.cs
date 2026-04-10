@@ -59,6 +59,14 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Extend aimline when an enemy is facing the local player (High Alert).</summary>
         public bool HighAlert { get; set; } = true;
 
+        // ── Exfils ──────────────────────────────────────────────────────────────
+
+        /// <summary>Master toggle for exfil rendering on the radar.</summary>
+        public bool ShowExfils { get; set; } = true;
+
+        /// <summary>Hide exfils that are closed or not available to the local player.</summary>
+        public bool HideInactiveExfils { get; set; } = true;
+
         // ── Loot ────────────────────────────────────────────────────────────────
 
         /// <summary>Master toggle for loot rendering on the radar.</summary>

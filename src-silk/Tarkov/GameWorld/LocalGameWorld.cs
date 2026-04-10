@@ -1,4 +1,5 @@
 using eft_dma_radar.Silk.Misc.Workers;
+using eft_dma_radar.Silk.Tarkov.GameWorld.Exits;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using VmmSharpEx;
@@ -22,7 +23,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
     ///   <item><b>RealtimeWorker</b> (8ms target, DynamicSleep, AboveNormal priority) — scatter-batched
     ///   position + rotation for all active players in a single DMA round-trip.
     ///   Actual sleep = max(0, 8ms - workTime). <b>Never</b> touches loot or registration.</item>
-    ///   <item><b>RegistrationWorker</b> (100ms, BelowNormal priority) — strict priority ordering:
+    ///   <item><b>RegistrationWorker</b> (100ms target, DynamicSleep, BelowNormal priority) — strict priority ordering:
     ///     <list type="number">
     ///       <item><b>Local player discovery</b> — blocks everything until found.</item>
     ///       <item><b>Player list refresh</b> — always runs every tick.</item>
@@ -41,6 +42,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private readonly CancellationToken _ct;
         private readonly RegisteredPlayers _registeredPlayers;
         private readonly LootManager _lootManager;
+        private ExfilManager? _exfilManager;
         private volatile bool _disposed;
         private WorkerThread? _realtimeWorker;
         private WorkerThread? _registrationWorker;
@@ -86,6 +88,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>Current snapshot of corpses in the raid.</summary>
         public IReadOnlyList<LootCorpse> Corpses => _lootManager.Corpses;
+
+        /// <summary>Current snapshot of exfiltration points in the raid.</summary>
+        public IReadOnlyList<Exfil>? Exfils => _exfilManager?.Exfils;
 
         /// <summary>
         /// Clears the stale GameWorld guard and cooldown so a user-initiated restart
@@ -242,7 +247,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 Name = "Registration Worker",
                 ThreadPriority = ThreadPriority.BelowNormal,
                 SleepDuration = TimeSpan.FromMilliseconds(100),
-                SleepMode = WorkerSleepMode.Default
+                SleepMode = WorkerSleepMode.DynamicSleep
             };
             _registrationWorker.PerformWork += RegistrationWorker_PerformWork;
         }
@@ -363,6 +368,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             // Loot refresh (rate-limited internally to once per 5s)
             _lootManager.Refresh();
 
+            // Exfil status refresh
+            _exfilManager?.Refresh();
+
             // Periodic transform validation
             var now = DateTime.UtcNow;
             if ((now - _lastTransformValidation) >= TransformValidationInterval)
@@ -397,6 +405,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     return false;
 
                 _localPlayerAddr = _registeredPlayers.LocalPlayerAddr;
+
+                // Initialize ExfilManager now that we know the local player's side
+                var lp = _registeredPlayers.LocalPlayer as Player.LocalPlayer;
+                _exfilManager = new ExfilManager(_base, MapID, lp?.IsPmc ?? true);
 
                 // Reset timing baselines now that the local player is confirmed —
                 // gives raid-ended and transform checks a fresh grace period.

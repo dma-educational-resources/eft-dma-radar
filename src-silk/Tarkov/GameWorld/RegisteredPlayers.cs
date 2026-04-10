@@ -36,14 +36,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private const int ErrorThreshold = 3;
 
         // Number of consecutive successes required to clear error state (hysteresis prevents flip-flop)
-        private const int RecoveryThreshold = 5;
+        private const int RecoveryThreshold = 2;
 
         // Number of consecutive position failures (while TransformReady) that trigger automatic
         // transform invalidation — covers cases where the pointer chain is valid but data isn't populated yet.
-        private const int ReinitThreshold = 10;
+        private const int ReinitThreshold = 5;
 
         // Maximum transform/rotation init retries before giving up (exponential backoff)
-        private const int MaxInitRetries = 10;
+        private const int MaxInitRetries = 15;
 
         // Gear refresh interval per player (seconds)
         private const int GearRefreshIntervalSec = 10;
@@ -355,16 +355,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                     var now = DateTime.UtcNow;
 
-                    // Re-init transform if invalidated (with backoff — fast initial retry, then exponential)
+                    // Re-init transform if invalidated (with backoff — fast initial retries, then capped linear)
                     if (!entry.TransformReady && entry.TransformInitFailures < MaxInitRetries && now >= entry.NextTransformRetry)
                     {
                         TryInitTransform(entry.Base, entry);
                         if (!entry.TransformReady)
                         {
                             entry.TransformInitFailures++;
-                            double backoffSec = entry.TransformInitFailures <= 2
-                                ? 0.5 * entry.TransformInitFailures  // 0.5s, 1s for first two retries
-                                : Math.Min(1 << (entry.TransformInitFailures - 1), 30); // then 4s, 8s, … 30s
+                            // Fast initial retries (100ms, 200ms, 500ms), then linear cap at 2s
+                            double backoffSec = entry.TransformInitFailures switch
+                            {
+                                1 => 0.1,
+                                2 => 0.2,
+                                3 => 0.5,
+                                _ => Math.Min(entry.TransformInitFailures * 0.5, 2.0)
+                            };
                             entry.NextTransformRetry = now.AddSeconds(backoffSec);
                             Log.WriteRateLimited(AppLogLevel.Warning,
                                 $"reinit_tfm_{kvp.Key:X}", TimeSpan.FromSeconds(5),
@@ -378,16 +383,20 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         }
                     }
 
-                    // Re-init rotation if invalidated (with backoff — fast initial retry, then exponential)
+                    // Re-init rotation if invalidated (with backoff — fast initial retries, then capped linear)
                     if (!entry.RotationReady && entry.RotationInitFailures < MaxInitRetries && now >= entry.NextRotationRetry)
                     {
                         TryInitRotation(entry.Base, entry);
                         if (!entry.RotationReady)
                         {
                             entry.RotationInitFailures++;
-                            double backoffSec = entry.RotationInitFailures <= 2
-                                ? 0.5 * entry.RotationInitFailures  // 0.5s, 1s for first two retries
-                                : Math.Min(1 << (entry.RotationInitFailures - 1), 30); // then 4s, 8s, … 30s
+                            double backoffSec = entry.RotationInitFailures switch
+                            {
+                                1 => 0.1,
+                                2 => 0.2,
+                                3 => 0.5,
+                                _ => Math.Min(entry.RotationInitFailures * 0.5, 2.0)
+                            };
                             entry.NextRotationRetry = now.AddSeconds(backoffSec);
                             Log.WriteRateLimited(AppLogLevel.Warning,
                                 $"reinit_rot_{kvp.Key:X}", TimeSpan.FromSeconds(5),
