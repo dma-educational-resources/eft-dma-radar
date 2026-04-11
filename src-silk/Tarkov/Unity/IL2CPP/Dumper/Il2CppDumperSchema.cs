@@ -241,6 +241,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                 F("_healthController"),
                 F("_inventoryController"),
                 F("_handsController"),
+                F("_playerLookRaycastTransform"),
                 F("<InteractionRayOriginOnStartOperation>k__BackingField", "InteractionRayOriginOnStartOperation"),
                 F("<InteractionRayDirectionOnStartOperation>k__BackingField", "InteractionRayDirectionOnStartOperation"),
                 F("<IsYourPlayer>k__BackingField", "IsYourPlayer"),
@@ -262,6 +263,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                 F("<PlayerBody>k__BackingField", "PlayerBody"),
                 F("<Id>k__BackingField", "Id"),
                 F("<VoipID>k__BackingField", "VoipId"),
+                F("_playerLookRaycastTransform"),
             ]),
 
             // ObservedPlayerController

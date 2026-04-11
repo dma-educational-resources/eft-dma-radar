@@ -339,6 +339,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <list type="number">
         ///   <item>Local player discovery (blocks everything else until found).</item>
         ///   <item>Player list refresh — always runs every tick.</item>
+        ///   <item>Early raid-ended detection — if local player was lost, skip expensive work.</item>
         ///   <item>Secondary work (loot, transform validation, raid-ended) — runs only
         ///         after players are handled. New features added here will never starve
         ///         player discovery or registration.</item>
@@ -364,6 +365,22 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             _registeredPlayers.RefreshRegistration();
 
             var regElapsed = Stopwatch.GetElapsedTime(regStart);
+
+            // ── Priority 2.5: Early raid-ended detection ───────────────────────
+            // If the local player disappeared from the registered list or player count dropped to 0,
+            // this is a high-confidence signal the raid has ended. Skip all expensive secondary work
+            // (transform validation, loot refresh, etc.) and immediately verify via IsRaidActive().
+            if (_registeredPlayers.LocalPlayerLost)
+            {
+                Log.WriteLine("[LocalGameWorld] Local player lost — checking raid status...");
+                if (!IsRaidActive())
+                {
+                    Log.WriteLine("[LocalGameWorld] Raid ended (local player lost).");
+                    Memory.ShowNotification?.Invoke("Raid has ended", NotificationLevel.Info);
+                    Dispose();
+                }
+                return; // Skip secondary work either way — data is unreliable
+            }
 
             // ── Priority 3: Secondary work (never starves player registration) ─
             long secStart = Stopwatch.GetTimestamp();

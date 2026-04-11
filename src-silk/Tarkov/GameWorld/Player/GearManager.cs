@@ -1,6 +1,8 @@
-using System.Collections.Frozen;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 using eft_dma_radar.Silk.Tarkov.Unity;
+using eft_dma_radar.Silk.Tarkov.Unity.IL2CPP;
+using System.Collections.Frozen;
+using static SDK.Offsets;
 
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 {
@@ -199,7 +201,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                     // Dogtag detection — find BarterOther item for ProfileId resolution
                     if (needsProfileId)
                     {
-                        var className = Il2CppClass.ReadName(item);
+                        var className = Unity.Il2CppClass.ReadName(item);
                         if (className is not null && className.Equals("BarterOther", StringComparison.Ordinal))
                         {
                             if (TryResolveProfileId(item, player))

@@ -13,7 +13,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>
         /// Prepares scatter reads for a single player's position + rotation.
-        /// No delegates or callbacks — results are read inline after Execute().
+        /// LookPosition for the local player is computed from the same vertex data —
+        /// no separate scatter read needed since both chains share the same TransformInternal.
         /// </summary>
         private static void PrepareScatterReads(VmmScatter scatter, PlayerEntry entry)
         {
@@ -78,6 +79,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                             $"pos_bad_{entry.Base:X}", TimeSpan.FromSeconds(3),
                             $"[RegisteredPlayers] Position compute failed for '{entry.Player.Name}' (idx={entry.TransformIndex}, verts=0x{entry.VerticesAddr:X})");
                     }
+
+                    // LookPosition for local player — same TransformInternal, same vertices, same result.
+                    // Just copy the already-computed position (avoids a redundant hierarchy walk).
+                    if (posOk && entry.LookTransformReady && entry.Player is Player.LocalPlayer localPlayer)
+                    {
+                        localPlayer.LookPosition = entry.Player.Position;
+                        localPlayer.HasLookPosition = true;
+                    }
                 }
                 else
                 {
@@ -119,6 +128,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 {
                     Log.WriteLine($"[RegisteredPlayers] Auto-invalidating transform for '{entry.Player.Name}' after {entry.ConsecutiveErrors} consecutive position failures");
                     entry.TransformReady = false;
+                    entry.LookTransformReady = false;
                     entry.TransformInitFailures = 0;
                     entry.NextTransformRetry = default;
                     entry.ConsecutiveErrors = 0; // Reset so we don't immediately re-trigger
@@ -215,7 +225,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// Uses a two-round scatter pattern for validation.
         /// Round 1: read Hierarchy ptr from TransformInternal.
         /// Round 2: read VerticesAddr from Hierarchy — compare with cached value.
-        /// On change: uses fast re-init from cached TransformInternal (skips first 6 hops).
+        /// On change: uses fast re-init from cached TransformInternal (skips the pointer chain hops).
         /// </summary>
         internal void ValidateTransforms()
         {
@@ -255,7 +265,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             }
             round2.Execute();
 
-            // Process round 2 results — compare vertices with cached value
+            // Process round 2 results — compare vertices with cached value.
+            // First pass: count changes and attempt fast re-init.
+            int changedCount = 0;
+            int fastReinitOk = 0;
+            List<int>? needFullReinit = null;
+
             for (int i = 0; i < _validateEntries.Count; i++)
             {
                 var hierarchy = hierarchies[i];
@@ -266,20 +281,56 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 if (round2.ReadValue<ulong>(hierarchy + TransformHierarchy.VerticesOffset, out var verticesPtr)
                     && verticesPtr != entry.VerticesAddr)
                 {
+                    changedCount++;
+
                     // Fast re-init: TransformInternal is stable — only Hierarchy→Vertices/Indices changed.
-                    // This saves 6 DMA reads vs full TryInitTransform (which re-walks from playerBase).
                     if (TryReinitFromTransformInternal(entry))
                     {
+                        SyncLookTransform(entry);
+                        fastReinitOk++;
                         Log.WriteLine($"[RegisteredPlayers] Transform changed for '{entry.Player.Name}' — fast re-init OK (verts 0x{entry.VerticesAddr:X})");
                     }
                     else
                     {
-                        // Fast path failed — fall back to full re-init
+                        (needFullReinit ??= []).Add(i);
+                    }
+                }
+            }
+
+            // If a large majority of transforms changed and fast re-init failed for most,
+            // this is almost certainly a mass-invalidation event (raid ending, scene unload).
+            // Skip the expensive serial TryInitTransform calls — just invalidate and let the
+            // registration worker handle it (or, more likely, raid-ended detection fires first).
+            if (needFullReinit is not null)
+            {
+                bool massInvalidation = needFullReinit.Count >= 5
+                    && needFullReinit.Count >= _validateEntries.Count / 2;
+
+                if (massInvalidation)
+                {
+                    Log.WriteLine($"[RegisteredPlayers] Mass transform invalidation detected ({needFullReinit.Count}/{_validateEntries.Count} changed, fast re-init failed) — skipping serial re-init");
+                    foreach (int idx in needFullReinit)
+                    {
+                        var entry = _validateEntries[idx];
+                        entry.TransformReady = false;
+                        entry.LookTransformReady = false;
+                        entry.TransformInitFailures = 0;
+                        entry.NextTransformRetry = default;
+                    }
+                }
+                else
+                {
+                    // Small number of changes — do serial full re-init as before
+                    foreach (int idx in needFullReinit)
+                    {
+                        var entry = _validateEntries[idx];
                         Log.WriteLine($"[RegisteredPlayers] Transform changed for '{entry.Player.Name}' — fast re-init failed, full re-init");
                         entry.TransformReady = false;
+                        entry.LookTransformReady = false;
                         entry.TransformInitFailures = 0;
                         entry.NextTransformRetry = default;
                         TryInitTransform(entry.Base, entry);
+                        SyncLookTransform(entry);
                     }
                 }
             }
@@ -289,21 +340,22 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         #region Transform / Rotation Init
 
+        /// <summary>
+        /// Initializes the transform for a single player using the short 2-hop chain:
+        /// _playerLookRaycastTransform → Transform+0x10 → TransformInternal → Hierarchy → Vertices.
+        /// Works for both local player (offset 0xA18) and observed players (offset 0x100).
+        /// </summary>
         private static void TryInitTransform(ulong playerBase, PlayerEntry entry)
         {
             try
             {
-                uint bodyOffset = entry.IsObserved
-                    ? Offsets.ObservedPlayerView.PlayerBody
-                    : Offsets.Player._playerBody;
+                uint lookOffset = entry.IsObserved
+                    ? Offsets.ObservedPlayerView._playerLookRaycastTransform
+                    : Offsets.Player._playerLookRaycastTransform;
 
-                // Walk pointer chain: PlayerBody → SkeletonRootJoint → _values → arr → bone[0] → TransformInternal
-                var bodyPtr = Memory.ReadPtr(playerBase + bodyOffset, false);
-                var skelRootJoint = Memory.ReadPtr(bodyPtr + Offsets.PlayerBody.SkeletonRootJoint, false);
-                var dizValues = Memory.ReadPtr(skelRootJoint + Offsets.DizSkinningSkeleton._values, false);
-                var arrPtr = Memory.ReadPtr(dizValues + List.ArrOffset, false);
-                var boneEntryPtr = Memory.ReadPtr(arrPtr + List.ArrStartOffset, false);
-                var transformInternal = Memory.ReadPtr(boneEntryPtr + 0x10, false);
+                // Short chain: _playerLookRaycastTransform → Transform component → TransformInternal
+                var lookTransformPtr = Memory.ReadPtr(playerBase + lookOffset, false);
+                var transformInternal = Memory.ReadPtr(lookTransformPtr + 0x10, false);
 
                 // TransformAccess fields are embedded directly in TransformInternal
                 var taIndex = Memory.ReadValue<int>(transformInternal + TransformAccess.IndexOffset, false);
@@ -339,9 +391,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 var indices = Memory.ReadArray<int>(indicesAddr, count, false);
 
                 // Validate that position data is actually readable before committing.
-                // The pointer chain can be valid while the game hasn't populated vertex data yet
-                // (e.g., player just spawned). Without this check, TransformReady=true but every
-                // position read fails until the game finishes initialization.
                 var testVertices = Memory.ReadArray<TrsX>(verticesAddr, count, false);
                 if (testVertices is null || !TestPositionCompute(taIndex, indices, testVertices))
                 {
@@ -493,12 +542,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// </summary>
         private readonly List<PlayerEntry> _batchInitEntries = new(MaxPlayerCount);
 
-        // Reusable buffers for BatchInitTransforms — avoids 11 heap arrays per call
-        private ulong[] _btiBodyPtrs = [];
-        private ulong[] _btiSkelPtrs = [];
-        private ulong[] _btiDizValuesPtrs = [];
-        private ulong[] _btiArrPtrs = [];
-        private ulong[] _btiBonePtrs = [];
+        // Reusable buffers for BatchInitTransforms — short 2-hop chain
+        private ulong[] _btiLookTransformPtrs = [];
         private ulong[] _btiTransformInternals = [];
         private int[] _btiTaIndices = [];
         private ulong[] _btiHierarchyPtrs = [];
@@ -549,7 +594,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <summary>
         /// Batched scatter-based initialization of transforms and rotations for all entries
         /// that need it. Replaces per-player serial <see cref="TryInitTransform"/> calls
-        /// (N × 8 serial DMA reads) with 8 scatter rounds (batching all players in each round).
+        /// with 4 scatter rounds (batching all players in each round) using the short
+        /// _playerLookRaycastTransform → TransformInternal chain.
         /// <para>
         /// Called from the registration worker thread after player discovery and before
         /// <see cref="UpdateExistingPlayers"/>. Handles both new entries (failures=0) and
@@ -646,6 +692,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 }
             }
 
+            // Mark look transform ready for local player.
+            // Since both chains now use _playerLookRaycastTransform, the TransformInternal is identical —
+            // LookPosition is computed from the same vertex data in the realtime loop (zero extra DMA).
+            foreach (var kvp in _players)
+            {
+                var entry = kvp.Value;
+                if (entry.Player.IsLocalPlayer && entry.TransformReady && !entry.LookTransformReady)
+                {
+                    entry.LookTransformReady = true;
+                    Log.WriteLine($"[RegisteredPlayers] LookTransform OK (from main transform): " +
+                        $"transformInternal=0x{entry.TransformInternal:X}, idx={entry.TransformIndex}, verts=0x{entry.VerticesAddr:X}");
+                    break; // Only one local player
+                }
+            }
+
             // Always-visible summary when there was work to do
             var elapsed = Stopwatch.GetElapsedTime(swStart);
             if (transformCandidates > 0 || rotationCandidates > 0)
@@ -669,18 +730,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>
         /// Scatter-batched transform initialization for multiple entries.
-        /// Walks the 8-hop pointer chain across all entries simultaneously using VmmScatter rounds.
+        /// Uses the short 2-hop chain: _playerLookRaycastTransform → Transform+0x10 → TransformInternal,
+        /// then reads Index+Hierarchy and Vertices+Indices in 4 total scatter rounds.
         /// </summary>
         private void BatchInitTransforms(List<PlayerEntry> entries, DateTime now)
         {
             int n = entries.Count;
 
             // Reuse pre-allocated buffers — only reallocates when player count grows
-            EnsureBuffer(ref _btiBodyPtrs, n);
-            EnsureBuffer(ref _btiSkelPtrs, n);
-            EnsureBuffer(ref _btiDizValuesPtrs, n);
-            EnsureBuffer(ref _btiArrPtrs, n);
-            EnsureBuffer(ref _btiBonePtrs, n);
+            EnsureBuffer(ref _btiLookTransformPtrs, n);
             EnsureBuffer(ref _btiTransformInternals, n);
             EnsureBuffer(ref _btiTaIndices, n);
             EnsureBuffer(ref _btiHierarchyPtrs, n);
@@ -688,11 +746,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             EnsureBuffer(ref _btiIndicesPtrs, n);
             EnsureBuffer(ref _btiValid, n, fillValue: true);
 
-            var bodyPtrs = _btiBodyPtrs;
-            var skelPtrs = _btiSkelPtrs;
-            var dizValuesPtrs = _btiDizValuesPtrs;
-            var arrPtrs = _btiArrPtrs;
-            var bonePtrs = _btiBonePtrs;
+            var lookTransformPtrs = _btiLookTransformPtrs;
             var transformInternals = _btiTransformInternals;
             var taIndices = _btiTaIndices;
             var hierarchyPtrs = _btiHierarchyPtrs;
@@ -702,124 +756,52 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             int validCount;
 
-            // Round 1: Read PlayerBody
+            // Round 1: Read _playerLookRaycastTransform → Transform component pointer
             using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
             {
                 for (int i = 0; i < n; i++)
                 {
                     var entry = entries[i];
-                    uint bodyOffset = entry.IsObserved
-                        ? Offsets.ObservedPlayerView.PlayerBody
-                        : Offsets.Player._playerBody;
-                    scatter.PrepareReadValue<ulong>(entry.Base + bodyOffset);
+                    uint lookOffset = entry.IsObserved
+                        ? Offsets.ObservedPlayerView._playerLookRaycastTransform
+                        : Offsets.Player._playerLookRaycastTransform;
+                    scatter.PrepareReadValue<ulong>(entry.Base + lookOffset);
                 }
                 scatter.Execute();
                 for (int i = 0; i < n; i++)
                 {
                     var entry = entries[i];
-                    uint bodyOffset = entry.IsObserved
-                        ? Offsets.ObservedPlayerView.PlayerBody
-                        : Offsets.Player._playerBody;
-                    if (scatter.ReadValue<ulong>(entry.Base + bodyOffset, out var body) && body.IsValidVirtualAddress())
-                        bodyPtrs[i] = body;
+                    uint lookOffset = entry.IsObserved
+                        ? Offsets.ObservedPlayerView._playerLookRaycastTransform
+                        : Offsets.Player._playerLookRaycastTransform;
+                    if (scatter.ReadValue<ulong>(entry.Base + lookOffset, out var lookPtr) && lookPtr.IsValidVirtualAddress())
+                        lookTransformPtrs[i] = lookPtr;
                     else
                         valid[i] = false;
                 }
             }
             validCount = CountTrue(valid, n);
-            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R1 (PlayerBody): {validCount}/{n} valid");
+            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R1 (LookTransform): {validCount}/{n} valid");
 
-            // Round 2: Read SkeletonRootJoint
+            // Round 2: Read TransformInternal from Transform component (+0x10)
             using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
             {
                 for (int i = 0; i < n; i++)
-                    if (valid[i]) scatter.PrepareReadValue<ulong>(bodyPtrs[i] + Offsets.PlayerBody.SkeletonRootJoint);
+                    if (valid[i]) scatter.PrepareReadValue<ulong>(lookTransformPtrs[i] + 0x10);
                 scatter.Execute();
                 for (int i = 0; i < n; i++)
                 {
                     if (!valid[i]) continue;
-                    if (scatter.ReadValue<ulong>(bodyPtrs[i] + Offsets.PlayerBody.SkeletonRootJoint, out var skel) && skel.IsValidVirtualAddress())
-                        skelPtrs[i] = skel;
-                    else
-                        valid[i] = false;
-                }
-            }
-            validCount = CountTrue(valid, n);
-            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R2 (SkeletonRootJoint): {validCount}/{n} valid");
-
-            // Round 3: Read _values
-            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
-            {
-                for (int i = 0; i < n; i++)
-                    if (valid[i]) scatter.PrepareReadValue<ulong>(skelPtrs[i] + Offsets.DizSkinningSkeleton._values);
-                scatter.Execute();
-                for (int i = 0; i < n; i++)
-                {
-                    if (!valid[i]) continue;
-                    if (scatter.ReadValue<ulong>(skelPtrs[i] + Offsets.DizSkinningSkeleton._values, out var diz) && diz.IsValidVirtualAddress())
-                        dizValuesPtrs[i] = diz;
-                    else
-                        valid[i] = false;
-                }
-            }
-            validCount = CountTrue(valid, n);
-            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R3 (_values): {validCount}/{n} valid");
-
-            // Round 4: Read arr (List backing array)
-            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
-            {
-                for (int i = 0; i < n; i++)
-                    if (valid[i]) scatter.PrepareReadValue<ulong>(dizValuesPtrs[i] + List.ArrOffset);
-                scatter.Execute();
-                for (int i = 0; i < n; i++)
-                {
-                    if (!valid[i]) continue;
-                    if (scatter.ReadValue<ulong>(dizValuesPtrs[i] + List.ArrOffset, out var arr) && arr.IsValidVirtualAddress())
-                        arrPtrs[i] = arr;
-                    else
-                        valid[i] = false;
-                }
-            }
-            validCount = CountTrue(valid, n);
-            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R4 (ListArr): {validCount}/{n} valid");
-
-            // Round 5: Read bone[0] entry pointer
-            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
-            {
-                for (int i = 0; i < n; i++)
-                    if (valid[i]) scatter.PrepareReadValue<ulong>(arrPtrs[i] + List.ArrStartOffset);
-                scatter.Execute();
-                for (int i = 0; i < n; i++)
-                {
-                    if (!valid[i]) continue;
-                    if (scatter.ReadValue<ulong>(arrPtrs[i] + List.ArrStartOffset, out var bone) && bone.IsValidVirtualAddress())
-                        bonePtrs[i] = bone;
-                    else
-                        valid[i] = false;
-                }
-            }
-            validCount = CountTrue(valid, n);
-            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R5 (Bone0): {validCount}/{n} valid");
-
-            // Round 6: Read TransformInternal from bone entry
-            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
-            {
-                for (int i = 0; i < n; i++)
-                    if (valid[i]) scatter.PrepareReadValue<ulong>(bonePtrs[i] + 0x10);
-                scatter.Execute();
-                for (int i = 0; i < n; i++)
-                {
-                    if (!valid[i]) continue;
-                    if (scatter.ReadValue<ulong>(bonePtrs[i] + 0x10, out var ti) && ti.IsValidVirtualAddress())
+                    if (scatter.ReadValue<ulong>(lookTransformPtrs[i] + 0x10, out var ti) && ti.IsValidVirtualAddress())
                         transformInternals[i] = ti;
                     else
                         valid[i] = false;
                 }
             }
             validCount = CountTrue(valid, n);
-            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R6 (TransformInternal): {validCount}/{n} valid");
+            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R2 (TransformInternal): {validCount}/{n} valid");
 
-            // Round 7: Read taIndex + taHierarchy from TransformInternal (both from same base)
+            // Round 3: Read taIndex + taHierarchy from TransformInternal
             using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
             {
                 for (int i = 0; i < n; i++)
@@ -847,9 +829,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 }
             }
             validCount = CountTrue(valid, n);
-            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R7 (Index+Hierarchy): {validCount}/{n} valid");
+            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R3 (Index+Hierarchy): {validCount}/{n} valid");
 
-            // Round 8: Read vertices + indices from hierarchy (both from same base)
+            // Round 4: Read vertices + indices from hierarchy
             using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
             {
                 for (int i = 0; i < n; i++)
@@ -877,7 +859,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 }
             }
             validCount = CountTrue(valid, n);
-            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R8 (Vertices+Indices): {validCount}/{n} valid");
+            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R4 (Vertices+Indices): {validCount}/{n} valid");
 
             // Final: read indices array + test vertex data for each valid entry (serial per entry — variable size)
             for (int i = 0; i < n; i++)
@@ -1110,6 +1092,23 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 };
                 entry.NextRotationRetry = now.AddSeconds(backoffSec);
             }
+        }
+
+        #endregion
+
+        #region Look Transform Sync
+
+        /// <summary>
+        /// Marks the look transform as ready for the local player.
+        /// Since both chains use _playerLookRaycastTransform, the main transform's
+        /// TransformInternal/Vertices/Indices are used directly — no separate fields needed.
+        /// </summary>
+        private static void SyncLookTransform(PlayerEntry entry)
+        {
+            if (!entry.Player.IsLocalPlayer || !entry.TransformReady)
+                return;
+
+            entry.LookTransformReady = true;
         }
 
         #endregion

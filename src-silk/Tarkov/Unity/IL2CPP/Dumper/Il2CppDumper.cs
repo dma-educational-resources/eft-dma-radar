@@ -697,6 +697,230 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             return null;
         }
 
+        #region DumpClassFields (diagnostic)
+
+        /// <summary>
+        /// Diagnostic helper: reads the IL2CPP klass pointer from an object instance,
+        /// walks the entire inheritance chain, and logs every field with its offset,
+        /// IL2CPP type name, field name, and live value read from the object instance.
+        /// <para>
+        /// Output format matches <c>DEBUG_OUTPUT_REFERENCE.md</c> §3:
+        /// <code>
+        /// ── Fields of 'label' @ 0xADDR (full hierarchy) ──
+        ///   ┌ ClassName (klass=0xPTR, N field(s))
+        ///   │  [0xOFFSET] type  name = value
+        /// </code>
+        /// </para>
+        /// </summary>
+        public static void DumpClassFields(ulong objectAddress, string label = null)
+        {
+            try
+            {
+                if (!eft_dma_radar.Silk.Misc.Utils.IsValidVirtualAddress(objectAddress))
+                {
+                    Log.WriteLine($"[Il2CppDumper] DumpClassFields: invalid object address 0x{objectAddress:X}");
+                    return;
+                }
+
+                // Il2CppObject layout: first 8 bytes = klass pointer
+                ulong klassPtr = ReadPtr(objectAddress);
+                if (!eft_dma_radar.Silk.Misc.Utils.IsValidVirtualAddress(klassPtr))
+                {
+                    Log.WriteLine($"[Il2CppDumper] DumpClassFields: invalid klass pointer at 0x{objectAddress:X}");
+                    return;
+                }
+
+                // Read top-level class name for the header
+                ulong topNamePtr = ReadPtr(klassPtr + K_Name);
+                string topClassName = ReadStr(topNamePtr) ?? "<unknown>";
+                var tag = label ?? topClassName;
+
+                Log.WriteLine($"[Il2CppDumper] ── Fields of '{tag}' @ 0x{objectAddress:X} (full hierarchy) ──");
+
+                // Walk the parent chain: klass → parent → parent → ... → null
+                const int MaxDepth = 32;
+                int depth = 0;
+                ulong currentKlass = klassPtr;
+
+                while (eft_dma_radar.Silk.Misc.Utils.IsValidVirtualAddress(currentKlass) && depth < MaxDepth)
+                {
+                    depth++;
+                    DumpSingleClassFieldsWithValues(currentKlass, objectAddress);
+                    currentKlass = ReadPtr(currentKlass + Offsets.Il2CppClass.Parent);
+                }
+
+                Log.WriteLine($"[Il2CppDumper] ── End of '{tag}' ({depth} class(es) in hierarchy) ──");
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[Il2CppDumper] DumpClassFields error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Dumps all fields declared on a single Il2CppClass with their types and
+        /// live values read from the object instance at <paramref name="objectAddress"/>.
+        /// </summary>
+        private static void DumpSingleClassFieldsWithValues(ulong klassPtr, ulong objectAddress)
+        {
+            // Read class name + namespace
+            ulong namePtr = ReadPtr(klassPtr + K_Name);
+            string className = ReadStr(namePtr) ?? "<unknown>";
+
+            ulong nsPtr = ReadPtr(klassPtr + 0x18); // Il2CppClass::namespaze
+            string ns = ReadStr(nsPtr) ?? string.Empty;
+            string fullName = string.IsNullOrEmpty(ns) ? className : $"{ns}.{className}";
+
+            var fieldCount = Memory.ReadValue<ushort>(klassPtr + K_FieldCount, false);
+
+            Log.WriteLine($"[Il2CppDumper]   ┌ {fullName} (klass=0x{klassPtr:X}, {fieldCount} field(s))");
+
+            if (fieldCount == 0 || fieldCount > 4096)
+                return;
+
+            ulong fieldsBase = ReadPtr(klassPtr + K_Fields);
+            if (!eft_dma_radar.Silk.Misc.Utils.IsValidVirtualAddress(fieldsBase))
+            {
+                Log.WriteLine($"[Il2CppDumper]   │  (fields pointer invalid)");
+                return;
+            }
+
+            RawFieldInfoFull[] rawFields;
+            try { rawFields = Memory.ReadArray<RawFieldInfoFull>(fieldsBase, fieldCount, false); }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[Il2CppDumper]   │  (failed to read field array: {ex.Message})");
+                return;
+            }
+
+            // Scatter read: field name strings + Il2CppType structs
+            var nameEntries = new ScatterReadEntry<UTF8String>[rawFields.Length];
+            var typeEntries = new ScatterReadEntry<RawIl2CppType>[rawFields.Length];
+            var scatter = new List<IScatterEntry>(rawFields.Length * 2);
+
+            for (int i = 0; i < rawFields.Length; i++)
+            {
+                if (eft_dma_radar.Silk.Misc.Utils.IsValidVirtualAddress(rawFields[i].NamePtr))
+                {
+                    nameEntries[i] = ScatterReadEntry<UTF8String>.Get(rawFields[i].NamePtr, MaxNameLen);
+                    scatter.Add(nameEntries[i]);
+                }
+                if (eft_dma_radar.Silk.Misc.Utils.IsValidVirtualAddress(rawFields[i].TypePtr))
+                {
+                    typeEntries[i] = ScatterReadEntry<RawIl2CppType>.Get(rawFields[i].TypePtr, 0);
+                    scatter.Add(typeEntries[i]);
+                }
+            }
+
+            if (scatter.Count > 0)
+                Memory.ReadScatter(scatter.ToArray(), false);
+
+            for (int i = 0; i < rawFields.Length; i++)
+            {
+                string name = nameEntries[i] is not null && !nameEntries[i].IsFailed
+                    ? (string)(UTF8String)nameEntries[i].Result
+                    : "<unreadable>";
+
+                // Resolve type name
+                string typeName = "?";
+                byte typeEnum = 0;
+                if (typeEntries[i] is not null && !typeEntries[i].IsFailed)
+                {
+                    ref var t = ref typeEntries[i].Result;
+                    typeEnum = t.TypeEnum;
+                    typeName = Il2CppTypeEnumName(typeEnum);
+                }
+
+                int offset = rawFields[i].Offset;
+
+                // Read live value from the object instance
+                string valueStr;
+                if (offset < 0)
+                {
+                    // Static field — offset is into the static fields region, not the instance
+                    valueStr = "(static)";
+                }
+                else
+                {
+                    valueStr = ReadFieldValueString(objectAddress, (uint)offset, typeEnum);
+                }
+
+                Log.WriteLine($"[Il2CppDumper]   │  [0x{(uint)offset:X}] {typeName,-12} {name} = {valueStr}");
+            }
+        }
+
+        /// <summary>
+        /// Reads a live field value from an object instance and formats it as a string.
+        /// </summary>
+        private static string ReadFieldValueString(ulong objectAddress, uint offset, byte typeEnum)
+        {
+            try
+            {
+                ulong addr = objectAddress + offset;
+                return typeEnum switch
+                {
+                    0x02 => Memory.ReadValue<bool>(addr, false).ToString().ToLowerInvariant(),             // bool
+                    0x03 => $"'{(char)Memory.ReadValue<ushort>(addr, false)}'",                             // char
+                    0x04 => Memory.ReadValue<sbyte>(addr, false).ToString(),                                // sbyte
+                    0x05 => $"0x{Memory.ReadValue<byte>(addr, false):X2}",                                  // byte
+                    0x06 => Memory.ReadValue<short>(addr, false).ToString(),                                // short
+                    0x07 => $"0x{Memory.ReadValue<ushort>(addr, false):X4}",                                // ushort
+                    0x08 => Memory.ReadValue<int>(addr, false).ToString(),                                  // int
+                    0x09 => $"0x{Memory.ReadValue<uint>(addr, false):X}",                                   // uint
+                    0x0A => Memory.ReadValue<long>(addr, false).ToString(),                                 // long
+                    0x0B => $"0x{Memory.ReadValue<ulong>(addr, false):X}",                                  // ulong
+                    0x0C => Memory.ReadValue<float>(addr, false).ToString("G6"),                            // float
+                    0x0D => Memory.ReadValue<double>(addr, false).ToString("G6"),                           // double
+                    0x0E => ReadStringFieldValue(addr),                                                     // string
+                    0x12 or 0x15 or 0x1D or 0x14 => ReadPointerFieldValue(addr),                           // class, generic<>, [], [,]
+                    0x18 => $"0x{Memory.ReadValue<ulong>(addr, false):X}",                                  // IntPtr
+                    _ => ReadPointerOrValueFieldValue(addr),                                                // valuetype, enum, unknown
+                };
+            }
+            catch
+            {
+                return "<read failed>";
+            }
+        }
+
+        /// <summary>Reads a string field: dereferences the pointer and reads the Unity string.</summary>
+        private static string ReadStringFieldValue(ulong addr)
+        {
+            var ptr = ReadPtr(addr);
+            if (ptr == 0) return "null";
+            if (!eft_dma_radar.Silk.Misc.Utils.IsValidVirtualAddress(ptr)) return $"<bad ptr 0x{ptr:X}>";
+            try
+            {
+                var s = Memory.ReadUnityString(ptr, 128, false);
+                return $"\"{s}\"";
+            }
+            catch
+            {
+                return $"0x{ptr:X}";
+            }
+        }
+
+        /// <summary>Reads a pointer field (class, generic, array).</summary>
+        private static string ReadPointerFieldValue(ulong addr)
+        {
+            var ptr = ReadPtr(addr);
+            return ptr == 0 ? "null" : $"0x{ptr:X}";
+        }
+
+        /// <summary>Reads a field as a pointer first; if it looks like a small value, shows as int.</summary>
+        private static string ReadPointerOrValueFieldValue(ulong addr)
+        {
+            var raw = Memory.ReadValue<ulong>(addr, false);
+            // Heuristic: if the value fits in 32 bits and isn't a valid VA, show as int
+            if (raw <= uint.MaxValue)
+                return $"{(int)(uint)raw}";
+            if (eft_dma_radar.Silk.Misc.Utils.IsValidVirtualAddress(raw))
+                return $"0x{raw:X}";
+            return $"0x{raw:X}";
+        }
+
+        #endregion
+
         private static ulong ReadPtr(ulong addr)
         {
             if (!eft_dma_radar.Silk.Misc.Utils.IsValidVirtualAddress(addr)) return 0;

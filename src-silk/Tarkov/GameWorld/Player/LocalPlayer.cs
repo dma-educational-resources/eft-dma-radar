@@ -8,6 +8,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
     {
         public override bool IsLocalPlayer => true;
 
+        /// <summary>
+        /// Eye-level position from <c>_playerLookRaycastTransform</c>.
+        /// Updated each realtime tick when the look transform is initialized.
+        /// Falls back to <see cref="Player.Position"/> if not yet available.
+        /// </summary>
+        public Vector3 LookPosition { get; set; }
+
+        /// <summary>Whether the look transform has been initialized and is producing valid positions.</summary>
+        public bool HasLookPosition { get; set; }
+
         /// <summary>Whether the local player is a PMC (USEC or BEAR).</summary>
         public bool IsPmc { get; set; }
 

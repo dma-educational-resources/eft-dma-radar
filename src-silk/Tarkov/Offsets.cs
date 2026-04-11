@@ -213,6 +213,7 @@ namespace SDK
             public static uint _healthController = 0x968;
             public static uint _inventoryController = 0x980;
             public static uint _handsController = 0x988;
+            public static uint _playerLookRaycastTransform = 0xA18;
             public static uint InteractionRayOriginOnStartOperation = 0xA24;
             public static uint InteractionRayDirectionOnStartOperation = 0xA30;
             public static uint IsYourPlayer = 0xA91;
@@ -233,6 +234,7 @@ namespace SDK
             public static uint PlayerBody = 0xD8;
             public static uint Id = 0x7C;
             public static uint VoipId = 0xB0;
+            public static uint _playerLookRaycastTransform = 0x100;
         }
         public readonly partial struct ObservedPlayerController
         {

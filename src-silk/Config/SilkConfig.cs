@@ -59,6 +59,21 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Show filtered loot items in the aimview widget.</summary>
         public bool AimviewShowLoot { get; set; } = true;
 
+        /// <summary>Show nearby corpses with gear value in the aimview widget.</summary>
+        public bool AimviewShowCorpses { get; set; } = true;
+
+        /// <summary>Max distance (meters) for players to appear in the aimview.</summary>
+        public float AimviewPlayerDistance { get; set; } = 300f;
+
+        /// <summary>Max distance (meters) for loot/corpses to appear in the aimview.</summary>
+        public float AimviewLootDistance { get; set; } = 15f;
+
+        /// <summary>Eye height offset (meters) above body root for the aimview camera.</summary>
+        public float AimviewEyeHeight { get; set; } = 1.35f;
+
+        /// <summary>Zoom level for the aimview (1.0 = ~90° FOV, higher = narrower/zoomed in).</summary>
+        public float AimviewZoom { get; set; } = 1.0f;
+
         /// <summary>Aimline length in pixels for human players (PMC/PScav).</summary>
         public int AimlineLength { get; set; } = 15;
 

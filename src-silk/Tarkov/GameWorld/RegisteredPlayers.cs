@@ -83,6 +83,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <summary>Number of currently tracked players.</summary>
         public int Count => _players.Count;
 
+        /// <summary>
+        /// Set when the local player disappears from the game's RegisteredPlayers list.
+        /// This is an immediate, high-confidence signal that the raid is ending (death, extraction,
+        /// or disconnect). The registration worker uses this to skip expensive secondary work and
+        /// trigger an early <c>IsRaidActive()</c> check.
+        /// </summary>
+        public bool LocalPlayerLost { get; private set; }
+
         #endregion
 
         #region Inner Types
@@ -127,6 +135,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             // Gear refresh tracking — rate-limited to avoid excessive DMA reads
             public DateTime NextGearRefresh;
+
+            // Look transform (local player only) — used for aimview eye position.
+            // Since both main and look chains use _playerLookRaycastTransform, the
+            // TransformInternal/Vertices/Indices are identical — no separate fields needed.
+            // This flag simply tracks whether the look transform has been synced.
+            public volatile bool LookTransformReady;
 
             public PlayerEntry(ulong playerBase, Player.Player player, bool isObserved)
             {
@@ -229,6 +243,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     Log.WriteRateLimited(AppLogLevel.Warning, "rp_count", TimeSpan.FromSeconds(10),
                         $"[RegisteredPlayers] Invalid player count: {count} (addr=0x{rgtPlayersAddr:X}), streak={_invalidCountStreak}");
 
+                    // Player count dropping to 0 is a strong signal the raid has ended
+                    if (count == 0 && LocalPlayer is not null)
+                        LocalPlayerLost = true;
+
                     // Exponential backoff: sleep longer when we keep getting invalid counts (e.g., after raid ends)
                     if (_invalidCountStreak > 3)
                     {
@@ -284,7 +302,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             }
 
             // Batch-init transforms and rotations for all entries that need it.
-            // This replaces N × 11 serial DMA reads with ~11 scatter rounds.
             BatchInitTransformsAndRotations();
 
             // Update existing players — mark active/inactive based on registration
@@ -390,7 +407,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 foreach (var key in toRemove)
                 {
                     if (_players.TryRemove(key, out var removed))
+                    {
                         Log.WriteLine($"[RegisteredPlayers] Removed '{removed.Player.Name}' ({removed.Player.Type}) @ 0x{key:X} — no longer registered");
+
+                        if (removed.Player.IsLocalPlayer)
+                        {
+                            LocalPlayerLost = true;
+                            Log.WriteLine("[RegisteredPlayers] Local player lost — raid is likely ending.");
+                        }
+                    }
                 }
             }
         }
