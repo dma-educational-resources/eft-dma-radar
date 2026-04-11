@@ -390,8 +390,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             // Periodic summary (every ~5s)
             Log.WriteRateLimited(AppLogLevel.Info,
                 "reg_worker_timing", TimeSpan.FromSeconds(5),
-                $"[RegistrationWorker] Tick: registration={regElapsed.TotalMilliseconds:F1}ms, secondary={secElapsed.TotalMilliseconds:F1}ms, " +
-                $"total={Stopwatch.GetElapsedTime(regStart).TotalMilliseconds:F1}ms, players={_registeredPlayers.Count}");
+                $"[RegistrationWorker] Tick: players={regElapsed.TotalMilliseconds:F1}ms, " +
+                $"world={secElapsed.TotalMilliseconds:F1}ms (loot/exfils/doors/validation), " +
+                $"total={Stopwatch.GetElapsedTime(regStart).TotalMilliseconds:F1}ms, tracked={_registeredPlayers.Count}");
         }
 
         /// <summary>

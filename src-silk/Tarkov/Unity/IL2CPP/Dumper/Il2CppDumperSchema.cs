@@ -1,5 +1,4 @@
-﻿#pragma warning disable IDE0130
-using UTF8String = eft_dma_radar.Silk.Misc.UTF8String;
+﻿using UTF8String = eft_dma_radar.Silk.Misc.UTF8String;
 namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
 {
     public static partial class Il2CppDumper
@@ -8,21 +7,19 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
 
         private enum FieldKind { Normal, MethodRva }
 
-        private readonly struct SchemaField
+        private readonly struct SchemaField(string il2cpp, string cs, FieldKind kind = FieldKind.Normal)
         {
-            public readonly string Il2CppName; // name as it appears in IL2CPP metadata
-            public readonly string CsName;     // name to emit in the output struct
-            public readonly FieldKind Kind;
-            public SchemaField(string il2cpp, string cs, FieldKind kind = FieldKind.Normal)
-            { Il2CppName = il2cpp; CsName = cs; Kind = kind; }
+            public readonly string Il2CppName = il2cpp; // name as it appears in IL2CPP metadata
+            public readonly string CsName = cs;     // name to emit in the output struct
+            public readonly FieldKind Kind = kind;
         }
 
-        private sealed class SchemaClass
+        private sealed class SchemaClass(string il2cpp, string cs, bool isStatic, SchemaField[] fields, uint? typeIndex, string? resolveViaChild = null)
         {
-            public readonly string Il2CppName; // plain class name used for name-based lookup
-            public readonly string CsName;     // struct name in generated output
-            public readonly bool IsStatic;   // emit as static class (singleton statics)
-            public readonly SchemaField[] Fields;
+            public readonly string Il2CppName = il2cpp; // plain class name used for name-based lookup
+            public readonly string CsName = cs;     // struct name in generated output
+            public readonly bool IsStatic = isStatic;   // emit as static class (singleton statics)
+            public readonly SchemaField[] Fields = fields;
             /// <summary>
             /// When non-null, resolves the class directly via
             ///   tablePtr + TypeIndex * 8
@@ -30,7 +27,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             /// Obtain from Offsets.Special or by scanning the type table offline.
             /// MDToken → TypeIndex: (mdToken &amp; 0x00FFFFFF) - 1
             /// </summary>
-            public readonly uint? TypeIndex;
+            public readonly uint? TypeIndex = typeIndex;
             /// <summary>
             /// When non-null, resolves the class by finding this concrete child class
             /// in the type table and walking its Il2CppClass::parent chain until a
@@ -40,16 +37,13 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             /// The parent chain from a concrete child yields the inflated generic
             /// instance with real offsets.
             /// </summary>
-            public readonly string ResolveViaChild;
-
-            public SchemaClass(string il2cpp, string cs, bool isStatic, SchemaField[] fields, uint? typeIndex, string resolveViaChild = null)
-            { Il2CppName = il2cpp; CsName = cs; IsStatic = isStatic; Fields = fields; TypeIndex = typeIndex; ResolveViaChild = resolveViaChild; }
+            public readonly string? ResolveViaChild = resolveViaChild;
         }
 
         // Shorthand helpers
-        private static SchemaField F(string il2cpp, string cs = null)
+        private static SchemaField F(string il2cpp, string? cs = null)
             => new(il2cpp, cs ?? il2cpp, FieldKind.Normal);
-        private static SchemaField M(string il2cpp, string cs = null)
+        private static SchemaField M(string il2cpp, string? cs = null)
             => new(il2cpp, cs ?? (il2cpp + "_RVA"), FieldKind.MethodRva);
 
         /// <param name="il2cpp">Plain IL2CPP class name (only used for name-based fallback).</param>
@@ -68,7 +62,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
         /// finds a class matching <paramref name="il2cpp"/>, yielding the inflated
         /// generic instance with real field offsets.
         /// </param>
-        private static SchemaClass C(string il2cpp, SchemaField[] f, string cs = null, bool s = false, uint ti = 0, string child = null)
+        private static SchemaClass C(string il2cpp, SchemaField[] f, string? cs = null, bool s = false, uint ti = 0, string? child = null)
             => new(il2cpp, cs ?? il2cpp, s, f, ti == 0 ? null : ti, child);
 
         private static SchemaClass[] BuildSchema() =>

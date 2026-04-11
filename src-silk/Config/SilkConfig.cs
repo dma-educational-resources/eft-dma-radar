@@ -132,6 +132,17 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Master toggle for all memory write features.</summary>
         public bool MemWritesEnabled { get; set; } = false;
 
+        // ── Web Radar ───────────────────────────────────────────────────────────
+
+        /// <summary>Enable the web radar HTTP server on startup.</summary>
+        public bool WebRadarEnabled { get; set; } = false;
+
+        /// <summary>HTTP port for the web radar server.</summary>
+        public int WebRadarPort { get; set; } = 7224;
+
+        /// <summary>Web radar update interval in milliseconds.</summary>
+        public int WebRadarTickMs { get; set; } = 50;
+
         // ── Persistence ─────────────────────────────────────────────────────────
 
         /// <summary>

@@ -12,6 +12,27 @@ namespace eft_dma_radar.Silk.UI.Panels
         /// </summary>
         public static bool IsOpen { get; set; }
 
+        private static async Task ToggleWebRadarAsync(bool enable)
+        {
+            try
+            {
+                if (enable)
+                {
+                    await eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.StartAsync(
+                        Config.WebRadarPort,
+                        TimeSpan.FromMilliseconds(Config.WebRadarTickMs));
+                }
+                else
+                {
+                    await eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.StopAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[WebRadar] Toggle error: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// Draw the settings panel.
         /// </summary>
@@ -87,6 +108,53 @@ namespace eft_dma_radar.Silk.UI.Panels
                 Config.BattleMode = battleMode;
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Hide loot and clutter; focus on players only  [B]");
+
+            ImGui.Spacing();
+            ImGui.SeparatorText("Web Radar");
+
+            bool webEnabled = Config.WebRadarEnabled;
+            if (ImGui.Checkbox("Enable Web Radar", ref webEnabled))
+            {
+                Config.WebRadarEnabled = webEnabled;
+                _ = ToggleWebRadarAsync(webEnabled);
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Start/stop the web radar HTTP server.\nAccess from a browser on any device on your network.");
+
+            if (Config.WebRadarEnabled)
+            {
+                ImGui.Indent(16);
+
+                ImGui.SetNextItemWidth(120);
+                int port = Config.WebRadarPort;
+                if (ImGui.InputInt("Port", ref port, 0, 0))
+                {
+                    if (port is >= 1024 and <= 65535)
+                        Config.WebRadarPort = port;
+                }
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("HTTP port (requires restart to take effect)");
+
+                ImGui.SetNextItemWidth(120);
+                int tickMs = Config.WebRadarTickMs;
+                if (ImGui.SliderInt("Tick (ms)", ref tickMs, 20, 200))
+                    Config.WebRadarTickMs = tickMs;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Update interval for the web radar data");
+
+                if (eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.IsRunning)
+                {
+                    ImGui.TextColored(new Vector4(0.26f, 0.84f, 0.50f, 1f),
+                        $"\u25cf Running on port {Config.WebRadarPort}");
+                }
+                else
+                {
+                    ImGui.TextColored(new Vector4(0.60f, 0.60f, 0.60f, 1f),
+                        "\u25cb Stopped");
+                }
+
+                ImGui.Unindent(16);
+            }
 
             ImGui.EndTabItem();
         }

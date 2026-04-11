@@ -55,7 +55,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private readonly ulong _gameWorldBase;
         private readonly string _mapId;
         private readonly ConcurrentDictionary<ulong, PlayerEntry> _players = new();
-        private HashSet<ulong> _seenSet = new(MaxPlayerCount);
+        private readonly HashSet<ulong> _seenSet = new(MaxPlayerCount);
 
         // Reusable list for active entries — avoids per-tick allocation on the 8ms realtime path
         private readonly List<PlayerEntry> _activeEntries = new(MaxPlayerCount);
@@ -99,11 +99,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// Pairs a <see cref="Player.Player"/> with its cached transform data so we can avoid
         /// re-walking the pointer chain on every tick.
         /// </summary>
-        private sealed class PlayerEntry
+        private sealed class PlayerEntry(ulong playerBase, Player.Player player, bool isObserved)
         {
-            public readonly ulong Base;
-            public readonly Player.Player Player;
-            public readonly bool IsObserved;
+            public readonly ulong Base = playerBase;
+            public readonly Player.Player Player = player;
+            public readonly bool IsObserved = isObserved;
 
             // Cached transform state (populated once, re-validated periodically)
             // Written by registration thread, read by realtime thread — volatile ensures cross-core visibility.
@@ -141,13 +141,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             // TransformInternal/Vertices/Indices are identical — no separate fields needed.
             // This flag simply tracks whether the look transform has been synced.
             public volatile bool LookTransformReady;
-
-            public PlayerEntry(ulong playerBase, Player.Player player, bool isObserved)
-            {
-                Base = playerBase;
-                Player = player;
-                IsObserved = isObserved;
-            }
         }
 
         #endregion
@@ -176,11 +169,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// </summary>
         private struct PlayerEnumerator(IEnumerator<KeyValuePair<ulong, PlayerEntry>> inner) : IEnumerator<Player.Player>
         {
-            public Player.Player Current => inner.Current.Value.Player;
-            object System.Collections.IEnumerator.Current => Current;
-            public bool MoveNext() => inner.MoveNext();
-            public void Reset() => inner.Reset();
-            public void Dispose() => inner.Dispose();
+            public readonly Player.Player Current => inner.Current.Value.Player;
+            readonly object System.Collections.IEnumerator.Current => Current;
+            public readonly bool MoveNext() => inner.MoveNext();
+            public readonly void Reset() => inner.Reset();
+            public readonly void Dispose() => inner.Dispose();
         }
 
         #endregion
@@ -350,7 +343,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             // Periodic summary (every ~10s)
             Log.WriteRateLimited(AppLogLevel.Info,
                 "realtime_summary", TimeSpan.FromSeconds(10),
-                $"[RealtimeWorker] Active={_activeEntries.Count}, transformReady={transformReady}, rotationReady={rotationReady}, total={_players.Count}");
+                $"[RealtimeWorker] Scatter: active={_activeEntries.Count} (position={transformReady}, rotation={rotationReady}), total={_players.Count}");
         }
 
         #endregion

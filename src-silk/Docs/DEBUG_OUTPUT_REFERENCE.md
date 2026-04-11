@@ -25,6 +25,7 @@ Use this when debugging memory reads, verifying offset chains, or understanding 
 7. [Common Error Patterns](#7-common-error-patterns)
 8. [Loot & Exfil Dumps](#8-loot--exfil-dumps)
 9. [Shutdown Sequence](#9-shutdown-sequence)
+10. [TransformPath Comparison](#10-transformpath-comparison)
 
 ---
 
@@ -63,12 +64,12 @@ Normal boot → DMA init → process attach → GOM resolve → IL2CPP dump → 
 The fast-path: if the PE checksum matches the cached dump, all offsets are applied instantly:
 
 ```
-[00:19:06.796] [Il2CppDumper] Dump starting...
-[00:19:06.816] [Il2CppDumper] Fast cache loaded (PE match) — 378/378 fields applied.
-[00:19:06.817] [Memory] State → Initializing
+[20:57:52.052] [Il2CppDumper] Dump starting...
+[20:57:52.085] [Il2CppDumper] Fast cache loaded (PE match) — 380/380 fields applied.
+[20:57:52.087] [Memory] State → Initializing
 ```
 
-- **378 fields** = total schema fields across all `SchemaClass` definitions in `Il2CppDumperSchema.cs`
+- **380 fields** = total schema fields across all `SchemaClass` definitions in `Il2CppDumperSchema.cs`
 - Cache file: `%AppData%\eft-dma-radar-silk\il2cpp_offsets.json`
 - If PE changes (game update), a full scatter-based re-dump runs instead
 
@@ -234,8 +235,8 @@ After the main player dump, each sub-object gets its own hierarchy dump. These i
 ```
 ── Fields of 'Profile' @ 0x1E3DBAA4730 (full hierarchy) ──
   ┌ EFT.Profile (klass=0x1E162C08F80, 39 field(s))
-  │  [0x10] string       Id = "5e1351fe246aeb28245760ab"
-  │  [0x18] string       AccountId = "2909689"
+  │  [0x10] string       Id = "xxxxxxxxxxxxxxxxxxxxxxxx"
+  │  [0x18] string       AccountId = "0000000"
   │  [0x48] class        Info = 0x1EAF20BD9A0
   │  [0x70] class        Inventory = 0x1EB90D6A820
 ```
@@ -244,7 +245,7 @@ After the main player dump, each sub-object gets its own hierarchy dump. These i
 ```
 ── Fields of 'PlayerInfo' @ 0x1EAF20BD9A0 (full hierarchy) ──
   ┌ EFT.<unknown> (klass=0x1E1624DA460, 25 field(s))
-  │  [0x10] string       Nickname = "Nadeus"
+  │  [0x10] string       Nickname = "LocalPlayer"
   │  [0x28] string       EntryPoint = "MallSE"
   │  [0x60] string       GameVersion = "standard"
   │  [0x68] valuetype    Type               ← PlayerType enum (PMC/Scav/Boss)
@@ -254,13 +255,21 @@ After the main player dump, each sub-object gets its own hierarchy dump. These i
 
 **MovementContext** (3 classes — `ClientPlayerMovementContext` → `MovementContext` → `System.Object`):
 ```
-── Fields of 'MovementContext' @ 0x1E472C92000 (full hierarchy) ──
-  ┌ EFT.MovementContext (klass=0x1E1612263C0, 192 field(s))
-  │  [0x40] class        _player = 0x1EAF22D5000       ← back-reference to player
-  │  [0xC0] valuetype    _rotation                       ← THE rotation we read (Vector2)
+── Fields of 'MovementContext (LocalPlayer)' @ 0x1B59D392A80 (full hierarchy) ──
+  ┌ EFT.ClientPlayerMovementContext (klass=0x1B2A29A9270, 0 field(s))
+  ┌ EFT.MovementContext (klass=0x1B2A12263C0, 192 field(s))
+  │  [0x10] class        _playerTransform = 0x1B511A5A680  ← BifacialTransform (NOT a Unity Transform!)
+  │  [0x40] class        _player = 0x1B5AF28A000             ← back-reference to player
+  │  [0xC0] valuetype    _rotation                            ← THE rotation we read (Vector2)
   │  [0xC8] valuetype    _previousRotation
-  │  [0x380] float       <CharacterMovementSpeed>k__BackingField = 0.6434
+  │  [0x380] float       <CharacterMovementSpeed>k__BackingField = 0.6449
+  ┌ System.Object (klass=0x1B2A02523F0, 0 field(s))
 ```
+
+> **Key discovery**: `_playerTransform` at offset `0x10` is a `BifacialTransform`, not a Unity `Transform`.
+> `BifacialTransform.Original` at offset `0x10` is the real Unity `Transform`.
+> Chain: `MovementContext+0x10 → BifacialTransform+0x10 → Transform+0x10 → TransformInternal`.
+> This resolves to a **different** TransformInternal than `_playerLookRaycastTransform` — it's the body root (index 0) rather than the eye-level transform (index 35). See [TransformPath Comparison](#10-transformpath-comparison).
 
 **HealthController** — different for client vs observed:
 
@@ -298,13 +307,30 @@ Observed (2 classes):
 
 **ObservedMovementController** (2 classes — `ObservedPlayerStateContext`):
 ```
-── Fields of 'ObservedMovementController' @ 0x1E3CC873B80 (full hierarchy) ──
+── Fields of 'ObservedMovementController (Usec14)' @ 0x1B5A1E05450 (full hierarchy) ──
   ┌ EFT.NextObservedPlayer.ObservedPlayerStateContext (klass=..., 61 field(s))
   │  [0x28] valuetype    <Rotation>k__BackingField          ← the rotation we read
+  │  [0x88] class        _playerTransform = 0x1B515F0E270   ← BifacialTransform (same type as local)
+  │  [0x90] class        _characterController = 0x1B59D4B4BE0
   │  [0xF8] valuetype    _velocity                           ← the velocity we read
-  │  [0xE0] float        _characterMovementSpeed = 0.643137
-  │  [0x138] class       _player = 0x1E3D7467CF0            ← back-ref
+  │  [0xE0] float        _characterMovementSpeed = 0.192157
+  │  [0x138] class       _player = 0x1B5A1E058A0            ← back-ref to ObservedPlayerView
 ```
+
+> `_playerTransform` at offset `0x88` on observed is also a `BifacialTransform`, same chain as local but at a different offset.
+
+**OPC→Player (ObservedPlayerView)** — the inner `Player` reached via `OPC+0x18` is actually the `ObservedPlayerView` itself (circular reference):
+```
+── Fields of 'ObservedPlayer (OPC→Player) (Usec14)' @ 0x1B5A1E058A0 (full hierarchy) ──
+  ┌ EFT.NextObservedPlayer.ObservedPlayerView (klass=..., 51 field(s))
+  │  [0x28] class        <ObservedPlayerController>k__BackingField = 0x1B5A1E1BD20  ← circular!
+  │  [0x60] valuetype    <VisibleToCameraType>k__BackingField = 0x100000000
+  │  [0x100] class       _playerLookRaycastTransform = 0x1B596AF55C0
+```
+
+> **Important**: `ObservedPlayerView+0x60` is `VisibleToCameraType` (not `MovementContext`).
+> Attempting to dump `+0x60` as a class pointer yields `0x100000000` → invalid klass pointer.
+> The observed movement data lives on `ObservedPlayerStateContext`, NOT on any `MovementContext` subclass.
 
 **ObservedInfoContainer** — sometimes fails to read:
 ```
@@ -455,42 +481,21 @@ Different pointer chain structure — goes through `ObservedPlayerController`:
 
 This is the **most performance-critical chain** — read every frame to get player world positions.
 
-**8 hops total**: `Body → SkelRoot → _values → arr → bone0 → TI → Hierarchy → Vertices`
+**Current: 2 hops** via `_playerLookRaycastTransform → Transform+0x10 → TransformInternal`
 
-**ClientPlayer** (Body at +0x190):
+This short chain replaced the old 8-hop Body→Skeleton→Bone chain. Both client and observed players use the same pattern — only the initial offset differs.
+
+**Hierarchy data** (read once during init, cached):
 ```
-── TransformInternal chain (HOTPATH) ─────────────────────────
-  [Body]              0x1EB8DC49690  (playerBase + 0x190 [Player._playerBody])
-  [SkeletonRootJoint]                  = 0x1EA9FA4B3C0  (body + 0x30  [addr=0x1EB8DC496C0])
-  [DizSkel._values]                    = 0x1EAB2324060  (skelRoot + 0x30  [addr=0x1EA9FA4B3F0])
-  [List._items]                        = 0x1E767C98A80  (dizValues + 0x10  [addr=0x1EAB2324070])
-    → list count: 138
-  [Bone0]                              = 0x1EAF4BBA8E0  (arr + 0x20  [addr=0x1E767C98AA0])
-  [Bone1]             0x1EAF4BBA8C0  (arr + 0x28)
-  [TransformInternal]                  = 0x1EA059DBB70  (bone0 + 0x10  [addr=0x1EAF4BBA8F0])
-  [TI.Index addr]     0x1EA059DBBE8  (ti + 0x78)
-    → taIndex value: 1
-  [TI.Hierarchy addr] 0x1EA059DBBE0  (ti + 0x70)
-  [Hierarchy]                          = 0x1E562C9AED0  (ti + 0x70  [addr=0x1EA059DBBE0])
-  [Hierarchy.Vertices]                 = 0x1E562C9AF80  (hierarchy + 0x68  [addr=0x1E562C9AF38])
-  [Hierarchy.Indices]                  = 0x1E562CAF080  (hierarchy + 0x40  [addr=0x1E562C9AF10])
+TransformInternal + 0x78  → Index (int)
+TransformInternal + 0x70  → Hierarchy
+  Hierarchy + 0x68        → Vertices (TrsX[])
+  Hierarchy + 0x40        → Indices (int[])
 ```
 
-**Summary line** (always logged):
+**Legacy 8-hop chain** (historical — kept for reference, no longer used):
 ```
-── TransformInternal summary ──
-  playerBase → Body(+0x190) → SkelRoot(+0x30) → _values(+0x30) → arr(+0x10) → bone0(+0x20) → TI(+0x10) → Hierarchy(+0x70) → Vertices(+0x68)
-  Total hops: 8 (body→skel→diz→arr→bone→TI→hier→verts)
-  [Cross-ref] Bone1.TI=0x1E9E2585EB0, Bone1.Hierarchy=0x1E562C9AED0  (same hierarchy=True)
-```
-
-> `same hierarchy=True` — Bone0 and Bone1 share the same Hierarchy object. This is expected and validates the transform tree.
-
-**ObservedPlayerView** (Body at +0xD8 — different offset!):
-```
-── TransformInternal chain (HOTPATH) ─────────────────────────
-  [Body]              0x1EB8DC49B40  (playerBase + 0xD8 [ObservedPlayerView.PlayerBody])
-  ...same chain from here...
+playerBase → Body(+0x190) → SkelRoot(+0x30) → _values(+0x30) → arr(+0x10) → bone0(+0x20) → TI(+0x10) → Hierarchy(+0x70) → Vertices(+0x68)
 ```
 
 **Inventory chain** (appended to both):
@@ -504,51 +509,60 @@ This is the **most performance-critical chain** — read every frame to get play
 
 ## 5. BatchInit Logs
 
-After players are discovered, `BatchInitTransforms` and `BatchInitRotations` run scatter reads in rounds:
+After players are discovered, `BatchInitTransforms` and `BatchInitRotations` run scatter reads in rounds.
+
+### Transform Init (4 rounds — short 2-hop chain)
+
+Uses `_playerLookRaycastTransform → Transform+0x10 → TransformInternal` then reads hierarchy data:
 
 ```
-[00:19:11.311] [RegisteredPlayers] BatchInitTransforms R1 (PlayerBody): 13/13 valid
-[00:19:11.313] [RegisteredPlayers] BatchInitTransforms R2 (SkeletonRootJoint): 13/13 valid
-[00:19:11.316] [RegisteredPlayers] BatchInitTransforms R3 (_values): 13/13 valid
-[00:19:11.318] [RegisteredPlayers] BatchInitTransforms R4 (ListArr): 13/13 valid
-[00:19:11.341] [RegisteredPlayers] BatchInitTransforms R5 (Bone0): 13/13 valid
-[00:19:11.343] [RegisteredPlayers] BatchInitTransforms R6 (TransformInternal): 13/13 valid
-[00:19:11.346] [RegisteredPlayers] BatchInitTransforms R7 (Index+Hierarchy): 13/13 valid
-[00:19:11.350] [RegisteredPlayers] BatchInitTransforms R8 (Vertices+Indices): 13/13 valid
+[RegisteredPlayers] BatchInitTransforms R1 (LookTransform): 20/20 valid
+[RegisteredPlayers] BatchInitTransforms R2 (TransformInternal): 20/20 valid
+[RegisteredPlayers] BatchInitTransforms R3 (Index+Hierarchy): 20/20 valid
+[RegisteredPlayers] BatchInitTransforms R4 (Vertices+Indices): 20/20 valid
 ```
 
-Each round corresponds to one hop in the TransformInternal chain:
-- **R1**: Read `PlayerBody` from each player
-- **R2**: Read `SkeletonRootJoint` from each body
-- **R3–R4**: Read `_values` → array items pointer
-- **R5–R6**: Read `Bone0` → `TransformInternal`
-- **R7**: Read `Index` + `Hierarchy` pointer
-- **R8**: Read `Vertices` + `Indices` arrays
+Each round:
+- **R1**: Read `_playerLookRaycastTransform` from each player (offset `0xA18` client, `0x100` observed)
+- **R2**: Read `TransformInternal` from Transform component (`+0x10`)
+- **R3**: Read `Index` + `Hierarchy` pointer from TransformInternal
+- **R4**: Read `Vertices` + `Indices` pointers from Hierarchy
 
-**Rotation init** (3 rounds for observed, different chain):
+After R4, each entry's indices array and test vertices are read serially (variable size per player).
+
+**Final summary**:
 ```
-[00:19:11.362] [RegisteredPlayers] BatchInitRotations R1 (OPC/MovCtx): 13/13 valid
-[00:19:11.365] [RegisteredPlayers] BatchInitRotations R2 (MC step1): 13/13 valid
-[00:19:11.368] [RegisteredPlayers] BatchInitRotations R3 (MC step2): 13/13 valid
-[00:19:11.371] [RegisteredPlayers] BatchInitRotations DONE: 13 entries, 13 succeeded
+[RegisteredPlayers] BatchInitTransforms DONE: 20 entries, 18 succeeded, 0 chain-failed, 2 chain-ok-but-vertex-fail
 ```
 
-**Summary line**:
+- `chain-failed` = pointer chain broke during scatter rounds
+- `chain-ok-but-vertex-fail` = chain resolved but vertex data not yet populated (retried next tick)
+
+### Rotation Init (3 rounds for observed, 1 for client)
+
 ```
-[00:19:11.373] [RegisteredPlayers] BatchInit: 14 players, transform(13 candidates, 13 OK, 1 already, 0 maxed), rotation(13 candidates, 13 OK, 1 already, 0 maxed), elapsed=66.2ms
+[RegisteredPlayers] BatchInitRotations R1 (OPC/MovCtx): 20/20 valid
+[RegisteredPlayers] BatchInitRotations R2 (MC step1): 20/20 valid
+[RegisteredPlayers] BatchInitRotations R3 (MC step2): 20/20 valid
+[RegisteredPlayers] BatchInitRotations DONE: 20 entries, 20 succeeded
 ```
 
-- `14 players` total tracked
-- `13 candidates` needed init (the 14th = local player, already initialized)
-- `1 already` = local player was done in the one-shot dump
+### Combined Summary
+
+```
+[RegisteredPlayers] BatchInit: 21 players, transform(20 candidates, 18 OK, 1 already, 0 maxed), rotation(20 candidates, 20 OK, 1 already, 0 maxed), elapsed=555.0ms
+```
+
+- `21 players` total tracked
+- `20 candidates` needed init (the 1 = local player, already initialized via serial path)
+- `1 already` = local player
 - `0 maxed` = none hit max retry count
 
-**Partial success** (some fail, retry next tick):
+**Retry on next tick** (players that had vertex failures get re-initialized):
 ```
-[00:19:25.591] [RegisteredPlayers] BatchInit: 23 players, transform(1 candidates, 1 OK, 22 already, 0 maxed), rotation(2 candidates, 1 OK, 21 already, 0 maxed), elapsed=30.0ms
+[RegisteredPlayers] BatchInitTransforms DONE: 4 entries, 4 succeeded, 0 chain-failed, 0 chain-ok-but-vertex-fail
+[RegisteredPlayers] BatchInit: 21 players, transform(4 candidates, 4 OK, 17 already, 0 maxed), rotation(0 candidates, 0 OK, 21 already, 0 maxed), elapsed=4.8ms
 ```
-
-Here 2 needed rotation init, only 1 succeeded — the other will retry next tick.
 
 ---
 
@@ -561,8 +575,8 @@ Here 2 needed rotation init, only 1 succeeded — the other will retry next tick
 
 **Examples**:
 ```
-[00:19:09.398] [RegisteredPlayers] Discovered: Default [Nadeus] @ 0x1EAF22D5000 (class='ClientPlayer', observed=False, transformReady=True, rotationReady=True, pos=<0, 0, 0>)
-[00:19:09.400] [RegisteredPlayers] LocalPlayer found: Nadeus (class='ClientPlayer')
+[00:19:09.398] [RegisteredPlayers] Discovered: Default [LocalPlayer] @ 0x1EAF22D5000 (class='ClientPlayer', observed=False, transformReady=True, rotationReady=True, pos=<0, 0, 0>)
+[00:19:09.400] [RegisteredPlayers] LocalPlayer found: LocalPlayer (class='ClientPlayer')
 [00:19:10.273] [RegisteredPlayers] Discovered: AIBoss [Tagilla] @ 0x1E3D7467CF0 (class='ObservedPlayerView', observed=True, transformReady=False, rotationReady=False, pos=<0, 0, 0>)
 [00:19:10.278] [RegisteredPlayers] Discovered: AIScav [Scav] @ 0x1E3CC873A10 (class='ObservedPlayerView', observed=True, transformReady=False, rotationReady=False, pos=<0, 0, 0>)
 [00:19:11.266] [RegisteredPlayers] Discovered: USEC [Usec4] @ 0x1EAF6A59170 (class='ObservedPlayerView', observed=True, transformReady=False, rotationReady=False, pos=<0, 0, 0>)
@@ -606,17 +620,16 @@ Here 2 needed rotation init, only 1 succeeded — the other will retry next tick
 
 **Profile resolution** (background async):
 ```
-[00:19:11.490] [GearManager] Resolved ProfileId for USEC [Usec4]: 652a7671a7198e8d230097c5
-[00:19:11.612] [GearManager] Resolved ProfileId for BEAR [Bear12]: 5dfe7478f45ded063e41dde2
-[00:19:11.662] [GearManager] Resolved ProfileId for Default [Nadeus]: 5e1351fe246aeb28245760ab
-[00:19:13.035] [ProfileService] Fetched profile for 2909689: Nadeus
+[00:19:11.490] [GearManager] Resolved ProfileId for USEC [Usec4]: xxxxxxxxxxxxxxxxxxxxxxxx
+[00:19:11.612] [GearManager] Resolved ProfileId for BEAR [Bear12]: xxxxxxxxxxxxxxxxxxxxxxxx
+[00:19:11.662] [GearManager] Resolved ProfileId for Default [LocalPlayer]: xxxxxxxxxxxxxxxxxxxxxxxx
+[00:19:13.035] [ProfileService] Fetched profile for 0000000: LocalPlayer
 ```
 
 **RealtimeWorker status** (periodic):
 ```
-[00:19:09.412] [RealtimeWorker] Active=1, transformReady=1, rotationReady=1, total=1
-[00:19:19.411] [RealtimeWorker] Active=16, transformReady=16, rotationReady=15, total=16
-[00:19:29.415] [RealtimeWorker] Active=23, transformReady=23, rotationReady=23, total=23
+[20:57:52.743] [RealtimeWorker] Scatter: active=1 (position=1, rotation=1), total=1
+[20:58:02.748] [RealtimeWorker] Scatter: active=21 (position=21, rotation=21), total=21
 ```
 
 ---
@@ -752,32 +765,31 @@ These are normal and do not indicate bugs.
 
 ## Quick Reference: Offset Chains
 
-### LocalPlayer (ClientPlayer) Position
+### Player Position (Both Client and Observed)
+
+Both player types use the same short 2-hop chain via `_playerLookRaycastTransform`:
 
 ```
-playerBase + 0x190     → PlayerBody
-  + 0x30               → SkeletonRootJoint (DizSkinningSkeleton)
-    + 0x30             → _values (List)
-      + 0x10           → _items (array)
-        + 0x20         → Bone[0] (Transform)
-          + 0x10       → TransformInternal
-            + 0x70     → Hierarchy
-              + 0x68   → Vertices (float[] — position at index*12)
+playerBase + 0xA18     → _playerLookRaycastTransform (Transform)   [ClientPlayer]
+playerBase + 0x100     → _playerLookRaycastTransform (Transform)   [ObservedPlayerView]
+  + 0x10               → TransformInternal
+    + 0x78             → Index (int — hierarchy depth)
+    + 0x70             → Hierarchy
+      + 0x68           → Vertices (TrsX[] — position/rotation/scale per bone)
+      + 0x40           → Indices (int[] — parent index per bone)
 ```
+
+**Total: 2 pointer hops** to reach TransformInternal, then 2 more to get Vertices+Indices.
+This is the eye-level transform (index ~35 for local, varies for observed).
+
+> **Alternative path (NOT used)**: `MovementContext._playerTransform (BifacialTransform, 0x10) → Original (Transform, 0x10) → +0x10 → TransformInternal`.
+> This resolves to the body root transform (index 0), which is ~0.7m lower (foot level). Requires 3 pointer hops and gives less useful position data.
 
 ### LocalPlayer Rotation
 
 ```
 playerBase + 0x60      → MovementContext
   + 0xC0               → _rotation (Vector2: yaw, pitch)
-```
-
-### ObservedPlayer Position
-
-```
-playerBase + 0xD8      → PlayerBody
-  + 0x30               → SkeletonRootJoint
-    ...same from here as ClientPlayer...
 ```
 
 ### ObservedPlayer Rotation
@@ -812,22 +824,68 @@ OPC + 0x10             → InventoryController   (Observed)
 
 ---
 
+## 10. TransformPath Comparison
+
+Diagnostic comparison of two paths to `TransformInternal` (now removed from code — results documented here for reference).
+
+**Path A** — current, via `_playerLookRaycastTransform`:
+```
+playerBase + lookOffset → Transform + 0x10 → TransformInternal
+```
+
+**Path B** — alternative, via `MovementContext._playerTransform` (`BifacialTransform`):
+```
+MovementContext + 0x10 → BifacialTransform + 0x10 (Original) → Transform + 0x10 → TransformInternal
+```
+
+**Live comparison result** (local player on Interchange):
+```
+[TransformPath] ── Compare for 'LocalPlayer' (local) ──
+[TransformPath]   Path A (_playerLookRaycastTransform): Transform=0x1B596547400 → TI=0x1B6F3ABE4B0
+[TransformPath]   Path B (_playerTransform on MC):      BifacialTransform=0x1B511A5A680 → Transform=0x1B59654E560 → TI=0x1B6F3AB4380
+[TransformPath]   Same TransformInternal: False
+[TransformPath]   Index A=35, Index B=0  (lower = less vertex data to read)
+[TransformPath]   Position A=<542.24786, 18.209715, -331.2256>
+[TransformPath]   Position B=<541.7549, 17.905117, -331.61902>
+[TransformPath]   Distance=0.7004m  (0 = identical transform)
+[TransformPath] ── End ──
+```
+
+**Key findings**:
+
+| Aspect | Path A (lookRaycast) | Path B (BifacialTransform) |
+|--------|---------------------|---------------------------|
+| TransformInternal | `0x1B6F3ABE4B0` | `0x1B6F3AB4380` |
+| Index | 35 | 0 (root) |
+| Position | `<542.25, 18.21, -331.23>` | `<541.75, 17.91, -331.62>` |
+| Body part | Eye/head level | Body root (feet/pelvis) |
+| Pointer hops | 2 | 3 |
+| Distance apart | — | 0.70m |
+
+**Decision**: Path A (`_playerLookRaycastTransform`) is kept because:
+1. Fewer DMA reads (2 hops vs 3)
+2. Eye-level position is better for radar dot placement and aimview
+3. Already proven reliable (21/21 players tracked)
+
+---
+
 ## Timeline Summary
 
 This raid session on Interchange:
 
 | Time | Event | Players |
 |------|-------|---------|
-| 00:19:06.816 | IL2CPP cache loaded (378 fields) | — |
-| 00:19:07.237 | GameWorld found, map=Interchange | — |
-| 00:19:09.398 | LocalPlayer discovered (Nadeus) | 1 |
-| 00:19:10.273 | First observed player (Tagilla) | 2 |
-| 00:19:11.266 | First human PMC (Usec4) | ~14 |
-| 00:19:11.373 | BatchInit complete (66.2ms) | 14 |
-| 00:19:12.555 | Exfils initialized (8 total) | 14 |
-| 00:19:22.349 | Late spawners initialized | 19 |
-| 00:19:25.567 | More late spawners | 23 |
-| 00:19:32.155 | Radar shutdown | 23 |
+| 20:57:52.085 | IL2CPP cache loaded (380 fields) | — |
+| 20:57:52.180 | GameWorld found, map=Interchange | — |
+| 20:57:52.731 | LocalPlayer discovered | 1 |
+| 20:57:52.751 | First observed players (Killa, Tagilla) | 3 |
+| 20:57:52.782 | First human PMCs (Usec11, Usec14) | ~8 |
+| 20:57:52.854 | BatchInitTransforms DONE (18/20 OK) | 21 |
+| 20:57:52.980 | Retry batch (4 remaining, 4 OK) | 21 |
+| 20:57:54.072 | Exfils initialized (8 total) | 21 |
+| 20:58:02.748 | All 21 players active in realtime loop | 21 |
+| 20:58:16.768 | First player removal (Scav dead) | 20 |
+| 20:58:24.190 | Radar shutdown | 20 |
 
-Total time from raid detection to all 23 players tracked: **~18 seconds**  
-Total time for initial 14-player batch: **~4 seconds** (including all diagnostic dumps)
+Total time from raid detection to all 21 players tracked: **~0.8 seconds** (4-round transform chain)  
+Retry for 2 vertex-failed players: **~0.1 seconds** additional

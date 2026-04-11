@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>EFT WebRadar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+
+<div id="root">
+  <canvas id="radar"></canvas>
+</div>
+
+<!-- Status badge -->
+<div id="status" class="warn">
+  <span class="dot"></span>
+  <span class="label">Connecting&hellip;</span>
+</div>
+
+<!-- Player count chips (bottom-left) -->
+<div id="playerCounts"></div>
+
+<!-- Hamburger -->
+<button id="menuBtn" title="Toggle sidebar">
+  <div class="lines" aria-hidden="true">
+    <span></span><span></span><span></span>
+  </div>
+</button>
+
+<!-- Edge zone for hover-open -->
+<div id="edgeZone"></div>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <header>
+    <div id="titlewrap">
+      <div id="title">EFT WebRadar</div>
+      <div id="subline" class="mono">waiting&hellip;</div>
+    </div>
+    <button id="toggle" title="Collapse">&lt;</button>
+  </header>
+
+  <div class="tabbar">
+    <div class="tab active" data-tab="players">Players</div>
+    <div class="tab" data-tab="general">General</div>
+  </div>
+
+  <!-- ── Players Tab ── -->
+  <div class="tab-content active" id="players">
+    <div class="section">
+      <h3>Colors</h3>
+      <label>Local <input type="color" id="localColor"></label>
+      <label>Teammate <input type="color" id="teammateColor"></label>
+      <label>USEC / BEAR <input type="color" id="pmcColor"></label>
+      <label>Scav <input type="color" id="scavColor"></label>
+      <label>Player Scav <input type="color" id="pscavColor"></label>
+      <label>Raider <input type="color" id="raiderColor"></label>
+      <label>Boss <input type="color" id="bossColor"></label>
+      <label>Dead <input type="color" id="deadColor"></label>
+    </div>
+
+    <div class="section">
+      <h3>Display</h3>
+      <label>
+        Show Players
+        <span class="toggle-switch"><input type="checkbox" id="showPlayers"><span class="slider"></span></span>
+      </label>
+      <label>
+        Aim Lines
+        <span class="toggle-switch"><input type="checkbox" id="showAim"><span class="slider"></span></span>
+      </label>
+      <label>
+        Names
+        <span class="toggle-switch"><input type="checkbox" id="showNames"><span class="slider"></span></span>
+      </label>
+      <label>
+        Height Arrows
+        <span class="toggle-switch"><input type="checkbox" id="showHeight"><span class="slider"></span></span>
+      </label>
+      <label>
+        Group Lines
+        <span class="toggle-switch"><input type="checkbox" id="showGroups"><span class="slider"></span></span>
+      </label>
+      <label>
+        Player Size
+        <span class="range-wrap">
+          <input type="range" id="playerSize" min="2" max="10" step="1">
+          <span class="range-val" id="playerSizeVal">6</span>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <!-- ── General Tab ── -->
+  <div class="tab-content" id="general">
+    <div class="section">
+      <h3>Map</h3>
+      <label>
+        Show Map
+        <span class="toggle-switch"><input type="checkbox" id="showMap"><span class="slider"></span></span>
+      </label>
+      <label>
+        Zoom
+        <span class="range-wrap">
+          <input type="range" id="zoom" min="0.05" max="4" step="0.05">
+          <span class="range-val" id="zoomVal">1.0</span>
+        </span>
+      </label>
+      <label>
+        Rotate With Local
+        <span class="toggle-switch"><input type="checkbox" id="rotateWithLocal"><span class="slider"></span></span>
+      </label>
+      <label>
+        Poll Rate
+        <span class="range-wrap">
+          <input type="range" id="pollMs" min="20" max="200" step="5">
+          <span class="range-val" id="pollMsVal">50<small>ms</small></span>
+        </span>
+      </label>
+      <label>
+        Free Mode
+        <span class="toggle-switch"><input type="checkbox" id="freeMode"><span class="slider"></span></span>
+      </label>
+      <div class="row">
+        <button class="small" id="centerOnLocal">Center on Local</button>
+        <span class="badge mono" id="modeBadge">follow</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>UI</h3>
+      <label>
+        Hover-open Sidebar
+        <span class="toggle-switch"><input type="checkbox" id="hoverOpenSidebar"><span class="slider"></span></span>
+      </label>
+    </div>
+
+    <div class="section">
+      <h3>Cache</h3>
+      <div class="row">
+        <button class="small" id="resetSettings">Reset Settings</button>
+        <span class="badge" id="cacheBadge">cache</span>
+      </div>
+      <div class="kv"><span>Map cache</span><span class="mono" id="mapCacheInfo">0</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Tooltip (populated via JS) -->
+<div id="tooltip" class="tooltip hidden"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

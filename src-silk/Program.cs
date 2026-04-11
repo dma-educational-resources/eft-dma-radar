@@ -47,6 +47,23 @@ namespace eft_dma_radar.Silk
                 MapManager.ModuleInit();
                 Log.WriteLine("[SilkProgram] Map manager initialized, starting RadarWindow...");
 
+                if (Config.WebRadarEnabled)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.StartAsync(
+                                Config.WebRadarPort,
+                                TimeSpan.FromMilliseconds(Config.WebRadarTickMs));
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.WriteLine($"[WebRadar] Failed to start: {ex.Message}");
+                        }
+                    });
+                }
+
                 RadarWindow.Initialize();
                 RadarWindow.Run();
 
@@ -58,6 +75,9 @@ namespace eft_dma_radar.Silk
             }
             finally
             {
+                if (eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.IsRunning)
+                    eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.StopAsync().GetAwaiter().GetResult();
+
                 Memory.Close();
             }
         }

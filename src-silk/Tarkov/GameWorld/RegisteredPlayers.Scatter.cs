@@ -513,7 +513,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitRotation '{entry.Player.Name}': client movCtx=0x{movCtx:X} rotAddr=0x{rotAddr:X}");
                 }
 
-                // Validate rotation is sane before caching (only reject non-finite; game yaw accumulates beyond ±360°)
+                // Validate rotation is sane before caching
                 var rot = Memory.ReadValue<Vector2>(rotAddr, false);
                 if (!float.IsFinite(rot.X) || !float.IsFinite(rot.Y))
                 {

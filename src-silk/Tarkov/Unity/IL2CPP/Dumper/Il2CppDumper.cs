@@ -1,4 +1,3 @@
-#pragma warning disable IDE0130
 using UTF8String = eft_dma_radar.Silk.Misc.UTF8String;
 using System.IO;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
@@ -416,7 +415,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                 else if (target == typeof(uint[]))
                 {
                     // Deref-chain field: update only the first element with the dumped offset.
-                    var arr = (uint[])fi.GetValue(null);
+                    var arr = (uint[]?)fi.GetValue(null);
                     if (arr is not null && arr.Length > 0)
                     {
                         arr[0] = Convert.ToUInt32(value);
@@ -535,21 +534,21 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                 }
             }
 
-            Memory.ReadScatter(stringBatch.ToArray(), false);
+            Memory.ReadScatter([.. stringBatch], false);
 
             // Step 4: Build results.
             for (int j = 0; j < validIndices.Count; j++)
             {
                 int i = validIndices[j];
 
-                string name = nameEntries[j] is not null && !nameEntries[j].IsFailed
+                string? name = nameEntries[j] is not null && !nameEntries[j].IsFailed
                     ? (string)(UTF8String)nameEntries[j].Result
                     : null;
 
                 if (string.IsNullOrEmpty(name))
                     continue;
 
-                string ns = nsEntries[j] is not null && !nsEntries[j].IsFailed
+                string? ns = nsEntries[j] is not null && !nsEntries[j].IsFailed
                     ? (string)(UTF8String)nsEntries[j].Result
                     : string.Empty;
 
@@ -587,12 +586,12 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             }
 
             if (scatter.Count > 0)
-                Memory.ReadScatter(scatter.ToArray(), false);
+                Memory.ReadScatter([.. scatter], false);
 
             // Build results.
             for (int i = 0; i < rawFields.Length; i++)
             {
-                string name = nameEntries[i] is not null && !nameEntries[i].IsFailed
+                string? name = nameEntries[i] is not null && !nameEntries[i].IsFailed
                     ? (string)(UTF8String)nameEntries[i].Result
                     : null;
 
@@ -628,7 +627,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             }
 
             if (scatter1.Count > 0)
-                Memory.ReadScatter(scatter1.ToArray(), false);
+                Memory.ReadScatter([.. scatter1], false);
 
             // Scatter read all method name strings in one batch.
             var nameEntries = new ScatterReadEntry<UTF8String>[methodPtrs.Length];
@@ -647,7 +646,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             }
 
             if (scatter2.Count > 0)
-                Memory.ReadScatter(scatter2.ToArray(), false);
+                Memory.ReadScatter([.. scatter2], false);
 
             // Build results.
             for (int i = 0; i < methodPtrs.Length; i++)
@@ -655,7 +654,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                 if (nameEntries[i] is null || nameEntries[i].IsFailed) continue;
                 if (infoEntries[i] is null || infoEntries[i].IsFailed) continue;
 
-                string name = (string)(UTF8String)nameEntries[i].Result;
+                string? name = (string?)(UTF8String)nameEntries[i].Result;
                 if (string.IsNullOrEmpty(name)) continue;
 
                 var rva = infoEntries[i].Result.MethodPointer - gaBase;
@@ -672,7 +671,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
         ///   "&lt;Name&gt;k__BackingField"  ↔  "_Name_k__BackingField"
         /// Returns null if the input is not a backing field name.
         /// </summary>
-        private static string FlipBackingFieldConvention(string name)
+        private static string? FlipBackingFieldConvention(string name)
         {
             const string suffix = "k__BackingField";
             if (!name.EndsWith(suffix, StringComparison.Ordinal))
@@ -697,7 +696,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             return null;
         }
 
-        #region DumpClassFields (diagnostic)
+        #region DumpClassFields
 
         /// <summary>
         /// Diagnostic helper: reads the IL2CPP klass pointer from an object instance,
@@ -813,11 +812,11 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             }
 
             if (scatter.Count > 0)
-                Memory.ReadScatter(scatter.ToArray(), false);
+                Memory.ReadScatter([.. scatter], false);
 
             for (int i = 0; i < rawFields.Length; i++)
             {
-                string name = nameEntries[i] is not null && !nameEntries[i].IsFailed
+                string? name = nameEntries[i] is not null && !nameEntries[i].IsFailed
                     ? (string)(UTF8String)nameEntries[i].Result
                     : "<unreadable>";
 
@@ -928,7 +927,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             catch { return 0; }
         }
 
-        private static string ReadStr(ulong addr)
+        private static string? ReadStr(ulong addr)
         {
             if (!eft_dma_radar.Silk.Misc.Utils.IsValidVirtualAddress(addr)) return null;
             try { return Memory.ReadString(addr, MaxNameLen, false); }

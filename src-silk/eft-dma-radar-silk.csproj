@@ -41,4 +41,17 @@
         <ProjectReference Include="..\lib\VmmSharpEx\VmmSharpEx.csproj" />
     </ItemGroup>
 
+    <!-- ASP.NET Core (web radar HTTP server) -->
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <!-- Web Radar static files -->
+    <ItemGroup>
+        <Content Include="Web\wwwroot\**\*.*">
+            <Link>wwwroot\%(RecursiveDir)%(Filename)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
 </Project>
