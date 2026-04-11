@@ -61,6 +61,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         }
 
         /// <summary>
+        /// Player pitch in degrees (positive = looking down, EFT convention).
+        /// </summary>
+        public float RotationPitch { get; set; }
+
+        /// <summary>
         /// Pre-computed map rotation (yaw - 90°, normalized).
         /// </summary>
         public float MapRotation { get; private set; }

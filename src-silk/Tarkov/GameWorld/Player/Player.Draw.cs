@@ -202,10 +202,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 return;
 
             float radians = MapRotation * DegToRad;
-            float startX = point.X + MathF.Cos(radians) * DotRadius;
-            float startY = point.Y + MathF.Sin(radians) * DotRadius;
-            float endX = point.X + MathF.Cos(radians) * (DotRadius + length);
-            float endY = point.Y + MathF.Sin(radians) * (DotRadius + length);
+            (float sin, float cos) = MathF.SinCos(radians);
+            float startX = point.X + cos * DotRadius;
+            float startY = point.Y + sin * DotRadius;
+            float endX = point.X + cos * (DotRadius + length);
+            float endY = point.Y + sin * (DotRadius + length);
 
             var start = new SKPoint(startX, startY);
             var end = new SKPoint(endX, endY);
@@ -230,7 +231,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 
             // Convert yaw to a forward direction vector (EFT: yaw 0 = North/+Z)
             float yawRad = RotationYaw * DegToRad;
-            var forward = new Vector3(MathF.Sin(yawRad), 0f, MathF.Cos(yawRad));
+            (float sinYaw, float cosYaw) = MathF.SinCos(yawRad);
+            var forward = new Vector3(sinYaw, 0f, cosYaw);
 
             float dot = Vector3.Dot(forward, dirToTarget);
             float angle = MathF.Acos(Math.Clamp(dot, -1f, 1f)) * (180f / MathF.PI);

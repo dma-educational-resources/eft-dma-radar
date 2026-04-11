@@ -470,6 +470,26 @@ namespace eft_dma_radar.Silk.UI
                 }
             }
 
+            // Doors (keyed doors with state)
+            if (!Config.BattleMode && Config.ShowDoors)
+            {
+                var doors = Memory.Doors;
+                if (doors is not null)
+                {
+                    var lootForDoors = Config.DoorsOnlyNearLoot ? Memory.Loot : null;
+                    float proxSq = Config.DoorLootProximity * Config.DoorLootProximity;
+
+                    foreach (var door in doors)
+                    {
+                        if (!door.ShouldDraw())
+                            continue;
+                        if (lootForDoors is not null && !door.IsNearImportantLoot(lootForDoors, proxSq))
+                            continue;
+                        door.Draw(canvas, mapParams, map.Config, localPlayer);
+                    }
+                }
+            }
+
             // Group connectors
             if (Config.ConnectGroups && normalPlayers is not null)
                 DrawGroupConnectors(canvas, normalPlayers, map, mapParams);
@@ -833,64 +853,165 @@ namespace eft_dma_radar.Silk.UI
 
             try
             {
-                // Main menu bar
-                if (ImGui.BeginMainMenuBar())
-                {
-                    // Map mode toggle
-                    int pushedColors = 0;
-                    if (_freeMode)
-                    {
-                        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.2f, 0.6f, 0.2f, 1.0f));
-                        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.3f, 0.7f, 0.3f, 1.0f));
-                        ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.1f, 0.5f, 0.1f, 1.0f));
-                        pushedColors = 3;
-                    }
-
-                    if (ImGui.Button(_freeMode ? "Map Free" : "Map Follow"))
-                    {
-                        _freeMode = !_freeMode;
-                        if (!_freeMode)
-                            _mapPanPosition = Vector2.Zero;
-                    }
-                    if (ImGui.IsItemHovered())
-                        ImGui.SetTooltip(_freeMode
-                            ? "Free map panning (drag to move map)"
-                            : "Follow player (map centered on you)");
-
-                    if (pushedColors > 0)
-                        ImGui.PopStyleColor(pushedColors);
-
-                    ImGui.Separator();
-
-                    if (ImGui.MenuItem("Settings", null, SettingsPanel.IsOpen))
-                        SettingsPanel.IsOpen = !SettingsPanel.IsOpen;
-
-                    if (ImGui.MenuItem("Loot Filters", null, LootFiltersPanel.IsOpen))
-                        LootFiltersPanel.IsOpen = !LootFiltersPanel.IsOpen;
-
-                    if (ImGui.MenuItem("Players", null, PlayerInfoWidget.IsOpen))
-                        PlayerInfoWidget.IsOpen = !PlayerInfoWidget.IsOpen;
-
-                    if (ImGui.MenuItem("Loot", null, LootWidget.IsOpen))
-                        LootWidget.IsOpen = !LootWidget.IsOpen;
-
-                    // Right-aligned: Map name + FPS
-                    string mapName = MapManager.Map?.Config?.Name ?? "No Map";
-                    string rightText = $"{mapName} | {_fps} FPS";
-                    float rightTextWidth = ImGui.CalcTextSize(rightText).X;
-                    ImGui.SetCursorPosX(ImGui.GetWindowWidth() - rightTextWidth - 10);
-                    ImGui.Text(rightText);
-
-                    ImGui.EndMainMenuBar();
-                }
-
-                // Draw windows
+                DrawMainMenuBar();
+                DrawStatusBar();
                 DrawWindows();
             }
             finally
             {
                 _imgui.Render();
             }
+        }
+
+        /// <summary>
+        /// Ticks down the "Config saved" notification timer.
+        /// </summary>
+        private static float _saveNotifyTimer;
+
+        /// <summary>
+        /// Shows a brief "Saved!" indicator in the status bar after config save.
+        /// </summary>
+        internal static void NotifyConfigSaved() => _saveNotifyTimer = 2.0f;
+
+        private static void DrawMainMenuBar()
+        {
+            if (!ImGui.BeginMainMenuBar())
+                return;
+
+            // ── Map mode toggle button ──────────────────────────────────────
+            int pushedColors = 0;
+            if (_freeMode)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.18f, 0.48f, 0.48f, 1.0f));
+                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.24f, 0.58f, 0.58f, 1.0f));
+                ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.15f, 0.42f, 0.42f, 1.0f));
+                pushedColors = 3;
+            }
+
+            if (ImGui.Button(_freeMode ? "\u25cb Free" : "\u25c9 Follow"))
+            {
+                _freeMode = !_freeMode;
+                if (!_freeMode)
+                    _mapPanPosition = Vector2.Zero;
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip(_freeMode
+                    ? "Free map panning — drag to move  [F]"
+                    : "Camera follows your player  [F]");
+
+            if (pushedColors > 0)
+                ImGui.PopStyleColor(pushedColors);
+
+            ImGui.Separator();
+
+            // ── View menu ───────────────────────────────────────────────────
+            if (ImGui.BeginMenu("View"))
+            {
+                if (ImGui.MenuItem("\u2699 Settings", "S", SettingsPanel.IsOpen))
+                    SettingsPanel.IsOpen = !SettingsPanel.IsOpen;
+
+                if (ImGui.MenuItem("\u25a3 Loot Filters", "L", LootFiltersPanel.IsOpen))
+                    LootFiltersPanel.IsOpen = !LootFiltersPanel.IsOpen;
+
+                ImGui.Separator();
+
+                bool battleMode = Config.BattleMode;
+                if (ImGui.MenuItem("\u2694 Battle Mode", "B", battleMode))
+                    Config.BattleMode = !Config.BattleMode;
+
+                ImGui.EndMenu();
+            }
+
+            // ── Windows menu ────────────────────────────────────────────────
+            if (ImGui.BeginMenu("Windows"))
+            {
+                if (ImGui.MenuItem("\u263a Players", null, PlayerInfoWidget.IsOpen))
+                    PlayerInfoWidget.IsOpen = !PlayerInfoWidget.IsOpen;
+
+                if (ImGui.MenuItem("\u2234 Loot", null, LootWidget.IsOpen))
+                    LootWidget.IsOpen = !LootWidget.IsOpen;
+
+                if (ImGui.MenuItem("\u25ce Aimview", null, AimviewWidget.IsOpen))
+                    AimviewWidget.IsOpen = !AimviewWidget.IsOpen;
+
+                ImGui.EndMenu();
+            }
+
+            // ── Right-aligned info ──────────────────────────────────────────
+            string mapName = MapManager.Map?.Config?.Name ?? "No Map";
+            string rightText = $"{mapName}  |  {_fps} FPS";
+            float rightTextWidth = ImGui.CalcTextSize(rightText).X;
+            ImGui.SetCursorPosX(ImGui.GetWindowWidth() - rightTextWidth - 12);
+
+            ImGui.TextColored(new Vector4(0.55f, 0.60f, 0.65f, 1.0f), rightText);
+
+            ImGui.EndMainMenuBar();
+        }
+
+        private static void DrawStatusBar()
+        {
+            if (!InRaid)
+                return;
+
+            var viewport = ImGui.GetMainViewport();
+            float barHeight = ImGui.GetFrameHeight();
+
+            ImGui.SetNextWindowPos(new Vector2(viewport.Pos.X, viewport.Pos.Y + viewport.Size.Y - barHeight));
+            ImGui.SetNextWindowSize(new Vector2(viewport.Size.X, barHeight));
+
+            var flags = ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoInputs |
+                        ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoScrollWithMouse |
+                        ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoBringToFrontOnFocus |
+                        ImGuiWindowFlags.NoFocusOnAppearing;
+
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 2));
+            ImGui.PushStyleColor(ImGuiCol.WindowBg, new Vector4(0.10f, 0.10f, 0.12f, 0.92f));
+
+            if (ImGui.Begin("##StatusBar", flags))
+            {
+                // Left: raid status indicators
+                var allPlayers = AllPlayers;
+                int playerCount = 0;
+                int pmcCount = 0;
+                if (allPlayers is not null)
+                {
+                    foreach (var p in allPlayers)
+                    {
+                        if (p.IsLocalPlayer || !p.IsActive || !p.IsAlive)
+                            continue;
+                        playerCount++;
+                        if (p.Type is PlayerType.USEC or PlayerType.BEAR)
+                            pmcCount++;
+                    }
+                }
+
+                // Status dot
+                ImGui.TextColored(new Vector4(0.30f, 0.75f, 0.70f, 1f), "\u25cf");
+                ImGui.SameLine(0, 4);
+                ImGui.TextColored(new Vector4(0.60f, 0.62f, 0.65f, 1f), "In Raid");
+
+                ImGui.SameLine(0, 16);
+                ImGui.TextColored(new Vector4(0.50f, 0.52f, 0.55f, 1f), "\u2502");
+
+                ImGui.SameLine(0, 16);
+                ImGui.TextColored(new Vector4(0.60f, 0.62f, 0.65f, 1f),
+                    $"Players: {playerCount}  ({pmcCount} PMC)");
+
+                // Right: save notification
+                if (_saveNotifyTimer > 0f)
+                {
+                    _saveNotifyTimer -= ImGui.GetIO().DeltaTime;
+                    float alpha = Math.Clamp(_saveNotifyTimer, 0f, 1f);
+                    string savedText = "\u2713 Config saved";
+                    float savedWidth = ImGui.CalcTextSize(savedText).X;
+                    ImGui.SameLine(ImGui.GetWindowWidth() - savedWidth - 14);
+                    ImGui.TextColored(new Vector4(0.30f, 0.80f, 0.50f, alpha), savedText);
+                }
+            }
+
+            ImGui.End();
+            ImGui.PopStyleColor();
+            ImGui.PopStyleVar();
         }
 
         private static void DrawWindows()
@@ -906,37 +1027,113 @@ namespace eft_dma_radar.Silk.UI
 
             if (LootWidget.IsOpen && InRaid)
                 LootWidget.Draw();
+
+            if (AimviewWidget.IsOpen && InRaid && Config.ShowAimview)
+                AimviewWidget.Draw();
         }
 
         private static void ApplyImGuiDarkStyle()
         {
             var style = ImGui.GetStyle();
-            style.WindowRounding = 5.0f;
-            style.FrameRounding = 3.0f;
-            style.GrabRounding = 3.0f;
-            style.ScrollbarRounding = 3.0f;
-            style.TabRounding = 3.0f;
+            style.WindowRounding = 6.0f;
+            style.FrameRounding = 4.0f;
+            style.GrabRounding = 4.0f;
+            style.ScrollbarRounding = 6.0f;
+            style.TabRounding = 4.0f;
+            style.PopupRounding = 4.0f;
+            style.ChildRounding = 4.0f;
+            style.WindowBorderSize = 1.0f;
+            style.FrameBorderSize = 0.0f;
+            style.PopupBorderSize = 1.0f;
+            style.WindowPadding = new Vector2(10, 10);
+            style.FramePadding = new Vector2(6, 4);
+            style.ItemSpacing = new Vector2(8, 5);
+            style.ItemInnerSpacing = new Vector2(6, 4);
+            style.IndentSpacing = 20f;
+            style.ScrollbarSize = 12f;
+            style.GrabMinSize = 10f;
+            style.SeparatorTextBorderSize = 2f;
+
+            // ── Accent palette ──────────────────────────────────────────────────
+            // Subtle teal accent for interactive elements
+            var accentBase   = new Vector4(0.22f, 0.55f, 0.55f, 1.0f);
+            var accentHover  = new Vector4(0.28f, 0.65f, 0.65f, 1.0f);
+            var accentActive = new Vector4(0.18f, 0.48f, 0.48f, 1.0f);
 
             var colors = style.Colors;
-            colors[(int)ImGuiCol.WindowBg] = new Vector4(0.1f, 0.1f, 0.1f, 0.95f);
-            colors[(int)ImGuiCol.TitleBg] = new Vector4(0.15f, 0.15f, 0.15f, 1.0f);
-            colors[(int)ImGuiCol.TitleBgActive] = new Vector4(0.2f, 0.2f, 0.2f, 1.0f);
-            colors[(int)ImGuiCol.FrameBg] = new Vector4(0.2f, 0.2f, 0.2f, 1.0f);
-            colors[(int)ImGuiCol.FrameBgHovered] = new Vector4(0.3f, 0.3f, 0.3f, 1.0f);
-            colors[(int)ImGuiCol.FrameBgActive] = new Vector4(0.25f, 0.25f, 0.25f, 1.0f);
-            colors[(int)ImGuiCol.Button] = new Vector4(0.25f, 0.25f, 0.25f, 1.0f);
-            colors[(int)ImGuiCol.ButtonHovered] = new Vector4(0.35f, 0.35f, 0.35f, 1.0f);
-            colors[(int)ImGuiCol.ButtonActive] = new Vector4(0.2f, 0.5f, 0.2f, 1.0f);
-            colors[(int)ImGuiCol.Header] = new Vector4(0.2f, 0.2f, 0.2f, 1.0f);
-            colors[(int)ImGuiCol.HeaderHovered] = new Vector4(0.3f, 0.3f, 0.3f, 1.0f);
-            colors[(int)ImGuiCol.HeaderActive] = new Vector4(0.25f, 0.25f, 0.25f, 1.0f);
-            colors[(int)ImGuiCol.MenuBarBg] = new Vector4(0.15f, 0.15f, 0.15f, 1.0f);
-            colors[(int)ImGuiCol.SliderGrab] = new Vector4(0.4f, 0.4f, 0.4f, 1.0f);
-            colors[(int)ImGuiCol.SliderGrabActive] = new Vector4(0.5f, 0.5f, 0.5f, 1.0f);
-            colors[(int)ImGuiCol.CheckMark] = new Vector4(0.3f, 0.7f, 0.3f, 1.0f);
-            colors[(int)ImGuiCol.Tab] = new Vector4(0.15f, 0.15f, 0.15f, 1.0f);
-            colors[(int)ImGuiCol.TabHovered] = new Vector4(0.25f, 0.25f, 0.25f, 1.0f);
-            colors[(int)ImGuiCol.TabSelected] = new Vector4(0.2f, 0.2f, 0.2f, 1.0f);
+
+            // Window
+            colors[(int)ImGuiCol.WindowBg]           = new Vector4(0.08f, 0.08f, 0.10f, 0.96f);
+            colors[(int)ImGuiCol.ChildBg]            = new Vector4(0.08f, 0.08f, 0.10f, 0.0f);
+            colors[(int)ImGuiCol.PopupBg]            = new Vector4(0.10f, 0.10f, 0.12f, 0.96f);
+
+            // Borders
+            colors[(int)ImGuiCol.Border]             = new Vector4(0.25f, 0.28f, 0.30f, 0.60f);
+            colors[(int)ImGuiCol.BorderShadow]       = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
+
+            // Title bar
+            colors[(int)ImGuiCol.TitleBg]            = new Vector4(0.10f, 0.10f, 0.12f, 1.0f);
+            colors[(int)ImGuiCol.TitleBgActive]      = new Vector4(0.14f, 0.14f, 0.17f, 1.0f);
+            colors[(int)ImGuiCol.TitleBgCollapsed]    = new Vector4(0.08f, 0.08f, 0.10f, 0.75f);
+
+            // Menu bar
+            colors[(int)ImGuiCol.MenuBarBg]          = new Vector4(0.10f, 0.10f, 0.12f, 1.0f);
+
+            // Frame backgrounds
+            colors[(int)ImGuiCol.FrameBg]            = new Vector4(0.14f, 0.15f, 0.17f, 1.0f);
+            colors[(int)ImGuiCol.FrameBgHovered]     = new Vector4(0.20f, 0.22f, 0.24f, 1.0f);
+            colors[(int)ImGuiCol.FrameBgActive]      = new Vector4(0.18f, 0.20f, 0.22f, 1.0f);
+
+            // Buttons
+            colors[(int)ImGuiCol.Button]             = new Vector4(0.18f, 0.19f, 0.22f, 1.0f);
+            colors[(int)ImGuiCol.ButtonHovered]       = accentHover;
+            colors[(int)ImGuiCol.ButtonActive]        = accentActive;
+
+            // Headers (collapsing headers, selectable, etc.)
+            colors[(int)ImGuiCol.Header]             = new Vector4(0.16f, 0.17f, 0.20f, 1.0f);
+            colors[(int)ImGuiCol.HeaderHovered]       = new Vector4(0.22f, 0.24f, 0.28f, 1.0f);
+            colors[(int)ImGuiCol.HeaderActive]        = new Vector4(0.20f, 0.22f, 0.26f, 1.0f);
+
+            // Tabs
+            colors[(int)ImGuiCol.Tab]                = new Vector4(0.12f, 0.13f, 0.15f, 1.0f);
+            colors[(int)ImGuiCol.TabHovered]          = accentHover;
+            colors[(int)ImGuiCol.TabSelected]         = accentBase;
+            colors[(int)ImGuiCol.TabDimmed]           = new Vector4(0.10f, 0.10f, 0.12f, 1.0f);
+            colors[(int)ImGuiCol.TabDimmedSelected]   = new Vector4(0.14f, 0.14f, 0.17f, 1.0f);
+
+            // Sliders & grabs
+            colors[(int)ImGuiCol.SliderGrab]          = accentBase;
+            colors[(int)ImGuiCol.SliderGrabActive]    = accentHover;
+
+            // Checkboxes
+            colors[(int)ImGuiCol.CheckMark]           = new Vector4(0.30f, 0.75f, 0.70f, 1.0f);
+
+            // Scrollbar
+            colors[(int)ImGuiCol.ScrollbarBg]        = new Vector4(0.06f, 0.06f, 0.08f, 0.6f);
+            colors[(int)ImGuiCol.ScrollbarGrab]      = new Vector4(0.22f, 0.24f, 0.28f, 1.0f);
+            colors[(int)ImGuiCol.ScrollbarGrabHovered] = new Vector4(0.30f, 0.32f, 0.36f, 1.0f);
+            colors[(int)ImGuiCol.ScrollbarGrabActive]  = accentBase;
+
+            // Separators
+            colors[(int)ImGuiCol.Separator]          = new Vector4(0.22f, 0.24f, 0.28f, 0.6f);
+            colors[(int)ImGuiCol.SeparatorHovered]   = accentHover;
+            colors[(int)ImGuiCol.SeparatorActive]    = accentActive;
+
+            // Resize grip
+            colors[(int)ImGuiCol.ResizeGrip]         = new Vector4(0.22f, 0.24f, 0.28f, 0.4f);
+            colors[(int)ImGuiCol.ResizeGripHovered]  = accentHover;
+            colors[(int)ImGuiCol.ResizeGripActive]   = accentActive;
+
+            // Text
+            colors[(int)ImGuiCol.Text]               = new Vector4(0.90f, 0.92f, 0.94f, 1.0f);
+            colors[(int)ImGuiCol.TextDisabled]       = new Vector4(0.45f, 0.47f, 0.50f, 1.0f);
+
+            // Table
+            colors[(int)ImGuiCol.TableHeaderBg]      = new Vector4(0.12f, 0.13f, 0.15f, 1.0f);
+            colors[(int)ImGuiCol.TableBorderStrong]  = new Vector4(0.22f, 0.24f, 0.28f, 0.8f);
+            colors[(int)ImGuiCol.TableBorderLight]   = new Vector4(0.18f, 0.20f, 0.22f, 0.5f);
+            colors[(int)ImGuiCol.TableRowBg]         = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
+            colors[(int)ImGuiCol.TableRowBgAlt]      = new Vector4(1.0f, 1.0f, 1.0f, 0.02f);
         }
 
         #endregion
@@ -1180,6 +1377,10 @@ namespace eft_dma_radar.Silk.UI
 
         private static void OnKeyDown(IKeyboard keyboard, Key key, int scancode)
         {
+            // Don't handle shortcuts when ImGui text inputs have focus
+            if (ImGui.GetIO().WantCaptureKeyboard)
+                return;
+
             switch (key)
             {
                 case Key.F:
@@ -1190,11 +1391,18 @@ namespace eft_dma_radar.Silk.UI
                 case Key.B:
                     Config.BattleMode = !Config.BattleMode;
                     break;
+                case Key.S:
+                    SettingsPanel.IsOpen = !SettingsPanel.IsOpen;
+                    break;
+                case Key.L:
+                    LootFiltersPanel.IsOpen = !LootFiltersPanel.IsOpen;
+                    break;
                 case Key.Escape:
                     SettingsPanel.IsOpen = false;
                     LootFiltersPanel.IsOpen = false;
                     PlayerInfoWidget.IsOpen = false;
                     LootWidget.IsOpen = false;
+                    AimviewWidget.IsOpen = false;
                     break;
             }
         }

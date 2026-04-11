@@ -44,10 +44,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 
         private const string SecureSlot = "SecuredContainer";
 
-        // C# array: count at offset 0x18, data starts at offset 0x20
-        private const uint ArrayCountOffset = 0x18;
-        private const uint ArrayDataOffset = 0x20;
-
         // Maximum recursion depth for nested mod slots (safety guard)
         private const int MaxRecursionDepth = 8;
 
@@ -63,14 +59,22 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         {
             try
             {
-                if (!TryReadEquipmentSlots(playerBase, isObserved, out var slotsPtr, out var slotPtrs))
+                if (!TryReadEquipmentSlots(playerBase, isObserved, out var slotsArr))
+                {
+                    Log.WriteRateLimited(AppLogLevel.Warning,
+                        $"gear_chain_{playerBase:X}", TimeSpan.FromSeconds(30),
+                        $"[GearManager] Equipment chain failed for '{player.Name}' (observed={isObserved})");
                     return;
+                }
 
-                BuildGear(player, slotsPtr, slotPtrs);
+                using (slotsArr)
+                    BuildGear(player, slotsArr);
             }
-            catch
+            catch (Exception ex)
             {
-                // Non-fatal — skip this tick
+                Log.WriteRateLimited(AppLogLevel.Warning,
+                    $"gear_ex_{playerBase:X}", TimeSpan.FromSeconds(30),
+                    $"[GearManager] Refresh exception for '{player.Name}': {ex.Message}");
             }
         }
 
@@ -81,11 +85,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         private static bool TryReadEquipmentSlots(
             ulong playerBase,
             bool isObserved,
-            out ulong slotsPtr,
-            out ulong[] slotPtrs)
+            out MemArray<ulong> slotsArr)
         {
-            slotsPtr = 0;
-            slotPtrs = [];
+            slotsArr = null!;
 
             // Step 1: Get InventoryController address (different path for observed vs client players)
             ulong invController;
@@ -94,62 +96,78 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 // ObservedPlayerView → ObservedPlayerController → InventoryController
                 if (!Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView.ObservedPlayerController, out var obsController)
                     || !obsController.IsValidVirtualAddress())
+                {
+                    Log.Write(AppLogLevel.Debug, $"[GearManager] Step1a fail: OPC null/invalid for 0x{playerBase:X}");
                     return false;
+                }
 
                 if (!Memory.TryReadPtr(obsController + Offsets.ObservedPlayerController.InventoryController, out invController)
                     || !invController.IsValidVirtualAddress())
+                {
+                    Log.Write(AppLogLevel.Debug, $"[GearManager] Step1b fail: InventoryController null/invalid for observed 0x{playerBase:X}");
                     return false;
+                }
             }
             else
             {
                 // ClientPlayer → _inventoryController
                 if (!Memory.TryReadPtr(playerBase + Offsets.Player._inventoryController, out invController)
                     || !invController.IsValidVirtualAddress())
+                {
+                    Log.Write(AppLogLevel.Debug, $"[GearManager] Step1 fail: _inventoryController null/invalid for client 0x{playerBase:X}");
                     return false;
+                }
             }
 
             // Step 2: InventoryController → Inventory → Equipment → Slots array
             if (!Memory.TryReadPtr(invController + Offsets.InventoryController.Inventory, out var inventory)
                 || !inventory.IsValidVirtualAddress())
+            {
+                Log.Write(AppLogLevel.Debug, $"[GearManager] Step2a fail: Inventory null/invalid for 0x{playerBase:X}");
                 return false;
+            }
 
             if (!Memory.TryReadPtr(inventory + Offsets.Inventory.Equipment, out var equipment)
                 || !equipment.IsValidVirtualAddress())
+            {
+                Log.Write(AppLogLevel.Debug, $"[GearManager] Step2b fail: Equipment null/invalid for 0x{playerBase:X}");
                 return false;
+            }
 
-            if (!Memory.TryReadPtr(equipment + Offsets.Equipment.Slots, out slotsPtr)
+            if (!Memory.TryReadPtr(equipment + Offsets.Equipment.Slots, out var slotsPtr)
                 || !slotsPtr.IsValidVirtualAddress())
+            {
+                Log.Write(AppLogLevel.Debug, $"[GearManager] Step2c fail: Slots null/invalid for 0x{playerBase:X}");
                 return false;
+            }
 
-            // Step 3: Read C# array (count at +0x18, data at +0x20)
-            if (!Memory.TryReadValue<int>(slotsPtr + ArrayCountOffset, out var count) || count < 1 || count > 64)
-                return false;
-
+            // Step 3: Read C# array via pooled MemArray
             try
             {
-                slotPtrs = Memory.ReadArray<ulong>(slotsPtr + ArrayDataOffset, count, false);
+                slotsArr = MemArray<ulong>.Get(slotsPtr, false);
             }
             catch
             {
                 return false;
             }
 
-            return slotPtrs.Length > 0;
+            return slotsArr.Count > 0;
         }
 
         /// <summary>
         /// Iterates equipment slots, resolves item templates, builds gear dictionary and computes totals.
         /// Also attempts to read ProfileId from the player's alive dogtag for identity resolution.
         /// </summary>
-        private static void BuildGear(Player player, ulong slotsPtr, ulong[] slotPtrs)
+        private static void BuildGear(Player player, MemArray<ulong> slotPtrs)
         {
-            var gear = new Dictionary<string, GearItem>(slotPtrs.Length, StringComparer.OrdinalIgnoreCase);
+            var gear = new Dictionary<string, GearItem>(slotPtrs.Count, StringComparer.OrdinalIgnoreCase);
             int totalValue = 0;
             bool hasNvg = false, hasThermal = false;
             bool needsProfileId = player.IsHuman && player.ProfileId is null;
 
-            foreach (var slotPtr in slotPtrs)
+            for (int i = 0; i < slotPtrs.Count; i++)
             {
+                var slotPtr = slotPtrs[i];
                 if (!slotPtr.IsValidVirtualAddress())
                     continue;
 
@@ -321,22 +339,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                     || !modSlotsPtr.IsValidVirtualAddress())
                     return;
 
-                if (!Memory.TryReadValue<int>(modSlotsPtr + ArrayCountOffset, out var count)
-                    || count < 1 || count > 64)
+                using var modSlots = MemArray<ulong>.Get(modSlotsPtr, false);
+                if (modSlots.Count < 1 || modSlots.Count > 64)
                     return;
 
-                ulong[] modSlots;
-                try
+                for (int i = 0; i < modSlots.Count; i++)
                 {
-                    modSlots = Memory.ReadArray<ulong>(modSlotsPtr + ArrayDataOffset, count, false);
-                }
-                catch
-                {
-                    return;
-                }
-
-                foreach (var modSlotPtr in modSlots)
-                {
+                    var modSlotPtr = modSlots[i];
                     if (!modSlotPtr.IsValidVirtualAddress())
                         continue;
 

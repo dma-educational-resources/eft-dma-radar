@@ -18,8 +18,8 @@ namespace eft_dma_radar.Silk.UI.Panels
         public static void Draw()
         {
             bool isOpen = IsOpen;
-            ImGui.SetNextWindowSize(new Vector2(500, 600), ImGuiCond.FirstUseEver);
-            if (!ImGui.Begin("Radar Settings", ref isOpen))
+            ImGui.SetNextWindowSize(new Vector2(440, 520), ImGuiCond.FirstUseEver);
+            if (!ImGui.Begin("\u2699 Settings", ref isOpen, ImGuiWindowFlags.NoCollapse))
             {
                 IsOpen = isOpen;
                 ImGui.End();
@@ -36,6 +36,19 @@ namespace eft_dma_radar.Silk.UI.Panels
                 ImGui.EndTabBar();
             }
 
+            // ── Persistent footer ──
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
+            if (ImGui.Button("\u2713 Save Config", new Vector2(120, 0)))
+            {
+                Config.Save();
+                RadarWindow.NotifyConfigSaved();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Save all settings to disk");
+
             ImGui.End();
         }
 
@@ -44,37 +57,36 @@ namespace eft_dma_radar.Silk.UI.Panels
             if (!ImGui.BeginTabItem("General"))
                 return;
 
+            ImGui.Spacing();
+
             ImGui.SeparatorText("Display");
 
+            ImGui.SetNextItemWidth(200);
             float uiScale = Config.UIScale;
-            if (ImGui.SliderFloat("UI Scale", ref uiScale, 0.5f, 2.0f))
+            if (ImGui.SliderFloat("UI Scale", ref uiScale, 0.5f, 2.0f, "%.1fx"))
                 Config.UIScale = uiScale;
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Scale the radar canvas rendering");
 
+            ImGui.SetNextItemWidth(200);
             int fps = Config.TargetFps;
-            if (ImGui.SliderInt("Target FPS", ref fps, 30, 1500))
+            string fpsLabel = fps == 0 ? "Unlimited" : $"{fps}";
+            if (ImGui.SliderInt("Target FPS", ref fps, 0, 360, fpsLabel))
             {
                 Config.TargetFps = fps;
                 RadarWindow.Window.FramesPerSecond = fps;
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Maximum frames per second for the radar window");
+                ImGui.SetTooltip("Max frames per second (0 = unlimited)");
 
+            ImGui.Spacing();
             ImGui.SeparatorText("Modes");
 
             bool battleMode = Config.BattleMode;
             if (ImGui.Checkbox("Battle Mode", ref battleMode))
                 Config.BattleMode = battleMode;
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Hide loot and other clutter; show only players");
-
-            ImGui.SeparatorText("Actions");
-
-            if (ImGui.Button("Save Config"))
-                Config.Save();
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Save current configuration to disk");
+                ImGui.SetTooltip("Hide loot and clutter; focus on players only  [B]");
 
             ImGui.EndTabItem();
         }
@@ -83,6 +95,8 @@ namespace eft_dma_radar.Silk.UI.Panels
         {
             if (!ImGui.BeginTabItem("Players"))
                 return;
+
+            ImGui.Spacing();
 
             ImGui.SeparatorText("Rendering");
 
@@ -98,36 +112,65 @@ namespace eft_dma_radar.Silk.UI.Panels
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Draw lines connecting players in the same group");
 
+            ImGui.Spacing();
             ImGui.SeparatorText("Aimline");
 
             bool showAimlines = Config.ShowAimlines;
             if (ImGui.Checkbox("Show Aimlines", ref showAimlines))
                 Config.ShowAimlines = showAimlines;
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Show facing direction lines extending from player markers");
+                ImGui.SetTooltip("Show facing direction lines on player markers");
 
             if (Config.ShowAimlines)
             {
+                ImGui.Indent(16);
+
+                ImGui.SetNextItemWidth(180);
                 int aimlineLength = Config.AimlineLength;
-                if (ImGui.SliderInt("Aimline Length", ref aimlineLength, 0, 100))
+                if (ImGui.SliderInt("Length", ref aimlineLength, 0, 100))
                     Config.AimlineLength = aimlineLength;
                 if (ImGui.IsItemHovered())
-                    ImGui.SetTooltip("Length of the aimline in pixels (human players)");
+                    ImGui.SetTooltip("Aimline length in pixels (human players)");
 
                 bool highAlert = Config.HighAlert;
                 if (ImGui.Checkbox("High Alert", ref highAlert))
                     Config.HighAlert = highAlert;
                 if (ImGui.IsItemHovered())
-                    ImGui.SetTooltip("Extend aimline across the map when an enemy is aiming at you");
+                    ImGui.SetTooltip("Extend aimline when an enemy is aiming at you");
+
+                ImGui.Unindent(16);
             }
 
+            ImGui.Spacing();
+            ImGui.SeparatorText("Aimview");
+
+            bool showAimview = Config.ShowAimview;
+            if (ImGui.Checkbox("Show Aimview", ref showAimview))
+                Config.ShowAimview = showAimview;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("First-person projection widget showing nearby players");
+
+            if (Config.ShowAimview)
+            {
+                ImGui.Indent(16);
+
+                bool aimviewLoot = Config.AimviewShowLoot;
+                if (ImGui.Checkbox("Show Loot", ref aimviewLoot))
+                    Config.AimviewShowLoot = aimviewLoot;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Show nearby filtered loot items in the aimview");
+
+                ImGui.Unindent(16);
+            }
+
+            ImGui.Spacing();
             ImGui.SeparatorText("Profile");
 
             bool profileLookups = Config.ProfileLookups;
             if (ImGui.Checkbox("Profile Lookups", ref profileLookups))
                 Config.ProfileLookups = profileLookups;
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Fetch player profiles from tarkov.dev (K/D, hours, survival rate)");
+                ImGui.SetTooltip("Fetch player stats from tarkov.dev (K/D, hours, survival rate)");
 
             ImGui.EndTabItem();
         }
@@ -137,6 +180,9 @@ namespace eft_dma_radar.Silk.UI.Panels
             if (!ImGui.BeginTabItem("Map"))
                 return;
 
+            ImGui.Spacing();
+
+            ImGui.SetNextItemWidth(200);
             int zoom = RadarWindow.Zoom;
             if (ImGui.SliderInt("Zoom", ref zoom, 1, 200))
                 RadarWindow.Zoom = zoom;
@@ -145,8 +191,9 @@ namespace eft_dma_radar.Silk.UI.Panels
             if (ImGui.Checkbox("Free Mode", ref freeMode))
                 RadarWindow.FreeMode = freeMode;
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Toggle between player-follow and free-pan map mode");
+                ImGui.SetTooltip("Toggle between player-follow and free-pan  [F]");
 
+            ImGui.Spacing();
             ImGui.SeparatorText("Exfils");
 
             bool showExfils = Config.ShowExfils;
@@ -157,11 +204,63 @@ namespace eft_dma_radar.Silk.UI.Panels
 
             if (Config.ShowExfils)
             {
+                ImGui.Indent(16);
+
                 bool hideInactive = Config.HideInactiveExfils;
-                if (ImGui.Checkbox("Hide Inactive Exfils", ref hideInactive))
+                if (ImGui.Checkbox("Hide Inactive", ref hideInactive))
                     Config.HideInactiveExfils = hideInactive;
                 if (ImGui.IsItemHovered())
-                    ImGui.SetTooltip("Hide exfils that are closed or not available to you");
+                    ImGui.SetTooltip("Hide closed or unavailable exfils");
+
+                ImGui.Unindent(16);
+            }
+
+            ImGui.Spacing();
+            ImGui.SeparatorText("Doors");
+
+            bool showDoors = Config.ShowDoors;
+            if (ImGui.Checkbox("Show Doors", ref showDoors))
+                Config.ShowDoors = showDoors;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Show keyed doors on the radar");
+
+            if (Config.ShowDoors)
+            {
+                ImGui.Indent(16);
+
+                bool showLocked = Config.ShowLockedDoors;
+                if (ImGui.Checkbox("Show Locked", ref showLocked))
+                    Config.ShowLockedDoors = showLocked;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Show locked doors (red)");
+
+                bool showUnlocked = Config.ShowUnlockedDoors;
+                if (ImGui.Checkbox("Show Unlocked", ref showUnlocked))
+                    Config.ShowUnlockedDoors = showUnlocked;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Show open or shut doors (green/orange)");
+
+                bool onlyNearLoot = Config.DoorsOnlyNearLoot;
+                if (ImGui.Checkbox("Only Near Valuable Loot", ref onlyNearLoot))
+                    Config.DoorsOnlyNearLoot = onlyNearLoot;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Only show doors near important (high-value) loot items");
+
+                if (Config.DoorsOnlyNearLoot)
+                {
+                    ImGui.Indent(16);
+
+                    ImGui.SetNextItemWidth(160);
+                    float proximity = Config.DoorLootProximity;
+                    if (ImGui.SliderFloat("Proximity (m)", ref proximity, 5f, 100f, "%.0fm"))
+                        Config.DoorLootProximity = proximity;
+                    if (ImGui.IsItemHovered())
+                        ImGui.SetTooltip("Max distance from door to valuable loot");
+
+                    ImGui.Unindent(16);
+                }
+
+                ImGui.Unindent(16);
             }
 
             ImGui.EndTabItem();

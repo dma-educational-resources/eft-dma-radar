@@ -205,14 +205,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// </summary>
         internal void RefreshRegistration()
         {
-            ulong rgtPlayersAddr, listItemsPtr;
-            int count;
+            ulong rgtPlayersAddr;
+            MemList<ulong> ptrs;
 
             try
             {
                 rgtPlayersAddr = Memory.ReadPtr(_gameWorldBase + Offsets.ClientLocalGameWorld.RegisteredPlayers, false);
-                listItemsPtr = Memory.ReadPtr(rgtPlayersAddr + List.ArrOffset, false);
-                count = Memory.ReadValue<int>(rgtPlayersAddr + 0x18, false);
+                ptrs = MemList<ulong>.Get(rgtPlayersAddr, false);
             }
             catch (Exception ex)
             {
@@ -221,78 +220,75 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 return;
             }
 
-            if (count < 1 || count > MaxPlayerCount)
+            using (ptrs)
             {
-                _invalidCountStreak++;
-                Log.WriteRateLimited(AppLogLevel.Warning, "rp_count", TimeSpan.FromSeconds(10),
-                    $"[RegisteredPlayers] Invalid player count: {count} (addr=0x{rgtPlayersAddr:X}), streak={_invalidCountStreak}");
-
-                // Exponential backoff: sleep longer when we keep getting invalid counts (e.g., after raid ends)
-                if (_invalidCountStreak > 3)
+                var count = ptrs.Count;
+                if (count < 1 || count > MaxPlayerCount)
                 {
-                    int backoffMs = Math.Min(1000 * _invalidCountStreak, 10_000);
-                    Thread.Sleep(backoffMs);
-                }
-                return;
-            }
+                    _invalidCountStreak++;
+                    Log.WriteRateLimited(AppLogLevel.Warning, "rp_count", TimeSpan.FromSeconds(10),
+                        $"[RegisteredPlayers] Invalid player count: {count} (addr=0x{rgtPlayersAddr:X}), streak={_invalidCountStreak}");
 
-            _invalidCountStreak = 0;
-
-            ulong[] ptrs;
-            try
-            {
-                ptrs = Memory.ReadArray<ulong>(listItemsPtr + List.ArrStartOffset, count, false);
-            }
-            catch (Exception ex)
-            {
-                Log.WriteRateLimited(AppLogLevel.Warning, "rp_ptrs", TimeSpan.FromSeconds(5),
-                    $"[RegisteredPlayers] Failed to read pointer array (count={count}): {ex.Message}");
-                return;
-            }
-
-            // Reuse the HashSet across calls to avoid per-tick allocation
-            var seen = _seenSet;
-            seen.Clear();
-            seen.EnsureCapacity(count);
-
-            int invalidPtrs = 0;
-            int newDiscovered = 0;
-            int newFailed = 0;
-
-            // Discover new players
-            foreach (var ptr in ptrs)
-            {
-                if (!ptr.IsValidVirtualAddress())
-                {
-                    invalidPtrs++;
-                    continue;
+                    // Exponential backoff: sleep longer when we keep getting invalid counts (e.g., after raid ends)
+                    if (_invalidCountStreak > 3)
+                    {
+                        int backoffMs = Math.Min(1000 * _invalidCountStreak, 10_000);
+                        Thread.Sleep(backoffMs);
+                    }
+                    return;
                 }
 
-                seen.Add(ptr);
+                _invalidCountStreak = 0;
 
-                if (_players.ContainsKey(ptr))
-                    continue;
+                // Reuse the HashSet across calls to avoid per-tick allocation
+                var seen = _seenSet;
+                seen.Clear();
+                seen.EnsureCapacity(count);
 
-                var entry = CreatePlayerEntry(ptr, isLocal: false);
-                if (entry is not null)
+                int invalidPtrs = 0;
+                int newDiscovered = 0;
+                int newFailed = 0;
+
+                // Discover new players
+                for (int i = 0; i < ptrs.Count; i++)
                 {
-                    _players.TryAdd(ptr, entry);
-                    newDiscovered++;
+                    var ptr = ptrs[i];
+                    if (!ptr.IsValidVirtualAddress())
+                    {
+                        invalidPtrs++;
+                        continue;
+                    }
+
+                    seen.Add(ptr);
+
+                    if (_players.ContainsKey(ptr))
+                        continue;
+
+                    var entry = CreatePlayerEntry(ptr, isLocal: false);
+                    if (entry is not null)
+                    {
+                        _players.TryAdd(ptr, entry);
+                        newDiscovered++;
+                    }
+                    else
+                    {
+                        newFailed++;
+                    }
                 }
-                else
+
+                if (newDiscovered > 0 || newFailed > 0 || invalidPtrs > 0)
                 {
-                    newFailed++;
+                    Log.WriteLine($"[RegisteredPlayers] Refresh: list={count}, valid={seen.Count}, invalidPtrs={invalidPtrs}, " +
+                        $"new={newDiscovered}, failed={newFailed}, total={_players.Count}");
                 }
             }
 
-            if (newDiscovered > 0 || newFailed > 0 || invalidPtrs > 0)
-            {
-                Log.WriteLine($"[RegisteredPlayers] Refresh: list={count}, valid={seen.Count}, invalidPtrs={invalidPtrs}, " +
-                    $"new={newDiscovered}, failed={newFailed}, total={_players.Count}");
-            }
+            // Batch-init transforms and rotations for all entries that need it.
+            // This replaces N × 11 serial DMA reads with ~11 scatter rounds.
+            BatchInitTransformsAndRotations();
 
             // Update existing players — mark active/inactive based on registration
-            UpdateExistingPlayers(seen);
+            UpdateExistingPlayers(_seenSet);
         }
 
         /// <summary>
@@ -308,6 +304,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             // Collect active entries and prepare scatter reads (no delegates, no allocation)
             _activeEntries.Clear();
+            int transformReady = 0, rotationReady = 0;
             foreach (var kvp in _players)
             {
                 var entry = kvp.Value;
@@ -316,6 +313,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                 _activeEntries.Add(entry);
                 PrepareScatterReads(scatter, entry);
+
+                if (entry.TransformReady) transformReady++;
+                if (entry.RotationReady) rotationReady++;
             }
 
             if (_activeEntries.Count == 0)
@@ -329,6 +329,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             {
                 ProcessScatterResults(scatter, entry);
             }
+
+            // Periodic summary (every ~10s)
+            Log.WriteRateLimited(AppLogLevel.Info,
+                "realtime_summary", TimeSpan.FromSeconds(10),
+                $"[RealtimeWorker] Active={_activeEntries.Count}, transformReady={transformReady}, rotationReady={rotationReady}, total={_players.Count}");
         }
 
         #endregion
@@ -355,60 +360,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                     var now = DateTime.UtcNow;
 
-                    // Re-init transform if invalidated (with backoff — fast initial retries, then capped linear)
-                    if (!entry.TransformReady && entry.TransformInitFailures < MaxInitRetries && now >= entry.NextTransformRetry)
-                    {
-                        TryInitTransform(entry.Base, entry);
-                        if (!entry.TransformReady)
-                        {
-                            entry.TransformInitFailures++;
-                            // Fast initial retries (100ms, 200ms, 500ms), then linear cap at 2s
-                            double backoffSec = entry.TransformInitFailures switch
-                            {
-                                1 => 0.1,
-                                2 => 0.2,
-                                3 => 0.5,
-                                _ => Math.Min(entry.TransformInitFailures * 0.5, 2.0)
-                            };
-                            entry.NextTransformRetry = now.AddSeconds(backoffSec);
-                            Log.WriteRateLimited(AppLogLevel.Warning,
-                                $"reinit_tfm_{kvp.Key:X}", TimeSpan.FromSeconds(5),
-                                $"[RegisteredPlayers] Transform init failed for '{entry.Player.Name}' (attempt {entry.TransformInitFailures}/{MaxInitRetries}, next retry in {backoffSec}s)");
-                        }
-                        else
-                        {
-                            if (entry.TransformInitFailures > 0)
-                                Log.WriteLine($"[RegisteredPlayers] Transform re-init succeeded for '{entry.Player.Name}' after {entry.TransformInitFailures} failures");
-                            entry.TransformInitFailures = 0;
-                        }
-                    }
-
-                    // Re-init rotation if invalidated (with backoff — fast initial retries, then capped linear)
-                    if (!entry.RotationReady && entry.RotationInitFailures < MaxInitRetries && now >= entry.NextRotationRetry)
-                    {
-                        TryInitRotation(entry.Base, entry);
-                        if (!entry.RotationReady)
-                        {
-                            entry.RotationInitFailures++;
-                            double backoffSec = entry.RotationInitFailures switch
-                            {
-                                1 => 0.1,
-                                2 => 0.2,
-                                3 => 0.5,
-                                _ => Math.Min(entry.RotationInitFailures * 0.5, 2.0)
-                            };
-                            entry.NextRotationRetry = now.AddSeconds(backoffSec);
-                            Log.WriteRateLimited(AppLogLevel.Warning,
-                                $"reinit_rot_{kvp.Key:X}", TimeSpan.FromSeconds(5),
-                                $"[RegisteredPlayers] Rotation init failed for '{entry.Player.Name}' (attempt {entry.RotationInitFailures}/{MaxInitRetries}, next retry in {backoffSec}s)");
-                        }
-                        else
-                        {
-                            if (entry.RotationInitFailures > 0)
-                                Log.WriteLine($"[RegisteredPlayers] Rotation re-init succeeded for '{entry.Player.Name}' after {entry.RotationInitFailures} failures");
-                            entry.RotationInitFailures = 0;
-                        }
-                    }
+                    // Transform + rotation init/re-init is handled by BatchInitTransformsAndRotations()
+                    // which runs before UpdateExistingPlayers in the registration worker cycle.
 
                     // Gear refresh (rate-limited per player)
                     if (now >= entry.NextGearRefresh)

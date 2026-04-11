@@ -221,8 +221,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 return;
 
             // Always sort — data is rebuilt fresh every frame
-            bool asc = _sortDirection == ImGuiSortDirection.Ascending;
-            _sorted.Sort((a, b) =>
+            _sorted.Sort(static (a, b) =>
             {
                 int cmp = _sortColumnId switch
                 {
@@ -233,7 +232,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
                     4 => a.NearestDist.CompareTo(b.NearestDist),
                     _ => a.PricePerItem.CompareTo(b.PricePerItem),
                 };
-                return asc ? cmp : -cmp;
+                return _sortDirection == ImGuiSortDirection.Ascending ? cmp : -cmp;
             });
         }
 

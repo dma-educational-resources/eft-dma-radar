@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -22,7 +22,6 @@
     <!-- Embedded Resources (fonts + data) -->
     <ItemGroup>
         <EmbeddedResource Include="..\resources\NeoSansStdRegular.otf" />
-        <EmbeddedResource Include="..\resources\NeoSansStdMedium.otf" />
         <EmbeddedResource Include="..\resources\DEFAULT_DATA.json" />
     </ItemGroup>
 

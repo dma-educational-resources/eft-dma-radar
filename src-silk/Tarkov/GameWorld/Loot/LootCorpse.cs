@@ -59,6 +59,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             IsAntialias = true,
         };
 
+        // Cached label to avoid per-frame string allocation
+        private string? _cachedLabel;
+        private string? _cachedLabelName;
+        private int _cachedLabelValue = -1;
+
         public LootCorpse(ulong interactiveClass, Vector3 position)
         {
             InteractiveClass = interactiveClass;
@@ -81,14 +86,19 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             canvas.DrawPath(_xMarker, _xStroke);
             canvas.Restore();
 
-            // Name label
+            // Name label — cached to avoid per-frame allocation
             float lx = screenPos.X + 7;
             float ly = screenPos.Y + 4.5f;
 
-            string label = TotalValue > 0 ? $"{Name} ({LootFilter.FormatPrice(TotalValue)})" : Name;
+            if (_cachedLabel is null || _cachedLabelValue != TotalValue || _cachedLabelName != Name)
+            {
+                _cachedLabelName = Name;
+                _cachedLabelValue = TotalValue;
+                _cachedLabel = TotalValue > 0 ? $"{Name} ({LootFilter.FormatPrice(TotalValue)})" : Name;
+            }
 
-            canvas.DrawText(label, lx + 1, ly + 1, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.LootShadow);
-            canvas.DrawText(label, lx, ly, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.TextCorpse);
+            canvas.DrawText(_cachedLabel, lx + 1, ly + 1, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.LootShadow);
+            canvas.DrawText(_cachedLabel, lx, ly, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.TextCorpse);
         }
     }
 

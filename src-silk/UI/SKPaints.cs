@@ -8,9 +8,7 @@ namespace eft_dma_radar.Silk.UI
     {
         #region Fonts
 
-        public static SKFont FontRegular12 { get; } = new(CustomFonts.Regular, 12) { Subpixel = true };
         public static SKFont FontRegular11 { get; } = new(CustomFonts.Regular, 11) { Subpixel = true };
-        public static SKFont FontMedium11 { get; } = new(CustomFonts.Medium, 11) { Subpixel = true };
         public static SKFont FontRegular48 { get; } = new(CustomFonts.Regular, 48) { Subpixel = true };
 
         #endregion
@@ -140,6 +138,30 @@ namespace eft_dma_radar.Silk.UI
         /// <summary>Exfil inactive (not available for player) — dimmed grey.</summary>
         public static SKPaint PaintExfilInactive { get; } = NewFillPaint(new SKColor(120, 120, 120, 120));
         public static SKPaint TextExfilInactive { get; } = NewTextPaint(new SKColor(120, 120, 120, 120));
+
+        #endregion
+
+        #region Door Paints
+
+        /// <summary>Locked door — red.</summary>
+        public static SKPaint PaintDoorLocked { get; } = NewFillPaint(new SKColor(220, 60, 60));
+        public static SKPaint TextDoorLocked { get; } = NewTextPaint(new SKColor(220, 60, 60));
+
+        /// <summary>Open door — green.</summary>
+        public static SKPaint PaintDoorOpen { get; } = NewFillPaint(new SKColor(60, 200, 60));
+        public static SKPaint TextDoorOpen { get; } = NewTextPaint(new SKColor(60, 200, 60));
+
+        /// <summary>Shut (closed but unlocked) door — orange.</summary>
+        public static SKPaint PaintDoorShut { get; } = NewFillPaint(new SKColor(240, 165, 30));
+        public static SKPaint TextDoorShut { get; } = NewTextPaint(new SKColor(240, 165, 30));
+
+        /// <summary>Someone is interacting with the door.</summary>
+        public static SKPaint PaintDoorInteracting { get; } = NewFillPaint(new SKColor(255, 215, 0));
+        public static SKPaint TextDoorInteracting { get; } = NewTextPaint(new SKColor(255, 215, 0));
+
+        /// <summary>Door is being breached.</summary>
+        public static SKPaint PaintDoorBreaching { get; } = NewFillPaint(new SKColor(255, 100, 100));
+        public static SKPaint TextDoorBreaching { get; } = NewTextPaint(new SKColor(255, 100, 100));
 
         #endregion
 

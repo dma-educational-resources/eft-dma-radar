@@ -33,9 +33,5 @@ namespace eft_dma_radar.Silk.Misc.Data
         /// <summary>Number of grid slots (at least 1).</summary>
         [JsonIgnore]
         public int GridCount => Slots < 1 ? 1 : Slots;
-
-        /// <summary>Check whether this item belongs to the given category.</summary>
-        public bool HasCategory(string category) =>
-            Array.Exists(Categories, c => c.Equals(category, StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -12,6 +12,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
 
         // Reusable list — avoids per-frame allocation
         private static readonly List<Player> _hostilePlayers = new(32);
+        private static Vector3 _sortOrigin;
 
         /// <summary>Whether the player info widget is open.</summary>
         public static bool IsOpen { get; set; } = true;
@@ -59,8 +60,9 @@ namespace eft_dma_radar.Silk.UI.Widgets
                     _hostilePlayers.Add(p);
             }
 
-            _hostilePlayers.Sort((a, b) =>
-                Vector3.DistanceSquared(localPos, a.Position).CompareTo(Vector3.DistanceSquared(localPos, b.Position)));
+            _sortOrigin = localPos;
+            _hostilePlayers.Sort(static (a, b) =>
+                Vector3.DistanceSquared(_sortOrigin, a.Position).CompareTo(Vector3.DistanceSquared(_sortOrigin, b.Position)));
 
             ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f),
                 $"PMC: {pmcCount}  PScav: {pscavCount}  AI: {aiCount}  Boss: {bossCount}");

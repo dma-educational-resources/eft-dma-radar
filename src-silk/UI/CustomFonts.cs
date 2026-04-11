@@ -6,12 +6,10 @@ namespace eft_dma_radar.Silk.UI
     internal static class CustomFonts
     {
         public static SKTypeface Regular { get; }
-        public static SKTypeface Medium { get; }
 
         static CustomFonts()
         {
             Regular = LoadFont("eft_dma_radar.Silk.NeoSansStdRegular.otf");
-            Medium = LoadFont("eft_dma_radar.Silk.NeoSansStdMedium.otf");
         }
 
         private static SKTypeface LoadFont(string resourceName)

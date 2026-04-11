@@ -64,7 +64,7 @@ namespace SDK
         }
         public readonly partial struct WorldController
         {
-            public static uint Interactables = 0x28;
+            public static uint Interactables = 0x30;
         }
         public readonly partial struct Interactable
         {

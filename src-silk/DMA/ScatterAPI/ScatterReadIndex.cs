@@ -8,7 +8,6 @@ namespace eft_dma_radar.Silk.DMA.ScatterAPI
     public sealed class ScatterReadIndex : IPooledObject<ScatterReadIndex>
     {
         internal Dictionary<int, IScatterEntry> Entries { get; } = new();
-        public int EntryCount => Entries.Count;
         public Action<ScatterReadIndex>? Callbacks { get; set; }
 
         [Obsolete("Rent via IPooledObject<ScatterReadIndex>.Rent().")]
@@ -36,13 +35,6 @@ namespace eft_dma_radar.Silk.DMA.ScatterAPI
             }
             result = default!;
             return false;
-        }
-
-        public ref TOut GetRef<TOut>(int id)
-        {
-            if (Entries.TryGetValue(id, out var e) && e is ScatterReadEntry<TOut> typed && !typed.IsFailed)
-                return ref typed.Result;
-            return ref Unsafe.NullRef<TOut>();
         }
 
         public void Dispose() => IPooledObject<ScatterReadIndex>.Return(this);

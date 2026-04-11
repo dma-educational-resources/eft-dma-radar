@@ -22,8 +22,8 @@ namespace eft_dma_radar.Silk.UI.Panels
         public static void Draw()
         {
             bool isOpen = IsOpen;
-            ImGui.SetNextWindowSize(new Vector2(380, 400), ImGuiCond.FirstUseEver);
-            if (!ImGui.Begin("Loot Filters", ref isOpen))
+            ImGui.SetNextWindowSize(new Vector2(400, 420), ImGuiCond.FirstUseEver);
+            if (!ImGui.Begin("\u25a3 Loot Filters", ref isOpen, ImGuiWindowFlags.NoCollapse))
             {
                 IsOpen = isOpen;
                 ImGui.End();
@@ -32,6 +32,7 @@ namespace eft_dma_radar.Silk.UI.Panels
             IsOpen = isOpen;
 
             DrawStatusBar();
+            ImGui.Spacing();
             DrawSearchSection();
             DrawPriceSection();
             DrawOptionsSection();
@@ -160,17 +161,22 @@ namespace eft_dma_radar.Silk.UI.Panels
 
         private static void DrawFooter()
         {
+            ImGui.Spacing();
             ImGui.Separator();
+            ImGui.Spacing();
 
-            if (ImGui.Button("Reset Defaults"))
+            if (ImGui.Button("\u21ba Reset Defaults"))
                 LootFilter.ResetAll();
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Reset all loot filter settings to defaults");
 
             ImGui.SameLine();
 
-            if (ImGui.Button("Save Config"))
+            if (ImGui.Button("\u2713 Save Config"))
+            {
                 Config.Save();
+                RadarWindow.NotifyConfigSaved();
+            }
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Save current settings to disk");
         }

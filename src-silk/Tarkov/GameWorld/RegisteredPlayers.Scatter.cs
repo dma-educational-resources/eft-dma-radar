@@ -154,6 +154,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             if (x < 0f) x += 360f;
 
             entry.Player.RotationYaw = x;
+            entry.Player.RotationPitch = rotation.Y;
             return true;
         }
 
@@ -214,6 +215,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// Uses a two-round scatter pattern for validation.
         /// Round 1: read Hierarchy ptr from TransformInternal.
         /// Round 2: read VerticesAddr from Hierarchy — compare with cached value.
+        /// On change: uses fast re-init from cached TransformInternal (skips first 6 hops).
         /// </summary>
         internal void ValidateTransforms()
         {
@@ -264,11 +266,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 if (round2.ReadValue<ulong>(hierarchy + TransformHierarchy.VerticesOffset, out var verticesPtr)
                     && verticesPtr != entry.VerticesAddr)
                 {
-                    Log.WriteLine($"[RegisteredPlayers] Transform changed for '{entry.Player.Name}' — re-initializing");
-                    entry.TransformReady = false;
-                    entry.TransformInitFailures = 0;
-                    entry.NextTransformRetry = default;
-                    TryInitTransform(entry.Base, entry);
+                    // Fast re-init: TransformInternal is stable — only Hierarchy→Vertices/Indices changed.
+                    // This saves 6 DMA reads vs full TryInitTransform (which re-walks from playerBase).
+                    if (TryReinitFromTransformInternal(entry))
+                    {
+                        Log.WriteLine($"[RegisteredPlayers] Transform changed for '{entry.Player.Name}' — fast re-init OK (verts 0x{entry.VerticesAddr:X})");
+                    }
+                    else
+                    {
+                        // Fast path failed — fall back to full re-init
+                        Log.WriteLine($"[RegisteredPlayers] Transform changed for '{entry.Player.Name}' — fast re-init failed, full re-init");
+                        entry.TransformReady = false;
+                        entry.TransformInitFailures = 0;
+                        entry.NextTransformRetry = default;
+                        TryInitTransform(entry.Base, entry);
+                    }
                 }
             }
         }
@@ -355,6 +367,51 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         }
 
         /// <summary>
+        /// Fast re-init path: re-reads Hierarchy → Vertices/Indices from a cached TransformInternal
+        /// pointer. Saves 6 DMA reads vs full TryInitTransform. Used when ValidateTransforms detects
+        /// a vertices change but TransformInternal itself is still valid.
+        /// </summary>
+        private static bool TryReinitFromTransformInternal(PlayerEntry entry)
+        {
+            try
+            {
+                var ti = entry.TransformInternal;
+                if (ti == 0)
+                    return false;
+
+                var taIndex = Memory.ReadValue<int>(ti + TransformAccess.IndexOffset, false);
+                var taHierarchy = Memory.ReadPtr(ti + TransformAccess.HierarchyOffset, false);
+
+                if (taIndex < 0 || taIndex > 128_000 || !taHierarchy.IsValidVirtualAddress())
+                    return false;
+
+                var verticesAddr = Memory.ReadPtr(taHierarchy + TransformHierarchy.VerticesOffset, false);
+                var indicesAddr = Memory.ReadPtr(taHierarchy + TransformHierarchy.IndicesOffset, false);
+
+                if (!verticesAddr.IsValidVirtualAddress() || !indicesAddr.IsValidVirtualAddress())
+                    return false;
+
+                int count = taIndex + 1;
+                var indices = Memory.ReadArray<int>(indicesAddr, count, false);
+                var testVertices = Memory.ReadArray<TrsX>(verticesAddr, count, false);
+
+                if (testVertices is null || !TestPositionCompute(taIndex, indices, testVertices))
+                    return false;
+
+                // Commit — TransformInternal stays the same, only refresh downstream data
+                entry.TransformIndex = taIndex;
+                entry.VerticesAddr = verticesAddr;
+                entry.CachedIndices = indices;
+                entry.TransformReady = true;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Tests whether vertex data produces a valid world position (no side effects).
         /// Used during TryInitTransform to verify game data is actually populated.
         /// </summary>
@@ -423,6 +480,635 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             {
                 Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitRotation FAILED '{entry.Player.Name}' 0x{playerBase:X}: {ex.Message}");
                 entry.RotationReady = false;
+            }
+        }
+
+        #endregion
+
+        #region Batched Init (Scatter)
+
+        /// <summary>
+        /// Reusable list for collecting entries that need transform/rotation init.
+        /// Avoids per-call allocation in the registration worker loop.
+        /// </summary>
+        private readonly List<PlayerEntry> _batchInitEntries = new(MaxPlayerCount);
+
+        // Reusable buffers for BatchInitTransforms — avoids 11 heap arrays per call
+        private ulong[] _btiBodyPtrs = [];
+        private ulong[] _btiSkelPtrs = [];
+        private ulong[] _btiDizValuesPtrs = [];
+        private ulong[] _btiArrPtrs = [];
+        private ulong[] _btiBonePtrs = [];
+        private ulong[] _btiTransformInternals = [];
+        private int[] _btiTaIndices = [];
+        private ulong[] _btiHierarchyPtrs = [];
+        private ulong[] _btiVerticesPtrs = [];
+        private ulong[] _btiIndicesPtrs = [];
+        private bool[] _btiValid = [];
+
+        // Reusable buffers for BatchInitRotations — avoids 5 heap arrays per call
+        private ulong[] _birOpcPtrs = [];
+        private ulong[] _birMcStep1 = [];
+        private ulong[] _birMcFinal = [];
+        private ulong[] _birRotAddrs = [];
+        private bool[] _birValid = [];
+
+        /// <summary>
+        /// Ensures a reusable array is at least <paramref name="minLength"/> long, then clears it.
+        /// Only reallocates when the buffer is too small — amortized zero-alloc.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void EnsureBuffer(ref ulong[] buffer, int minLength)
+        {
+            if (buffer.Length < minLength)
+                buffer = new ulong[minLength];
+            else
+                Array.Clear(buffer, 0, minLength);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void EnsureBuffer(ref int[] buffer, int minLength)
+        {
+            if (buffer.Length < minLength)
+                buffer = new int[minLength];
+            else
+                Array.Clear(buffer, 0, minLength);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void EnsureBuffer(ref bool[] buffer, int minLength, bool fillValue = false)
+        {
+            if (buffer.Length < minLength)
+                buffer = new bool[minLength];
+            if (fillValue)
+                Array.Fill(buffer, true, 0, minLength);
+            else
+                Array.Clear(buffer, 0, minLength);
+        }
+
+        /// <summary>
+        /// Batched scatter-based initialization of transforms and rotations for all entries
+        /// that need it. Replaces per-player serial <see cref="TryInitTransform"/> calls
+        /// (N × 8 serial DMA reads) with 8 scatter rounds (batching all players in each round).
+        /// <para>
+        /// Called from the registration worker thread after player discovery and before
+        /// <see cref="UpdateExistingPlayers"/>. Handles both new entries (failures=0) and
+        /// retries (with exponential backoff).
+        /// </para>
+        /// </summary>
+        private void BatchInitTransformsAndRotations()
+        {
+            var now = DateTime.UtcNow;
+            long swStart = Stopwatch.GetTimestamp();
+
+            // Count totals for summary
+            int totalPlayers = _players.Count;
+            int alreadyTransformReady = 0;
+            int alreadyRotationReady = 0;
+            int transformMaxedOut = 0;
+            int rotationMaxedOut = 0;
+
+            // Collect entries needing transform init
+            _batchInitEntries.Clear();
+            foreach (var kvp in _players)
+            {
+                var entry = kvp.Value;
+                if (entry.TransformReady)
+                    alreadyTransformReady++;
+                else if (entry.TransformInitFailures >= MaxInitRetries)
+                    transformMaxedOut++;
+                else if (now >= entry.NextTransformRetry)
+                    _batchInitEntries.Add(entry);
+            }
+
+            int transformCandidates = _batchInitEntries.Count;
+            int transformSucceeded = 0;
+
+            if (_batchInitEntries.Count > 0)
+            {
+                if (_batchInitEntries.Count == 1)
+                {
+                    // Single entry — use the serial path (no scatter overhead)
+                    var e = _batchInitEntries[0];
+                    TryInitTransform(e.Base, e);
+                    UpdateInitBackoff(e, e.TransformReady, isTransform: true, now);
+                    if (e.TransformReady) transformSucceeded = 1;
+                }
+                else
+                {
+                    BatchInitTransforms(_batchInitEntries, now);
+                    foreach (var e in _batchInitEntries)
+                        if (e.TransformReady) transformSucceeded++;
+                }
+            }
+
+            // Collect entries needing rotation init
+            _batchInitEntries.Clear();
+            foreach (var kvp in _players)
+            {
+                var entry = kvp.Value;
+                if (entry.RotationReady)
+                    alreadyRotationReady++;
+                else if (entry.RotationInitFailures >= MaxInitRetries)
+                    rotationMaxedOut++;
+                else if (now >= entry.NextRotationRetry)
+                    _batchInitEntries.Add(entry);
+            }
+
+            int rotationCandidates = _batchInitEntries.Count;
+            int rotationSucceeded = 0;
+
+            if (_batchInitEntries.Count > 0)
+            {
+                if (_batchInitEntries.Count == 1)
+                {
+                    var e = _batchInitEntries[0];
+                    TryInitRotation(e.Base, e);
+                    UpdateInitBackoff(e, e.RotationReady, isTransform: false, now);
+                    if (e.RotationReady) rotationSucceeded = 1;
+                }
+                else
+                {
+                    BatchInitRotations(_batchInitEntries, now);
+                    foreach (var e in _batchInitEntries)
+                        if (e.RotationReady) rotationSucceeded++;
+                }
+            }
+
+            // Assign spawn-groups for newly initialized human players
+            foreach (var kvp in _players)
+            {
+                var entry = kvp.Value;
+                if (entry.TransformReady && entry.Player.IsHuman
+                    && entry.Player.SpawnGroupID == -1 && !entry.Player.IsLocalPlayer)
+                {
+                    entry.Player.SpawnGroupID = GetOrAssignSpawnGroup(entry.Player.Position);
+                }
+            }
+
+            // Always-visible summary when there was work to do
+            var elapsed = Stopwatch.GetElapsedTime(swStart);
+            if (transformCandidates > 0 || rotationCandidates > 0)
+            {
+                Log.WriteLine($"[RegisteredPlayers] BatchInit: {totalPlayers} players, " +
+                    $"transform({transformCandidates} candidates, {transformSucceeded} OK, {alreadyTransformReady} already, {transformMaxedOut} maxed), " +
+                    $"rotation({rotationCandidates} candidates, {rotationSucceeded} OK, {alreadyRotationReady} already, {rotationMaxedOut} maxed), " +
+                    $"elapsed={elapsed.TotalMilliseconds:F1}ms");
+            }
+        }
+
+        /// <summary>Counts <c>true</c> values in a bool span — avoids LINQ delegate allocation.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int CountTrue(bool[] arr, int length)
+        {
+            int c = 0;
+            for (int i = 0; i < length; i++)
+                if (arr[i]) c++;
+            return c;
+        }
+
+        /// <summary>
+        /// Scatter-batched transform initialization for multiple entries.
+        /// Walks the 8-hop pointer chain across all entries simultaneously using VmmScatter rounds.
+        /// </summary>
+        private void BatchInitTransforms(List<PlayerEntry> entries, DateTime now)
+        {
+            int n = entries.Count;
+
+            // Reuse pre-allocated buffers — only reallocates when player count grows
+            EnsureBuffer(ref _btiBodyPtrs, n);
+            EnsureBuffer(ref _btiSkelPtrs, n);
+            EnsureBuffer(ref _btiDizValuesPtrs, n);
+            EnsureBuffer(ref _btiArrPtrs, n);
+            EnsureBuffer(ref _btiBonePtrs, n);
+            EnsureBuffer(ref _btiTransformInternals, n);
+            EnsureBuffer(ref _btiTaIndices, n);
+            EnsureBuffer(ref _btiHierarchyPtrs, n);
+            EnsureBuffer(ref _btiVerticesPtrs, n);
+            EnsureBuffer(ref _btiIndicesPtrs, n);
+            EnsureBuffer(ref _btiValid, n, fillValue: true);
+
+            var bodyPtrs = _btiBodyPtrs;
+            var skelPtrs = _btiSkelPtrs;
+            var dizValuesPtrs = _btiDizValuesPtrs;
+            var arrPtrs = _btiArrPtrs;
+            var bonePtrs = _btiBonePtrs;
+            var transformInternals = _btiTransformInternals;
+            var taIndices = _btiTaIndices;
+            var hierarchyPtrs = _btiHierarchyPtrs;
+            var verticesPtrs = _btiVerticesPtrs;
+            var indicesPtrs = _btiIndicesPtrs;
+            var valid = _btiValid;
+
+            int validCount;
+
+            // Round 1: Read PlayerBody
+            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    var entry = entries[i];
+                    uint bodyOffset = entry.IsObserved
+                        ? Offsets.ObservedPlayerView.PlayerBody
+                        : Offsets.Player._playerBody;
+                    scatter.PrepareReadValue<ulong>(entry.Base + bodyOffset);
+                }
+                scatter.Execute();
+                for (int i = 0; i < n; i++)
+                {
+                    var entry = entries[i];
+                    uint bodyOffset = entry.IsObserved
+                        ? Offsets.ObservedPlayerView.PlayerBody
+                        : Offsets.Player._playerBody;
+                    if (scatter.ReadValue<ulong>(entry.Base + bodyOffset, out var body) && body.IsValidVirtualAddress())
+                        bodyPtrs[i] = body;
+                    else
+                        valid[i] = false;
+                }
+            }
+            validCount = CountTrue(valid, n);
+            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R1 (PlayerBody): {validCount}/{n} valid");
+
+            // Round 2: Read SkeletonRootJoint
+            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < n; i++)
+                    if (valid[i]) scatter.PrepareReadValue<ulong>(bodyPtrs[i] + Offsets.PlayerBody.SkeletonRootJoint);
+                scatter.Execute();
+                for (int i = 0; i < n; i++)
+                {
+                    if (!valid[i]) continue;
+                    if (scatter.ReadValue<ulong>(bodyPtrs[i] + Offsets.PlayerBody.SkeletonRootJoint, out var skel) && skel.IsValidVirtualAddress())
+                        skelPtrs[i] = skel;
+                    else
+                        valid[i] = false;
+                }
+            }
+            validCount = CountTrue(valid, n);
+            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R2 (SkeletonRootJoint): {validCount}/{n} valid");
+
+            // Round 3: Read _values
+            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < n; i++)
+                    if (valid[i]) scatter.PrepareReadValue<ulong>(skelPtrs[i] + Offsets.DizSkinningSkeleton._values);
+                scatter.Execute();
+                for (int i = 0; i < n; i++)
+                {
+                    if (!valid[i]) continue;
+                    if (scatter.ReadValue<ulong>(skelPtrs[i] + Offsets.DizSkinningSkeleton._values, out var diz) && diz.IsValidVirtualAddress())
+                        dizValuesPtrs[i] = diz;
+                    else
+                        valid[i] = false;
+                }
+            }
+            validCount = CountTrue(valid, n);
+            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R3 (_values): {validCount}/{n} valid");
+
+            // Round 4: Read arr (List backing array)
+            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < n; i++)
+                    if (valid[i]) scatter.PrepareReadValue<ulong>(dizValuesPtrs[i] + List.ArrOffset);
+                scatter.Execute();
+                for (int i = 0; i < n; i++)
+                {
+                    if (!valid[i]) continue;
+                    if (scatter.ReadValue<ulong>(dizValuesPtrs[i] + List.ArrOffset, out var arr) && arr.IsValidVirtualAddress())
+                        arrPtrs[i] = arr;
+                    else
+                        valid[i] = false;
+                }
+            }
+            validCount = CountTrue(valid, n);
+            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R4 (ListArr): {validCount}/{n} valid");
+
+            // Round 5: Read bone[0] entry pointer
+            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < n; i++)
+                    if (valid[i]) scatter.PrepareReadValue<ulong>(arrPtrs[i] + List.ArrStartOffset);
+                scatter.Execute();
+                for (int i = 0; i < n; i++)
+                {
+                    if (!valid[i]) continue;
+                    if (scatter.ReadValue<ulong>(arrPtrs[i] + List.ArrStartOffset, out var bone) && bone.IsValidVirtualAddress())
+                        bonePtrs[i] = bone;
+                    else
+                        valid[i] = false;
+                }
+            }
+            validCount = CountTrue(valid, n);
+            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R5 (Bone0): {validCount}/{n} valid");
+
+            // Round 6: Read TransformInternal from bone entry
+            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < n; i++)
+                    if (valid[i]) scatter.PrepareReadValue<ulong>(bonePtrs[i] + 0x10);
+                scatter.Execute();
+                for (int i = 0; i < n; i++)
+                {
+                    if (!valid[i]) continue;
+                    if (scatter.ReadValue<ulong>(bonePtrs[i] + 0x10, out var ti) && ti.IsValidVirtualAddress())
+                        transformInternals[i] = ti;
+                    else
+                        valid[i] = false;
+                }
+            }
+            validCount = CountTrue(valid, n);
+            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R6 (TransformInternal): {validCount}/{n} valid");
+
+            // Round 7: Read taIndex + taHierarchy from TransformInternal (both from same base)
+            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    if (!valid[i]) continue;
+                    scatter.PrepareReadValue<int>(transformInternals[i] + TransformAccess.IndexOffset);
+                    scatter.PrepareReadValue<ulong>(transformInternals[i] + TransformAccess.HierarchyOffset);
+                }
+                scatter.Execute();
+                for (int i = 0; i < n; i++)
+                {
+                    if (!valid[i]) continue;
+                    bool idxOk = scatter.ReadValue<int>(transformInternals[i] + TransformAccess.IndexOffset, out var idx);
+                    bool hierOk = scatter.ReadValue<ulong>(transformInternals[i] + TransformAccess.HierarchyOffset, out var hier);
+
+                    if (idxOk && hierOk && idx >= 0 && idx <= 128_000 && hier.IsValidVirtualAddress())
+                    {
+                        taIndices[i] = idx;
+                        hierarchyPtrs[i] = hier;
+                    }
+                    else
+                    {
+                        valid[i] = false;
+                    }
+                }
+            }
+            validCount = CountTrue(valid, n);
+            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R7 (Index+Hierarchy): {validCount}/{n} valid");
+
+            // Round 8: Read vertices + indices from hierarchy (both from same base)
+            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    if (!valid[i]) continue;
+                    scatter.PrepareReadValue<ulong>(hierarchyPtrs[i] + TransformHierarchy.VerticesOffset);
+                    scatter.PrepareReadValue<ulong>(hierarchyPtrs[i] + TransformHierarchy.IndicesOffset);
+                }
+                scatter.Execute();
+                for (int i = 0; i < n; i++)
+                {
+                    if (!valid[i]) continue;
+                    bool vOk = scatter.ReadValue<ulong>(hierarchyPtrs[i] + TransformHierarchy.VerticesOffset, out var verts);
+                    bool iOk = scatter.ReadValue<ulong>(hierarchyPtrs[i] + TransformHierarchy.IndicesOffset, out var inds);
+
+                    if (vOk && iOk && verts.IsValidVirtualAddress() && inds.IsValidVirtualAddress())
+                    {
+                        verticesPtrs[i] = verts;
+                        indicesPtrs[i] = inds;
+                    }
+                    else
+                    {
+                        valid[i] = false;
+                    }
+                }
+            }
+            validCount = CountTrue(valid, n);
+            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransforms R8 (Vertices+Indices): {validCount}/{n} valid");
+
+            // Final: read indices array + test vertex data for each valid entry (serial per entry — variable size)
+            for (int i = 0; i < n; i++)
+            {
+                var entry = entries[i];
+                if (!valid[i])
+                {
+                    UpdateInitBackoff(entry, success: false, isTransform: true, now);
+                    continue;
+                }
+
+                try
+                {
+                    int count = taIndices[i] + 1;
+                    var indices = Memory.ReadArray<int>(indicesPtrs[i], count, false);
+                    var testVertices = Memory.ReadArray<TrsX>(verticesPtrs[i], count, false);
+
+                    if (testVertices is null || !TestPositionCompute(taIndices[i], indices, testVertices))
+                    {
+                        Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransform '{entry.Player.Name}': " +
+                            $"pointer chain OK but vertex data not ready (idx={taIndices[i]}, verts=0x{verticesPtrs[i]:X})");
+                        UpdateInitBackoff(entry, success: false, isTransform: true, now);
+                        continue;
+                    }
+
+                    entry.TransformInternal = transformInternals[i];
+                    entry.TransformIndex = taIndices[i];
+                    entry.VerticesAddr = verticesPtrs[i];
+                    entry.CachedIndices = indices;
+                    entry.TransformReady = true;
+
+                    if (entry.TransformInitFailures > 0)
+                        Log.WriteLine($"[RegisteredPlayers] BatchInitTransform OK '{entry.Player.Name}' after {entry.TransformInitFailures} prior failures");
+                    entry.TransformInitFailures = 0;
+
+                    Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransform OK '{entry.Player.Name}': " +
+                        $"transformInternal=0x{transformInternals[i]:X}, idx={taIndices[i]}, verts=0x{verticesPtrs[i]:X}");
+                }
+                catch
+                {
+                    UpdateInitBackoff(entry, success: false, isTransform: true, now);
+                }
+            }
+
+            int finalOk = 0;
+            int chainOkButVertexFail = 0;
+            for (int i2 = 0; i2 < n; i2++)
+            {
+                if (entries[i2].TransformReady) finalOk++;
+                if (valid[i2] && !entries[i2].TransformReady) chainOkButVertexFail++;
+            }
+            Log.WriteLine($"[RegisteredPlayers] BatchInitTransforms DONE: {n} entries, {finalOk} succeeded, " +
+                $"{n - validCount} chain-failed, {chainOkButVertexFail} chain-ok-but-vertex-fail");
+        }
+
+        /// <summary>
+        /// Scatter-batched rotation initialization for multiple entries.
+        /// Observed: OPC → MovementController chain → rotation addr (3 hops).
+        /// Client: MovementContext → rotation addr (1 hop).
+        /// </summary>
+        private void BatchInitRotations(List<PlayerEntry> entries, DateTime now)
+        {
+            int n = entries.Count;
+
+            // Reuse pre-allocated buffers — only reallocates when player count grows
+            EnsureBuffer(ref _birOpcPtrs, n);
+            EnsureBuffer(ref _birMcStep1, n);
+            EnsureBuffer(ref _birMcFinal, n);
+            EnsureBuffer(ref _birRotAddrs, n);
+            EnsureBuffer(ref _birValid, n, fillValue: true);
+
+            var opcPtrs = _birOpcPtrs;       // Observed: OPC; Client: MovementContext
+            var mcStep1 = _birMcStep1;       // Observed: OPC+0xD8; Client: unused
+            var mcFinal = _birMcFinal;       // Observed: step1+0x98; Client: unused
+            var rotAddrs = _birRotAddrs;
+            var valid = _birValid;
+
+            int rValidCount;
+
+            // Round 1: Read OPC (observed) or MovementContext (client)
+            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    var entry = entries[i];
+                    uint offset = entry.IsObserved
+                        ? Offsets.ObservedPlayerView.ObservedPlayerController
+                        : Offsets.Player.MovementContext;
+                    scatter.PrepareReadValue<ulong>(entry.Base + offset);
+                }
+                scatter.Execute();
+                for (int i = 0; i < n; i++)
+                {
+                    var entry = entries[i];
+                    uint offset = entry.IsObserved
+                        ? Offsets.ObservedPlayerView.ObservedPlayerController
+                        : Offsets.Player.MovementContext;
+                    if (scatter.ReadValue<ulong>(entry.Base + offset, out var ptr) && ptr.IsValidVirtualAddress())
+                    {
+                        opcPtrs[i] = ptr;
+                        // Client players are done — rotation addr is MovementContext + _rotation
+                        if (!entry.IsObserved)
+                            rotAddrs[i] = ptr + Offsets.MovementContext._rotation;
+                    }
+                    else
+                    {
+                        valid[i] = false;
+                    }
+                }
+            }
+            rValidCount = CountTrue(valid, n);
+            Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitRotations R1 (OPC/MovCtx): {rValidCount}/{n} valid");
+
+            // Round 2: Observed only — read MovementController step 1 (OPC + 0xD8)
+            bool anyObserved = false;
+            for (int i = 0; i < n; i++)
+                if (valid[i] && entries[i].IsObserved) { anyObserved = true; break; }
+
+            if (anyObserved)
+            {
+                using var scatter = Memory.GetScatter(VmmFlags.NOCACHE);
+                for (int i = 0; i < n; i++)
+                    if (valid[i] && entries[i].IsObserved)
+                        scatter.PrepareReadValue<ulong>(opcPtrs[i] + Offsets.ObservedPlayerController.MovementController[0]);
+                scatter.Execute();
+                for (int i = 0; i < n; i++)
+                {
+                    if (!valid[i] || !entries[i].IsObserved) continue;
+                    if (scatter.ReadValue<ulong>(opcPtrs[i] + Offsets.ObservedPlayerController.MovementController[0], out var mc1) && mc1.IsValidVirtualAddress())
+                        mcStep1[i] = mc1;
+                    else
+                        valid[i] = false;
+                }
+                rValidCount = CountTrue(valid, n);
+                Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitRotations R2 (MC step1): {rValidCount}/{n} valid");
+
+                // Round 3: Observed only — read MovementController step 2 (step1 + 0x98)
+                using var scatter2 = Memory.GetScatter(VmmFlags.NOCACHE);
+                for (int i = 0; i < n; i++)
+                    if (valid[i] && entries[i].IsObserved)
+                        scatter2.PrepareReadValue<ulong>(mcStep1[i] + Offsets.ObservedPlayerController.MovementController[1]);
+                scatter2.Execute();
+                for (int i = 0; i < n; i++)
+                {
+                    if (!valid[i] || !entries[i].IsObserved) continue;
+                    if (scatter2.ReadValue<ulong>(mcStep1[i] + Offsets.ObservedPlayerController.MovementController[1], out var mc2) && mc2.IsValidVirtualAddress())
+                    {
+                        mcFinal[i] = mc2;
+                        rotAddrs[i] = mc2 + Offsets.ObservedMovementController.Rotation;
+                    }
+                    else
+                    {
+                        valid[i] = false;
+                    }
+                }
+                rValidCount = CountTrue(valid, n);
+                Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitRotations R3 (MC step2): {rValidCount}/{n} valid");
+            }
+
+            // Final round: Read rotation value to validate it's sane
+            using (var scatter = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < n; i++)
+                    if (valid[i]) scatter.PrepareReadValue<Vector2>(rotAddrs[i]);
+                scatter.Execute();
+                for (int i = 0; i < n; i++)
+                {
+                    var entry = entries[i];
+                    if (!valid[i])
+                    {
+                        UpdateInitBackoff(entry, success: false, isTransform: false, now);
+                        continue;
+                    }
+
+                    if (scatter.ReadValue<Vector2>(rotAddrs[i], out var rot)
+                        && float.IsFinite(rot.X) && float.IsFinite(rot.Y))
+                    {
+                        entry.RotationAddr = rotAddrs[i];
+                        entry.RotationReady = true;
+
+                        if (entry.RotationInitFailures > 0)
+                            Log.WriteLine($"[RegisteredPlayers] BatchInitRotation OK '{entry.Player.Name}' after {entry.RotationInitFailures} prior failures");
+                        entry.RotationInitFailures = 0;
+
+                        Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitRotation OK '{entry.Player.Name}': " +
+                            $"rotAddr=0x{rotAddrs[i]:X}, rot=({rot.X:F1}, {rot.Y:F1})");
+                    }
+                    else
+                    {
+                        UpdateInitBackoff(entry, success: false, isTransform: false, now);
+                    }
+                }
+            }
+
+            int rotOk = 0;
+            for (int i = 0; i < n; i++)
+                if (entries[i].RotationReady) rotOk++;
+            Log.WriteLine($"[RegisteredPlayers] BatchInitRotations DONE: {n} entries, {rotOk} succeeded");
+        }
+
+        /// <summary>
+        /// Updates backoff state for a failed init attempt (shared by batch and serial paths).
+        /// </summary>
+        private static void UpdateInitBackoff(PlayerEntry entry, bool success, bool isTransform, DateTime now)
+        {
+            if (success)
+                return;
+
+            if (isTransform)
+            {
+                entry.TransformInitFailures++;
+                double backoffSec = entry.TransformInitFailures switch
+                {
+                    1 => 0.1,
+                    2 => 0.2,
+                    3 => 0.5,
+                    _ => Math.Min(entry.TransformInitFailures * 0.5, 2.0)
+                };
+                entry.NextTransformRetry = now.AddSeconds(backoffSec);
+            }
+            else
+            {
+                entry.RotationInitFailures++;
+                double backoffSec = entry.RotationInitFailures switch
+                {
+                    1 => 0.1,
+                    2 => 0.2,
+                    3 => 0.5,
+                    _ => Math.Min(entry.RotationInitFailures * 0.5, 2.0)
+                };
+                entry.NextRotationRetry = now.AddSeconds(backoffSec);
             }
         }
 

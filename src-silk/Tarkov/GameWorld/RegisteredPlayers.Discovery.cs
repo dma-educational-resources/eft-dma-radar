@@ -1,5 +1,4 @@
 using eft_dma_radar.Silk.Tarkov.Unity;
-using eft_dma_radar.Silk.Tarkov.Unity.IL2CPP;
 using System.Collections.Frozen;
 using static eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets;
 using static SDK.Offsets;
@@ -20,7 +19,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             try
             {
                 var className = ReadClassName(playerBase);
-                //Il2CppDumper.DumpClassFields(playerBase, $"className ({className})");
                 bool isObserved = !isLocal && className is not (null or "ClientPlayer" or "LocalPlayer");
 
                 Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] CreatePlayerEntry 0x{playerBase:X} isLocal={isLocal} class='{className ?? "<null>"}' isObserved={isObserved}");
@@ -91,13 +89,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                 var entry = new PlayerEntry(playerBase, player, isObserved);
 
-                // Pre-warm caches so the first draw tick has position/rotation
-                TryInitTransform(playerBase, entry);
-                TryInitRotation(playerBase, entry);
-
-                // Assign spawn-group based on initial position proximity (for human players)
-                if (!isLocal && player.IsHuman && entry.TransformReady)
-                    player.SpawnGroupID = GetOrAssignSpawnGroup(player.Position);
+                // Transform + rotation init is deferred to BatchInitTransformsAndRotations()
+                // which runs after all new players are discovered in a single batched scatter.
+                // For the local player (single init) we still do it inline.
+                if (isLocal)
+                {
+                    TryInitTransform(playerBase, entry);
+                    TryInitRotation(playerBase, entry);
+                }
 
                 Log.WriteLine($"[RegisteredPlayers] Discovered: {player} @ 0x{playerBase:X} (class='{className}', observed={isObserved}, " +
                     $"transformReady={entry.TransformReady}, rotationReady={entry.RotationReady}, pos={player.Position})");

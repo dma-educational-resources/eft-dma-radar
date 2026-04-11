@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Exits;
+using eft_dma_radar.Silk.Tarkov.GameWorld.Interactables;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using GameObjectManager = eft_dma_radar.Silk.Tarkov.Unity.GOM;
@@ -56,9 +57,6 @@ namespace eft_dma_radar.Silk.DMA
         public static ulong UnityBase { get; private set; }
         public static ulong GOM { get; private set; }
         public static ulong GameAssemblyBase { get; private set; }
-        public static uint ProcessPID => _pid;
-        public static Vmm? VmmHandle => _vmm;
-        public static bool IsDisposed => _vmm is null;
         public static bool Ready => _state is MemoryState.ProcessFound or MemoryState.InRaid;
         public static bool InRaid => _state is MemoryState.InRaid;
 
@@ -69,6 +67,7 @@ namespace eft_dma_radar.Silk.DMA
         public static IReadOnlyList<LootItem>? Loot => Game?.Loot;
         public static IReadOnlyList<LootCorpse>? Corpses => Game?.Corpses;
         public static IReadOnlyList<Exfil>? Exfils => Game?.Exfils;
+        public static IReadOnlyList<Door>? Doors => Game?.Doors;
 
         #endregion
 
@@ -522,14 +521,6 @@ namespace eft_dma_radar.Silk.DMA
                 throw new VmmException("Memory read failed.");
         }
 
-        public static byte[] ReadBuffer(ulong addr, int size, bool useCache = true)
-        {
-            var buf = VmmOrThrow().MemRead(_pid, addr, (uint)size, out uint cbRead, ToFlags(useCache));
-            if (cbRead != (uint)size)
-                throw new VmmException($"Incomplete read at 0x{addr:X}.");
-            return buf ?? [];
-        }
-
         public static T[] ReadArray<T>(ulong addr, int count, bool useCache = true)
             where T : unmanaged
         {
@@ -541,6 +532,7 @@ namespace eft_dma_radar.Silk.DMA
 
         public static string ReadString(ulong addr, int cb = 128, bool useCache = true)
         {
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(cb, 0, nameof(cb));
             ArgumentOutOfRangeException.ThrowIfGreaterThan(cb, 0x1000, nameof(cb));
             return VmmOrThrow().MemReadString(_pid, addr, cb, Encoding.UTF8, ToFlags(useCache))
                 ?? throw new VmmException("String read failed.");
@@ -548,25 +540,10 @@ namespace eft_dma_radar.Silk.DMA
 
         public static string ReadUnityString(ulong addr, int length = 128, bool useCache = true)
         {
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(length, 0, nameof(length));
             ArgumentOutOfRangeException.ThrowIfGreaterThan(length, 0x1000, nameof(length));
             return VmmOrThrow().MemReadString(_pid, addr + 0x14, length, Encoding.Unicode, ToFlags(useCache))
                 ?? throw new VmmException("Unity string read failed.");
-        }
-
-        public static unsafe T ReadValueEnsure<T>(ulong addr)
-            where T : unmanaged, allows ref struct
-        {
-            int cb = sizeof(T);
-            var vmm = VmmOrThrow();
-            T r1 = vmm.MemReadValue<T>(_pid, addr, VmmFlags.NOCACHE);
-            Thread.SpinWait(5);
-            T r2 = vmm.MemReadValue<T>(_pid, addr, VmmFlags.NOCACHE);
-            Thread.SpinWait(5);
-            T r3 = vmm.MemReadValue<T>(_pid, addr, VmmFlags.NOCACHE);
-            if (!new ReadOnlySpan<byte>(&r1, cb).SequenceEqual(new ReadOnlySpan<byte>(&r2, cb)) ||
-                !new ReadOnlySpan<byte>(&r1, cb).SequenceEqual(new ReadOnlySpan<byte>(&r3, cb)))
-                throw new VmmException("Triple-read mismatch.");
-            return r1;
         }
 
         #endregion
@@ -653,29 +630,6 @@ namespace eft_dma_radar.Silk.DMA
             VmmOrThrow().MemWriteSpan(_pid, addr, buf);
         }
 
-        public static void WriteBuffer<T>(ulong addr, Span<T> buffer)
-            where T : unmanaged
-            => VmmOrThrow().MemWriteSpan(_pid, addr, buffer);
-
-        public static unsafe void WriteValueEnsure<T>(ulong addr, T value)
-            where T : unmanaged, allows ref struct
-        {
-            int cb = sizeof(T);
-            var b1 = new ReadOnlySpan<byte>(&value, cb);
-            for (int i = 0; i < 3; i++)
-            {
-                try
-                {
-                    WriteValue(addr, value);
-                    Thread.SpinWait(5);
-                    T temp = ReadValue<T>(addr, false);
-                    if (b1.SequenceEqual(new ReadOnlySpan<byte>(&temp, cb))) return;
-                }
-                catch { }
-            }
-            throw new VmmException("Memory write failed after 3 retries.");
-        }
-
         #endregion
 
         #region Misc
@@ -687,11 +641,11 @@ namespace eft_dma_radar.Silk.DMA
         /// </summary>
         public static void ThrowIfNotInGame()
         {
-            FullRefresh();
             for (int i = 0; i < 5; i++)
             {
                 try
                 {
+                    FullRefresh();
                     if (VmmOrThrow().PidGetFromName(ProcessName, out uint pid) && pid == _pid)
                         return;
                 }
@@ -728,8 +682,8 @@ namespace eft_dma_radar.Silk.DMA
         /// <summary>Thrown when the game process is no longer running.</summary>
         public sealed class GameNotRunningException : Exception
         {
-            public GameNotRunningException() { }
-            public GameNotRunningException(string message) : base(message) { }
+            public GameNotRunningException()
+                : base("Game process is no longer running.") { }
         }
 
         #endregion

@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Runtime.InteropServices;
 using eft_dma_radar.Silk.DMA;
 using SilkUtils = eft_dma_radar.Silk.Misc.Utils;
@@ -23,8 +22,6 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
         // ── Component ───────────────────────────────────────────────────────
         public const uint Comp_ObjectClass = 0x20;  // Component → ObjectClass (InteractiveClass)
         public const uint Comp_GameObject  = 0x58;  // Component → parent GameObject pointer
-        public const uint Comp_Size        = 0x58;  // Component entry stride
-
         // ── ObjectClass name chain ──────────────────────────────────────────
         public static readonly uint[] ObjClass_ToNamePtr = [0x0, 0x10];
 
@@ -44,8 +41,6 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
 
         // ── ModuleBase (UnityPlayer.dll offsets) ────────────────────────────
         public const uint GomFallback        = 0x1A233A0;  // UnityPlayer.dll Dec 2025
-        public const uint AllCamerasFallback = 0x19F3080;   // UnityPlayer.dll Dec 2025
-
         // ── Il2Cpp generic List<T> layout ────────────────────────────────────
         public static class List
         {
@@ -133,14 +128,11 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
     // ─────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Mirrors the IL2CPP GameObject struct for component iteration.
-    /// Read via <see cref="GameObject.Read(ulong, bool)"/>.
+    /// Mirrors the IL2CPP GameObject struct layout.
     /// </summary>
     [StructLayout(LayoutKind.Explicit)]
     internal readonly struct GameObject
     {
-        private const int MaxStackEntries = 32;
-
         [FieldOffset(0x08)]
         public readonly int InstanceID;
 
@@ -152,160 +144,6 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
 
         [FieldOffset((int)UnityOffsets.GO_Name)]
         public readonly ulong NamePtr;
-
-        /// <summary>Reads a <see cref="GameObject"/> from the given pointer.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static GameObject Read(ulong gameObjectPtr, bool useCache = false)
-            => Memory.ReadValue<GameObject>(gameObjectPtr, useCache);
-
-        /// <summary>Reads the name string from this GameObject.</summary>
-        public string GetName(int maxLen = 64)
-        {
-            if (!SilkUtils.IsValidVirtualAddress(NamePtr))
-                return string.Empty;
-            return Memory.TryReadString(NamePtr, out var s, maxLen, false) ? s! : string.Empty;
-        }
-
-        // ── Component entries reader (stackalloc fast-path) ──────────────────
-
-        private readonly bool TryReadEntries(out ComponentArray.Entry[] entries, out int count)
-        {
-            entries = [];
-            count = 0;
-
-            if (!SilkUtils.IsValidVirtualAddress(Components.ArrayBase) || Components.Size == 0)
-                return false;
-
-            count = (int)Math.Min(Components.Size, 0x400);
-            entries = count <= MaxStackEntries
-                ? new ComponentArray.Entry[count]
-                : ArrayPool<ComponentArray.Entry>.Shared.Rent(count);
-
-            return Memory.TryReadBuffer(Components.ArrayBase, entries.AsSpan(0, count), false);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void ReturnEntries(ComponentArray.Entry[] entries, int count)
-        {
-            if (count > MaxStackEntries)
-                ArrayPool<ComponentArray.Entry>.Shared.Return(entries);
-        }
-
-        // ── Component by class name ─────────────────────────────────────────
-
-        /// <summary>
-        /// Iterates the ComponentArray looking for a component whose ObjectClass
-        /// has the specified IL2CPP class name. Returns the ObjectClass pointer, or 0.
-        /// </summary>
-        public ulong GetComponent(string className)
-        {
-            if (string.IsNullOrWhiteSpace(className))
-                return 0;
-
-            if (!TryReadEntries(out var entries, out int count))
-                return 0;
-
-            try
-            {
-                for (int i = 0; i < count; i++)
-                {
-                    var compPtr = entries[i].Component;
-                    if (!SilkUtils.IsValidVirtualAddress(compPtr))
-                        continue;
-
-                    if (!Memory.TryReadPtr(compPtr + UnityOffsets.Comp_ObjectClass, out var objectClass, false))
-                        continue;
-
-                    var name = Il2CppClass.ReadName(objectClass, 128);
-                    if (name is not null && name.Equals(className, StringComparison.OrdinalIgnoreCase))
-                        return objectClass;
-                }
-            }
-            finally
-            {
-                ReturnEntries(entries, count);
-            }
-
-            return 0;
-        }
-
-        /// <summary>
-        /// Static helper: reads a GameObject from <paramref name="gameObjectPtr"/> and finds
-        /// a component by class name. Returns the ObjectClass pointer, or 0.
-        /// </summary>
-        public static ulong GetComponent(ulong gameObjectPtr, string className)
-        {
-            if (!SilkUtils.IsValidVirtualAddress(gameObjectPtr))
-                return 0;
-            return Read(gameObjectPtr).GetComponent(className);
-        }
-
-        // ── Component by klass pointer ──────────────────────────────────────
-
-        /// <summary>
-        /// Iterates the ComponentArray comparing each component's klass pointer (at objectClass+0x0)
-        /// against a pre-resolved Il2CppClass pointer. Avoids reading class name strings.
-        /// Returns the ObjectClass pointer of the matching component, or 0.
-        /// </summary>
-        public ulong GetComponentByKlassPtr(ulong klassPtr)
-        {
-            if (!SilkUtils.IsValidVirtualAddress(klassPtr))
-                return 0;
-
-            if (!TryReadEntries(out var entries, out int count))
-                return 0;
-
-            try
-            {
-                for (int i = 0; i < count; i++)
-                {
-                    var compPtr = entries[i].Component;
-                    if (!SilkUtils.IsValidVirtualAddress(compPtr))
-                        continue;
-
-                    if (!Memory.TryReadPtr(compPtr + UnityOffsets.Comp_ObjectClass, out var objectClass, false))
-                        continue;
-
-                    if (Memory.TryReadValue<ulong>(objectClass, out var klass, false) && klass == klassPtr)
-                        return objectClass;
-                }
-            }
-            finally
-            {
-                ReturnEntries(entries, count);
-            }
-
-            return 0;
-        }
-
-        /// <summary>
-        /// Static helper: reads a GameObject from <paramref name="gameObjectPtr"/> and finds
-        /// a component by klass pointer. Returns the ObjectClass pointer, or 0.
-        /// </summary>
-        public static ulong GetComponentByKlassPtr(ulong gameObjectPtr, ulong klassPtr)
-        {
-            if (!SilkUtils.IsValidVirtualAddress(gameObjectPtr) || !SilkUtils.IsValidVirtualAddress(klassPtr))
-                return 0;
-            return Read(gameObjectPtr).GetComponentByKlassPtr(klassPtr);
-        }
-
-        // ── GetComponentFromBehaviour ────────────────────────────────────────
-
-        /// <summary>
-        /// Navigates from a behaviour/component's ObjectClass back to its parent
-        /// GameObject, then searches that GameObject's components for the specified
-        /// class name. Returns the ObjectClass pointer of the sibling component, or 0.
-        /// </summary>
-        public static ulong GetComponentFromBehaviour(ulong componentObject, string className)
-        {
-            if (!SilkUtils.IsValidVirtualAddress(componentObject))
-                return 0;
-
-            if (!Memory.TryReadPtr(componentObject + UnityOffsets.Comp_GameObject, out var gameObjectPtr, false))
-                return 0;
-
-            return GetComponent(gameObjectPtr, className);
-        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -335,7 +173,6 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
 
         // ── Cached resolved addresses ────────────────────────────────────────
         private static ulong _cachedGomAddr;
-        private static ulong _cachedAllCamerasAddr;
 
         /// <summary>Reads the GOM struct from a resolved GOM address.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -485,38 +322,6 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
             throw new InvalidOperationException("Failed to locate GameObjectManager");
         }
 
-        // ── AllCameras address resolution ─────────────────────────────────────
-
-        /// <summary>
-        /// Resolves the AllCameras list pointer via hardcoded fallback.
-        /// The returned pointer points to a structure where:
-        ///   +0x08 = items pointer (ulong[])
-        ///   +0x10 = count (int) or end pointer
-        /// Returns 0 on failure. Phase 4 — aimview will use this.
-        /// AllCameras-specific signatures will be added when identified in IDA.
-        /// </summary>
-        public static ulong GetAllCamerasAddr(ulong unityBase)
-        {
-            if (SilkUtils.IsValidVirtualAddress(_cachedAllCamerasAddr))
-                return _cachedAllCamerasAddr;
-
-            // Fallback: hardcoded offset
-            try
-            {
-                ulong fallback = Memory.ReadPtr(unityBase + UnityOffsets.AllCamerasFallback, false);
-                if (SilkUtils.IsValidVirtualAddress(fallback))
-                {
-                    Log.WriteLine("[AllCameras] Located via hardcoded offset");
-                    _cachedAllCamerasAddr = fallback;
-                    return fallback;
-                }
-            }
-            catch { }
-
-            Log.WriteLine("[AllCameras] Resolution failed — Phase 4 features unavailable.");
-            return 0;
-        }
-
         /// <summary>
         /// Reads the first 7 bytes of a getter function and checks for:
         ///   48 8B 05 XX XX XX XX  (mov rax, [rip+rel32])
@@ -576,7 +381,6 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
         internal static void ResetCachedAddresses()
         {
             _cachedGomAddr = 0;
-            _cachedAllCamerasAddr = 0;
             ClearCache();
         }
 
@@ -618,48 +422,6 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
                 lock (_cacheLock)
                     _nameCache[name] = result;
             }
-
-            return result;
-        }
-
-        /// <summary>
-        /// Walks the GOM and finds a behaviour component by IL2CPP class name.
-        /// Returns the ObjectClass pointer of the matching component, or 0.
-        /// </summary>
-        public ulong FindBehaviourByClassName(string className)
-        {
-            if (!Memory.TryReadValue<LinkedListObject>(ActiveNodes, out var first, false)) return 0;
-            if (!Memory.TryReadValue<LinkedListObject>(LastActiveNode, out var last, false)) return 0;
-
-            ulong result = WalkList(first, last, forward: true,
-                (node) => GameObject.GetComponent(node.ThisObject, className));
-
-            if (result == 0)
-                result = WalkList(last, first, forward: false,
-                    (node) => GameObject.GetComponent(node.ThisObject, className));
-
-            return result;
-        }
-
-        /// <summary>
-        /// Walks the GOM and compares each component's klass pointer against a pre-resolved
-        /// Il2CppClass pointer. Much faster than name-based lookup (avoids string reads).
-        /// Returns the ObjectClass pointer of the matching component, or 0.
-        /// </summary>
-        public ulong FindBehaviourByKlassPtr(ulong klassPtr)
-        {
-            if (!SilkUtils.IsValidVirtualAddress(klassPtr))
-                return 0;
-
-            if (!Memory.TryReadValue<LinkedListObject>(ActiveNodes, out var first, false)) return 0;
-            if (!Memory.TryReadValue<LinkedListObject>(LastActiveNode, out var last, false)) return 0;
-
-            ulong result = WalkList(first, last, forward: true,
-                (node) => GameObject.GetComponentByKlassPtr(node.ThisObject, klassPtr));
-
-            if (result == 0)
-                result = WalkList(last, first, forward: false,
-                    (node) => GameObject.GetComponentByKlassPtr(node.ThisObject, klassPtr));
 
             return result;
         }

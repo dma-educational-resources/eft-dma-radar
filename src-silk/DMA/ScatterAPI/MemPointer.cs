@@ -12,13 +12,6 @@ namespace eft_dma_radar.Silk.DMA.ScatterAPI
         private readonly ulong _pointer;
 #pragma warning restore CS0649
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void Validate()
-        {
-            if (!eft_dma_radar.Silk.Misc.Utils.IsValidVirtualAddress(_pointer))
-                throw new ArgumentException($"Invalid virtual address: 0x{_pointer:X}");
-        }
-
         public override string ToString() => _pointer.ToString("X");
     }
 }

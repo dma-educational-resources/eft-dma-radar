@@ -63,9 +63,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             }.Start();
         }
 
-        /// <summary>Total number of persisted profileId entries.</summary>
-        public static int Count => _db.Count;
-
         #endregion
 
         #region Public API

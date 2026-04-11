@@ -1,7 +1,9 @@
 using eft_dma_radar.Silk.Misc.Workers;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Exits;
+using eft_dma_radar.Silk.Tarkov.GameWorld.Interactables;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 using eft_dma_radar.Silk.Tarkov.Unity;
+using eft_dma_radar.Silk.Tarkov.Unity.IL2CPP;
 using VmmSharpEx;
 
 using static eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets;
@@ -42,6 +44,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private readonly CancellationToken _ct;
         private readonly RegisteredPlayers _registeredPlayers;
         private readonly LootManager _lootManager;
+        private readonly InteractablesManager _interactablesManager;
         private ExfilManager? _exfilManager;
         private volatile bool _disposed;
         private WorkerThread? _realtimeWorker;
@@ -91,6 +94,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>Current snapshot of exfiltration points in the raid.</summary>
         public IReadOnlyList<Exfil>? Exfils => _exfilManager?.Exfils;
+
+        /// <summary>Current snapshot of keyed doors in the raid.</summary>
+        public IReadOnlyList<Door> Doors => _interactablesManager.Doors;
 
         /// <summary>
         /// Clears the stale GameWorld guard and cooldown so a user-initiated restart
@@ -232,6 +238,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             _ct = ct;
             _registeredPlayers = new RegisteredPlayers(gameWorldBase, mapId);
             _lootManager = new LootManager(gameWorldBase);
+            _interactablesManager = new InteractablesManager(gameWorldBase);
 
             _realtimeWorker = new WorkerThread
             {
@@ -342,6 +349,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         {
             if (_disposed) return;
 
+            long regStart = Stopwatch.GetTimestamp();
+
             // ── Priority 1: Local player discovery ─────────────────────────────
             // Until the local player is found, skip ALL other work. The radar shows
             // "Waiting for Raid Start" and transitions seamlessly once position is available.
@@ -354,8 +363,18 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             // ── Priority 2: Player registration (always runs every tick) ───────
             _registeredPlayers.RefreshRegistration();
 
+            var regElapsed = Stopwatch.GetElapsedTime(regStart);
+
             // ── Priority 3: Secondary work (never starves player registration) ─
+            long secStart = Stopwatch.GetTimestamp();
             DoSecondaryWork();
+            var secElapsed = Stopwatch.GetElapsedTime(secStart);
+
+            // Periodic summary (every ~5s)
+            Log.WriteRateLimited(AppLogLevel.Info,
+                "reg_worker_timing", TimeSpan.FromSeconds(5),
+                $"[RegistrationWorker] Tick: registration={regElapsed.TotalMilliseconds:F1}ms, secondary={secElapsed.TotalMilliseconds:F1}ms, " +
+                $"total={Stopwatch.GetElapsedTime(regStart).TotalMilliseconds:F1}ms, players={_registeredPlayers.Count}");
         }
 
         /// <summary>
@@ -370,6 +389,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             // Exfil status refresh
             _exfilManager?.Refresh();
+
+            // Interactables (doors) — discovery + state refresh (rate-limited internally)
+            _interactablesManager.Refresh();
 
             // Periodic transform validation
             var now = DateTime.UtcNow;

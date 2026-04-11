@@ -53,6 +53,12 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Show aimlines extending from player markers indicating facing direction.</summary>
         public bool ShowAimlines { get; set; } = true;
 
+        /// <summary>Show the aimview widget (first-person projection of nearby players).</summary>
+        public bool ShowAimview { get; set; } = true;
+
+        /// <summary>Show filtered loot items in the aimview widget.</summary>
+        public bool AimviewShowLoot { get; set; } = true;
+
         /// <summary>Aimline length in pixels for human players (PMC/PScav).</summary>
         public int AimlineLength { get; set; } = 15;
 
@@ -66,6 +72,23 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>Hide exfils that are closed or not available to the local player.</summary>
         public bool HideInactiveExfils { get; set; } = true;
+
+        // ── Doors ───────────────────────────────────────────────────────────────
+
+        /// <summary>Master toggle for keyed door rendering on the radar.</summary>
+        public bool ShowDoors { get; set; } = true;
+
+        /// <summary>Show locked doors on the radar.</summary>
+        public bool ShowLockedDoors { get; set; } = true;
+
+        /// <summary>Show unlocked (open/shut) doors on the radar.</summary>
+        public bool ShowUnlockedDoors { get; set; } = true;
+
+        /// <summary>Only show doors that are near important (high-value) loot items.</summary>
+        public bool DoorsOnlyNearLoot { get; set; } = true;
+
+        /// <summary>Maximum distance (meters) from a door to important loot for it to be shown.</summary>
+        public float DoorLootProximity { get; set; } = 25f;
 
         // ── Loot ────────────────────────────────────────────────────────────────
 

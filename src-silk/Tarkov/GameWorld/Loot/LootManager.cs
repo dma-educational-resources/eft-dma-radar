@@ -2,6 +2,8 @@ using System.Collections.Frozen;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
 using eft_dma_radar.Silk.Misc.Data;
 using eft_dma_radar.Silk.Tarkov.Unity;
+using VmmSharpEx;
+using VmmSharpEx.Options;
 
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 {
@@ -61,51 +63,55 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 return;
             }
 
+            // ── Unified scatter pass: identifies loot + corpses in one batched read ──
+            // This eliminates hundreds of serial Il2CppClass.ReadName() calls that were
+            // previously needed to filter corpses from the LootList.
+            List<LootItem> lootResult = [];
+            List<LootCorpse> corpseResult = [];
+
             try
             {
-                _loot = ReadLoot(ptrs);
+                ReadLootAndCorpses(ptrs, out lootResult, out corpseResult);
             }
             catch (Exception ex)
             {
-                Log.WriteLine($"[LootManager] Refresh failed: {ex.Message}");
+                Log.WriteLine($"[LootManager] Unified loot/corpse scatter failed: {ex.Message}");
+            }
+            finally
+            {
+                ptrs.Dispose();
             }
 
-            try
-            {
-                var newCorpses = ReadCorpsePositions(ptrs);
+            _loot = lootResult;
 
-                // Carry over previously-read gear/name data to new corpse objects
-                // (ReadCorpsePositions recreates the list each cycle)
-                var oldCorpses = _corpses;
-                if (oldCorpses.Count > 0 && newCorpses.Count > 0)
+            // Carry over previously-read gear/name data to new corpse objects
+            var oldCorpses = _corpses;
+            if (oldCorpses.Count > 0 && corpseResult.Count > 0)
+            {
+                foreach (var nc in corpseResult)
                 {
-                    foreach (var nc in newCorpses)
+                    for (int i = 0; i < oldCorpses.Count; i++)
                     {
-                        for (int i = 0; i < oldCorpses.Count; i++)
+                        var oc = oldCorpses[i];
+                        if (oc.InteractiveClass == nc.InteractiveClass)
                         {
-                            var oc = oldCorpses[i];
-                            if (oc.InteractiveClass == nc.InteractiveClass)
-                            {
-                                nc.Name = oc.Name;
-                                nc.GearReady = oc.GearReady;
-                                nc.Equipment = oc.Equipment;
-                                nc.TotalValue = oc.TotalValue;
-                                break;
-                            }
+                            nc.Name = oc.Name;
+                            nc.GearReady = oc.GearReady;
+                            nc.Equipment = oc.Equipment;
+                            nc.TotalValue = oc.TotalValue;
+                            break;
                         }
                     }
                 }
-
-                _corpses = newCorpses;
-            }
-            catch (Exception ex)
-            {
-                Log.WriteLine($"[LootManager] Corpse position read failed: {ex.Message}");
             }
 
+            _corpses = corpseResult;
+
+            // Dogtag + equipment reads — now iterate only known corpses (typically 0-5),
+            // not the entire LootList (hundreds of items).
             try
             {
-                ReadCorpseDogtags(ptrs);
+                ReadCorpseDogtags();
             }
             catch (Exception ex)
             {
@@ -128,196 +134,454 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// <summary>
         /// Reads the LootList pointer array once, shared by loot, corpse, and dogtag phases.
         /// </summary>
-        private bool TryReadLootListPtrs(out ulong[] ptrs)
+        private bool TryReadLootListPtrs(out MemList<ulong> list)
         {
-            ptrs = [];
+            list = null!;
 
             if (!Memory.TryReadPtr(_lgw + Offsets.ClientLocalGameWorld.LootList, out var lootListAddr))
                 return false;
 
-            if (!Memory.TryReadPtr(lootListAddr + UnityOffsets.List.ArrOffset, out var arrBase))
+            try
+            {
+                list = MemList<ulong>.Get(lootListAddr, false);
+            }
+            catch
+            {
                 return false;
+            }
 
-            var count = Memory.ReadValue<int>(lootListAddr + 0x18); // List._size
-            if (count <= 0 || count > 4096)
-                return false;
-
-            ptrs = Memory.ReadArray<ulong>(arrBase + UnityOffsets.List.ArrStartOffset, count);
-            return ptrs.Length > 0;
+            return list.Count > 0;
         }
 
         #endregion
 
-        private List<LootItem> ReadLoot(ulong[] ptrs)
+        /// <summary>
+        /// Unified scatter pass — reads ALL LootList entries in one batched operation,
+        /// routing items to loot or corpse lists based on class name (resolved in round 3).
+        /// <para>
+        /// <b>Two-phase design:</b>
+        /// <list type="number">
+        ///   <item><b>Phase 1</b> — 6-round ScatterReadMap resolves pointer chains and collects
+        ///     <c>transformInternal</c> + <c>mongoId</c> for each item into pending lists.</item>
+        ///   <item><b>Phase 2</b> — batched VmmScatter reads resolve all transform positions
+        ///     and BSG ID strings in ~3 DMA round-trips instead of serial reads per item.</item>
+        /// </list>
+        /// </para>
+        /// </summary>
+        private void ReadLootAndCorpses(MemList<ulong> ptrs, out List<LootItem> lootResult, out List<LootCorpse> corpseResult)
         {
-            // 6-round scatter chain
-            using var map = ScatterReadMap.Get();
-            var round1 = map.AddRound();
-            var round2 = map.AddRound();
-            var round3 = map.AddRound();
-            var round4 = map.AddRound();
-            var round5 = map.AddRound();
-            var round6 = map.AddRound();
+            // Pending items collected during Phase 1 scatter callbacks
+            var pendingLoot = new List<PendingLoot>(ptrs.Count);
+            var pendingCorpses = new List<PendingCorpse>();
 
-            var result = new List<LootItem>(ptrs.Length);
-
-            for (int ix = 0; ix < ptrs.Length; ix++)
+            // ── Phase 1: 6-round scatter to resolve pointer chains ──────────────
+            using (var map = ScatterReadMap.Get())
             {
-                var i = ix;
-                var lootBase = ptrs[i];
-                if (!Utils.IsValidVirtualAddress(lootBase))
-                    continue;
+                var round1 = map.AddRound();
+                var round2 = map.AddRound();
+                var round3 = map.AddRound();
+                var round4 = map.AddRound();
+                var round5 = map.AddRound();
+                var round6 = map.AddRound();
 
-                // ROUND 1: MonoBehaviour (LootItemPositionClass + 0x10) + class name chain start
-                round1[i].AddEntry<MemPointer>(0, lootBase + 0x10);
-                round1[i].AddEntry<MemPointer>(1, lootBase); // First ptr for class name chain [0x0]
-
-                round1[i].Callbacks += x1 =>
+                for (int ix = 0; ix < ptrs.Count; ix++)
                 {
-                    if (!x1.TryGetResult<MemPointer>(0, out var monoBehaviour) ||
-                        !x1.TryGetResult<MemPointer>(1, out var c1))
-                        return;
+                    var i = ix;
+                    var lootBase = ptrs[i];
+                    if (!Utils.IsValidVirtualAddress(lootBase))
+                        continue;
 
-                    // ROUND 2: InteractiveClass, GameObject, class name ptr
-                    round2[i].AddEntry<MemPointer>(2, monoBehaviour + UnityOffsets.Comp_ObjectClass);
-                    round2[i].AddEntry<MemPointer>(3, monoBehaviour + UnityOffsets.Comp_GameObject);
-                    round2[i].AddEntry<MemPointer>(4, c1 + 0x10); // [0x10] for class name
+                    // ROUND 1: MonoBehaviour (LootItemPositionClass + 0x10) + class name chain start
+                    round1[i].AddEntry<MemPointer>(0, lootBase + 0x10);
+                    round1[i].AddEntry<MemPointer>(1, lootBase);
 
-                    round2[i].Callbacks += x2 =>
+                    round1[i].Callbacks += x1 =>
                     {
-                        if (!x2.TryGetResult<MemPointer>(2, out var interactiveClass) ||
-                            !x2.TryGetResult<MemPointer>(3, out var gameObject) ||
-                            !x2.TryGetResult<MemPointer>(4, out var classNamePtr))
+                        if (!x1.TryGetResult<MemPointer>(0, out var monoBehaviour) ||
+                            !x1.TryGetResult<MemPointer>(1, out var c1))
                             return;
 
-                        // ROUND 3: Components array, class name string
-                        round3[i].AddEntry<MemPointer>(5, gameObject + UnityOffsets.GO_Components);
-                        round3[i].AddEntry<UTF8String>(6, classNamePtr, 64);
+                        // ROUND 2: InteractiveClass, GameObject, class name ptr
+                        round2[i].AddEntry<MemPointer>(2, monoBehaviour + UnityOffsets.Comp_ObjectClass);
+                        round2[i].AddEntry<MemPointer>(3, monoBehaviour + UnityOffsets.Comp_GameObject);
+                        round2[i].AddEntry<MemPointer>(4, c1 + 0x10);
 
-                        round3[i].Callbacks += x3 =>
+                        round2[i].Callbacks += x2 =>
                         {
-                            if (!x3.TryGetResult<MemPointer>(5, out var components) ||
-                                !x3.TryGetResult<UTF8String>(6, out var classNameRaw))
+                            if (!x2.TryGetResult<MemPointer>(2, out var interactiveClass) ||
+                                !x2.TryGetResult<MemPointer>(3, out var gameObject) ||
+                                !x2.TryGetResult<MemPointer>(4, out var classNamePtr))
                                 return;
 
-                            string className = classNameRaw;
-                            if (string.IsNullOrEmpty(className))
-                                return;
+                            // ROUND 3: Components array, class name string
+                            round3[i].AddEntry<MemPointer>(5, gameObject + UnityOffsets.GO_Components);
+                            round3[i].AddEntry<UTF8String>(6, classNamePtr, 64);
 
-                            // Phase 1: only process ObservedLootItem (loose loot)
-                            if (!className.Equals("ObservedLootItem", StringComparison.OrdinalIgnoreCase))
-                                return;
-
-                            // ROUND 4: First transform component (ComponentArray + 0x08) + item ID chain
-                            round4[i].AddEntry<MemPointer>(7, components + 0x08);
-                            round4[i].AddEntry<MemPointer>(8, interactiveClass + Offsets.InteractiveLootItem.Item);
-
-                            round4[i].Callbacks += x4 =>
+                            round3[i].Callbacks += x3 =>
                             {
-                                if (!x4.TryGetResult<MemPointer>(7, out var t1) ||
-                                    !x4.TryGetResult<MemPointer>(8, out var item))
+                                if (!x3.TryGetResult<MemPointer>(5, out var components) ||
+                                    !x3.TryGetResult<UTF8String>(6, out var classNameRaw))
                                     return;
 
-                                // ROUND 5: Transform chain + item template
-                                round5[i].AddEntry<MemPointer>(9, t1 + UnityOffsets.Comp_ObjectClass);
-                                round5[i].AddEntry<MemPointer>(10, item + Offsets.LootItem.Template);
+                                string className = classNameRaw;
+                                if (string.IsNullOrEmpty(className))
+                                    return;
 
-                                round5[i].Callbacks += x5 =>
-                                {
-                                    if (!x5.TryGetResult<MemPointer>(9, out var t2) ||
-                                        !x5.TryGetResult<MemPointer>(10, out var template))
-                                        return;
-
-                                    // ROUND 6: TransformInternal (ObjectClass + 0x10) + BSG ID
-                                    round6[i].AddEntry<MemPointer>(11, t2 + 0x10);
-                                    round6[i].AddEntry<Types.MongoID>(12, template + Offsets.ItemTemplate._id);
-
-                                    round6[i].Callbacks += x6 =>
-                                    {
-                                        if (!x6.TryGetResult<MemPointer>(11, out var transformInternal) ||
-                                            !x6.TryGetResult<Types.MongoID>(12, out var mongoId))
-                                            return;
-
-                                        try
-                                        {
-                                            var bsgId = Memory.ReadUnityString(mongoId.StringID);
-                                            if (string.IsNullOrEmpty(bsgId))
-                                                return;
-
-                                            if (!EftDataManager.AllItems.TryGetValue(bsgId, out var marketItem))
-                                                return;
-
-                                            var pos = ReadTransformPosition(transformInternal);
-                                            if (pos == Vector3.Zero)
-                                                return;
-
-                                            lock (result)
-                                                result.Add(new LootItem(marketItem, pos));
-                                        }
-                                        catch { }
-                                    };
-                                };
+                                if (className.Equals("ObservedLootItem", StringComparison.OrdinalIgnoreCase))
+                                    CollectLootItem(round4, round5, round6, i, interactiveClass, components, pendingLoot);
+                                else if (className.Contains("Corpse", StringComparison.OrdinalIgnoreCase))
+                                    CollectCorpseItem(round4, round5, round6, i, interactiveClass, components, pendingCorpses);
                             };
                         };
                     };
-                };
+                }
+
+                map.Execute();
             }
 
-            map.Execute();
+            // ── Phase 2: Batched transform + BSG ID resolution ──────────────────
+            lootResult = ResolveLootBatched(pendingLoot);
+            corpseResult = ResolveCorpsesBatched(pendingCorpses);
+        }
+
+        #region Phase 1 — Scatter Callbacks (collect pending items, no serial reads)
+
+        /// <summary>
+        /// Intermediate loot data collected during Phase 1 scatter — no serial DMA reads here.
+        /// </summary>
+        private readonly record struct PendingLoot(ulong TransformInternal, ulong BsgIdStringAddr);
+
+        /// <summary>
+        /// Intermediate corpse data collected during Phase 1 scatter — no serial DMA reads here.
+        /// </summary>
+        private readonly record struct PendingCorpse(ulong InteractiveClass, ulong TransformInternal);
+
+        /// <summary>
+        /// Scatter callback for loose loot — resolves transform + BSG ID pointers (rounds 4-6),
+        /// then adds to pending list. No serial reads.
+        /// </summary>
+        private static void CollectLootItem(
+            ScatterReadRound round4, ScatterReadRound round5, ScatterReadRound round6,
+            int i, ulong interactiveClass, ulong components, List<PendingLoot> pending)
+        {
+            round4[i].AddEntry<MemPointer>(7, components + 0x08);
+            round4[i].AddEntry<MemPointer>(8, interactiveClass + Offsets.InteractiveLootItem.Item);
+
+            round4[i].Callbacks += x4 =>
+            {
+                if (!x4.TryGetResult<MemPointer>(7, out var t1) ||
+                    !x4.TryGetResult<MemPointer>(8, out var item))
+                    return;
+
+                round5[i].AddEntry<MemPointer>(9, t1 + UnityOffsets.Comp_ObjectClass);
+                round5[i].AddEntry<MemPointer>(10, item + Offsets.LootItem.Template);
+
+                round5[i].Callbacks += x5 =>
+                {
+                    if (!x5.TryGetResult<MemPointer>(9, out var t2) ||
+                        !x5.TryGetResult<MemPointer>(10, out var template))
+                        return;
+
+                    round6[i].AddEntry<MemPointer>(11, t2 + 0x10);
+                    round6[i].AddEntry<Types.MongoID>(12, template + Offsets.ItemTemplate._id);
+
+                    round6[i].Callbacks += x6 =>
+                    {
+                        if (!x6.TryGetResult<MemPointer>(11, out var transformInternal) ||
+                            !x6.TryGetResult<Types.MongoID>(12, out var mongoId))
+                            return;
+
+                        if (!mongoId.StringID.IsValidVirtualAddress())
+                            return;
+
+                        lock (pending)
+                            pending.Add(new PendingLoot(transformInternal, mongoId.StringID));
+                    };
+                };
+            };
+        }
+
+        /// <summary>
+        /// Scatter callback for corpse items — resolves transform pointer (rounds 4-6),
+        /// then adds to pending list. No serial reads.
+        /// </summary>
+        private static void CollectCorpseItem(
+            ScatterReadRound round4, ScatterReadRound round5, ScatterReadRound round6,
+            int i, ulong interactiveClass, ulong components, List<PendingCorpse> pending)
+        {
+            round4[i].AddEntry<MemPointer>(7, components + 0x08);
+
+            round4[i].Callbacks += x4 =>
+            {
+                if (!x4.TryGetResult<MemPointer>(7, out var t1))
+                    return;
+
+                round5[i].AddEntry<MemPointer>(9, t1 + UnityOffsets.Comp_ObjectClass);
+
+                round5[i].Callbacks += x5 =>
+                {
+                    if (!x5.TryGetResult<MemPointer>(9, out var t2))
+                        return;
+
+                    round6[i].AddEntry<MemPointer>(11, t2 + 0x10);
+
+                    round6[i].Callbacks += x6 =>
+                    {
+                        if (!x6.TryGetResult<MemPointer>(11, out var transformInternal))
+                            return;
+
+                        lock (pending)
+                            pending.Add(new PendingCorpse(interactiveClass, transformInternal));
+                    };
+                };
+            };
+        }
+
+        #endregion
+
+        #region Phase 2 — Batched Transform + BSG ID Resolution
+
+        /// <summary>
+        /// Resolves all pending loot items in batched DMA operations:
+        /// <list type="number">
+        ///   <item>Batch 1: Read hierarchy + index + BSG ID strings for all items</item>
+        ///   <item>Batch 2: Read verticesPtr + indicesPtr from hierarchies</item>
+        ///   <item>Batch 3: Read vertices + indices arrays for all valid items</item>
+        ///   <item>Compute positions locally (pure math, no DMA)</item>
+        /// </list>
+        /// </summary>
+        private static List<LootItem> ResolveLootBatched(List<PendingLoot> pending)
+        {
+            if (pending.Count == 0)
+                return [];
+
+            var result = new List<LootItem>(pending.Count);
+
+            // Arrays to hold intermediate state across batches
+            var hierarchies = new ulong[pending.Count];
+            var indices = new int[pending.Count];
+            var bsgIds = new string?[pending.Count];
+            var verticesPtrs = new ulong[pending.Count];
+            var indicesPtrs = new ulong[pending.Count];
+
+            // ── Batch 1: hierarchy + index + BSG ID strings ─────────────────────
+            using (var s1 = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    var ti = pending[i].TransformInternal;
+                    s1.PrepareReadValue<ulong>(ti + UnityOffsets.TransformAccess.HierarchyOffset);
+                    s1.PrepareReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset);
+                    // Unity string: length at +0x10 (int), chars at +0x14 (UTF-16)
+                    s1.PrepareRead(pending[i].BsgIdStringAddr + 0x14, 128);
+                }
+                s1.Execute();
+
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    var ti = pending[i].TransformInternal;
+                    s1.ReadValue<ulong>(ti + UnityOffsets.TransformAccess.HierarchyOffset, out hierarchies[i]);
+                    s1.ReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset, out indices[i]);
+                    bsgIds[i] = s1.ReadString(pending[i].BsgIdStringAddr + 0x14, 128, Encoding.Unicode);
+                }
+            }
+
+            // ── Batch 2: verticesPtr + indicesPtr from hierarchies ──────────────
+            using (var s2 = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    if (!hierarchies[i].IsValidVirtualAddress() || indices[i] < 0 || indices[i] > 150_000)
+                        continue;
+                    s2.PrepareReadValue<ulong>(hierarchies[i] + UnityOffsets.TransformHierarchy.VerticesOffset);
+                    s2.PrepareReadValue<ulong>(hierarchies[i] + UnityOffsets.TransformHierarchy.IndicesOffset);
+                }
+                s2.Execute();
+
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    if (!hierarchies[i].IsValidVirtualAddress() || indices[i] < 0 || indices[i] > 150_000)
+                        continue;
+                    s2.ReadValue<ulong>(hierarchies[i] + UnityOffsets.TransformHierarchy.VerticesOffset, out verticesPtrs[i]);
+                    s2.ReadValue<ulong>(hierarchies[i] + UnityOffsets.TransformHierarchy.IndicesOffset, out indicesPtrs[i]);
+                }
+            }
+
+            // ── Batch 3: vertices + indices arrays ──────────────────────────────
+            using (var s3 = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    if (!verticesPtrs[i].IsValidVirtualAddress() || !indicesPtrs[i].IsValidVirtualAddress())
+                        continue;
+                    int vertCount = indices[i] + 1;
+                    s3.PrepareReadArray<TrsX>(verticesPtrs[i], vertCount);
+                    s3.PrepareReadArray<int>(indicesPtrs[i], vertCount);
+                }
+                s3.Execute();
+
+                // Compute positions and create LootItems
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    try
+                    {
+                        // Validate BSG ID
+                        var rawId = bsgIds[i];
+                        if (string.IsNullOrEmpty(rawId))
+                            continue;
+
+                        // Trim null terminator if present
+                        int nt = rawId.IndexOf('\0');
+                        var bsgId = nt >= 0 ? rawId[..nt] : rawId;
+                        if (bsgId.Length == 0)
+                            continue;
+
+                        if (!EftDataManager.AllItems.TryGetValue(bsgId, out var marketItem))
+                            continue;
+
+                        if (!verticesPtrs[i].IsValidVirtualAddress() || !indicesPtrs[i].IsValidVirtualAddress())
+                            continue;
+
+                        int vertCount = indices[i] + 1;
+                        var vertices = s3.ReadArray<TrsX>(verticesPtrs[i], vertCount);
+                        var parentIndices = s3.ReadArray<int>(indicesPtrs[i], vertCount);
+                        if (vertices is null || parentIndices is null ||
+                            vertices.Length < vertCount || parentIndices.Length < vertCount)
+                            continue;
+
+                        var pos = ComputeTransformPosition(vertices, parentIndices, indices[i]);
+                        if (pos == Vector3.Zero)
+                            continue;
+
+                        result.Add(new LootItem(marketItem, pos));
+                    }
+                    catch { }
+                }
+            }
 
             return result;
         }
 
-        #region Corpse Position Reading
-
         /// <summary>
-        /// Reads corpse positions from the LootList using linear memory reads.
-        /// Returns a list of <see cref="LootCorpse"/> with their world positions.
-        /// Names and equipment are resolved in later phases.
+        /// Resolves all pending corpse items in batched DMA operations (same 3-batch pattern as loot).
         /// </summary>
-        private List<LootCorpse> ReadCorpsePositions(ulong[] ptrs)
+        private static List<LootCorpse> ResolveCorpsesBatched(List<PendingCorpse> pending)
         {
-            var corpses = new List<LootCorpse>();
+            if (pending.Count == 0)
+                return [];
 
-            foreach (var lootBase in ptrs)
+            var result = new List<LootCorpse>(pending.Count);
+            var hierarchies = new ulong[pending.Count];
+            var indices = new int[pending.Count];
+            var verticesPtrs = new ulong[pending.Count];
+            var indicesPtrs = new ulong[pending.Count];
+
+            // ── Batch 1: hierarchy + index ──────────────────────────────────────
+            using (var s1 = Memory.GetScatter(VmmFlags.NOCACHE))
             {
-                if (!lootBase.IsValidVirtualAddress())
-                    continue;
-
-                try
+                for (int i = 0; i < pending.Count; i++)
                 {
-                    var className = Il2CppClass.ReadName(lootBase);
-                    if (className is null || !className.Contains("Corpse", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    // MonoBehaviour → InteractiveClass
-                    if (!Memory.TryReadPtr(lootBase + 0x10, out var monoBehaviour))
-                        continue;
-                    if (!Memory.TryReadPtr(monoBehaviour + UnityOffsets.Comp_ObjectClass, out var interactiveClass))
-                        continue;
-
-                    // GameObject → Components → Transform chain
-                    if (!Memory.TryReadPtr(monoBehaviour + UnityOffsets.Comp_GameObject, out var gameObject))
-                        continue;
-                    if (!Memory.TryReadPtr(gameObject + UnityOffsets.GO_Components, out var components))
-                        continue;
-                    if (!Memory.TryReadPtr(components + 0x08, out var t1))
-                        continue;
-                    if (!Memory.TryReadPtr(t1 + UnityOffsets.Comp_ObjectClass, out var t2))
-                        continue;
-                    if (!Memory.TryReadPtr(t2 + 0x10, out var transformInternal))
-                        continue;
-
-                    var pos = ReadTransformPosition(transformInternal);
-                    if (pos == Vector3.Zero)
-                        continue;
-
-                    corpses.Add(new LootCorpse(interactiveClass, pos));
+                    var ti = pending[i].TransformInternal;
+                    s1.PrepareReadValue<ulong>(ti + UnityOffsets.TransformAccess.HierarchyOffset);
+                    s1.PrepareReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset);
                 }
-                catch { }
+                s1.Execute();
+
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    var ti = pending[i].TransformInternal;
+                    s1.ReadValue<ulong>(ti + UnityOffsets.TransformAccess.HierarchyOffset, out hierarchies[i]);
+                    s1.ReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset, out indices[i]);
+                }
             }
 
-            return corpses;
+            // ── Batch 2: verticesPtr + indicesPtr ───────────────────────────────
+            using (var s2 = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    if (!hierarchies[i].IsValidVirtualAddress() || indices[i] < 0 || indices[i] > 150_000)
+                        continue;
+                    s2.PrepareReadValue<ulong>(hierarchies[i] + UnityOffsets.TransformHierarchy.VerticesOffset);
+                    s2.PrepareReadValue<ulong>(hierarchies[i] + UnityOffsets.TransformHierarchy.IndicesOffset);
+                }
+                s2.Execute();
+
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    if (!hierarchies[i].IsValidVirtualAddress() || indices[i] < 0 || indices[i] > 150_000)
+                        continue;
+                    s2.ReadValue<ulong>(hierarchies[i] + UnityOffsets.TransformHierarchy.VerticesOffset, out verticesPtrs[i]);
+                    s2.ReadValue<ulong>(hierarchies[i] + UnityOffsets.TransformHierarchy.IndicesOffset, out indicesPtrs[i]);
+                }
+            }
+
+            // ── Batch 3: vertices + indices arrays ──────────────────────────────
+            using (var s3 = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    if (!verticesPtrs[i].IsValidVirtualAddress() || !indicesPtrs[i].IsValidVirtualAddress())
+                        continue;
+                    int vertCount = indices[i] + 1;
+                    s3.PrepareReadArray<TrsX>(verticesPtrs[i], vertCount);
+                    s3.PrepareReadArray<int>(indicesPtrs[i], vertCount);
+                }
+                s3.Execute();
+
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    try
+                    {
+                        if (!verticesPtrs[i].IsValidVirtualAddress() || !indicesPtrs[i].IsValidVirtualAddress())
+                            continue;
+
+                        int vertCount = indices[i] + 1;
+                        var vertices = s3.ReadArray<TrsX>(verticesPtrs[i], vertCount);
+                        var parentIndices = s3.ReadArray<int>(indicesPtrs[i], vertCount);
+                        if (vertices is null || parentIndices is null ||
+                            vertices.Length < vertCount || parentIndices.Length < vertCount)
+                            continue;
+
+                        var pos = ComputeTransformPosition(vertices, parentIndices, indices[i]);
+                        if (pos == Vector3.Zero)
+                            continue;
+
+                        result.Add(new LootCorpse(pending[i].InteractiveClass, pos));
+                    }
+                    catch { }
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Pure math — computes world position from pre-read vertices + indices.
+        /// No DMA reads. Shared by loot and corpse resolution.
+        /// </summary>
+        private static Vector3 ComputeTransformPosition(TrsX[] vertices, int[] parentIndices, int index)
+        {
+            var pos = vertices[index].T;
+            int parent = parentIndices[index];
+            int iter = 0;
+
+            while (parent >= 0 && parent < vertices.Length && iter++ < 4096)
+            {
+                ref readonly var p = ref vertices[parent];
+                pos = Vector3.Transform(pos, p.Q);
+                pos *= p.S;
+                pos += p.T;
+                parent = parentIndices[parent];
+            }
+
+            if (!float.IsFinite(pos.X) || !float.IsFinite(pos.Y) || !float.IsFinite(pos.Z))
+                return Vector3.Zero;
+
+            if (pos.LengthSquared() < 16f)
+                return Vector3.Zero;
+
+            return pos;
         }
 
         #endregion
@@ -325,42 +589,28 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         #region Corpse Dogtag Reading
 
         /// <summary>
-        /// Iterates the LootList for corpse items, walks their equipment slots,
-        /// finds BarterOther (dogtag) items, reads DogtagComponent fields, and seeds
-        /// <see cref="DogtagCache"/> with victim identity data.
+        /// Iterates only the known corpses (from the unified scatter pass) and walks their
+        /// equipment slots to find dogtag items and seed <see cref="DogtagCache"/>.
+        /// This is O(corpses) not O(lootList) — typically 0-5 iterations, not hundreds.
         /// </summary>
-        private void ReadCorpseDogtags(ulong[] ptrs)
+        private void ReadCorpseDogtags()
         {
-            foreach (var lootBase in ptrs)
+            var corpses = _corpses;
+            if (corpses.Count == 0)
+                return;
+
+            foreach (var corpse in corpses)
             {
-                if (!lootBase.IsValidVirtualAddress())
+                var interactiveClass = corpse.InteractiveClass;
+
+                // Already processed this corpse?
+                if (_processedCorpses.Contains(interactiveClass))
                     continue;
+
+                _processedCorpses.Add(interactiveClass);
 
                 try
                 {
-                    // Read MonoBehaviour (LootItemPositionClass + 0x10)
-                    if (!Memory.TryReadPtr(lootBase + 0x10, out var monoBehaviour))
-                        continue;
-
-                    // Read InteractiveClass
-                    if (!Memory.TryReadPtr(monoBehaviour + UnityOffsets.Comp_ObjectClass, out var interactiveClass))
-                        continue;
-
-                    if (!interactiveClass.IsValidVirtualAddress())
-                        continue;
-
-                    // Already processed this corpse?
-                    if (_processedCorpses.Contains(interactiveClass))
-                        continue;
-
-                    // Read class name to identify corpses
-                    var className = Il2CppClass.ReadName(lootBase);
-                    if (className is null || !className.Contains("Corpse", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    // Mark as processed
-                    _processedCorpses.Add(interactiveClass);
-
                     // Corpse: InteractiveLootItem.Item → base item → LootItemMod.Slots → array of slots
                     if (!Memory.TryReadPtr(interactiveClass + Offsets.InteractiveLootItem.Item, out var itemBase)
                         || !itemBase.IsValidVirtualAddress())
@@ -370,13 +620,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                         || !slotsArr.IsValidVirtualAddress())
                         continue;
 
-                    if (!Memory.TryReadValue<int>(slotsArr + 0x18, out var slotCount) || slotCount < 1 || slotCount > 64)
+                    using var slotPtrs = MemArray<ulong>.Get(slotsArr, false);
+                    if (slotPtrs.Count < 1 || slotPtrs.Count > 64)
                         continue;
 
-                    var slotPtrs = Memory.ReadArray<ulong>(slotsArr + 0x20, slotCount);
-
-                    foreach (var slotPtr in slotPtrs)
+                    for (int si = 0; si < slotPtrs.Count; si++)
                     {
+                        var slotPtr = slotPtrs[si];
                         if (!slotPtr.IsValidVirtualAddress())
                             continue;
 
@@ -464,15 +714,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                     || !slotsArr.IsValidVirtualAddress())
                     return;
 
-                if (!Memory.TryReadValue<int>(slotsArr + 0x18, out var slotCount) || slotCount < 1 || slotCount > 64)
+                using var slotPtrs = MemArray<ulong>.Get(slotsArr, false);
+                if (slotPtrs.Count < 1 || slotPtrs.Count > 64)
                     return;
 
-                var slotPtrs = Memory.ReadArray<ulong>(slotsArr + 0x20, slotCount);
-                var gear = new Dictionary<string, CorpseGearItem>(slotPtrs.Length, StringComparer.OrdinalIgnoreCase);
+                var gear = new Dictionary<string, CorpseGearItem>(slotPtrs.Count, StringComparer.OrdinalIgnoreCase);
                 int totalValue = 0;
 
-                foreach (var slotPtr in slotPtrs)
+                for (int si = 0; si < slotPtrs.Count; si++)
                 {
+                    var slotPtr = slotPtrs[si];
                     if (!slotPtr.IsValidVirtualAddress())
                         continue;
 
@@ -552,63 +803,5 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         }
 
         #endregion
-
-        /// <summary>
-        /// Reads world position from a TransformInternal pointer using the hierarchy walk.
-        /// Simplified single-read version (non-scatter) — acceptable for loot which is static.
-        /// </summary>
-        private static Vector3 ReadTransformPosition(ulong transformInternal)
-        {
-            try
-            {
-                var hierarchy = Memory.ReadValue<ulong>(transformInternal + UnityOffsets.TransformAccess.HierarchyOffset);
-                if (!Utils.IsValidVirtualAddress(hierarchy))
-                    return Vector3.Zero;
-
-                var index = Memory.ReadValue<int>(transformInternal + UnityOffsets.TransformAccess.IndexOffset);
-                if (index < 0 || index > 150_000)
-                    return Vector3.Zero;
-
-                var verticesPtr = Memory.ReadValue<ulong>(hierarchy + UnityOffsets.TransformHierarchy.VerticesOffset);
-                var indicesPtr = Memory.ReadValue<ulong>(hierarchy + UnityOffsets.TransformHierarchy.IndicesOffset);
-                if (!Utils.IsValidVirtualAddress(verticesPtr) || !Utils.IsValidVirtualAddress(indicesPtr))
-                    return Vector3.Zero;
-
-                int vertCount = index + 1;
-
-                // Read vertices and indices
-                var vertices = Memory.ReadArray<TrsX>(verticesPtr, vertCount);
-                var indices = Memory.ReadArray<int>(indicesPtr, vertCount);
-
-                if (vertices.Length < vertCount || indices.Length < vertCount)
-                    return Vector3.Zero;
-
-                // Walk the transform hierarchy
-                var pos = vertices[index].T;
-                int parent = indices[index];
-                int iter = 0;
-
-                while (parent >= 0 && parent < vertCount && iter++ < 4096)
-                {
-                    ref readonly var p = ref vertices[parent];
-                    pos = Vector3.Transform(pos, p.Q);
-                    pos *= p.S;
-                    pos += p.T;
-                    parent = indices[parent];
-                }
-
-                if (!float.IsFinite(pos.X) || !float.IsFinite(pos.Y) || !float.IsFinite(pos.Z))
-                    return Vector3.Zero;
-
-                if (pos.LengthSquared() < 16f) // Skip origin-ish positions
-                    return Vector3.Zero;
-
-                return pos;
-            }
-            catch
-            {
-                return Vector3.Zero;
-            }
-        }
     }
 }
