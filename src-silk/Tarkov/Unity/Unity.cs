@@ -86,6 +86,32 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
         public readonly Quaternion Q;     // rotation (16 bytes)
         public readonly Vector3 S;        // scale (12 bytes)
         private readonly float _pad1;     // padding (4 bytes)
+
+        /// <summary>
+        /// Walks the transform hierarchy from pre-read vertex/index data and returns the world position.
+        /// Pure math — no DMA reads. Returns the raw computed position; callers validate as needed.
+        /// </summary>
+        internal static Vector3 ComputeWorldPosition(
+            ReadOnlySpan<TrsX> vertices,
+            ReadOnlySpan<int> parentIndices,
+            int index,
+            int maxIterations = 4096)
+        {
+            var pos = vertices[index].T;
+            int parent = parentIndices[index];
+            int iter = 0;
+
+            while (parent >= 0 && parent < vertices.Length && iter++ < maxIterations)
+            {
+                ref readonly var p = ref vertices[parent];
+                pos = Vector3.Transform(pos, p.Q);
+                pos *= p.S;
+                pos += p.T;
+                parent = parentIndices[parent];
+            }
+
+            return pos;
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────────

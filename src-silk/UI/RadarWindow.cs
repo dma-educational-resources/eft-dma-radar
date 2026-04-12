@@ -68,9 +68,32 @@ namespace eft_dma_radar.Silk.UI
         private static long _lastPurgeTick;
         private const long PurgeIntervalMs = 1000;
 
+        // Pinned font data for ImGui — must remain alive for the lifetime of the atlas
+        private static GCHandle _imguiFontHandle;
+        private static GCHandle _iconGlyphRangesHandle;
+
+        // Icon glyph ranges for UI symbols — null-terminated pairs of (first, last)
+        private static readonly ushort[] _iconGlyphRanges =
+        [
+            0x2192, 0x2192, // →
+            0x2234, 0x2234, // ∴
+            0x2500, 0x2502, // ─ │
+            0x25A0, 0x25CF, // Geometric Shapes subset (□▣▲◆◉○◎●)
+            0x263A, 0x263A, // ☺
+            0x2694, 0x2694, // ⚔
+            0x2699, 0x2699, // ⚙
+            0x26A0, 0x26A0, // ⚠
+            0x2713, 0x2713, // ✓
+            0               // terminator
+        ];
+
         // Zoom constants
         private const float ZOOM_TO_MOUSE_STRENGTH = 5f;
         private const int ZOOM_STEP = 5;
+
+        // Mouse hit-test dead zone — skip expensive entity scanning when mouse barely moved
+        private static Vector2 _lastHitTestMousePos;
+        private const float HitTestDeadZone = 3f; // pixels
 
         #endregion
 
@@ -204,10 +227,12 @@ namespace eft_dma_radar.Silk.UI
                     {
                         var io = ImGui.GetIO();
                         io.ConfigFlags |= ImGuiConfigFlags.NavEnableKeyboard;
+                        LoadImGuiFont(io);
                     }
                 );
 
                 ApplyImGuiDarkStyle();
+                ApplyImGuiFontScale();
 
                 // Wire up events
                 foreach (var mouse in _input.Mice)
@@ -229,6 +254,13 @@ namespace eft_dma_radar.Silk.UI
 
                 // Start FPS timer
                 _ = RunFpsTimerAsync();
+
+                // Restore widget/panel visibility from config
+                PlayerInfoWidget.IsOpen = Config.ShowPlayersWidget;
+                LootWidget.IsOpen = Config.ShowLootWidget;
+                AimviewWidget.IsOpen = Config.ShowAimviewWidget;
+                SettingsPanel.IsOpen = Config.ShowSettingsOverlay;
+                LootFiltersPanel.IsOpen = Config.ShowLootFiltersPanel;
 
                 // Wire up the notification callback into the silk Memory module
                 Memory.ShowNotification ??= static (msg, level) =>
@@ -306,7 +338,16 @@ namespace eft_dma_radar.Silk.UI
             {
                 // Frame setup
                 Interlocked.Increment(ref _fpsCounter);
-                _grContext.ResetContext();
+
+                // Only reset GL state that ImGui touched — much cheaper than a full reset
+                _grContext.ResetContext(
+                    GRGlBackendState.RenderTarget |
+                    GRGlBackendState.TextureBinding |
+                    GRGlBackendState.View |
+                    GRGlBackendState.Blend |
+                    GRGlBackendState.Vertex |
+                    GRGlBackendState.Program |
+                    GRGlBackendState.PixelStore);
 
                 // Periodic resource purge
                 long now = Environment.TickCount64;
@@ -354,6 +395,10 @@ namespace eft_dma_radar.Silk.UI
                     {
                         DrawRadar(canvas, localPlayer, map, scale);
                     }
+                    else if (MapManager.IsLoading)
+                    {
+                        DrawStatusMessage(canvas, "Loading Map", scale, animated: true);
+                    }
                     else
                     {
                         DrawStatusMessage(canvas, "Waiting for Raid Start", scale);
@@ -399,6 +444,11 @@ namespace eft_dma_radar.Silk.UI
 
             map.Draw(canvas, localPlayerPos.Y, mapParams.Bounds, mapCanvasBounds);
 
+            // Viewport culling — world-space pre-cull avoids coordinate transforms for off-screen entities
+            const float CullMargin = 120f;
+            var worldBounds = mapParams.GetWorldBounds(CullMargin);
+            var mapCfg = map.Config;
+
             // Snapshot players
             var allPlayersSnapshot = AllPlayers;
 
@@ -425,14 +475,20 @@ namespace eft_dma_radar.Silk.UI
 
                 if (loot is not null)
                 {
+                    float playerY = localPlayerPos.Y;
+
                     int visibleCount = 0;
                     foreach (var item in loot)
                     {
-                        if (item.ShouldDraw())
-                        {
-                            item.Draw(canvas, mapParams, map.Config, localPlayer);
-                            visibleCount++;
-                        }
+                        int price = item.DisplayPrice;
+                        if (!item.ShouldDraw(price))
+                            continue;
+                        if (!worldBounds.Contains(item.Position))
+                            continue;
+                        var sp = mapParams.ToScreenPos(MapParams.ToMapPos(item.Position, mapCfg));
+                        bool underMap = item.Position.Y < playerY - 15f;
+                        item.Draw(canvas, sp, price, underMap);
+                        visibleCount++;
                     }
                     LootFilter.SetCounts(visibleCount, loot.Count);
                 }
@@ -440,18 +496,26 @@ namespace eft_dma_radar.Silk.UI
                 {
                     LootFilter.SetCounts(0, 0);
                 }
-
-                // Corpses
-                var corpses = Memory.Corpses;
-                if (corpses is not null)
-                {
-                    foreach (var corpse in corpses)
-                        corpse.Draw(canvas, mapParams, map.Config, localPlayer);
-                }
             }
             else
             {
                 LootFilter.SetCounts(0, 0);
+            }
+
+            // Corpses
+            if (!Config.BattleMode && Config.ShowLoot && Config.ShowCorpses)
+            {
+                var corpses = Memory.Corpses;
+                if (corpses is not null)
+                {
+                    foreach (var corpse in corpses)
+                    {
+                        if (!worldBounds.Contains(corpse.Position))
+                            continue;
+                        var sp = mapParams.ToScreenPos(MapParams.ToMapPos(corpse.Position, mapCfg));
+                        corpse.Draw(canvas, sp);
+                    }
+                }
             }
 
             // Exfils (drawn before players so player dots render on top)
@@ -465,7 +529,10 @@ namespace eft_dma_radar.Silk.UI
                     {
                         if (Config.HideInactiveExfils && lp is not null && !exfil.IsAvailableFor(lp))
                             continue;
-                        exfil.Draw(canvas, mapParams, map.Config, localPlayer);
+                        if (!worldBounds.Contains(exfil.Position))
+                            continue;
+                        var sp = mapParams.ToScreenPos(MapParams.ToMapPos(exfil.Position, mapCfg));
+                        exfil.Draw(canvas, sp, localPlayer);
                     }
                 }
             }
@@ -476,16 +543,18 @@ namespace eft_dma_radar.Silk.UI
                 var doors = Memory.Doors;
                 if (doors is not null)
                 {
-                    var lootForDoors = Config.DoorsOnlyNearLoot ? Memory.Loot : null;
-                    float proxSq = Config.DoorLootProximity * Config.DoorLootProximity;
+                    bool filterByLoot = Config.DoorsOnlyNearLoot;
 
                     foreach (var door in doors)
                     {
                         if (!door.ShouldDraw())
                             continue;
-                        if (lootForDoors is not null && !door.IsNearImportantLoot(lootForDoors, proxSq))
+                        if (filterByLoot && !door.IsNearLoot)
                             continue;
-                        door.Draw(canvas, mapParams, map.Config, localPlayer);
+                        if (!worldBounds.Contains(door.Position))
+                            continue;
+                        var sp = mapParams.ToScreenPos(MapParams.ToMapPos(door.Position, mapCfg));
+                        door.Draw(canvas, sp, localPlayer);
                     }
                 }
             }
@@ -494,16 +563,20 @@ namespace eft_dma_radar.Silk.UI
             if (Config.ConnectGroups && normalPlayers is not null)
                 DrawGroupConnectors(canvas, normalPlayers, map, mapParams);
 
-            // Draw local player
-            localPlayer.Draw(canvas, mapParams, map.Config, localPlayer);
+            // Draw local player + other players
+            var localScreenPos = mapParams.ToScreenPos(MapParams.ToMapPos(localPlayer.Position, mapCfg));
+            localPlayer.Draw(canvas, localScreenPos, localPlayer);
 
-            // Other players
             if (normalPlayers is not null)
             {
                 foreach (var player in normalPlayers)
                 {
-                    if (!player.IsLocalPlayer)
-                        player.Draw(canvas, mapParams, map.Config, localPlayer);
+                    if (player.IsLocalPlayer)
+                        continue;
+                    if (!worldBounds.Contains(player.Position))
+                        continue;
+                    var sp = mapParams.ToScreenPos(MapParams.ToMapPos(player.Position, mapCfg));
+                    player.Draw(canvas, sp, localPlayer);
                 }
             }
 
@@ -629,6 +702,10 @@ namespace eft_dma_radar.Silk.UI
                 _tooltipLines.Add(($"Price: {LootFilter.FormatPrice(loot.DisplayPrice)}", SKPaints.TooltipAccent));
 
             _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
+
+            // Warn if loot is far below the player (likely under the map / inaccessible)
+            if (loot.Position.Y < localPlayer.Position.Y - 15f)
+                _tooltipLines.Add(("Under map (inaccessible)", SKPaints.TooltipLabel));
         }
 
         private static void BuildCorpseTooltipLines(LootCorpse corpse, Player localPlayer)
@@ -741,7 +818,7 @@ namespace eft_dma_radar.Silk.UI
 
             foreach (var (text, paint) in lines)
             {
-                canvas.DrawText(text, textX, textY, SKTextAlign.Left, SKPaints.FontTooltip, paint);
+                canvas.DrawText(text, textX, textY, SKPaints.FontTooltip, paint);
                 textY += lineH;
             }
         }
@@ -840,7 +917,7 @@ namespace eft_dma_radar.Silk.UI
             float x = (bounds.Width - textWidth) / 2f;
             float y = bounds.Height / 2f;
 
-            canvas.DrawText(text, x, y, SKTextAlign.Left, SKPaints.FontRegular48, SKPaints.TextRadarStatus);
+            canvas.DrawText(text, x, y, SKPaints.FontRegular48, SKPaints.TextRadarStatus);
         }
 
         #endregion
@@ -904,9 +981,63 @@ namespace eft_dma_radar.Silk.UI
 
             ImGui.Separator();
 
-            // ── View menu ───────────────────────────────────────────────────
+            // ── View menu — radar display toggles ─────────────────────────
             if (ImGui.BeginMenu("View"))
             {
+                // Mode
+                bool battleMode = Config.BattleMode;
+                if (ImGui.MenuItem("\u2694 Battle Mode", "B", battleMode))
+                    Config.BattleMode = !Config.BattleMode;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Hide loot, corpses and doors — show only players");
+
+                ImGui.Separator();
+
+                // Radar layers
+                ImGui.TextDisabled("Radar Layers");
+
+                bool showLoot = Config.ShowLoot;
+                if (ImGui.MenuItem("\u25c6 Loot", null, showLoot))
+                    Config.ShowLoot = !Config.ShowLoot;
+
+                bool showExfils = Config.ShowExfils;
+                if (ImGui.MenuItem("\u25b2 Exfils", null, showExfils))
+                    Config.ShowExfils = !Config.ShowExfils;
+
+                bool showDoors = Config.ShowDoors;
+                if (ImGui.MenuItem("\u25a1 Doors", null, showDoors))
+                    Config.ShowDoors = !Config.ShowDoors;
+
+                ImGui.Separator();
+
+                // Player display
+                ImGui.TextDisabled("Player Display");
+
+                bool showAimlines = Config.ShowAimlines;
+                if (ImGui.MenuItem("\u2192 Aimlines", null, showAimlines))
+                    Config.ShowAimlines = !Config.ShowAimlines;
+
+                bool connectGroups = Config.ConnectGroups;
+                if (ImGui.MenuItem("\u2500 Connect Groups", null, connectGroups))
+                    Config.ConnectGroups = !Config.ConnectGroups;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Draw lines between squad members");
+
+                bool highAlert = Config.HighAlert;
+                if (ImGui.MenuItem("\u26a0 High Alert", null, highAlert))
+                    Config.HighAlert = !Config.HighAlert;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Extend aimline when an enemy is looking at you");
+
+                ImGui.EndMenu();
+            }
+
+            // ── Windows menu — panels & widgets ─────────────────────────────
+            if (ImGui.BeginMenu("Windows"))
+            {
+                // Panels
+                ImGui.TextDisabled("Panels");
+
                 if (ImGui.MenuItem("\u2699 Settings", "S", SettingsPanel.IsOpen))
                     SettingsPanel.IsOpen = !SettingsPanel.IsOpen;
 
@@ -915,24 +1046,28 @@ namespace eft_dma_radar.Silk.UI
 
                 ImGui.Separator();
 
-                bool battleMode = Config.BattleMode;
-                if (ImGui.MenuItem("\u2694 Battle Mode", "B", battleMode))
-                    Config.BattleMode = !Config.BattleMode;
+                // Widgets
+                ImGui.TextDisabled("Widgets");
 
-                ImGui.EndMenu();
-            }
-
-            // ── Windows menu ────────────────────────────────────────────────
-            if (ImGui.BeginMenu("Windows"))
-            {
-                if (ImGui.MenuItem("\u263a Players", null, PlayerInfoWidget.IsOpen))
+                if (ImGui.MenuItem("\u263a Players", "P", PlayerInfoWidget.IsOpen))
                     PlayerInfoWidget.IsOpen = !PlayerInfoWidget.IsOpen;
 
-                if (ImGui.MenuItem("\u2234 Loot", null, LootWidget.IsOpen))
+                if (ImGui.MenuItem("\u2234 Loot Table", "T", LootWidget.IsOpen))
                     LootWidget.IsOpen = !LootWidget.IsOpen;
 
-                if (ImGui.MenuItem("\u25ce Aimview", null, AimviewWidget.IsOpen))
+                if (ImGui.MenuItem("\u25ce Aimview", "A", AimviewWidget.IsOpen))
                     AimviewWidget.IsOpen = !AimviewWidget.IsOpen;
+
+                ImGui.Separator();
+
+                if (ImGui.MenuItem("Close All", "Esc"))
+                {
+                    SettingsPanel.IsOpen = false;
+                    LootFiltersPanel.IsOpen = false;
+                    PlayerInfoWidget.IsOpen = false;
+                    LootWidget.IsOpen = false;
+                    AimviewWidget.IsOpen = false;
+                }
 
                 ImGui.EndMenu();
             }
@@ -1136,6 +1271,76 @@ namespace eft_dma_radar.Silk.UI
             colors[(int)ImGuiCol.TableRowBgAlt]      = new Vector4(1.0f, 1.0f, 1.0f, 0.02f);
         }
 
+        /// <summary>
+        /// Loads the embedded NeoSansStd font into ImGui's font atlas.
+        /// Must be called inside the onConfigureIO callback before the atlas is built.
+        /// </summary>
+        private static unsafe void LoadImGuiFont(ImGuiIOPtr io)
+        {
+            using var stream = Assembly.GetExecutingAssembly()
+                .GetManifestResourceStream("eft_dma_radar.Silk.NeoSansStdRegular.otf");
+            if (stream is null)
+            {
+                Log.WriteLine("[RadarWindow] WARNING: Embedded font not found for ImGui, using default.");
+                return;
+            }
+
+            var fontData = new byte[stream.Length];
+            stream.ReadExactly(fontData);
+
+            // Pin the managed array — must stay pinned for the lifetime of ImGui's font atlas
+            _imguiFontHandle = GCHandle.Alloc(fontData, GCHandleType.Pinned);
+
+            // Create config with FontDataOwnedByAtlas = false so ImGui won't try to free our pinned memory
+            var config = ImGuiNative.ImFontConfig_ImFontConfig();
+            config->FontDataOwnedByAtlas = 0;
+
+            io.Fonts.AddFontFromMemoryTTF(
+                _imguiFontHandle.AddrOfPinnedObject(),
+                fontData.Length,
+                13.0f,
+                new ImFontConfigPtr(config),
+                io.Fonts.GetGlyphRangesDefault());
+
+            ImGuiNative.ImFontConfig_destroy(config);
+            Log.WriteLine("[RadarWindow] Custom font loaded for ImGui (13px).");
+
+            // Merge system symbol font for Unicode icon glyphs (geometric shapes, arrows, etc.)
+            var symbolFontPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Fonts),
+                "seguisym.ttf");
+
+            if (File.Exists(symbolFontPath))
+            {
+                _iconGlyphRangesHandle = GCHandle.Alloc(_iconGlyphRanges, GCHandleType.Pinned);
+
+                var mergeConfig = ImGuiNative.ImFontConfig_ImFontConfig();
+                mergeConfig->MergeMode = 1; // Merge into the previously added font
+                mergeConfig->FontDataOwnedByAtlas = 1; // ImGui owns file-loaded data
+
+                io.Fonts.AddFontFromFileTTF(
+                    symbolFontPath,
+                    13.0f,
+                    new ImFontConfigPtr(mergeConfig),
+                    _iconGlyphRangesHandle.AddrOfPinnedObject());
+
+                ImGuiNative.ImFontConfig_destroy(mergeConfig);
+                Log.WriteLine("[RadarWindow] Symbol font merged for ImGui icons.");
+            }
+            else
+            {
+                Log.WriteLine("[RadarWindow] WARNING: seguisym.ttf not found, icons may render as '?'.");
+            }
+        }
+
+        /// <summary>
+        /// Applies ImGui global font scale based on config UIScale.
+        /// </summary>
+        private static void ApplyImGuiFontScale()
+        {
+            ImGui.GetIO().FontGlobalScale = UIScale;
+        }
+
         #endregion
 
         #region Input Handling
@@ -1178,6 +1383,13 @@ namespace eft_dma_radar.Silk.UI
                 return;
             }
 
+            // Dead zone — skip expensive hit-testing when mouse barely moved
+            float dx = position.X - _lastHitTestMousePos.X;
+            float dy = position.Y - _lastHitTestMousePos.Y;
+            if (dx * dx + dy * dy < HitTestDeadZone * HitTestDeadZone)
+                return;
+            _lastHitTestMousePos = position;
+
             var curParams = GetCurrentMapParams();
             if (curParams is null)
             {
@@ -1193,6 +1405,9 @@ namespace eft_dma_radar.Silk.UI
             var mousePos = position;
             float hitRadius = 12f * UIScale;
 
+            // Pre-compute world bounds for culling — entities off-screen can't be hovered
+            var worldBounds = mp.GetWorldBounds(0f);
+
             // Check players
             Player? closestPlayer = null;
             float closestPlayerDist = float.MaxValue;
@@ -1203,6 +1418,8 @@ namespace eft_dma_radar.Silk.UI
                 foreach (var p in players)
                 {
                     if (p.IsLocalPlayer || !p.IsActive || !p.IsAlive)
+                        continue;
+                    if (!worldBounds.Contains(p.Position))
                         continue;
                     var screenPos = mp.ToScreenPos(MapParams.ToMapPos(p.Position, mp.Config));
                     float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
@@ -1239,6 +1456,8 @@ namespace eft_dma_radar.Silk.UI
                     {
                         if (!item.ShouldDraw())
                             continue;
+                        if (!worldBounds.Contains(item.Position))
+                            continue;
                         var screenPos = mp.ToScreenPos(MapParams.ToMapPos(item.Position, mp.Config));
                         float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
                         if (dist < closestLootDist)
@@ -1261,6 +1480,8 @@ namespace eft_dma_radar.Silk.UI
                 {
                     foreach (var c in corpses)
                     {
+                        if (!worldBounds.Contains(c.Position))
+                            continue;
                         var screenPos = mp.ToScreenPos(MapParams.ToMapPos(c.Position, mp.Config));
                         float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
                         if (dist < closestCorpseDist)
@@ -1305,6 +1526,8 @@ namespace eft_dma_radar.Silk.UI
                 {
                     foreach (var e in exfils)
                     {
+                        if (!worldBounds.Contains(e.Position))
+                            continue;
                         var screenPos = mp.ToScreenPos(MapParams.ToMapPos(e.Position, mp.Config));
                         float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
                         if (dist < closestExfilDist)
@@ -1397,6 +1620,15 @@ namespace eft_dma_radar.Silk.UI
                 case Key.L:
                     LootFiltersPanel.IsOpen = !LootFiltersPanel.IsOpen;
                     break;
+                case Key.P:
+                    PlayerInfoWidget.IsOpen = !PlayerInfoWidget.IsOpen;
+                    break;
+                case Key.T:
+                    LootWidget.IsOpen = !LootWidget.IsOpen;
+                    break;
+                case Key.A:
+                    AimviewWidget.IsOpen = !AimviewWidget.IsOpen;
+                    break;
                 case Key.Escape:
                     SettingsPanel.IsOpen = false;
                     LootFiltersPanel.IsOpen = false;
@@ -1423,6 +1655,14 @@ namespace eft_dma_radar.Silk.UI
             Config.WindowWidth = _window.Size.X;
             Config.WindowHeight = _window.Size.Y;
             Config.WindowMaximized = _window.WindowState == WindowState.Maximized;
+
+            // Persist widget/panel visibility
+            Config.ShowPlayersWidget = PlayerInfoWidget.IsOpen;
+            Config.ShowLootWidget = LootWidget.IsOpen;
+            Config.ShowAimviewWidget = AimviewWidget.IsOpen;
+            Config.ShowSettingsOverlay = SettingsPanel.IsOpen;
+            Config.ShowLootFiltersPanel = LootFiltersPanel.IsOpen;
+
             Config.Save();
 
             // Signal the memory worker to stop cleanly before we release GPU resources
@@ -1431,6 +1671,10 @@ namespace eft_dma_radar.Silk.UI
             // Dispose GPU/UI resources
             _fpsTimer.Dispose();
             _imgui?.Dispose();
+            if (_imguiFontHandle.IsAllocated)
+                _imguiFontHandle.Free();
+            if (_iconGlyphRangesHandle.IsAllocated)
+                _iconGlyphRangesHandle.Free();
             _skSurface?.Dispose();
             _skBackendRenderTarget?.Dispose();
             _grContext?.Dispose();

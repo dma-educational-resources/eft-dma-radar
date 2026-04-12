@@ -88,18 +88,26 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             var oldCorpses = _corpses;
             if (oldCorpses.Count > 0 && corpseResult.Count > 0)
             {
-                foreach (var nc in corpseResult)
+                // Build lookup by address for O(1) matching instead of O(n*m) nested loop
+                Dictionary<ulong, LootCorpse>? oldByAddr = null;
+                foreach (var oc in oldCorpses)
                 {
-                    for (int i = 0; i < oldCorpses.Count; i++)
+                    if (oc.Name != "Corpse" || oc.GearReady)
                     {
-                        var oc = oldCorpses[i];
-                        if (oc.InteractiveClass == nc.InteractiveClass)
+                        (oldByAddr ??= new(oldCorpses.Count))[oc.InteractiveClass] = oc;
+                    }
+                }
+
+                if (oldByAddr is not null)
+                {
+                    foreach (var nc in corpseResult)
+                    {
+                        if (oldByAddr.TryGetValue(nc.InteractiveClass, out var oc))
                         {
                             nc.Name = oc.Name;
                             nc.GearReady = oc.GearReady;
                             nc.Equipment = oc.Equipment;
                             nc.TotalValue = oc.TotalValue;
-                            break;
                         }
                     }
                 }
@@ -562,18 +570,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// </summary>
         private static Vector3 ComputeTransformPosition(TrsX[] vertices, int[] parentIndices, int index)
         {
-            var pos = vertices[index].T;
-            int parent = parentIndices[index];
-            int iter = 0;
-
-            while (parent >= 0 && parent < vertices.Length && iter++ < 4096)
-            {
-                ref readonly var p = ref vertices[parent];
-                pos = Vector3.Transform(pos, p.Q);
-                pos *= p.S;
-                pos += p.T;
-                parent = parentIndices[parent];
-            }
+            var pos = TrsX.ComputeWorldPosition(vertices, parentIndices, index);
 
             if (!float.IsFinite(pos.X) || !float.IsFinite(pos.Y) || !float.IsFinite(pos.Z))
                 return Vector3.Zero;

@@ -27,23 +27,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// <summary>Whether equipment has been read at least once.</summary>
         public bool GearReady { get; set; }
 
-        // Pre-built X marker path — static, shared across all corpses
-        private static readonly SKPath _xMarker = CreateXMarker();
-
-        private static SKPath CreateXMarker()
-        {
-            const float s = 4.5f;
-            var path = new SKPath();
-            path.MoveTo(-s, -s);
-            path.LineTo(s, s);
-            path.MoveTo(-s, s);
-            path.LineTo(s, -s);
-            return path;
-        }
-
-        // Stroke paint for the X — reused, color set per-draw
+        // Stroke paint for the X — color set once at init
         private static readonly SKPaint _xStroke = new()
         {
+            Color = SKPaints.PaintCorpse.Color,
             StrokeWidth = 2.0f,
             Style = SKPaintStyle.Stroke,
             StrokeCap = SKStrokeCap.Round,
@@ -59,11 +46,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             IsAntialias = true,
         };
 
-        // Cached label to avoid per-frame string allocation
-        private string? _cachedLabel;
-        private string? _cachedLabelName;
-        private int _cachedLabelValue = -1;
-
         public LootCorpse(ulong interactiveClass, Vector3 position)
         {
             InteractiveClass = interactiveClass;
@@ -71,34 +53,17 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         }
 
         /// <summary>
-        /// Draw this corpse on the radar canvas as an X marker with name label.
+        /// Draw this corpse on the radar canvas as an X marker.
+        /// Uses direct line draws to avoid canvas Save/Translate/Restore.
         /// </summary>
-        public void Draw(SKCanvas canvas, MapParams mapParams, MapConfig mapConfig, Player.Player localPlayer)
+        public void Draw(SKCanvas canvas, SKPoint screenPos)
         {
-            var mapPos = MapParams.ToMapPos(Position, mapConfig);
-            var screenPos = mapParams.ToScreenPos(mapPos);
-
-            // X marker
-            canvas.Save();
-            canvas.Translate(screenPos.X, screenPos.Y);
-            canvas.DrawPath(_xMarker, _xOutline);
-            _xStroke.Color = SKPaints.PaintCorpse.Color;
-            canvas.DrawPath(_xMarker, _xStroke);
-            canvas.Restore();
-
-            // Name label — cached to avoid per-frame allocation
-            float lx = screenPos.X + 7;
-            float ly = screenPos.Y + 4.5f;
-
-            if (_cachedLabel is null || _cachedLabelValue != TotalValue || _cachedLabelName != Name)
-            {
-                _cachedLabelName = Name;
-                _cachedLabelValue = TotalValue;
-                _cachedLabel = TotalValue > 0 ? $"{Name} ({LootFilter.FormatPrice(TotalValue)})" : Name;
-            }
-
-            canvas.DrawText(_cachedLabel, lx + 1, ly + 1, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.LootShadow);
-            canvas.DrawText(_cachedLabel, lx, ly, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.TextCorpse);
+            const float s = 4.5f;
+            float px = screenPos.X, py = screenPos.Y;
+            canvas.DrawLine(px - s, py - s, px + s, py + s, _xOutline);
+            canvas.DrawLine(px - s, py + s, px + s, py - s, _xOutline);
+            canvas.DrawLine(px - s, py - s, px + s, py + s, _xStroke);
+            canvas.DrawLine(px - s, py + s, px + s, py - s, _xStroke);
         }
     }
 

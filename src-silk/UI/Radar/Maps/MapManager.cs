@@ -4,8 +4,9 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
 {
     /// <summary>
     /// Manages map configs and the currently active <see cref="RadarMap"/>.
-    /// Thread-safe lazy load — rasterizes SVG layers on first use per map ID.
-    /// Self-contained map manager with no external dependencies.
+    /// Thread-safe lazy load — rasterizes SVG layers on a background thread to avoid
+    /// blocking the render loop. The render thread checks <see cref="IsLoading"/> and
+    /// shows a status message until the map is ready.
     /// </summary>
     internal static class MapManager
     {
@@ -14,6 +15,7 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
 
         private static RadarMap? _currentMap;
         private static string? _currentMapId;
+        private static volatile bool _isLoading;
         private static readonly Lock _lock = new();
 
         /// <summary>Maps directory in the output tree.</summary>
@@ -28,6 +30,9 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
 
         /// <summary>Currently active map, or <see langword="null"/> if none loaded.</summary>
         internal static RadarMap? Map => _currentMap;
+
+        /// <summary>Whether a map is currently being loaded on a background thread.</summary>
+        internal static bool IsLoading => _isLoading;
 
         /// <summary>
         /// Scans the Maps directory, deserializes all JSON configs, and caches them.
@@ -77,9 +82,10 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
         }
 
         /// <summary>
-        /// Loads (or reloads) the map matching <paramref name="mapId"/>.
-        /// Falls back to the "default" config if the ID is not found.
-        /// No-ops if the requested map is already active.
+        /// Kicks off a background load for the map matching <paramref name="mapId"/>.
+        /// Returns immediately — the render thread should check <see cref="IsLoading"/>
+        /// and <see cref="Map"/> each frame. No-ops if the requested map is already
+        /// active or a load is in progress.
         /// </summary>
         internal static void LoadMap(string mapId)
         {
@@ -90,6 +96,10 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
             {
                 // Already loaded?
                 if (string.Equals(_currentMapId, mapId, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                // Already loading this map?
+                if (_isLoading)
                     return;
 
                 // Resolve config
@@ -110,18 +120,35 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
                 _currentMapId = null;
                 old?.Dispose();
 
-                try
+                _isLoading = true;
+                var capturedConfig = config;
+                var capturedId = mapId;
+
+                Task.Run(() =>
                 {
-                    Log.WriteLine($"[MapManager] Loading map '{mapId}' ({config.Name})...");
-                    var map = new RadarMap(MapsDir, mapId, config);
-                    _currentMap   = map;
-                    _currentMapId = mapId;
-                    Log.WriteLine($"[MapManager] Map '{config.Name}' ready.");
-                }
-                catch (Exception ex)
-                {
-                    Log.WriteLine($"[MapManager] Failed to load map '{mapId}': {ex}");
-                }
+                    try
+                    {
+                        Log.WriteLine($"[MapManager] Loading map '{capturedId}' ({capturedConfig.Name})...");
+                        var sw = Stopwatch.StartNew();
+                        var map = new RadarMap(MapsDir, capturedId, capturedConfig);
+                        sw.Stop();
+                        Log.WriteLine($"[MapManager] Map '{capturedConfig.Name}' ready ({sw.ElapsedMilliseconds}ms).");
+
+                        lock (_lock)
+                        {
+                            _currentMap = map;
+                            _currentMapId = capturedId;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.WriteLine($"[MapManager] Failed to load map '{capturedId}': {ex}");
+                    }
+                    finally
+                    {
+                        _isLoading = false;
+                    }
+                });
             }
         }
     }

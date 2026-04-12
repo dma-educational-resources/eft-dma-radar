@@ -106,15 +106,22 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// </summary>
         public static void ClearSearch() => _searchText = string.Empty;
 
+        // ── Price formatting cache ───────────────────────────────────────
+        // FormatPrice is called from tooltips and widgets — caching avoids repeated
+        // string interpolation for the same price value across frames.
+        private static readonly ConcurrentDictionary<int, string> _priceCache = new();
+
         /// <summary>
         /// Format a rouble price for display (e.g. 1.2M, 50K, 999).
+        /// Results are cached to avoid per-frame string allocation.
         /// </summary>
-        public static string FormatPrice(int price) => price switch
-        {
-            >= 1_000_000 => $"{price / 1_000_000f:0.#}M",
-            >= 1_000 => $"{price / 1_000f:0.#}K",
-            _ => price.ToString(),
-        };
+        public static string FormatPrice(int price) =>
+            _priceCache.GetOrAdd(price, static p => p switch
+            {
+                >= 1_000_000 => $"{p / 1_000_000f:0.#}M",
+                >= 1_000 => $"{p / 1_000f:0.#}K",
+                _ => p.ToString(),
+            });
 
         /// <summary>
         /// Reset all filter settings to defaults.

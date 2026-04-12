@@ -101,7 +101,13 @@ namespace eft_dma_radar.Silk.UI
             IsAntialias = true,
         };
 
-        public static SKPaint TextRadarStatus { get; } = NewTextPaint(SKColors.Red);
+        public static SKPaint TextRadarStatus { get; } = NewTextPaint(new SKColor(77, 192, 181));
+
+        /// <summary>Subtitle text on the idle/loading screen — dim grey.</summary>
+        public static SKPaint TextRadarStatusSub { get; } = NewTextPaint(new SKColor(130, 135, 145));
+
+        /// <summary>Font for status subtitle (smaller than title).</summary>
+        public static SKFont FontRegular18 { get; } = new(CustomFonts.Regular, 18) { Subpixel = true };
 
         #endregion
 
@@ -112,6 +118,12 @@ namespace eft_dma_radar.Silk.UI
 
         /// <summary>Valuable loot — bright green circle + text.</summary>
         public static SKPaint LootImportant { get; } = NewTextPaint(new SKColor(50, 255, 50));
+
+        /// <summary>Normal loot on a different floor — dimmed.</summary>
+        public static SKPaint LootNormalDimmed { get; } = NewTextPaint(new SKColor(200, 200, 200, 80));
+
+        /// <summary>Valuable loot on a different floor — dimmed.</summary>
+        public static SKPaint LootImportantDimmed { get; } = NewTextPaint(new SKColor(50, 255, 50, 100));
 
         /// <summary>Corpse marker fill — muted orange.</summary>
         public static SKPaint PaintCorpse { get; } = NewFillPaint(new SKColor(200, 150, 80, 180));
@@ -207,12 +219,8 @@ namespace eft_dma_radar.Silk.UI
             IsAntialias = true,
         };
 
-        private static SKPaint NewTextPaint(SKColor color) => new()
-        {
-            Color = color,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
+        /// <summary>Alias — text and fill paints use the same style.</summary>
+        private static SKPaint NewTextPaint(SKColor color) => NewFillPaint(color);
 
         #endregion
     }

@@ -298,6 +298,15 @@ namespace eft_dma_radar.Silk.UI.Panels
                 ImGui.SetTooltip("Toggle between player-follow and free-pan  [F]");
 
             ImGui.Spacing();
+            ImGui.SeparatorText("Corpses");
+
+            bool showCorpses = Config.ShowCorpses;
+            if (ImGui.Checkbox("Show Corpses", ref showCorpses))
+                Config.ShowCorpses = showCorpses;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Show corpse X markers on the radar");
+
+            ImGui.Spacing();
             ImGui.SeparatorText("Exfils");
 
             bool showExfils = Config.ShowExfils;

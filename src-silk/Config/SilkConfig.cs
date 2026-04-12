@@ -80,6 +80,23 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Extend aimline when an enemy is facing the local player (High Alert).</summary>
         public bool HighAlert { get; set; } = true;
 
+        // ── Widget Visibility ───────────────────────────────────────────────────
+
+        /// <summary>Whether the Players widget is open.</summary>
+        public bool ShowPlayersWidget { get; set; } = true;
+
+        /// <summary>Whether the Loot widget is open.</summary>
+        public bool ShowLootWidget { get; set; } = false;
+
+        /// <summary>Whether the Aimview widget is open.</summary>
+        public bool ShowAimviewWidget { get; set; } = true;
+
+        /// <summary>Whether the unified settings overlay is open.</summary>
+        public bool ShowSettingsOverlay { get; set; } = false;
+
+        /// <summary>Whether the Loot Filters panel is open.</summary>
+        public bool ShowLootFiltersPanel { get; set; } = false;
+
         // ── Exfils ──────────────────────────────────────────────────────────────
 
         /// <summary>Master toggle for exfil rendering on the radar.</summary>
@@ -109,6 +126,9 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>Master toggle for loot rendering on the radar.</summary>
         public bool ShowLoot { get; set; } = true;
+
+        /// <summary>Show corpse X markers on the radar (when loot is enabled).</summary>
+        public bool ShowCorpses { get; set; } = true;
 
         /// <summary>Minimum price (roubles) below which loot is hidden from the radar.</summary>
         public int LootMinPrice { get; set; } = 50_000;

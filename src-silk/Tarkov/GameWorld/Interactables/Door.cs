@@ -28,6 +28,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Interactables
         /// <summary>World position (static — read once at construction).</summary>
         public Vector3 Position { get; }
 
+        /// <summary>
+        /// Cached flag: whether this door is near important loot.
+        /// Updated by the registration worker, read by the render thread.
+        /// </summary>
+        public volatile bool IsNearLoot;
+
         public Door(ulong ptr, string id, string? keyId, string? keyName, Vector3 position, EDoorState state)
         {
             Base = ptr;
@@ -37,6 +43,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Interactables
             Position = position;
             DoorState = state;
         }
+
+        // Cached distance label — avoids per-frame string allocation + MeasureText
+        private int _cachedDistVal = -1;
+        private string _cachedDistText = "";
+        private float _cachedDistWidth;
 
         /// <summary>
         /// Whether this door should be drawn on the radar.
@@ -57,27 +68,28 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Interactables
         }
 
         /// <summary>
-        /// Whether this door is within proximity of at least one important loot item.
+        /// Updates <see cref="IsNearLoot"/> based on proximity to important loot items.
+        /// Called from the registration worker thread, not the render thread.
         /// </summary>
-        public bool IsNearImportantLoot(IReadOnlyList<LootItem> loot, float proximitySquared)
+        public void UpdateNearLootFlag(IReadOnlyList<LootItem> loot, float proximitySquared)
         {
             for (int i = 0; i < loot.Count; i++)
             {
                 var item = loot[i];
                 if (item.IsImportant && Vector3.DistanceSquared(Position, item.Position) <= proximitySquared)
-                    return true;
+                {
+                    IsNearLoot = true;
+                    return;
+                }
             }
-            return false;
+            IsNearLoot = false;
         }
 
         /// <summary>
         /// Draw this door on the radar canvas.
         /// </summary>
-        public void Draw(SKCanvas canvas, MapParams mapParams, MapConfig mapConfig, Player.Player localPlayer)
+        public void Draw(SKCanvas canvas, SKPoint screenPos, Player.Player localPlayer)
         {
-            var mapPos = MapParams.ToMapPos(Position, mapConfig);
-            var screenPos = mapParams.ToScreenPos(mapPos);
-
             var (dot, text) = GetPaints();
 
             // Small square marker
@@ -90,18 +102,22 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Interactables
             {
                 float lx = screenPos.X + 7f;
                 float ly = screenPos.Y + 4.5f;
-                canvas.DrawText(KeyName, lx + 1, ly + 1, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.TextShadow);
-                canvas.DrawText(KeyName, lx, ly, SKTextAlign.Left, SKPaints.FontRegular11, text);
+                canvas.DrawText(KeyName, lx + 1, ly + 1, SKPaints.FontRegular11, SKPaints.TextShadow);
+                canvas.DrawText(KeyName, lx, ly, SKPaints.FontRegular11, text);
             }
 
-            // Distance label
-            var dist = Vector3.Distance(localPlayer.Position, Position);
-            var distText = $"{(int)dist}m";
-            var distWidth = SKPaints.FontRegular11.MeasureText(distText);
-            float dx = screenPos.X - distWidth / 2;
+            // Distance label — cached to avoid per-frame string allocation + MeasureText
+            int d = (int)Vector3.Distance(localPlayer.Position, Position);
+            if (d != _cachedDistVal)
+            {
+                _cachedDistVal = d;
+                _cachedDistText = $"{d}m";
+                _cachedDistWidth = SKPaints.FontRegular11.MeasureText(_cachedDistText);
+            }
+            float dx = screenPos.X - _cachedDistWidth / 2;
             float dy = screenPos.Y + 14f;
-            canvas.DrawText(distText, dx + 1, dy + 1, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.TextShadow);
-            canvas.DrawText(distText, dx, dy, SKTextAlign.Left, SKPaints.FontRegular11, text);
+            canvas.DrawText(_cachedDistText, dx + 1, dy + 1, SKPaints.FontRegular11, SKPaints.TextShadow);
+            canvas.DrawText(_cachedDistText, dx, dy, SKPaints.FontRegular11, text);
         }
 
         private (SKPaint dot, SKPaint text) GetPaints() => DoorState switch

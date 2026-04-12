@@ -15,7 +15,14 @@ namespace eft_dma_radar.Silk.UI.Widgets
         private static Vector3 _sortOrigin;
 
         /// <summary>Whether the player info widget is open.</summary>
-        public static bool IsOpen { get; set; } = true;
+        public static bool IsOpenField;
+
+        /// <summary>Whether the player info widget is open.</summary>
+        public static bool IsOpen
+        {
+            get => IsOpenField;
+            set => IsOpenField = value;
+        }
 
         /// <summary>Draw the player info widget.</summary>
         public static void Draw()

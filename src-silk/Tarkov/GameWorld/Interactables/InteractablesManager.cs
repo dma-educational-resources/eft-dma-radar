@@ -402,18 +402,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Interactables
         /// </summary>
         private static Vector3 ComputeTransformPosition(TrsX[] vertices, int[] parentIndices, int index)
         {
-            var pos = vertices[index].T;
-            int parent = parentIndices[index];
-            int iter = 0;
-
-            while (parent >= 0 && parent < vertices.Length && iter++ < 4096)
-            {
-                ref readonly var p = ref vertices[parent];
-                pos = Vector3.Transform(pos, p.Q);
-                pos *= p.S;
-                pos += p.T;
-                parent = parentIndices[parent];
-            }
+            var pos = TrsX.ComputeWorldPosition(vertices, parentIndices, index);
 
             if (!float.IsFinite(pos.X) || !float.IsFinite(pos.Y) || !float.IsFinite(pos.Z))
                 return Vector3.Zero;

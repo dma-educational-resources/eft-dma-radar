@@ -11,7 +11,14 @@ namespace eft_dma_radar.Silk.UI.Widgets
         private const int MAX_ROWS = 50;
 
         /// <summary>Whether the loot widget is open.</summary>
-        public static bool IsOpen { get; set; }
+        public static bool IsOpenField;
+
+        /// <summary>Whether the loot widget is open.</summary>
+        public static bool IsOpen
+        {
+            get => IsOpenField;
+            set => IsOpenField = value;
+        }
 
         // Reusable per-frame collections
         private static readonly Dictionary<string, LootGroup> _groups = new(128);

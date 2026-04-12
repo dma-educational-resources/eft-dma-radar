@@ -23,7 +23,14 @@ namespace eft_dma_radar.Silk.UI.Widgets
         private static uint _colorLoot, _colorLootImportant, _colorCorpse;
 
         /// <summary>Whether the aimview widget is open.</summary>
-        public static bool IsOpen { get; set; } = true;
+        public static bool IsOpenField;
+
+        /// <summary>Whether the aimview widget is open.</summary>
+        public static bool IsOpen
+        {
+            get => IsOpenField;
+            set => IsOpenField = value;
+        }
 
         // Reusable buffers — avoid per-frame allocation
         private static readonly ProjectedItem[] _lootBuf = new ProjectedItem[128];
@@ -163,7 +170,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
 
                     uint color = GetPlayerColor(player);
 
-                    float dotRadius = Math.Clamp(6f - dist * 0.015f, 2f, 6f);
+                    float dotRadius = float.Clamp(6f - dist * 0.015f, 2f, 6f);
                     drawList.AddCircleFilled(new Vector2(screenX, screenY), dotRadius, color);
                     drawList.AddCircle(new Vector2(screenX, screenY), dotRadius, _colorDotOutline);
 
@@ -229,7 +236,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
             for (int i = 0; i < visible; i++)
             {
                 ref var p = ref _lootBuf[i];
-                float half = Math.Clamp(4.5f - p.Dist * 0.1f, 2.5f, 4.5f);
+                float half = float.Clamp(4.5f - p.Dist * 0.1f, 2.5f, 4.5f);
                 var pos = new Vector2(p.ScreenX, p.ScreenY);
                 drawList.AddQuadFilled(
                     pos + new Vector2(0, -half), pos + new Vector2(half, 0),
@@ -246,7 +253,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
             for (int i = 0; i < visible; i++)
             {
                 ref var p = ref _lootBuf[i];
-                float half = Math.Clamp(4.5f - p.Dist * 0.1f, 2.5f, 4.5f);
+                float half = float.Clamp(4.5f - p.Dist * 0.1f, 2.5f, 4.5f);
                 float baseY = p.ScreenY + half + 2f;
                 float labelY = DeconflictY(baseY, _usedLabelYs, ref usedCount,
                     contentMin.Y + 2, contentMax.Y - LabelLineHeight - 2);
@@ -300,7 +307,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
             for (int i = 0; i < visible; i++)
             {
                 ref var p = ref _corpseBuf[i];
-                float s = Math.Clamp(4f - p.Dist * 0.08f, 2.5f, 4f);
+                float s = float.Clamp(4f - p.Dist * 0.08f, 2.5f, 4f);
                 var pos = new Vector2(p.ScreenX, p.ScreenY);
                 drawList.AddLine(pos + new Vector2(-s, -s), pos + new Vector2(s, s), _colorDotOutline, 2.5f);
                 drawList.AddLine(pos + new Vector2(-s, s), pos + new Vector2(s, -s), _colorDotOutline, 2.5f);
@@ -313,7 +320,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
             for (int i = 0; i < visible; i++)
             {
                 ref var p = ref _corpseBuf[i];
-                float s = Math.Clamp(4f - p.Dist * 0.08f, 2.5f, 4f);
+                float s = float.Clamp(4f - p.Dist * 0.08f, 2.5f, 4f);
                 float baseY = p.ScreenY + s + 2f;
                 float labelY = DeconflictY(baseY, _usedLabelYs, ref usedCount,
                     contentMin.Y + 2, contentMax.Y - LabelLineHeight - 2);
@@ -389,8 +396,8 @@ namespace eft_dma_radar.Silk.UI.Widgets
             var textSize = ImGui.CalcTextSize(label);
             float labelX = screenX - textSize.X * 0.5f;
 
-            labelX = Math.Clamp(labelX, contentMin.X + 2, contentMax.X - textSize.X - 2);
-            labelY = Math.Clamp(labelY, contentMin.Y + 2, contentMax.Y - textSize.Y - 2);
+            labelX = float.Clamp(labelX, contentMin.X + 2, contentMax.X - textSize.X - 2);
+            labelY = float.Clamp(labelY, contentMin.Y + 2, contentMax.Y - textSize.Y - 2);
 
             drawList.AddText(new Vector2(labelX + 1, labelY + 1), _colorShadow, label);
             drawList.AddText(new Vector2(labelX, labelY), color, label);
@@ -407,22 +414,22 @@ namespace eft_dma_radar.Silk.UI.Widgets
         {
             var textSize = ImGui.CalcTextSize(label);
             float labelX = screenX - textSize.X * 0.5f;
-            labelX = Math.Clamp(labelX, contentMin.X + 2, contentMax.X - textSize.X - 2);
-            labelY = Math.Clamp(labelY, contentMin.Y + 2, contentMax.Y - textSize.Y - 2);
+            labelX = float.Clamp(labelX, contentMin.X + 2, contentMax.X - textSize.X - 2);
+            labelY = float.Clamp(labelY, contentMin.Y + 2, contentMax.Y - textSize.Y - 2);
 
             drawList.AddText(new Vector2(labelX + 1, labelY + 1), _colorShadow, label);
             drawList.AddText(new Vector2(labelX, labelY), color, label);
         }
 
         /// <summary>
-        /// Nudges <paramref name="desiredY"/> so it doesn't overlap any previously used Y.
+        /// Nudges
         /// Tracks used positions in the shared buffer.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static float DeconflictY(float desiredY, float[] usedYs, ref int usedCount,
             float minY, float maxY)
         {
-            float y = Math.Clamp(desiredY, minY, maxY);
+            float y = float.Clamp(desiredY, minY, maxY);
 
             for (int attempt = 0; attempt < 6; attempt++)
             {
@@ -439,7 +446,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 if (!conflict) break;
             }
 
-            y = Math.Clamp(y, minY, maxY);
+            y = float.Clamp(y, minY, maxY);
 
             if (usedCount < usedYs.Length)
                 usedYs[usedCount++] = y;

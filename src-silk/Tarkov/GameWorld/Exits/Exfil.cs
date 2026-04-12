@@ -33,6 +33,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
         /// <summary>Raw address for scatter status reads.</summary>
         public ulong StatusAddr => _addr + Offsets.Exfil._status;
 
+        // Cached distance label — avoids per-frame string allocation + MeasureText
+        private int _cachedDistVal = -1;
+        private string _cachedDistText = "";
+        private float _cachedDistWidth;
+
         public Exfil(ulong baseAddr, bool isPmc, string mapId)
         {
             _addr = baseAddr;
@@ -109,11 +114,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
         /// <summary>
         /// Draws this exfil on the radar canvas.
         /// </summary>
-        public void Draw(SKCanvas canvas, MapParams mapParams, MapConfig mapConfig, Player.Player localPlayer)
+        public void Draw(SKCanvas canvas, SKPoint screenPos, Player.Player localPlayer)
         {
-            var mapPos = MapParams.ToMapPos(Position, mapConfig);
-            var screenPos = mapParams.ToScreenPos(mapPos);
-
             var (dot, text) = GetPaints(localPlayer as Player.LocalPlayer);
 
             // Draw marker circle
@@ -123,17 +125,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
             // Draw name label
             float lx = screenPos.X + 7f;
             float ly = screenPos.Y + 4.5f;
-            canvas.DrawText(Name, lx + 1, ly + 1, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.TextShadow);
-            canvas.DrawText(Name, lx, ly, SKTextAlign.Left, SKPaints.FontRegular11, text);
+            canvas.DrawText(Name, lx + 1, ly + 1, SKPaints.FontRegular11, SKPaints.TextShadow);
+            canvas.DrawText(Name, lx, ly, SKPaints.FontRegular11, text);
 
-            // Draw distance
-            var dist = Vector3.Distance(localPlayer.Position, Position);
-            var distText = $"{(int)dist}m";
-            var distWidth = SKPaints.FontRegular11.MeasureText(distText);
-            float dx = screenPos.X - distWidth / 2;
+            // Draw distance — cached to avoid per-frame string allocation + MeasureText
+            int d = (int)Vector3.Distance(localPlayer.Position, Position);
+            if (d != _cachedDistVal)
+            {
+                _cachedDistVal = d;
+                _cachedDistText = $"{d}m";
+                _cachedDistWidth = SKPaints.FontRegular11.MeasureText(_cachedDistText);
+            }
+            float dx = screenPos.X - _cachedDistWidth / 2;
             float dy = screenPos.Y + 16f;
-            canvas.DrawText(distText, dx + 1, dy + 1, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.TextShadow);
-            canvas.DrawText(distText, dx, dy, SKTextAlign.Left, SKPaints.FontRegular11, text);
+            canvas.DrawText(_cachedDistText, dx + 1, dy + 1, SKPaints.FontRegular11, SKPaints.TextShadow);
+            canvas.DrawText(_cachedDistText, dx, dy, SKPaints.FontRegular11, text);
         }
 
         private (SKPaint dot, SKPaint text) GetPaints(Player.LocalPlayer? localPlayer)

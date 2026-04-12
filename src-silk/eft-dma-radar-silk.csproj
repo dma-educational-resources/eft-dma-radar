@@ -7,7 +7,7 @@
         <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
         <ServerGarbageCollection>true</ServerGarbageCollection>
         <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
-        <RetainVMGarbageCollection>true</RetainVMGarbageCollection>
+        <RetainVMGarbageCollection>false</RetainVMGarbageCollection>
         <DebugType>portable</DebugType>
     </PropertyGroup>
 

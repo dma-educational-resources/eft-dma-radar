@@ -10,38 +10,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         // Core dot — small filled circle
         private const float DotRadius = 5f;
 
-        // Directional chevron extending from the dot
-        private static readonly SKPath _chevron = CreateChevron();
-        private static readonly SKPath _deathMarker = CreateDeathMarker();
-
-        /// <summary>
-        /// Small forward-pointing chevron (arrow tick).
-        /// Points right (+X), rotated by MapRotation via canvas transform.
-        /// </summary>
-        private static SKPath CreateChevron()
-        {
-            var path = new SKPath();
-            float tipX = DotRadius + 6f;
-            float baseX = DotRadius + 0.5f;
-            float wingY = 3.2f;
-
-            path.MoveTo(baseX, -wingY);
-            path.LineTo(tipX, 0f);
-            path.LineTo(baseX, wingY);
-            return path;
-        }
-
-        private static SKPath CreateDeathMarker()
-        {
-            const float s = 4f;
-            var path = new SKPath();
-            path.MoveTo(-s, -s);
-            path.LineTo(s, s);
-            path.MoveTo(-s, s);
-            path.LineTo(s, -s);
-            return path;
-        }
-
         // Chevron stroke paints
         private static readonly SKPaint _chevronOutline = new()
         {
@@ -109,13 +77,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 
         #region Draw
 
+        // Cached info line — avoids per-frame string allocation
+        private int _cachedInfoH = int.MinValue;
+        private int _cachedInfoD = int.MinValue;
+        private string? _cachedInfo;
+
         /// <summary>
         /// Draws this player on the radar canvas.
         /// </summary>
-        internal virtual void Draw(SKCanvas canvas, MapParams mapParams, MapConfig mapConfig, Player? localPlayer = null)
+        internal virtual void Draw(SKCanvas canvas, SKPoint pos, Player? localPlayer = null)
         {
-            var pos = mapParams.ToScreenPos(MapParams.ToMapPos(Position, mapConfig));
-
             if (!IsAlive)
             {
                 DrawDeathMarker(canvas, pos);
@@ -124,11 +95,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 
             var (fillPaint, textPaint) = GetPaints();
 
-            DrawMarker(canvas, pos, fillPaint);
+            // Compute rotation sin/cos once — shared by marker + aimline
+            float rad = MapRotation * DegToRad;
+            (float sin, float cos) = MathF.SinCos(rad);
+
+            DrawMarker(canvas, pos, fillPaint, sin, cos);
 
             // Aimline — draw after marker so it extends outward
             if (SilkProgram.Config.ShowAimlines && !IsLocalPlayer)
-                DrawAimline(canvas, pos, fillPaint, localPlayer);
+                DrawAimline(canvas, pos, fillPaint, sin, cos, localPlayer);
 
             if (!IsLocalPlayer)
             {
@@ -136,36 +111,59 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 
                 if (localPlayer is not null)
                 {
-                    float height = Position.Y - localPlayer.Position.Y;
-                    float dist = Vector3.Distance(localPlayer.Position, Position);
-                    DrawLabel(canvas, pos, textPaint, name, height, dist);
+                    int h = (int)(Position.Y - localPlayer.Position.Y);
+                    int d = (int)Vector3.Distance(localPlayer.Position, Position);
+
+                    if (h != _cachedInfoH || d != _cachedInfoD)
+                    {
+                        _cachedInfoH = h;
+                        _cachedInfoD = d;
+                        _cachedInfo = string.Create(null, stackalloc char[32], $"{h:+0;-0}m  {d:N0}m");
+                    }
+
+                    DrawLabel(canvas, pos, textPaint, name, _cachedInfo);
                 }
                 else
                 {
-                    DrawLabel(canvas, pos, textPaint, name, null, null);
+                    DrawLabel(canvas, pos, textPaint, name, null);
                 }
             }
         }
 
+        // Chevron geometry constants
+        private const float ChevronTipX = DotRadius + 6f;
+        private const float ChevronBaseX = DotRadius + 0.5f;
+        private const float ChevronWingY = 3.2f;
+
         /// <summary>
         /// Draws a filled circle + directional chevron tick.
+        /// Manually rotates chevron points to avoid canvas Save/Translate/Rotate/Restore.
         /// </summary>
-        private void DrawMarker(SKCanvas canvas, SKPoint point, SKPaint fillPaint)
+        private void DrawMarker(SKCanvas canvas, SKPoint point, SKPaint fillPaint, float sin, float cos)
         {
-            canvas.Save();
-            canvas.Translate(point.X, point.Y);
-
             // Filled dot with thin dark border
-            canvas.DrawCircle(0, 0, DotRadius, SKPaints.ShapeBorder);
-            canvas.DrawCircle(0, 0, DotRadius - 0.6f, fillPaint);
+            canvas.DrawCircle(point, DotRadius, SKPaints.ShapeBorder);
+            canvas.DrawCircle(point, DotRadius - 0.6f, fillPaint);
 
-            // Directional chevron — rotated to face direction
-            canvas.RotateDegrees(MapRotation);
-            canvas.DrawPath(_chevron, _chevronOutline);
+            // Rotate the 3 chevron vertices manually
+            float px = point.X, py = point.Y;
+
+            // Wing top: (ChevronBaseX, -ChevronWingY) rotated + translated
+            float w1x = px + cos * ChevronBaseX - sin * (-ChevronWingY);
+            float w1y = py + sin * ChevronBaseX + cos * (-ChevronWingY);
+            // Tip: (ChevronTipX, 0) rotated + translated
+            float tx = px + cos * ChevronTipX;
+            float ty = py + sin * ChevronTipX;
+            // Wing bottom: (ChevronBaseX, ChevronWingY) rotated + translated
+            float w2x = px + cos * ChevronBaseX - sin * ChevronWingY;
+            float w2y = py + sin * ChevronBaseX + cos * ChevronWingY;
+
+            // Outline then colored stroke
+            canvas.DrawLine(w1x, w1y, tx, ty, _chevronOutline);
+            canvas.DrawLine(tx, ty, w2x, w2y, _chevronOutline);
             _chevronStroke.Color = fillPaint.Color;
-            canvas.DrawPath(_chevron, _chevronStroke);
-
-            canvas.Restore();
+            canvas.DrawLine(w1x, w1y, tx, ty, _chevronStroke);
+            canvas.DrawLine(tx, ty, w2x, w2y, _chevronStroke);
         }
 
         /// <summary>
@@ -173,10 +171,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// </summary>
         private static void DrawDeathMarker(SKCanvas canvas, SKPoint point)
         {
-            canvas.Save();
-            canvas.Translate(point.X, point.Y);
-            canvas.DrawPath(_deathMarker, SKPaints.PaintDeathMarker);
-            canvas.Restore();
+            const float s = 4f;
+            float px = point.X, py = point.Y;
+            canvas.DrawLine(px - s, py - s, px + s, py + s, SKPaints.PaintDeathMarker);
+            canvas.DrawLine(px - s, py + s, px + s, py - s, SKPaints.PaintDeathMarker);
         }
 
         /// <summary>
@@ -184,7 +182,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// Length varies by player type. High Alert extends the line when the enemy
         /// is aiming at the local player.
         /// </summary>
-        private void DrawAimline(SKCanvas canvas, SKPoint point, SKPaint fillPaint, Player? localPlayer)
+        private void DrawAimline(SKCanvas canvas, SKPoint point, SKPaint fillPaint, float sin, float cos, Player? localPlayer)
         {
             var config = SilkProgram.Config;
 
@@ -201,19 +199,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             if (length <= 0f)
                 return;
 
-            float radians = MapRotation * DegToRad;
-            (float sin, float cos) = MathF.SinCos(radians);
             float startX = point.X + cos * DotRadius;
             float startY = point.Y + sin * DotRadius;
             float endX = point.X + cos * (DotRadius + length);
             float endY = point.Y + sin * (DotRadius + length);
 
-            var start = new SKPoint(startX, startY);
-            var end = new SKPoint(endX, endY);
-
-            canvas.DrawLine(start, end, _aimlineOutline);
+            canvas.DrawLine(startX, startY, endX, endY, _aimlineOutline);
             _aimlineStroke.Color = fillPaint.Color;
-            canvas.DrawLine(start, end, _aimlineStroke);
+            canvas.DrawLine(startX, startY, endX, endY, _aimlineStroke);
         }
 
         /// <summary>
@@ -235,7 +228,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             var forward = new Vector3(sinYaw, 0f, cosYaw);
 
             float dot = Vector3.Dot(forward, dirToTarget);
-            float angle = MathF.Acos(Math.Clamp(dot, -1f, 1f)) * (180f / MathF.PI);
+            float angle = MathF.Acos(float.Clamp(dot, -1f, 1f)) * (180f / MathF.PI);
 
             // Non-linear angle threshold — tighter at long range, looser at close range
             float threshold = 31.36f - 3.52f * MathF.Log(MathF.Abs(0.627f - 15.69f * distance));
@@ -248,24 +241,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// <summary>
         /// Draws the player name + optional compact H/D info line.
         /// </summary>
-        private static void DrawLabel(SKCanvas canvas, SKPoint point, SKPaint textPaint, string name, float? height, float? dist)
+        private static void DrawLabel(SKCanvas canvas, SKPoint point, SKPaint textPaint, string name, string? info)
         {
             float x = point.X + DotRadius + 4f;
             float y = point.Y + 4.5f;
 
             // Name — offset shadow then fill for clean contrast
-            canvas.DrawText(name, x + 1, y + 1, SKTextAlign.Left, SKPaints.FontRegular11, SKPaints.TextShadow);
-            canvas.DrawText(name, x, y, SKTextAlign.Left, SKPaints.FontRegular11, textPaint);
+            canvas.DrawText(name, x + 1, y + 1, SKPaints.FontRegular11, SKPaints.TextShadow);
+            canvas.DrawText(name, x, y, SKPaints.FontRegular11, textPaint);
 
             // Compact H/D on second line in a smaller, dimmer font
-            if (height.HasValue && dist.HasValue)
+            if (info is not null)
             {
                 float y2 = y + 12f;
-                int h = (int)height.Value;
-                int d = (int)dist.Value;
-                string info = string.Create(null, stackalloc char[32], $"{h:+0;-0}m  {d:N0}m");
-                canvas.DrawText(info, x + 1, y2 + 1, SKTextAlign.Left, _infoFont, _infoShadow);
-                canvas.DrawText(info, x, y2, SKTextAlign.Left, _infoFont, _infoPaint);
+                canvas.DrawText(info, x + 1, y2 + 1, _infoFont, _infoShadow);
+                canvas.DrawText(info, x, y2, _infoFont, _infoPaint);
             }
         }
 

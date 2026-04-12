@@ -175,23 +175,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         {
             try
             {
-                var indices = entry.CachedIndices!;
-                var worldPos = vertices[entry.TransformIndex].T;
-                int idx = indices[entry.TransformIndex];
-                int iterations = 0;
-
-                while (idx >= 0)
-                {
-                    if (iterations++ > MaxHierarchyIterations)
-                        return false;
-
-                    var parent = vertices[idx];
-                    worldPos = Vector3.Transform(worldPos, parent.Q);
-                    worldPos *= parent.S;
-                    worldPos += parent.T;
-
-                    idx = indices[idx];
-                }
+                var worldPos = TrsX.ComputeWorldPosition(vertices, entry.CachedIndices!, entry.TransformIndex, MaxHierarchyIterations);
 
                 if (float.IsFinite(worldPos.X) && float.IsFinite(worldPos.Y) && float.IsFinite(worldPos.Z))
                 {
@@ -468,22 +452,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         {
             try
             {
-                var worldPos = vertices[transformIndex].T;
-                int idx = indices[transformIndex];
-                int iterations = 0;
-
-                while (idx >= 0)
-                {
-                    if (iterations++ > MaxHierarchyIterations)
-                        return false;
-
-                    var parent = vertices[idx];
-                    worldPos = Vector3.Transform(worldPos, parent.Q);
-                    worldPos *= parent.S;
-                    worldPos += parent.T;
-
-                    idx = indices[idx];
-                }
+                var worldPos = TrsX.ComputeWorldPosition(vertices, indices, transformIndex, MaxHierarchyIterations);
 
                 return float.IsFinite(worldPos.X) && float.IsFinite(worldPos.Y) && float.IsFinite(worldPos.Z)
                     && (worldPos.X != 0f || worldPos.Y != 0f || worldPos.Z != 0f);
@@ -563,25 +532,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// Only reallocates when the buffer is too small — amortized zero-alloc.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void EnsureBuffer(ref ulong[] buffer, int minLength)
+        private static void EnsureBuffer<T>(ref T[] buffer, int minLength) where T : struct
         {
             if (buffer.Length < minLength)
-                buffer = new ulong[minLength];
+                buffer = new T[minLength];
             else
                 Array.Clear(buffer, 0, minLength);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void EnsureBuffer(ref int[] buffer, int minLength)
-        {
-            if (buffer.Length < minLength)
-                buffer = new int[minLength];
-            else
-                Array.Clear(buffer, 0, minLength);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void EnsureBuffer(ref bool[] buffer, int minLength, bool fillValue = false)
+        private static void EnsureBuffer(ref bool[] buffer, int minLength, bool fillValue)
         {
             if (buffer.Length < minLength)
                 buffer = new bool[minLength];

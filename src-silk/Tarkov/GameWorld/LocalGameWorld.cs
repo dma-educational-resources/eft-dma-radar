@@ -372,7 +372,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             // (transform validation, loot refresh, etc.) and immediately verify via IsRaidActive().
             if (_registeredPlayers.LocalPlayerLost)
             {
-                Log.WriteLine("[LocalGameWorld] Local player lost — checking raid status...");
+                Log.WriteRateLimited(AppLogLevel.Info, "lgw_lp_lost", TimeSpan.FromSeconds(3),
+                    "[LocalGameWorld] Local player lost — checking raid status...");
                 if (!IsRaidActive())
                 {
                     Log.WriteLine("[LocalGameWorld] Raid ended (local player lost).");
@@ -410,6 +411,19 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             // Interactables (doors) — discovery + state refresh (rate-limited internally)
             _interactablesManager.Refresh();
+
+            // Update door-loot proximity flags (cheap — runs on worker, not render thread)
+            if (SilkProgram.Config.DoorsOnlyNearLoot)
+            {
+                var loot = _lootManager.Loot;
+                var doors = _interactablesManager.Doors;
+                if (loot.Count > 0 && doors.Count > 0)
+                {
+                    float proxSq = SilkProgram.Config.DoorLootProximity * SilkProgram.Config.DoorLootProximity;
+                    for (int i = 0; i < doors.Count; i++)
+                        doors[i].UpdateNearLootFlag(loot, proxSq);
+                }
+            }
 
             // Periodic transform validation
             var now = DateTime.UtcNow;
@@ -479,11 +493,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         ///   <item>RegisteredPlayers count is > 0 (drops to 0 when GameWorld is torn down).</item>
         ///   <item>Map ID hasn't changed (detects map transitions).</item>
         /// </list>
-        /// Retries up to 5 times for transient DMA read failures.
+        /// Retries up to 3 times for transient DMA read failures.
         /// </summary>
         private bool IsRaidActive()
         {
-            for (int attempt = 0; attempt < 5; attempt++)
+            for (int attempt = 0; attempt < 3; attempt++)
             {
                 try
                 {
@@ -495,7 +509,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         if (attempt == 0)
                             Log.Write(AppLogLevel.Debug, $"[LocalGameWorld] IsRaidActive: MainPlayer mismatch " +
                                 $"(read=0x{mainPlayer:X}, expected=0x{_localPlayerAddr:X})");
-                        Thread.Sleep(50);
+                        Thread.Sleep(25);
                         continue;
                     }
 
@@ -506,7 +520,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     {
                         if (attempt == 0)
                             Log.Write(AppLogLevel.Debug, $"[LocalGameWorld] IsRaidActive: player count={count}");
-                        Thread.Sleep(50);
+                        Thread.Sleep(25);
                         continue;
                     }
 
@@ -530,11 +544,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 {
                     if (attempt == 0)
                         Log.Write(AppLogLevel.Debug, $"[LocalGameWorld] IsRaidActive attempt {attempt}: {ex.Message}");
-                    Thread.Sleep(50);
+                    Thread.Sleep(25);
                 }
             }
 
-            // All 5 attempts failed — raid has ended
+            // All 3 attempts failed — raid has ended
             return false;
         }
 
