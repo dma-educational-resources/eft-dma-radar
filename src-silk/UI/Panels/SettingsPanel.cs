@@ -53,6 +53,7 @@ namespace eft_dma_radar.Silk.UI.Panels
                 DrawGeneralTab();
                 DrawPlayersTab();
                 DrawMapTab();
+                DrawHotkeysTab();
 
                 ImGui.EndTabBar();
             }
@@ -384,6 +385,99 @@ namespace eft_dma_radar.Silk.UI.Panels
 
                 ImGui.Unindent(16);
             }
+
+            ImGui.EndTabItem();
+        }
+
+        private static void DrawHotkeysTab()
+        {
+            if (!ImGui.BeginTabItem("Hotkeys"))
+                return;
+
+            ImGui.Spacing();
+
+            if (!InputManager.IsReady)
+            {
+                ImGui.TextColored(new Vector4(1f, 0.6f, 0.2f, 1f),
+                    "\u26a0 Input manager not initialized.");
+                ImGui.TextWrapped("Hotkeys require an active DMA connection. They will activate once a raid starts.");
+                ImGui.EndTabItem();
+                return;
+            }
+
+            ImGui.SeparatorText("Key Bindings");
+            ImGui.TextWrapped("Click a key button to rebind. Press Escape to cancel.");
+            ImGui.Spacing();
+
+            bool isRebinding = HotkeyManager.RebindingAction is not null;
+
+            foreach (var action in HotkeyManager.Actions)
+            {
+                bool isThisRebinding = ReferenceEquals(HotkeyManager.RebindingAction, action);
+                int vk = action.GetKeyCode();
+
+                // Action label (fixed width for alignment)
+                ImGui.AlignTextToFramePadding();
+                ImGui.Text(action.DisplayName);
+                ImGui.SameLine(160);
+
+                // Key binding button
+                string buttonLabel = isThisRebinding
+                    ? "[ Press a key... ]"
+                    : vk > 0 ? VK.GetName(vk) : "(None)";
+
+                float buttonWidth = 140;
+                ImGui.SetNextItemWidth(buttonWidth);
+
+                // Highlight the active rebind button
+                if (isThisRebinding)
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.8f, 0.5f, 0.1f, 1f));
+                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.6f, 0.2f, 1f));
+                    ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.7f, 0.4f, 0.1f, 1f));
+                }
+
+                bool disabled = isRebinding && !isThisRebinding;
+                if (disabled)
+                    ImGui.BeginDisabled();
+
+                if (ImGui.Button($"{buttonLabel}##{action.Id}", new Vector2(buttonWidth, 0)))
+                {
+                    if (isThisRebinding)
+                        HotkeyManager.RebindingAction = null; // Cancel
+                    else
+                        HotkeyManager.RebindingAction = action; // Start capture
+                }
+
+                if (disabled)
+                    ImGui.EndDisabled();
+
+                if (isThisRebinding)
+                    ImGui.PopStyleColor(3);
+
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip(action.Tooltip);
+
+                // Clear button
+                if (vk > 0 && !isRebinding)
+                {
+                    ImGui.SameLine();
+                    if (ImGui.SmallButton($"\u2715##{action.Id}_clear"))
+                    {
+                        HotkeyManager.ClearBinding(action);
+                        Log.WriteLine($"[HotkeyManager] Cleared binding for '{action.DisplayName}'");
+                    }
+                    if (ImGui.IsItemHovered())
+                        ImGui.SetTooltip("Clear this binding");
+                }
+            }
+
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
+            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f),
+                "Hotkeys work via DMA — they read the gaming PC's keyboard state.");
 
             ImGui.EndTabItem();
         }

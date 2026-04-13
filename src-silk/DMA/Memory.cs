@@ -55,6 +55,8 @@ namespace eft_dma_radar.Silk.DMA
         #region Public State
 
         public static MemoryState State => _state;
+        /// <summary>The active VMM handle, or <see langword="null"/> if not yet initialized.</summary>
+        internal static Vmm? VmmHandle => _vmm;
         public static ulong UnityBase { get; private set; }
         public static ulong GOM { get; private set; }
         public static ulong GameAssemblyBase { get; private set; }
@@ -201,6 +203,10 @@ namespace eft_dma_radar.Silk.DMA
                 {
                     break;
                 }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
                 catch (Exception ex)
                 {
                     if (_shutdown) break;
@@ -293,7 +299,7 @@ namespace eft_dma_radar.Silk.DMA
 
         private static void RunGameLoop()
         {
-            while (true)
+            while (!_shutdown)
             {
                 try
                 {
@@ -325,8 +331,13 @@ namespace eft_dma_radar.Silk.DMA
                 }
                 catch (OperationCanceledException)
                 {
+                    if (_shutdown) break;
                     Log.WriteLine("[Memory] Radar restart requested.");
                     continue;
+                }
+                catch (ObjectDisposedException)
+                {
+                    break; // VMM handle disposed — shutdown in progress
                 }
                 catch (GameNotRunningException)
                 {
@@ -334,6 +345,7 @@ namespace eft_dma_radar.Silk.DMA
                 }
                 catch (Exception ex)
                 {
+                    if (_shutdown) break;
                     Log.WriteLine($"[Memory] CRITICAL in game loop: {ex}");
                     Notify("CRITICAL error in game loop", NotificationLevel.Error);
                     break;
@@ -341,12 +353,16 @@ namespace eft_dma_radar.Silk.DMA
                 finally
                 {
                     OnRaidStopped();
-                    Thread.Sleep(100);
+                    if (!_shutdown)
+                        Thread.Sleep(100);
                 }
             }
 
-            Log.WriteLine("[Memory] Game is no longer running.");
-            Notify("Game is no longer running", NotificationLevel.Warning);
+            if (!_shutdown)
+            {
+                Log.WriteLine("[Memory] Game is no longer running.");
+                Notify("Game is no longer running", NotificationLevel.Warning);
+            }
         }
 
         private static volatile bool _restartRequested;

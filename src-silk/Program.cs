@@ -40,6 +40,11 @@ namespace eft_dma_radar.Silk
                 Memory.ModuleInit(Config);
                 Memory.GameStarted += (_, _) => ProfileService.Start();
                 Memory.GameStopped += (_, _) => ProfileService.Stop();
+                Memory.GameStarted += (_, _) =>
+                {
+                    InputManager.Initialize();
+                    HotkeyManager.RegisterAll();
+                };
                 Log.WriteLine("[SilkProgram] Memory module initialized.");
 
                 EftDataManager.ModuleInit();
@@ -80,6 +85,8 @@ namespace eft_dma_radar.Silk
                 if (eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.IsRunning)
                     eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.StopAsync().GetAwaiter().GetResult();
 
+                HotkeyManager.UnregisterAll();
+                InputManager.Shutdown();
                 Memory.Close();
             }
         }

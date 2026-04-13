@@ -44,11 +44,18 @@ namespace VmmSharpEx.Extensions.Input
     public sealed class VmmInputManager
     {
         private readonly Vmm _vmm;
+        private readonly Action<string>? _log;
 
         private readonly byte[] _stateBitmap = new byte[64];
         private readonly byte[] _previousStateBitmap = new byte[256 / 8];
         private readonly ulong _gafAsyncKeyStateExport;
         private readonly uint _winLogonPid;
+
+        /// <summary>The target machine's Windows build number detected during initialization.</summary>
+        public int TargetBuildNumber { get; }
+
+        /// <summary>The resolution method that was used to find gafAsyncKeyState.</summary>
+        public string ResolutionMethod { get; private set; } = "Unknown";
 
         private VmmInputManager() { throw new NotImplementedException(); }
 
@@ -57,34 +64,50 @@ namespace VmmSharpEx.Extensions.Input
         /// Supports both Windows 10 and Windows 11.
         /// </summary>
         /// <param name="vmm">Parent VMM Instance (must be already initialized).</param>
+        /// <param name="log">
+        /// Optional diagnostic logging callback. When provided, receives detailed
+        /// messages about each resolution step for troubleshooting.
+        /// </param>
         /// <exception cref="VmmException"></exception>
-        public VmmInputManager(Vmm vmm)
+        public VmmInputManager(Vmm vmm, Action<string>? log = null)
         {
             _vmm = vmm;
+            _log = log;
+
             if (!_vmm.PidGetFromName("winlogon.exe", out _winLogonPid))
                 throw new VmmException("Failed to get winlogon.exe PID");
 
-            int buildNumber = GetTargetBuildNumber();
+            TargetBuildNumber = GetTargetBuildNumber();
+            _log?.Invoke($"Target build: {TargetBuildNumber}, winlogon PID: {_winLogonPid}");
 
             // Try the expected path first based on the target OS build number,
             // then fall back to the other path. This handles misdetection and
             // edge-case builds (e.g. Win10 with win32ksgd.sys backport).
             ulong gafAsyncKeyState = 0;
-            if (buildNumber >= 22000)
+            if (TargetBuildNumber >= 22000)
             {
+                _log?.Invoke("Attempting Win11 resolution (build >= 22000)...");
                 if (!TryResolveWin11KeyState(out gafAsyncKeyState))
+                {
+                    _log?.Invoke("Win11 failed, falling back to Win10...");
                     TryResolveWin10KeyState(out gafAsyncKeyState);
+                }
             }
             else
             {
+                _log?.Invoke($"Attempting Win10 resolution (build {TargetBuildNumber})...");
                 if (!TryResolveWin10KeyState(out gafAsyncKeyState))
+                {
+                    _log?.Invoke("Win10 failed, falling back to Win11...");
                     TryResolveWin11KeyState(out gafAsyncKeyState);
+                }
             }
 
             if (gafAsyncKeyState == 0)
-                throw new VmmException("Failed to resolve gafAsyncKeyState via Win11 or Win10 methods");
+                throw new VmmException($"Failed to resolve gafAsyncKeyState via Win11 or Win10 methods (build {TargetBuildNumber})");
 
             _gafAsyncKeyStateExport = gafAsyncKeyState;
+            _log?.Invoke($"Resolved gafAsyncKeyState @ 0x{gafAsyncKeyState:X} via {ResolutionMethod}");
         }
 
         /// <summary>
@@ -172,7 +195,7 @@ namespace VmmSharpEx.Extensions.Input
                     int relative = _vmm.MemReadValue<int>(pid, gSessionPtr + 3);
                     ulong gSessionGlobalSlots = gSessionPtr + 7 + (ulong)relative;
                     ulong userSessionState = 0;
-                    for (int i = 0; i < 4; i++)
+                    for (int i = 0; i < 8; i++)
                     {
                         userSessionState = _vmm.MemReadValue<ulong>(pid, _vmm.MemReadValue<ulong>(pid, _vmm.MemReadValue<ulong>(pid, gSessionGlobalSlots) + (ulong)(8 * i)));
                         if (userSessionState.IsValidKernelVA())
@@ -192,6 +215,8 @@ namespace VmmSharpEx.Extensions.Input
 
                     if (candidate.IsValidKernelVA())
                     {
+                        _log?.Invoke($"Win11: resolved via csrss PID {pid}, session offset 0x{sessionOffset:X}");
+                        ResolutionMethod = "Win11-SessionPointer";
                         result = candidate;
                         return true;
                     }
@@ -202,6 +227,7 @@ namespace VmmSharpEx.Extensions.Input
                 }
             }
 
+            _log?.Invoke("Win11: all csrss PIDs exhausted without finding gafAsyncKeyState");
             return false;
         }
 
@@ -212,36 +238,81 @@ namespace VmmSharpEx.Extensions.Input
         private bool TryResolveWin10KeyState(out ulong result)
         {
             result = 0;
+            uint kernelPid = _winLogonPid | Vmm.PID_PROCESS_WITH_KERNELMEMORY;
+
+            // Method 1: EAT export lookup — fastest, works on most Win10 builds
             try
             {
-                uint kernelPid = _winLogonPid | Vmm.PID_PROCESS_WITH_KERNELMEMORY;
-
+                _log?.Invoke("Win10: attempting EAT export lookup for gafAsyncKeyState...");
                 var eatEntries = _vmm.Map_GetEAT(kernelPid, "win32kbase.sys", out _);
                 if (eatEntries != null)
                 {
                     foreach (var entry in eatEntries)
                     {
-                        if (entry.sFunction == "gafAsyncKeyState")
+                        if (entry.sFunction == "gafAsyncKeyState" && entry.vaFunction.IsValidKernelVA())
                         {
+                            _log?.Invoke($"Win10: resolved via EAT @ 0x{entry.vaFunction:X}");
+                            ResolutionMethod = "Win10-EAT";
                             result = entry.vaFunction;
                             return true;
                         }
                     }
                 }
+                _log?.Invoke("Win10: EAT lookup found no matching export");
+            }
+            catch (Exception ex)
+            {
+                _log?.Invoke($"Win10: EAT lookup failed: {ex.Message}");
+            }
 
+            // Method 2: PDB symbol resolution — works when EAT is stripped/unavailable
+            try
+            {
+                _log?.Invoke("Win10: attempting PDB symbol resolution...");
+                ulong win32kbaseBase = 0;
+                if (_vmm.Map_GetModuleFromName(kernelPid, "win32kbase.sys", out var pdbMod))
+                    win32kbaseBase = pdbMod.vaBase;
+
+                if (win32kbaseBase != 0 && _vmm.PdbLoad(kernelPid, win32kbaseBase, out _))
+                {
+                    if (_vmm.PdbSymbolAddress("win32kbase", "gafAsyncKeyState", out ulong pdbAddr) && pdbAddr.IsValidKernelVA())
+                    {
+                        _log?.Invoke($"Win10: resolved via PDB @ 0x{pdbAddr:X}");
+                        ResolutionMethod = "Win10-PDB";
+                        result = pdbAddr;
+                        return true;
+                    }
+                }
+                _log?.Invoke("Win10: PDB symbol resolution did not find gafAsyncKeyState");
+            }
+            catch (Exception ex)
+            {
+                _log?.Invoke($"Win10: PDB resolution failed: {ex.Message}");
+            }
+
+            // Method 3: Signature scan — broadest coverage across builds
+            try
+            {
                 return TryResolveWin10KeyStateScan(kernelPid, out result);
             }
-            catch
+            catch (Exception ex)
             {
+                _log?.Invoke($"Win10: signature scan failed: {ex.Message}");
                 return false;
             }
         }
 
+        /// <summary>
+        /// Signature-based gafAsyncKeyState resolution for Win10.
+        /// Multiple patterns are tried to cover builds from 1507 through 22H2.
+        /// </summary>
         private bool TryResolveWin10KeyStateScan(uint kernelPid, out ulong result)
         {
             result = 0;
             ulong baseStart = 0, baseEnd = 0;
             uint scanPid = kernelPid;
+
+            _log?.Invoke("Win10: attempting signature scan...");
 
             if (_vmm.Map_GetModuleFromName(kernelPid, "win32kbase.sys", out var kMod))
             {
@@ -267,24 +338,49 @@ namespace VmmSharpEx.Extensions.Input
             }
 
             if (baseStart == 0)
-                return false;
-
-            ulong ptr = _vmm.FindSignature(scanPid, "48 8B 05 ?? ?? ?? ?? 48 63 D1 0F B6 44 10 08", baseStart, baseEnd);
-            if (ptr == 0)
-                ptr = _vmm.FindSignature(scanPid, "48 8B 05 ?? ?? ?? ?? 48 63 D1 0F B6 44 10 00", baseStart, baseEnd);
-            if (ptr == 0)
-                ptr = _vmm.FindSignature(scanPid, "48 8B 05 ?? ?? ?? ?? 48 8B 04 C8 0F B6 04 10 83 E0 01", baseStart, baseEnd);
-            if (ptr == 0)
-                return false;
-
-            int relative = _vmm.MemReadValue<int>(kernelPid, ptr + 3);
-            ulong candidate = ptr + 7 + (ulong)relative;
-            if (candidate.IsValidKernelVA())
             {
-                result = candidate;
-                return true;
+                _log?.Invoke("Win10: could not locate win32kbase.sys module");
+                return false;
             }
 
+            _log?.Invoke($"Win10: scanning win32kbase.sys @ 0x{baseStart:X} size 0x{baseEnd - baseStart:X}");
+
+            // Signatures covering various Win10 builds:
+            // Pattern 1: Win10 1903+ (19H1) - most common
+            // Pattern 2: Win10 1809 and earlier - offset variant
+            // Pattern 3: Win10 1507-1709 - indirect pointer table
+            // Pattern 4: Win10 20H1+ variant with different suffix
+            // Pattern 5: Win10 LTSC/Server variants
+            ReadOnlySpan<string> signatures =
+            [
+                "48 8B 05 ?? ?? ?? ?? 48 63 D1 0F B6 44 10 08",
+                "48 8B 05 ?? ?? ?? ?? 48 63 D1 0F B6 44 10 00",
+                "48 8B 05 ?? ?? ?? ?? 48 8B 04 C8 0F B6 04 10 83 E0 01",
+                "48 8B 05 ?? ?? ?? ?? 48 63 D1 44 0F B6 04 10",
+                "48 8B 05 ?? ?? ?? ?? 48 63 CA 0F B6 44 08 08",
+            ];
+
+            foreach (var sig in signatures)
+            {
+                ulong ptr = _vmm.FindSignature(scanPid, sig, baseStart, baseEnd);
+                if (ptr == 0)
+                    continue;
+
+                int relative = _vmm.MemReadValue<int>(scanPid, ptr + 3);
+                if (relative == 0)
+                    continue;
+
+                ulong candidate = ptr + 7 + (ulong)relative;
+                if (candidate.IsValidKernelVA())
+                {
+                    _log?.Invoke($"Win10: resolved via sig scan @ 0x{candidate:X} (pattern: {sig[..20]}...)");
+                    ResolutionMethod = "Win10-SigScan";
+                    result = candidate;
+                    return true;
+                }
+            }
+
+            _log?.Invoke("Win10: all signature patterns exhausted");
             return false;
         }
 

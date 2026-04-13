@@ -1202,6 +1202,8 @@ namespace eft_dma_radar.Silk.UI
 
         private static void DrawWindows()
         {
+            HotkeyManager.TryCaptureRebind();
+
             if (SettingsPanel.IsOpen)
                 SettingsPanel.Draw();
 

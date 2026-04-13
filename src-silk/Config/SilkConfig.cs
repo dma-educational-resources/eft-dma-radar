@@ -192,6 +192,23 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Web radar update interval in milliseconds.</summary>
         public int WebRadarTickMs { get; set; } = 50;
 
+        // ── Hotkeys ─────────────────────────────────────────────────────────────
+
+        /// <summary>Virtual key code for toggling Battle Mode (default: B = 0x42).</summary>
+        public int HotkeyBattleMode { get; set; } = 0x42; // B
+
+        /// <summary>Virtual key code for toggling Free Mode (default: F = 0x46).</summary>
+        public int HotkeyFreeMode { get; set; } = 0x46; // F
+
+        /// <summary>Virtual key code for toggling loot overlay (default: L = 0x4C).</summary>
+        public int HotkeyToggleLoot { get; set; } = 0x4C; // L
+
+        /// <summary>Virtual key code for zooming in (default: Numpad+ = 0x6B).</summary>
+        public int HotkeyZoomIn { get; set; } = 0x6B; // Numpad+
+
+        /// <summary>Virtual key code for zooming out (default: Numpad- = 0x6D).</summary>
+        public int HotkeyZoomOut { get; set; } = 0x6D; // Numpad-
+
         // ── Persistence ─────────────────────────────────────────────────────────
 
         /// <summary>
@@ -219,6 +236,12 @@ namespace eft_dma_radar.Silk.Config
 
             WebRadarPort = Math.Clamp(WebRadarPort, 1024, 65535);
             WebRadarTickMs = Math.Clamp(WebRadarTickMs, 16, 1000);
+
+            HotkeyBattleMode = Math.Clamp(HotkeyBattleMode, 0, 255);
+            HotkeyFreeMode = Math.Clamp(HotkeyFreeMode, 0, 255);
+            HotkeyToggleLoot = Math.Clamp(HotkeyToggleLoot, 0, 255);
+            HotkeyZoomIn = Math.Clamp(HotkeyZoomIn, 0, 255);
+            HotkeyZoomOut = Math.Clamp(HotkeyZoomOut, 0, 255);
 
             if (string.IsNullOrWhiteSpace(DeviceStr))
                 DeviceStr = "fpga";
