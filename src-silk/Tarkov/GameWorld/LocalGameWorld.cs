@@ -95,6 +95,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <summary>Current snapshot of exfiltration points in the raid.</summary>
         public IReadOnlyList<Exfil>? Exfils => _exfilManager?.Exfils;
 
+        /// <summary>Current snapshot of transit points in the raid.</summary>
+        public IReadOnlyList<TransitPoint>? Transits => _exfilManager?.Transits;
+
         /// <summary>Current snapshot of keyed doors in the raid.</summary>
         public IReadOnlyList<Door> Doors => _interactablesManager.Doors;
 

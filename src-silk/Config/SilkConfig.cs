@@ -16,6 +16,13 @@ namespace eft_dma_radar.Silk.Config
 
         private static readonly JsonSerializerOptions _jsonWriteOptions = new() { WriteIndented = true };
 
+        // Debounced save: dirty flag + timestamp
+        [JsonIgnore]
+        private volatile bool _dirty;
+        [JsonIgnore]
+        private long _dirtyTimestamp;
+        private const long DebounceSaveMs = 500;
+
         // ── DMA ─────────────────────────────────────────────────────────────────
 
         /// <summary>FPGA device string passed to MemProcFS (e.g. "fpga", "usb3380").</summary>
@@ -105,6 +112,11 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Hide exfils that are closed or not available to the local player.</summary>
         public bool HideInactiveExfils { get; set; } = true;
 
+        // ── Transits ────────────────────────────────────────────────────────────
+
+        /// <summary>Master toggle for transit point rendering on the radar.</summary>
+        public bool ShowTransits { get; set; } = true;
+
         // ── Doors ───────────────────────────────────────────────────────────────
 
         /// <summary>Master toggle for keyed door rendering on the radar.</summary>
@@ -142,6 +154,23 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Price source for loot values (0 = Best, 1 = Flea, 2 = Trader).</summary>
         public int LootPriceSource { get; set; } = 0;
 
+        // ── Loot Category Toggles ──────────────────────────────────────────────
+
+        /// <summary>Always show medical items (bypasses price filter).</summary>
+        public bool LootShowMeds { get; set; } = false;
+
+        /// <summary>Always show food/drink items (bypasses price filter).</summary>
+        public bool LootShowFood { get; set; } = false;
+
+        /// <summary>Always show backpacks (bypasses price filter).</summary>
+        public bool LootShowBackpacks { get; set; } = false;
+
+        /// <summary>Always show keys/keycards (bypasses price filter).</summary>
+        public bool LootShowKeys { get; set; } = false;
+
+        /// <summary>Always show wishlisted items (bypasses all filters).</summary>
+        public bool LootShowWishlist { get; set; } = true;
+
         // ── Profiles ────────────────────────────────────────────────────────────
 
         /// <summary>Enable tarkov.dev profile lookups for human players (KD, hours, etc.).</summary>
@@ -166,21 +195,51 @@ namespace eft_dma_radar.Silk.Config
         // ── Persistence ─────────────────────────────────────────────────────────
 
         /// <summary>
+        /// Clamps all numeric properties to safe ranges, preventing corrupt/hand-edited
+        /// config files from producing invalid state.
+        /// </summary>
+        private void Validate()
+        {
+            UIScale = Math.Clamp(UIScale, 0.5f, 3.0f);
+            TargetFps = Math.Clamp(TargetFps, 30, 300);
+            WindowWidth = Math.Clamp(WindowWidth, 800, 7680);
+            WindowHeight = Math.Clamp(WindowHeight, 600, 4320);
+
+            AimviewPlayerDistance = Math.Clamp(AimviewPlayerDistance, 1f, 2000f);
+            AimviewLootDistance = Math.Clamp(AimviewLootDistance, 1f, 500f);
+            AimviewEyeHeight = Math.Clamp(AimviewEyeHeight, 0f, 5f);
+            AimviewZoom = Math.Clamp(AimviewZoom, 0.5f, 5.0f);
+            AimlineLength = Math.Clamp(AimlineLength, 0, 500);
+
+            DoorLootProximity = Math.Clamp(DoorLootProximity, 1f, 200f);
+
+            LootMinPrice = Math.Max(LootMinPrice, 0);
+            LootImportantPrice = Math.Max(LootImportantPrice, 0);
+            LootPriceSource = Math.Clamp(LootPriceSource, 0, 2);
+
+            WebRadarPort = Math.Clamp(WebRadarPort, 1024, 65535);
+            WebRadarTickMs = Math.Clamp(WebRadarTickMs, 16, 1000);
+
+            if (string.IsNullOrWhiteSpace(DeviceStr))
+                DeviceStr = "fpga";
+        }
+
+        /// <summary>
         /// Load config from disk. Returns a default instance if the file does not exist or is corrupt.
+        /// All values are clamped to safe ranges after deserialization.
         /// </summary>
         public static SilkConfig Load()
         {
+            SilkConfig cfg;
             try
             {
                 if (File.Exists(_configPath))
                 {
                     var json = File.ReadAllText(_configPath);
-                    var cfg = JsonSerializer.Deserialize<SilkConfig>(json);
-                    if (cfg is not null)
-                    {
-                        Log.WriteLine("[SilkConfig] Config loaded OK.");
-                        return cfg;
-                    }
+                    cfg = JsonSerializer.Deserialize<SilkConfig>(json) ?? new SilkConfig();
+                    cfg.Validate();
+                    Log.WriteLine("[SilkConfig] Config loaded OK.");
+                    return cfg;
                 }
             }
             catch (Exception ex)
@@ -193,7 +252,31 @@ namespace eft_dma_radar.Silk.Config
         }
 
         /// <summary>
-        /// Save config to disk.
+        /// Marks the config as dirty. The next call to <see cref="FlushIfDirty"/>
+        /// (after the debounce interval) will persist it to disk.
+        /// </summary>
+        public void MarkDirty()
+        {
+            _dirty = true;
+            Interlocked.Exchange(ref _dirtyTimestamp, Environment.TickCount64);
+        }
+
+        /// <summary>
+        /// Persists the config to disk if it has been marked dirty and the debounce
+        /// interval has elapsed. Call periodically from the render loop or a timer.
+        /// </summary>
+        public void FlushIfDirty()
+        {
+            if (!_dirty)
+                return;
+            if (Environment.TickCount64 - Interlocked.Read(ref _dirtyTimestamp) < DebounceSaveMs)
+                return;
+            _dirty = false;
+            Save();
+        }
+
+        /// <summary>
+        /// Save config to disk immediately.
         /// </summary>
         public void Save()
         {

@@ -4,8 +4,9 @@ using eft_dma_radar.Silk.Misc.Data;
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 {
     /// <summary>
-    /// Central loot filter logic. Determines visibility and importance for each loot item
-    /// based on config settings and runtime search state.
+    /// Central loot filter logic. Determines visibility, importance, and highlight state
+    /// for each loot item based on config settings, category toggles, wishlist/blacklist,
+    /// and runtime search state.
     /// </summary>
     internal static class LootFilter
     {
@@ -23,6 +24,25 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// <summary>Total items evaluated on the last frame.</summary>
         public static int TotalCount { get; private set; }
 
+        // ── Persistent filter data (wishlist / blacklist) ────────────────────
+
+        private static LootFilterData _filterData = new();
+
+        /// <summary>The persistent wishlist/blacklist data.</summary>
+        public static LootFilterData FilterData => _filterData;
+
+        /// <summary>Load loot filter data from disk. Call once at startup.</summary>
+        public static void LoadFilterData()
+        {
+            _filterData = LootFilterData.Load();
+        }
+
+        /// <summary>Save loot filter data to disk.</summary>
+        public static void SaveFilterData()
+        {
+            _filterData.Save();
+        }
+
         // ── Constants ────────────────────────────────────────────────────────
 
         /// <summary>Price source labels for the UI combo box.</summary>
@@ -38,6 +58,29 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             ("100K", 100_000),
             ("200K", 200_000),
         ];
+
+        // ── Filter result ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Result of evaluating an item against all filter criteria.
+        /// Avoids repeated evaluation across render + widget + tooltip paths.
+        /// </summary>
+        internal readonly struct FilterResult
+        {
+            /// <summary>Whether the item should be drawn on the radar.</summary>
+            public bool Visible { get; init; }
+
+            /// <summary>Whether the item is highlighted as important (high value).</summary>
+            public bool Important { get; init; }
+
+            /// <summary>Whether the item is on the wishlist.</summary>
+            public bool Wishlisted { get; init; }
+
+            /// <summary>Whether the item was shown due to a category toggle.</summary>
+            public bool CategoryMatch { get; init; }
+
+            public static readonly FilterResult Hidden = new() { Visible = false };
+        }
 
         // ── Price ────────────────────────────────────────────────────────────
 
@@ -64,30 +107,90 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         // ── Filtering ────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Whether this item should be drawn on the radar.
+        /// Full evaluation of an item against all filter criteria.
+        /// Returns a <see cref="FilterResult"/> with visibility, importance, and highlight info.
         /// </summary>
-        public static bool ShouldDraw(TarkovMarketItem item, int displayPrice)
+        public static FilterResult Evaluate(TarkovMarketItem item, int displayPrice)
         {
-            // Price gate
-            if (displayPrice < SilkProgram.Config.LootMinPrice)
-                return false;
+            var config = SilkProgram.Config;
 
-            // Name search
-            if (_searchText.Length > 0)
+            // Blacklist — always hidden
+            if (_filterData.IsBlacklisted(item.BsgId))
+                return FilterResult.Hidden;
+
+            // Wishlist — always visible if enabled
+            bool wishlisted = config.LootShowWishlist && _filterData.IsWishlisted(item.BsgId);
+            if (wishlisted)
             {
-                if (!item.ShortName.Contains(_searchText, StringComparison.OrdinalIgnoreCase) &&
-                    !item.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
-                    return false;
+                return new FilterResult
+                {
+                    Visible = true,
+                    Important = IsImportant(displayPrice),
+                    Wishlisted = true,
+                };
             }
 
-            return true;
+            // Category toggle bypass (show regardless of price)
+            bool categoryMatch = IsCategoryMatch(item, config);
+            if (categoryMatch)
+            {
+                // Name search still applies to category items
+                if (!PassesNameSearch(item))
+                    return FilterResult.Hidden;
+
+                return new FilterResult
+                {
+                    Visible = true,
+                    Important = IsImportant(displayPrice),
+                    CategoryMatch = true,
+                };
+            }
+
+            // Standard price + name filter
+            if (displayPrice < config.LootMinPrice)
+                return FilterResult.Hidden;
+
+            if (!PassesNameSearch(item))
+                return FilterResult.Hidden;
+
+            return new FilterResult
+            {
+                Visible = true,
+                Important = IsImportant(displayPrice),
+            };
         }
+
+        /// <summary>
+        /// Simplified visibility check (backward-compatible).
+        /// </summary>
+        public static bool ShouldDraw(TarkovMarketItem item, int displayPrice) =>
+            Evaluate(item, displayPrice).Visible;
 
         /// <summary>
         /// Whether this item is highlighted as important (green).
         /// </summary>
         public static bool IsImportant(int displayPrice) =>
             displayPrice >= SilkProgram.Config.LootImportantPrice;
+
+        // ── Internal helpers ─────────────────────────────────────────────────
+
+        private static bool PassesNameSearch(TarkovMarketItem item)
+        {
+            if (_searchText.Length == 0)
+                return true;
+
+            return item.ShortName.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                   item.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsCategoryMatch(TarkovMarketItem item, SilkConfig config)
+        {
+            if (config.LootShowMeds && item.IsMeds) return true;
+            if (config.LootShowFood && item.IsFood) return true;
+            if (config.LootShowBackpacks && item.IsBackpack) return true;
+            if (config.LootShowKeys && item.IsKey) return true;
+            return false;
+        }
 
         // ── Batch helpers ────────────────────────────────────────────────────
 
@@ -134,6 +237,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             config.LootPriceSource = 0;
             config.LootPricePerSlot = false;
             config.ShowLoot = true;
+            config.LootShowMeds = false;
+            config.LootShowFood = false;
+            config.LootShowBackpacks = false;
+            config.LootShowKeys = false;
+            config.LootShowWishlist = true;
             ClearSearch();
         }
     }

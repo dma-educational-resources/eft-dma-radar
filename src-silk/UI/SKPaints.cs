@@ -119,11 +119,17 @@ namespace eft_dma_radar.Silk.UI
         /// <summary>Valuable loot — bright green circle + text.</summary>
         public static SKPaint LootImportant { get; } = NewTextPaint(new SKColor(50, 255, 50));
 
+        /// <summary>Wishlisted loot — bright cyan circle + text.</summary>
+        public static SKPaint LootWishlist { get; } = NewTextPaint(new SKColor(0, 230, 255));
+
         /// <summary>Normal loot on a different floor — dimmed.</summary>
         public static SKPaint LootNormalDimmed { get; } = NewTextPaint(new SKColor(200, 200, 200, 80));
 
         /// <summary>Valuable loot on a different floor — dimmed.</summary>
         public static SKPaint LootImportantDimmed { get; } = NewTextPaint(new SKColor(50, 255, 50, 100));
+
+        /// <summary>Wishlisted loot on a different floor — dimmed.</summary>
+        public static SKPaint LootWishlistDimmed { get; } = NewTextPaint(new SKColor(0, 230, 255, 100));
 
         /// <summary>Corpse marker fill — muted orange.</summary>
         public static SKPaint PaintCorpse { get; } = NewFillPaint(new SKColor(200, 150, 80, 180));
@@ -150,6 +156,18 @@ namespace eft_dma_radar.Silk.UI
         /// <summary>Exfil inactive (not available for player) — dimmed grey.</summary>
         public static SKPaint PaintExfilInactive { get; } = NewFillPaint(new SKColor(120, 120, 120, 120));
         public static SKPaint TextExfilInactive { get; } = NewTextPaint(new SKColor(120, 120, 120, 120));
+
+        #endregion
+
+        #region Transit Paints
+
+        /// <summary>Transit point — cyan/teal.</summary>
+        public static SKPaint PaintTransit { get; } = NewFillPaint(new SKColor(0, 200, 220));
+        public static SKPaint TextTransit { get; } = NewTextPaint(new SKColor(0, 200, 220));
+
+        /// <summary>Transit point inactive — dimmed.</summary>
+        public static SKPaint PaintTransitInactive { get; } = NewFillPaint(new SKColor(0, 200, 220, 100));
+        public static SKPaint TextTransitInactive { get; } = NewTextPaint(new SKColor(0, 200, 220, 100));
 
         #endregion
 
@@ -205,6 +223,9 @@ namespace eft_dma_radar.Silk.UI
         /// <summary>Accent / money value text inside tooltips.</summary>
         public static SKPaint TooltipAccent { get; } = NewTextPaint(new SKColor(100, 210, 100));
 
+        /// <summary>Wishlist highlight text inside tooltips — cyan.</summary>
+        public static SKPaint TooltipWishlist { get; } = NewTextPaint(new SKColor(0, 230, 255));
+
         /// <summary>Font used for tooltip text.</summary>
         public static SKFont FontTooltip { get; } = new(CustomFonts.Regular, 11) { Subpixel = true };
 
@@ -221,6 +242,53 @@ namespace eft_dma_radar.Silk.UI
 
         /// <summary>Alias — text and fill paints use the same style.</summary>
         private static SKPaint NewTextPaint(SKColor color) => NewFillPaint(color);
+
+        private static SKPaint NewChevronStroke(SKColor color) => new()
+        {
+            Color = color,
+            StrokeWidth = 1.8f,
+            Style = SKPaintStyle.Stroke,
+            StrokeCap = SKStrokeCap.Round,
+            StrokeJoin = SKStrokeJoin.Round,
+            IsAntialias = true,
+        };
+
+        private static SKPaint NewAimlineStroke(SKColor color) => new()
+        {
+            Color = color,
+            StrokeWidth = 1.2f,
+            Style = SKPaintStyle.Stroke,
+            StrokeCap = SKStrokeCap.Round,
+            IsAntialias = true,
+        };
+
+        #endregion
+
+        #region Per-Type Stroke Paints
+
+        // Chevron strokes — one per player type, never mutated at draw time
+        public static SKPaint ChevronLocalPlayer { get; } = NewChevronStroke(new SKColor(50, 205, 50));
+        public static SKPaint ChevronTeammate { get; } = NewChevronStroke(new SKColor(80, 220, 80));
+        public static SKPaint ChevronUSEC { get; } = NewChevronStroke(new SKColor(230, 60, 60));
+        public static SKPaint ChevronBEAR { get; } = NewChevronStroke(new SKColor(70, 130, 230));
+        public static SKPaint ChevronScav { get; } = NewChevronStroke(new SKColor(240, 230, 60));
+        public static SKPaint ChevronRaider { get; } = NewChevronStroke(new SKColor(255, 180, 30));
+        public static SKPaint ChevronBoss { get; } = NewChevronStroke(new SKColor(230, 50, 230));
+        public static SKPaint ChevronPScav { get; } = NewChevronStroke(new SKColor(220, 220, 220));
+        public static SKPaint ChevronSpecial { get; } = NewChevronStroke(new SKColor(255, 90, 160));
+        public static SKPaint ChevronStreamer { get; } = NewChevronStroke(new SKColor(170, 120, 255));
+
+        // Aimline strokes — one per player type, never mutated at draw time
+        public static SKPaint AimlineLocalPlayer { get; } = NewAimlineStroke(new SKColor(50, 205, 50));
+        public static SKPaint AimlineTeammate { get; } = NewAimlineStroke(new SKColor(80, 220, 80));
+        public static SKPaint AimlineUSEC { get; } = NewAimlineStroke(new SKColor(230, 60, 60));
+        public static SKPaint AimlineBEAR { get; } = NewAimlineStroke(new SKColor(70, 130, 230));
+        public static SKPaint AimlineScav { get; } = NewAimlineStroke(new SKColor(240, 230, 60));
+        public static SKPaint AimlineRaider { get; } = NewAimlineStroke(new SKColor(255, 180, 30));
+        public static SKPaint AimlineBoss { get; } = NewAimlineStroke(new SKColor(230, 50, 230));
+        public static SKPaint AimlinePScav { get; } = NewAimlineStroke(new SKColor(220, 220, 220));
+        public static SKPaint AimlineSpecial { get; } = NewAimlineStroke(new SKColor(255, 90, 160));
+        public static SKPaint AimlineStreamer { get; } = NewAimlineStroke(new SKColor(170, 120, 255));
 
         #endregion
     }

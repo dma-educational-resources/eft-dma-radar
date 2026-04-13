@@ -48,6 +48,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         // Gear refresh interval per player (seconds)
         private const int GearRefreshIntervalSec = 10;
 
+        // Hands refresh interval per player (seconds) — faster than gear since items swap often
+        private const int HandsRefreshIntervalSec = 3;
+
         #endregion
 
         #region Fields
@@ -135,6 +138,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             // Gear refresh tracking — rate-limited to avoid excessive DMA reads
             public DateTime NextGearRefresh;
+
+            // Hands refresh tracking — more frequent than gear
+            public DateTime NextHandsRefresh;
 
             // Look transform (local player only) — used for aimview eye position.
             // Since both main and look chains use _playerLookRaycastTransform, the
@@ -385,6 +391,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         if (entry.Player.ProfileId is not null && entry.Player.AccountId is null)
                             DogtagCache.TryApplyIdentity(entry.Player);
                     }
+
+                    // Hands refresh (rate-limited per player, faster than gear)
+                    if (now >= entry.NextHandsRefresh)
+                    {
+                        entry.NextHandsRefresh = now.AddSeconds(HandsRefreshIntervalSec);
+                        HandsManager.Refresh(entry.Base, entry.Player, entry.IsObserved);
+                        entry.Player.HandsReady = true;
+                    }
                 }
                 else
                 {
@@ -401,6 +415,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 {
                     if (_players.TryRemove(key, out var removed))
                     {
+                        HandsManager.ClearCache(key);
                         Log.WriteLine($"[RegisteredPlayers] Removed '{removed.Player.Name}' ({removed.Player.Type}) @ 0x{key:X} — no longer registered");
 
                         if (removed.Player.IsLocalPlayer)

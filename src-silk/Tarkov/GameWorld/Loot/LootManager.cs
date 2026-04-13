@@ -16,8 +16,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         private readonly ulong _lgw;
         private volatile IReadOnlyList<LootItem> _loot = [];
         private volatile IReadOnlyList<LootCorpse> _corpses = [];
-        private DateTime _lastRefresh;
-        private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(5);
+        private long _lastRefreshTimestamp;
+        private static readonly long RefreshIntervalTicks = (long)(Stopwatch.Frequency * 5); // 5 seconds
 
         // Track corpses we've already read dogtags from (by interactiveClass address)
         private readonly HashSet<ulong> _processedCorpses = [];
@@ -50,10 +50,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// </summary>
         public void Refresh()
         {
-            var now = DateTime.UtcNow;
-            if (now - _lastRefresh < RefreshInterval)
+            var now = Stopwatch.GetTimestamp();
+            if (now - _lastRefreshTimestamp < RefreshIntervalTicks)
                 return;
-            _lastRefresh = now;
+            _lastRefreshTimestamp = now;
 
             // Read the LootList pointer array once — shared by all phases
             if (!TryReadLootListPtrs(out var ptrs))

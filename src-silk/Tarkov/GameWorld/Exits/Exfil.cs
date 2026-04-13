@@ -33,6 +33,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
         /// <summary>Raw address for scatter status reads.</summary>
         public ulong StatusAddr => _addr + Offsets.Exfil._status;
 
+        private bool _eligibilityRead;
+
         // Cached distance label — avoids per-frame string allocation + MeasureText
         private int _cachedDistVal = -1;
         private string _cachedDistText = "";
@@ -82,21 +84,29 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
                 _ => ExfilStatus.Closed,          // NotPresent(1), Hidden(7), unknown
             };
 
-            // Read eligible entry points (PMC) or eligible IDs (Scav)
+            // Read eligible entry points (PMC) or eligible IDs (Scav) — once only
+            if (_eligibilityRead)
+                return;
+
             try
             {
                 if (_isPmc)
                 {
-                    if (Memory.TryReadPtr(_addr + Offsets.Exfil.EligibleEntryPoints, out var entriesArrPtr))
+                    if (Memory.TryReadPtr(_addr + Offsets.Exfil.EligibleEntryPoints, out var entriesArrPtr, false))
                         ReadStringArray(entriesArrPtr, PmcEntries);
                 }
                 else
                 {
-                    if (Memory.TryReadPtr(_addr + Offsets.ScavExfil.EligibleIds, out var idsListPtr))
+                    if (Memory.TryReadPtr(_addr + Offsets.ScavExfil.EligibleIds, out var idsListPtr, false))
                         ReadStringList(idsListPtr, ScavIds);
                 }
+
+                _eligibilityRead = true;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Log.Write(AppLogLevel.Debug, $"[Exfil] Failed to read eligibility for '{Name}': {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -238,7 +248,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
 
             for (int i = 0; i < count; i++)
             {
-                if (Memory.TryReadPtr(arrayPtr + 0x20 + (ulong)(i * 8), out var strPtr))
+                if (Memory.TryReadPtr(arrayPtr + 0x20 + (ulong)(i * 8), out var strPtr, false))
                 {
                     if (Memory.TryReadUnityString(strPtr, out var str) && str is not null)
                         target.Add(str);
@@ -252,7 +262,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
         /// </summary>
         private static void ReadStringList(ulong listPtr, HashSet<string> target)
         {
-            if (!Memory.TryReadPtr(listPtr + 0x10, out var arrPtr))
+            if (!Memory.TryReadPtr(listPtr + 0x10, out var arrPtr, false))
                 return;
             var count = Memory.ReadValue<int>(listPtr + 0x18, false);
             if (count <= 0 || count > 100)
@@ -260,7 +270,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
 
             for (int i = 0; i < count; i++)
             {
-                if (Memory.TryReadPtr(arrPtr + 0x20 + (ulong)(i * 8), out var strPtr))
+                if (Memory.TryReadPtr(arrPtr + 0x20 + (ulong)(i * 8), out var strPtr, false))
                 {
                     if (Memory.TryReadUnityString(strPtr, out var str) && str is not null)
                         target.Add(str);

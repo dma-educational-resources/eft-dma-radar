@@ -44,6 +44,8 @@ namespace eft_dma_radar.Silk
 
                 EftDataManager.ModuleInit();
 
+                LootFilter.LoadFilterData();
+
                 MapManager.ModuleInit();
                 Log.WriteLine("[SilkProgram] Map manager initialized, starting RadarWindow...");
 
@@ -55,7 +57,7 @@ namespace eft_dma_radar.Silk
                         {
                             await eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.StartAsync(
                                 Config.WebRadarPort,
-                                TimeSpan.FromMilliseconds(Config.WebRadarTickMs));
+                                TimeSpan.FromMilliseconds(Config.WebRadarTickMs)).ConfigureAwait(false);
                         }
                         catch (Exception ex)
                         {
@@ -93,7 +95,7 @@ namespace eft_dma_radar.Silk
                 Log.WriteLine($"WARNING: Unable to set Thread Execution State. ERROR {Marshal.GetLastWin32Error()}");
 
             Guid highPerformanceGuid = new("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c");
-            if (PowerSetActiveScheme(IntPtr.Zero, ref highPerformanceGuid) != 0)
+            if (PowerSetActiveScheme(0, ref highPerformanceGuid) != 0)
                 Log.WriteLine($"WARNING: Unable to set High Performance Power Plan. ERROR {Marshal.GetLastWin32Error()}");
 
             if (TimeBeginPeriod(5) != 0)
@@ -128,10 +130,10 @@ namespace eft_dma_radar.Silk
         }
 
         [LibraryImport("avrt.dll", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
-        private static partial IntPtr AvSetMmThreadCharacteristicsW(string taskName, out uint taskIndex);
+        private static partial nint AvSetMmThreadCharacteristicsW(string taskName, out uint taskIndex);
 
         [LibraryImport("powrprof.dll", SetLastError = true)]
-        private static partial uint PowerSetActiveScheme(IntPtr userRootPowerKey, ref Guid schemeGuid);
+        private static partial uint PowerSetActiveScheme(nint userRootPowerKey, ref Guid schemeGuid);
 
         [LibraryImport("winmm.dll", EntryPoint = "timeBeginPeriod", SetLastError = true)]
         private static partial uint TimeBeginPeriod(uint uMilliseconds);

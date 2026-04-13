@@ -33,5 +33,27 @@ namespace eft_dma_radar.Silk.Misc.Data
         /// <summary>Number of grid slots (at least 1).</summary>
         [JsonIgnore]
         public int GridCount => Slots < 1 ? 1 : Slots;
+
+        // ── Category helpers (match against the Categories array) ────────────
+
+        [JsonIgnore] public bool IsMeds => HasCategory("Meds");
+        [JsonIgnore] public bool IsFood => HasCategory("Food and drink");
+        [JsonIgnore] public bool IsBackpack => HasCategory("Backpack");
+        [JsonIgnore] public bool IsKey => HasCategory("Key");
+        [JsonIgnore] public bool IsAmmo => HasCategory("Ammo");
+        [JsonIgnore] public bool IsBarter => HasCategory("Barter item");
+        [JsonIgnore] public bool IsWeapon => HasCategory("Weapon");
+        [JsonIgnore] public bool IsWeaponMod => HasCategory("Weapon mod");
+        [JsonIgnore] public bool IsCurrency => HasCategory("Money");
+
+        private bool HasCategory(string category)
+        {
+            for (int i = 0; i < Categories.Length; i++)
+            {
+                if (Categories[i].Equals(category, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
     }
 }

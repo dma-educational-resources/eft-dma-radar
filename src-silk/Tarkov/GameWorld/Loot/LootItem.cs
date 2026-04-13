@@ -12,15 +12,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 
         // Cached label to avoid per-frame string allocation
         private string? _cachedLabel;
-        private int _cachedLabelPrice = -1;
+        private int _cachedLabelKey = int.MinValue;
 
         public string Id { get; }
         public string Name => _item.Name;
         public string ShortName => _item.ShortName;
         public Vector3 Position { get; set; }
 
+        /// <summary>The underlying market item data.</summary>
+        public TarkovMarketItem MarketItem => _item;
+
         /// <summary>Effective display price (respects price source + price-per-slot).</summary>
         public int DisplayPrice => LootFilter.GetDisplayPrice(_item);
+
+        /// <summary>Full filter evaluation — visibility, importance, wishlist, category.</summary>
+        public LootFilter.FilterResult Evaluate(int displayPrice) => LootFilter.Evaluate(_item, displayPrice);
 
         /// <summary>Whether the item passes current filter criteria.</summary>
         public bool ShouldDraw() => LootFilter.ShouldDraw(_item, DisplayPrice);
@@ -47,35 +53,50 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         }
 
         /// <summary>
-        /// Draw this loot item on the radar canvas (pre-computed price).
-        /// When <paramref name="differentFloor"/> is true the item is dimmed with a
-        /// [!] prefix to signal it is likely under the map and inaccessible.
+        /// Draw this loot item on the radar canvas with full filter result.
         /// </summary>
-        public void Draw(SKCanvas canvas, SKPoint screenPos, int price, bool differentFloor = false)
+        public void Draw(SKCanvas canvas, SKPoint screenPos, int price, LootFilter.FilterResult result, bool differentFloor = false)
         {
-            bool important = LootFilter.IsImportant(price);
-            var paint = (important, differentFloor) switch
-            {
-                (true,  false) => SKPaints.LootImportant,
-                (true,  true)  => SKPaints.LootImportantDimmed,
-                (false, false) => SKPaints.LootNormal,
-                (false, true)  => SKPaints.LootNormalDimmed,
-            };
+            var paint = GetPaint(result, differentFloor);
             canvas.DrawCircle(screenPos, differentFloor ? 3f : 4f, paint);
 
-            // Cache label string — only regenerate when price or floor state changes
-            int cacheKey = differentFloor ? ~price : price; // Flip bits to distinguish floor state
-            if (cacheKey != _cachedLabelPrice || _cachedLabel is null)
+            // Cache label string — encode state into key
+            int labelKey = HashCode.Combine(price, differentFloor, result.Wishlisted, result.CategoryMatch);
+            if (labelKey != _cachedLabelKey || _cachedLabel is null)
             {
-                _cachedLabelPrice = cacheKey;
+                _cachedLabelKey = labelKey;
+                string prefix = differentFloor ? "[!] " : "";
+                string suffix = result.Wishlisted ? " \u2605" : result.CategoryMatch ? " \u25cf" : "";
                 string baseLabel = price > 0 ? $"{ShortName} ({FormatPrice(price)})" : ShortName;
-                _cachedLabel = differentFloor ? $"[!] {baseLabel}" : baseLabel;
+                _cachedLabel = $"{prefix}{baseLabel}{suffix}";
             }
 
             float lx = screenPos.X + 7;
             float ly = screenPos.Y + 4.5f;
             canvas.DrawText(_cachedLabel, lx + 1, ly + 1, SKPaints.FontRegular11, SKPaints.LootShadow);
             canvas.DrawText(_cachedLabel, lx, ly, SKPaints.FontRegular11, paint);
+        }
+
+        /// <summary>
+        /// Draw this loot item on the radar canvas (pre-computed price, legacy overload).
+        /// When <paramref name="differentFloor"/> is true the item is dimmed with a
+        /// [!] prefix to signal it is likely under the map and inaccessible.
+        /// </summary>
+        public void Draw(SKCanvas canvas, SKPoint screenPos, int price, bool differentFloor = false)
+        {
+            var result = Evaluate(price);
+            Draw(canvas, screenPos, price, result, differentFloor);
+        }
+
+        private static SKPaint GetPaint(LootFilter.FilterResult result, bool differentFloor)
+        {
+            if (result.Wishlisted)
+                return differentFloor ? SKPaints.LootWishlistDimmed : SKPaints.LootWishlist;
+
+            if (result.Important)
+                return differentFloor ? SKPaints.LootImportantDimmed : SKPaints.LootImportant;
+
+            return differentFloor ? SKPaints.LootNormalDimmed : SKPaints.LootNormal;
         }
 
         private static string FormatPrice(int price) => LootFilter.FormatPrice(price);

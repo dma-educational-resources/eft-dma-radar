@@ -26,7 +26,7 @@ namespace eft_dma_radar.Silk.Misc
         private static extern bool AllocConsole();
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern IntPtr GetConsoleWindow();
+        private static extern nint GetConsoleWindow();
 
         static Log()
         {
@@ -52,7 +52,7 @@ namespace eft_dma_radar.Silk.Misc
                 return;
             try
             {
-                if (GetConsoleWindow() == IntPtr.Zero)
+                if (GetConsoleWindow() == 0)
                 {
                     if (AllocConsole())
                     {

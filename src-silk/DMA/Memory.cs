@@ -31,6 +31,7 @@ namespace eft_dma_radar.Silk.DMA
         private static readonly Lock _restartLock = new();
         private static CancellationTokenSource _cts = new();
         private static volatile bool _shutdown;
+        private static Thread? _workerThread;
 
         private static MemoryState _state = MemoryState.NotStarted;
 
@@ -67,6 +68,7 @@ namespace eft_dma_radar.Silk.DMA
         public static IReadOnlyList<LootItem>? Loot => Game?.Loot;
         public static IReadOnlyList<LootCorpse>? Corpses => Game?.Corpses;
         public static IReadOnlyList<Exfil>? Exfils => Game?.Exfils;
+        public static IReadOnlyList<TransitPoint>? Transits => Game?.Transits;
         public static IReadOnlyList<Door>? Doors => Game?.Doors;
 
         #endregion
@@ -158,7 +160,8 @@ namespace eft_dma_radar.Silk.DMA
 
                 SetState(MemoryState.WaitingForProcess);
 
-                new Thread(MemoryWorker) { IsBackground = true, Name = "MemoryWorker" }.Start();
+                _workerThread = new Thread(MemoryWorker) { IsBackground = true, Name = "MemoryWorker" };
+                _workerThread.Start();
 
                 Log.WriteLine("[Memory] DMA initialized OK.");
             }
@@ -658,12 +661,16 @@ namespace eft_dma_radar.Silk.DMA
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static VmmScatter GetScatter(VmmFlags flags) => new(VmmOrThrow(), _pid, flags);
 
-        /// <summary>Signals the worker to stop and disposes the VMM handle.</summary>
+        /// <summary>Signals the worker to stop, waits for it to exit, and disposes the VMM handle.</summary>
         public static void Close()
         {
             if (_shutdown) return; // idempotent
             _shutdown = true;
             try { _cts.Cancel(); } catch { }
+
+            // Wait for the worker thread to finish — bounded to prevent hung shutdown
+            _workerThread?.Join(TimeSpan.FromSeconds(5));
+
             _vmm?.Dispose();
             _vmm = null;
             Log.WriteLine("[Memory] Closed.");
@@ -680,7 +687,7 @@ namespace eft_dma_radar.Silk.DMA
         #region Nested Types
 
         /// <summary>Thrown when the game process is no longer running.</summary>
-        public sealed class GameNotRunningException : Exception
+        public sealed class GameNotRunningException : DmaException
         {
             public GameNotRunningException()
                 : base("Game process is no longer running.") { }

@@ -40,6 +40,7 @@ namespace eft_dma_radar.Silk.UI
         private static LootItem? _mouseOverLoot;
         private static LootCorpse? _mouseOverCorpse;
         private static Exfil? _mouseOverExfil;
+        private static TransitPoint? _mouseOverTransit;
 
         // Map state
         private static bool _freeMode;
@@ -481,13 +482,14 @@ namespace eft_dma_radar.Silk.UI
                     foreach (var item in loot)
                     {
                         int price = item.DisplayPrice;
-                        if (!item.ShouldDraw(price))
+                        var result = item.Evaluate(price);
+                        if (!result.Visible)
                             continue;
                         if (!worldBounds.Contains(item.Position))
                             continue;
                         var sp = mapParams.ToScreenPos(MapParams.ToMapPos(item.Position, mapCfg));
                         bool underMap = item.Position.Y < playerY - 15f;
-                        item.Draw(canvas, sp, price, underMap);
+                        item.Draw(canvas, sp, price, result, underMap);
                         visibleCount++;
                     }
                     LootFilter.SetCounts(visibleCount, loot.Count);
@@ -533,6 +535,22 @@ namespace eft_dma_radar.Silk.UI
                             continue;
                         var sp = mapParams.ToScreenPos(MapParams.ToMapPos(exfil.Position, mapCfg));
                         exfil.Draw(canvas, sp, localPlayer);
+                    }
+                }
+            }
+
+            // Transit points (drawn alongside exfils)
+            if (Config.ShowTransits)
+            {
+                var transits = Memory.Transits;
+                if (transits is not null)
+                {
+                    foreach (var transit in transits)
+                    {
+                        if (!worldBounds.Contains(transit.Position))
+                            continue;
+                        var sp = mapParams.ToScreenPos(MapParams.ToMapPos(transit.Position, mapCfg));
+                        transit.Draw(canvas, sp, localPlayer);
                     }
                 }
             }
@@ -601,6 +619,7 @@ namespace eft_dma_radar.Silk.UI
             var hoveredLoot = _mouseOverLoot;
             var hoveredCorpse = _mouseOverCorpse;
             var hoveredExfil = _mouseOverExfil;
+            var hoveredTransit = _mouseOverTransit;
 
             if (hoveredPlayer is not null)
             {
@@ -624,6 +643,12 @@ namespace eft_dma_radar.Silk.UI
             {
                 var screenPos = mapParams.ToScreenPos(MapParams.ToMapPos(hoveredExfil.Position, mapConfig));
                 BuildExfilTooltipLines(hoveredExfil, localPlayer);
+                DrawTooltipBox(canvas, screenPos, _tooltipLines);
+            }
+            else if (hoveredTransit is not null)
+            {
+                var screenPos = mapParams.ToScreenPos(MapParams.ToMapPos(hoveredTransit.Position, mapConfig));
+                BuildTransitTooltipLines(hoveredTransit, localPlayer);
                 DrawTooltipBox(canvas, screenPos, _tooltipLines);
             }
         }
@@ -668,6 +693,15 @@ namespace eft_dma_radar.Silk.UI
             // Distance
             _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
 
+            // In hands
+            if (player.HandsReady && player.InHandsItem is not null)
+            {
+                string handsText = player.InHandsAmmo is not null
+                    ? $"Hands: {player.InHandsItem} ({player.InHandsAmmo})"
+                    : $"Hands: {player.InHandsItem}";
+                _tooltipLines.Add((handsText, SKPaints.TooltipText));
+            }
+
             // Gear summary
             if (player.GearReady)
             {
@@ -694,9 +728,16 @@ namespace eft_dma_radar.Silk.UI
         {
             _tooltipLines.Clear();
             int dist = (int)Vector3.Distance(localPlayer.Position, loot.Position);
-            var paint = loot.IsImportant ? SKPaints.TooltipAccent : SKPaints.TooltipText;
+            var filterData = LootFilter.FilterData;
+            bool wishlisted = filterData.IsWishlisted(loot.Id);
+            var paint = wishlisted ? SKPaints.TooltipWishlist
+                      : loot.IsImportant ? SKPaints.TooltipAccent
+                      : SKPaints.TooltipText;
 
             _tooltipLines.Add((loot.Name, paint));
+
+            if (wishlisted)
+                _tooltipLines.Add(("\u2605 Wishlisted", SKPaints.TooltipWishlist));
 
             if (loot.DisplayPrice > 0)
                 _tooltipLines.Add(($"Price: {LootFilter.FormatPrice(loot.DisplayPrice)}", SKPaints.TooltipAccent));
@@ -763,6 +804,16 @@ namespace eft_dma_radar.Silk.UI
                 if (!exfil.IsAvailableFor(lp))
                     _tooltipLines.Add(("Not available", SKPaints.TextExfilInactive));
             }
+        }
+
+        private static void BuildTransitTooltipLines(TransitPoint transit, Player localPlayer)
+        {
+            _tooltipLines.Clear();
+            int dist = (int)Vector3.Distance(localPlayer.Position, transit.Position);
+
+            _tooltipLines.Add((transit.Name, SKPaints.TextTransit));
+            _tooltipLines.Add(($"Status: {(transit.IsActive ? "Active" : "Inactive")}", SKPaints.TooltipLabel));
+            _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
         }
 
         /// <summary>
@@ -1379,6 +1430,7 @@ namespace eft_dma_radar.Silk.UI
                 _mouseOverLoot = null;
                 _mouseOverCorpse = null;
                 _mouseOverExfil = null;
+                _mouseOverTransit = null;
                 MouseoverGroup = null;
                 return;
             }
@@ -1397,6 +1449,7 @@ namespace eft_dma_radar.Silk.UI
                 _mouseOverLoot = null;
                 _mouseOverCorpse = null;
                 _mouseOverExfil = null;
+                _mouseOverTransit = null;
                 MouseoverGroup = null;
                 return;
             }
@@ -1437,6 +1490,7 @@ namespace eft_dma_radar.Silk.UI
                 _mouseOverLoot = null;
                 _mouseOverCorpse = null;
                 _mouseOverExfil = null;
+                _mouseOverTransit = null;
                 MouseoverGroup = closestPlayer.IsHuman && closestPlayer.IsHostile && closestPlayer.SpawnGroupID != -1
                     ? closestPlayer.SpawnGroupID
                     : null;
@@ -1501,6 +1555,7 @@ namespace eft_dma_radar.Silk.UI
                 _mouseOverLoot = null;
                 _mouseOverPlayer = null;
                 _mouseOverExfil = null;
+                _mouseOverTransit = null;
                 MouseoverGroup = null;
                 return;
             }
@@ -1511,6 +1566,7 @@ namespace eft_dma_radar.Silk.UI
                 _mouseOverPlayer = null;
                 _mouseOverCorpse = null;
                 _mouseOverExfil = null;
+                _mouseOverTransit = null;
                 MouseoverGroup = null;
                 return;
             }
@@ -1545,6 +1601,42 @@ namespace eft_dma_radar.Silk.UI
                 _mouseOverPlayer = null;
                 _mouseOverLoot = null;
                 _mouseOverCorpse = null;
+                _mouseOverTransit = null;
+                MouseoverGroup = null;
+                return;
+            }
+
+            // Check transits
+            TransitPoint? closestTransit = null;
+            float closestTransitDist = float.MaxValue;
+
+            if (Config.ShowTransits)
+            {
+                var transits = Memory.Transits;
+                if (transits is not null)
+                {
+                    foreach (var t in transits)
+                    {
+                        if (!worldBounds.Contains(t.Position))
+                            continue;
+                        var screenPos = mp.ToScreenPos(MapParams.ToMapPos(t.Position, mp.Config));
+                        float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
+                        if (dist < closestTransitDist)
+                        {
+                            closestTransitDist = dist;
+                            closestTransit = t;
+                        }
+                    }
+                }
+            }
+
+            if (closestTransitDist < hitRadius && closestTransit is not null)
+            {
+                _mouseOverTransit = closestTransit;
+                _mouseOverPlayer = null;
+                _mouseOverLoot = null;
+                _mouseOverCorpse = null;
+                _mouseOverExfil = null;
                 MouseoverGroup = null;
                 return;
             }
@@ -1553,6 +1645,7 @@ namespace eft_dma_radar.Silk.UI
             _mouseOverLoot = null;
             _mouseOverCorpse = null;
             _mouseOverExfil = null;
+            _mouseOverTransit = null;
             MouseoverGroup = null;
         }
 

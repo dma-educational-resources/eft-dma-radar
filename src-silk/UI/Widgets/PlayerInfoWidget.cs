@@ -88,12 +88,13 @@ namespace eft_dma_radar.Silk.UI.Widgets
                              ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY |
                              ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.NoPadOuterX;
 
-            if (ImGui.BeginTable("PlayersTable", 7, tableFlags))
+            if (ImGui.BeginTable("PlayersTable", 8, tableFlags))
             {
                 ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthFixed, 140f);
                 ImGui.TableSetupColumn("Lvl", ImGuiTableColumnFlags.WidthFixed, 28f);
                 ImGui.TableSetupColumn("K/D", ImGuiTableColumnFlags.WidthFixed, 38f);
                 ImGui.TableSetupColumn("Grp", ImGuiTableColumnFlags.WidthFixed, 32f);
+                ImGui.TableSetupColumn("Hands", ImGuiTableColumnFlags.WidthFixed, 60f);
                 ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 55f);
                 ImGui.TableSetupColumn("Gear", ImGuiTableColumnFlags.WidthFixed, 40f);
                 ImGui.TableSetupColumn("Dist", ImGuiTableColumnFlags.WidthFixed, 45f);
@@ -131,6 +132,19 @@ namespace eft_dma_radar.Silk.UI.Widgets
                     // Group
                     ImGui.TableNextColumn();
                     ImGui.TextColored(color, player.SpawnGroupID == -1 ? "--" : player.SpawnGroupID.ToString());
+
+                    // Hands (item currently held)
+                    ImGui.TableNextColumn();
+                    if (player.HandsReady && player.InHandsItem is not null)
+                    {
+                        ImGui.TextColored(color, player.InHandsItem);
+                        if (ImGui.IsItemHovered() && player.InHandsAmmo is not null)
+                            ImGui.SetTooltip($"Ammo: {player.InHandsAmmo}");
+                    }
+                    else
+                    {
+                        ImGui.TextColored(ColorDim, "--");
+                    }
 
                     // Value
                     ImGui.TableNextColumn();
@@ -212,6 +226,14 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 TooltipRow("Group", player.GroupID.ToString());
 
             TooltipRow("Distance", $"{distance}m");
+
+            // ── In Hands ──
+            if (player.HandsReady && player.InHandsItem is not null)
+            {
+                TooltipRow("In Hands", player.InHandsItem);
+                if (player.InHandsAmmo is not null)
+                    TooltipRow("Ammo", player.InHandsAmmo);
+            }
 
             // ── Profile Stats ──
             var tp = GetPlayerProfile(player);

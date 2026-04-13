@@ -21,16 +21,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             IsAntialias = true,
         };
 
-        // Reused on render thread — Color is set per-draw in DrawMarker()
-        private static readonly SKPaint _chevronStroke = new()
-        {
-            StrokeWidth = 1.8f,
-            Style = SKPaintStyle.Stroke,
-            StrokeCap = SKStrokeCap.Round,
-            StrokeJoin = SKStrokeJoin.Round,
-            IsAntialias = true,
-        };
-
         // Small font for the compact H/D info line
         private static readonly SKFont _infoFont = new(CustomFonts.Regular, 9.5f) { Subpixel = true };
 
@@ -53,15 +43,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         {
             Color = new SKColor(0, 0, 0, 120),
             StrokeWidth = 2.6f,
-            Style = SKPaintStyle.Stroke,
-            StrokeCap = SKStrokeCap.Round,
-            IsAntialias = true,
-        };
-
-        // Reused on render thread — Color is set per-draw
-        private static readonly SKPaint _aimlineStroke = new()
-        {
-            StrokeWidth = 1.2f,
             Style = SKPaintStyle.Stroke,
             StrokeCap = SKStrokeCap.Round,
             IsAntialias = true,
@@ -93,17 +74,17 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 return;
             }
 
-            var (fillPaint, textPaint) = GetPaints();
+            var (fillPaint, textPaint, chevronPaint, aimlinePaint) = GetPaints();
 
             // Compute rotation sin/cos once — shared by marker + aimline
             float rad = MapRotation * DegToRad;
             (float sin, float cos) = MathF.SinCos(rad);
 
-            DrawMarker(canvas, pos, fillPaint, sin, cos);
+            DrawMarker(canvas, pos, fillPaint, chevronPaint, sin, cos);
 
             // Aimline — draw after marker so it extends outward
             if (SilkProgram.Config.ShowAimlines && !IsLocalPlayer)
-                DrawAimline(canvas, pos, fillPaint, sin, cos, localPlayer);
+                DrawAimline(canvas, pos, aimlinePaint, sin, cos, localPlayer);
 
             if (!IsLocalPlayer)
             {
@@ -139,7 +120,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// Draws a filled circle + directional chevron tick.
         /// Manually rotates chevron points to avoid canvas Save/Translate/Rotate/Restore.
         /// </summary>
-        private void DrawMarker(SKCanvas canvas, SKPoint point, SKPaint fillPaint, float sin, float cos)
+        private void DrawMarker(SKCanvas canvas, SKPoint point, SKPaint fillPaint, SKPaint chevronPaint, float sin, float cos)
         {
             // Filled dot with thin dark border
             canvas.DrawCircle(point, DotRadius, SKPaints.ShapeBorder);
@@ -161,9 +142,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             // Outline then colored stroke
             canvas.DrawLine(w1x, w1y, tx, ty, _chevronOutline);
             canvas.DrawLine(tx, ty, w2x, w2y, _chevronOutline);
-            _chevronStroke.Color = fillPaint.Color;
-            canvas.DrawLine(w1x, w1y, tx, ty, _chevronStroke);
-            canvas.DrawLine(tx, ty, w2x, w2y, _chevronStroke);
+            canvas.DrawLine(w1x, w1y, tx, ty, chevronPaint);
+            canvas.DrawLine(tx, ty, w2x, w2y, chevronPaint);
         }
 
         /// <summary>
@@ -182,7 +162,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// Length varies by player type. High Alert extends the line when the enemy
         /// is aiming at the local player.
         /// </summary>
-        private void DrawAimline(SKCanvas canvas, SKPoint point, SKPaint fillPaint, float sin, float cos, Player? localPlayer)
+        private void DrawAimline(SKCanvas canvas, SKPoint point, SKPaint aimlinePaint, float sin, float cos, Player? localPlayer)
         {
             var config = SilkProgram.Config;
 
@@ -205,8 +185,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             float endY = point.Y + sin * (DotRadius + length);
 
             canvas.DrawLine(startX, startY, endX, endY, _aimlineOutline);
-            _aimlineStroke.Color = fillPaint.Color;
-            canvas.DrawLine(startX, startY, endX, endY, _aimlineStroke);
+            canvas.DrawLine(startX, startY, endX, endY, aimlinePaint);
         }
 
         /// <summary>
@@ -265,22 +244,23 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         internal SKPaint TextPaint => GetPaints().text;
 
         /// <summary>
-        /// Returns the dot and text paints for this player based on type.
+        /// Returns the dot, text, chevron stroke, and aimline stroke paints for this player based on type.
+        /// All paints are pre-allocated static instances — never mutated at draw time.
         /// </summary>
-        protected virtual (SKPaint dot, SKPaint text) GetPaints()
+        protected virtual (SKPaint dot, SKPaint text, SKPaint chevron, SKPaint aimline) GetPaints()
         {
             return Type switch
             {
-                PlayerType.Teammate      => (SKPaints.PaintTeammate, SKPaints.TextTeammate),
-                PlayerType.USEC          => (SKPaints.PaintUSEC, SKPaints.TextUSEC),
-                PlayerType.BEAR          => (SKPaints.PaintBEAR, SKPaints.TextBEAR),
-                PlayerType.PScav         => (SKPaints.PaintPScav, SKPaints.TextPScav),
-                PlayerType.AIScav        => (SKPaints.PaintScav, SKPaints.TextScav),
-                PlayerType.AIRaider      => (SKPaints.PaintRaider, SKPaints.TextRaider),
-                PlayerType.AIBoss        => (SKPaints.PaintBoss, SKPaints.TextBoss),
-                PlayerType.SpecialPlayer => (SKPaints.PaintSpecial, SKPaints.TextSpecial),
-                PlayerType.Streamer      => (SKPaints.PaintStreamer, SKPaints.TextStreamer),
-                _                        => (SKPaints.PaintLocalPlayer, SKPaints.TextLocalPlayer)
+                PlayerType.Teammate      => (SKPaints.PaintTeammate, SKPaints.TextTeammate, SKPaints.ChevronTeammate, SKPaints.AimlineTeammate),
+                PlayerType.USEC          => (SKPaints.PaintUSEC, SKPaints.TextUSEC, SKPaints.ChevronUSEC, SKPaints.AimlineUSEC),
+                PlayerType.BEAR          => (SKPaints.PaintBEAR, SKPaints.TextBEAR, SKPaints.ChevronBEAR, SKPaints.AimlineBEAR),
+                PlayerType.PScav         => (SKPaints.PaintPScav, SKPaints.TextPScav, SKPaints.ChevronPScav, SKPaints.AimlinePScav),
+                PlayerType.AIScav        => (SKPaints.PaintScav, SKPaints.TextScav, SKPaints.ChevronScav, SKPaints.AimlineScav),
+                PlayerType.AIRaider      => (SKPaints.PaintRaider, SKPaints.TextRaider, SKPaints.ChevronRaider, SKPaints.AimlineRaider),
+                PlayerType.AIBoss        => (SKPaints.PaintBoss, SKPaints.TextBoss, SKPaints.ChevronBoss, SKPaints.AimlineBoss),
+                PlayerType.SpecialPlayer => (SKPaints.PaintSpecial, SKPaints.TextSpecial, SKPaints.ChevronSpecial, SKPaints.AimlineSpecial),
+                PlayerType.Streamer      => (SKPaints.PaintStreamer, SKPaints.TextStreamer, SKPaints.ChevronStreamer, SKPaints.AimlineStreamer),
+                _                        => (SKPaints.PaintLocalPlayer, SKPaints.TextLocalPlayer, SKPaints.ChevronLocalPlayer, SKPaints.AimlineLocalPlayer)
             };
         }
 

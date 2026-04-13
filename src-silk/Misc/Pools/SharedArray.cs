@@ -31,12 +31,44 @@ namespace eft_dma_radar.Silk.Misc.Pools
             _arr = ArrayPool<T>.Shared.Rent(count);
         }
 
-        public IEnumerator<T> GetEnumerator()
-        {
-            for (int i = 0; i < Count; i++) yield return _arr![i];
-        }
+        /// <summary>
+        /// Returns a zero-allocation struct enumerator over the active elements.
+        /// </summary>
+        public Enumerator GetEnumerator() => new(_arr!, Count);
 
+        IEnumerator<T> IEnumerable<T>.GetEnumerator() => GetEnumerator();
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+
+        /// <summary>
+        /// Zero-allocation struct enumerator for <see cref="SharedArray{T}"/>.
+        /// </summary>
+        public struct Enumerator : IEnumerator<T>
+        {
+            private readonly T[] _arr;
+            private readonly int _count;
+            private int _index;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            internal Enumerator(T[] arr, int count)
+            {
+                _arr = arr;
+                _count = count;
+                _index = -1;
+            }
+
+            public readonly T Current
+            {
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                get => _arr[_index];
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool MoveNext() => ++_index < _count;
+
+            public void Reset() => _index = -1;
+            readonly object System.Collections.IEnumerator.Current => Current;
+            public readonly void Dispose() { }
+        }
 
         public void SetDefault()
         {

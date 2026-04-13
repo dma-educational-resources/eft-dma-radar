@@ -329,6 +329,15 @@ namespace eft_dma_radar.Silk.UI.Panels
             }
 
             ImGui.Spacing();
+            ImGui.SeparatorText("Transits");
+
+            bool showTransits = Config.ShowTransits;
+            if (ImGui.Checkbox("Show Transits", ref showTransits))
+                Config.ShowTransits = showTransits;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Show transit points (map-to-map travel) on the radar");
+
+            ImGui.Spacing();
             ImGui.SeparatorText("Doors");
 
             bool showDoors = Config.ShowDoors;

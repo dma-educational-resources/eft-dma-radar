@@ -20,7 +20,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
         private static uint _colorTeammate, _colorUsec, _colorBear, _colorScav, _colorRaider;
         private static uint _colorBoss, _colorPScav, _colorSpecial, _colorStreamer;
         private static uint _colorCrosshair, _colorBg, _colorDotOutline, _colorShadow, _colorBorder;
-        private static uint _colorLoot, _colorLootImportant, _colorCorpse;
+        private static uint _colorLoot, _colorLootImportant, _colorLootWishlist, _colorCorpse;
 
         /// <summary>Whether the aimview widget is open.</summary>
         public static bool IsOpenField;
@@ -56,6 +56,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
             _colorBorder     = ImGui.GetColorU32(new Vector4(0.4f, 0.4f, 0.4f, 0.6f));
             _colorLoot          = ImGui.GetColorU32(new Vector4(0.78f, 0.78f, 0.78f, 0.85f));
             _colorLootImportant = ImGui.GetColorU32(new Vector4(0.20f, 1.0f, 0.20f, 1.0f));
+            _colorLootWishlist  = ImGui.GetColorU32(new Vector4(0.0f, 0.90f, 1.0f, 1.0f));
             _colorCorpse        = ImGui.GetColorU32(new Vector4(0.85f, 0.55f, 0.20f, 0.9f));
             _colorsReady = true;
         }
@@ -202,7 +203,9 @@ namespace eft_dma_radar.Silk.UI.Widgets
             for (int i = 0; i < loot.Count; i++)
             {
                 var item = loot[i];
-                if (!item.ShouldDraw())
+                int price = item.DisplayPrice;
+                var result = item.Evaluate(price);
+                if (!result.Visible)
                     continue;
 
                 var worldPos = item.Position;
@@ -214,9 +217,11 @@ namespace eft_dma_radar.Silk.UI.Widgets
                         contentMin, widgetW, widgetH, contentMax, zoom, out float sx, out float sy))
                     continue;
 
-                int price = item.DisplayPrice;
+                uint color = result.Wishlisted ? _colorLootWishlist
+                           : result.Important ? _colorLootImportant
+                           : _colorLoot;
                 _lootBuf[count++] = new ProjectedItem(sx, sy, dist, price,
-                    item.IsImportant ? _colorLootImportant : _colorLoot,
+                    color,
                     price > 0 ? $"{item.ShortName} ({LootFilter.FormatPrice(price)})" : item.ShortName);
 
                 if (count >= _lootBuf.Length)

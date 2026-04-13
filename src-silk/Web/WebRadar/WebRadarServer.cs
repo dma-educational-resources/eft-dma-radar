@@ -37,7 +37,7 @@ namespace eft_dma_radar.Silk.Web.WebRadar
         /// </summary>
         public static async Task StartAsync(int port, TimeSpan tickRate)
         {
-            await StopAsync();
+            await StopAsync().ConfigureAwait(false);
 
             _tickRate = tickRate;
 
@@ -77,7 +77,7 @@ namespace eft_dma_radar.Silk.Web.WebRadar
             _host.MapGet("/api/radar", () => Results.Json(_latest, _jsonOpts));
             _host.MapGet("/health", () => Results.Text("OK"));
 
-            await _host.StartAsync();
+            await _host.StartAsync().ConfigureAwait(false);
             StartWorker();
 
             Log.WriteLine($"[WebRadar] HTTP server running on port {port}");
@@ -93,8 +93,8 @@ namespace eft_dma_radar.Silk.Web.WebRadar
 
             if (_host is not null)
             {
-                await _host.StopAsync();
-                await _host.DisposeAsync();
+                await _host.StopAsync().ConfigureAwait(false);
+                await _host.DisposeAsync().ConfigureAwait(false);
                 _host = null;
             }
 

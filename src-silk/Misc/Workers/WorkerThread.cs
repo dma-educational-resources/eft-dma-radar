@@ -116,8 +116,8 @@ namespace eft_dma_radar.Silk.Misc.Workers
         {
             if (Interlocked.Exchange(ref _disposed, true) == false)
             {
-                PerformWork = null;
                 _cts.Cancel();
+                PerformWork = null;
                 _cts.Dispose();
             }
         }

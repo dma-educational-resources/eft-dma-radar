@@ -57,16 +57,19 @@ namespace eft_dma_radar.Silk.UI.Widgets
             if (loot is not null)
             {
                 var localPos = localPlayer.Position;
+                var filterData = LootFilter.FilterData;
 
                 for (int i = 0; i < loot.Count; i++)
                 {
                     var item = loot[i];
-                    if (!item.ShouldDraw())
+                    int price = item.DisplayPrice;
+                    var result = item.Evaluate(price);
+                    if (!result.Visible)
                         continue;
 
-                    int price = item.DisplayPrice;
                     float dist = Vector3.Distance(localPos, item.Position);
-                    bool important = LootFilter.IsImportant(price);
+                    bool important = result.Important;
+                    bool wishlisted = result.Wishlisted;
                     visibleCount++;
                     totalValue += price;
 
@@ -78,6 +81,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
                         if (dist < group.NearestDist)
                             group.NearestDist = dist;
                         group.IsImportant |= important;
+                        group.IsWishlisted |= wishlisted;
                     }
                     else
                     {
@@ -90,6 +94,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
                             Quantity = 1,
                             NearestDist = dist,
                             IsImportant = important,
+                            IsWishlisted = wishlisted,
                         };
                         _groups[item.ShortName] = g;
                         _sorted.Add(g);
@@ -167,7 +172,9 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 var g = _sorted[i];
                 ImGui.TableNextRow();
 
-                var color = g.IsImportant
+                var color = g.IsWishlisted
+                    ? new Vector4(0f, 0.9f, 1f, 1f)
+                    : g.IsImportant
                     ? new Vector4(0.2f, 1f, 0.2f, 1f)
                     : new Vector4(0.85f, 0.85f, 0.85f, 1f);
 
@@ -255,6 +262,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
             public int Quantity;
             public float NearestDist;
             public bool IsImportant;
+            public bool IsWishlisted;
         }
     }
 }

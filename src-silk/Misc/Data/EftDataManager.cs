@@ -15,6 +15,12 @@ namespace eft_dma_radar.Silk.Misc.Data
             = FrozenDictionary<string, TarkovMarketItem>.Empty;
 
         /// <summary>
+        /// Map data (extracts, transits) keyed by map nameId.
+        /// </summary>
+        public static FrozenDictionary<string, MapElement> MapData { get; private set; }
+            = FrozenDictionary<string, MapElement>.Empty;
+
+        /// <summary>
         /// Loads the item database from the embedded DEFAULT_DATA.json resource.
         /// </summary>
         internal static void ModuleInit()
@@ -45,6 +51,19 @@ namespace eft_dma_radar.Silk.Misc.Data
 
                 AllItems = builder.ToFrozenDictionary(StringComparer.Ordinal);
                 Log.WriteLine($"[EftDataManager] Loaded {AllItems.Count} items.");
+
+                // Load map data (extracts + transits)
+                if (data.Maps is { Count: > 0 })
+                {
+                    var mapBuilder = new Dictionary<string, MapElement>(data.Maps.Count, StringComparer.OrdinalIgnoreCase);
+                    foreach (var map in data.Maps)
+                    {
+                        if (!string.IsNullOrEmpty(map.NameId))
+                            mapBuilder.TryAdd(map.NameId, map);
+                    }
+                    MapData = mapBuilder.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+                    Log.WriteLine($"[EftDataManager] Loaded {MapData.Count} map configs.");
+                }
             }
             catch (Exception ex)
             {
@@ -61,6 +80,51 @@ namespace eft_dma_radar.Silk.Misc.Data
         {
             [JsonPropertyName("items")]
             public List<TarkovMarketItem> Items { get; set; } = [];
+
+            [JsonPropertyName("maps")]
+            public List<MapElement> Maps { get; set; } = [];
         }
+
+        #region Map Data Models
+
+        /// <summary>
+        /// Map data element containing extracts and transits.
+        /// </summary>
+        internal sealed class MapElement
+        {
+            [JsonPropertyName("name")]
+            public string Name { get; set; } = string.Empty;
+
+            [JsonPropertyName("nameId")]
+            public string NameId { get; set; } = string.Empty;
+
+            [JsonPropertyName("transits")]
+            public List<TransitElement> Transits { get; set; } = [];
+        }
+
+        internal sealed class TransitElement
+        {
+            [JsonPropertyName("description")]
+            public string Description { get; set; } = string.Empty;
+
+            [JsonPropertyName("position")]
+            public MapPositionElement? Position { get; set; }
+        }
+
+        internal sealed class MapPositionElement
+        {
+            [JsonPropertyName("x")]
+            public float X { get; set; }
+
+            [JsonPropertyName("y")]
+            public float Y { get; set; }
+
+            [JsonPropertyName("z")]
+            public float Z { get; set; }
+
+            public Vector3 ToVector3() => new(X, Y, Z);
+        }
+
+        #endregion
     }
 }

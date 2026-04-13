@@ -141,6 +141,22 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 
         #endregion
 
+        #region Hands (Item In Hands)
+
+        /// <summary>Short name of the item currently held (e.g. "AKM", "Salewa"). Null if not yet read.</summary>
+        public string? InHandsItem { get; set; }
+
+        /// <summary>BSG ID of the item currently held. Used for weapon detection.</summary>
+        internal string? InHandsItemId { get; set; }
+
+        /// <summary>Short name of the chambered ammo, if a weapon is held. Null otherwise.</summary>
+        public string? InHandsAmmo { get; set; }
+
+        /// <summary>Whether hands data has been read at least once for this player.</summary>
+        public bool HandsReady { get; set; }
+
+        #endregion
+
         public override string ToString() => $"{Type} [{Name}]";
     }
 }
