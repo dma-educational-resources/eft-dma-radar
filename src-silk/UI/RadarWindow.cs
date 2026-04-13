@@ -255,6 +255,10 @@ namespace eft_dma_radar.Silk.UI
                 SettingsPanel.IsOpen = Config.ShowSettingsOverlay;
                 LootFiltersPanel.IsOpen = Config.ShowLootFiltersPanel;
                 HotkeyManagerPanel.IsOpen = Config.ShowHotkeyPanel;
+                HideoutPanel.IsOpen = Config.ShowHideoutPanel;
+
+                // Auto-open the hideout panel when the player enters the hideout
+                Memory.HideoutEntered += static (_, _) => HideoutPanel.IsOpen = true;
 
                 // Wire up the notification callback into the silk Memory module
                 Memory.ShowNotification ??= static (msg, level) =>
@@ -398,6 +402,10 @@ namespace eft_dma_radar.Silk.UI
                         DrawStatusMessage(canvas, "Waiting for Raid Start", scale);
                     }
                 }
+                else if (Memory.InHideout)
+                {
+                    DrawStatusMessage(canvas, "In Hideout", scale);
+                }
                 else if (!Ready)
                 {
                     DrawStatusMessage(canvas, "Starting Up", scale, animated: true);
@@ -533,13 +541,12 @@ namespace eft_dma_radar.Silk.UI
                     bool showNames = Config.ShowContainerNames;
                     bool hideSearched = Config.HideSearchedContainers;
                     var selectedIds = Config.SelectedContainers;
-                    bool hasFilter = selectedIds is { Count: > 0 };
 
                     foreach (var container in containers)
                     {
                         if (hideSearched && container.Searched)
                             continue;
-                        if (hasFilter && !selectedIds!.Contains(container.Id))
+                        if (!selectedIds.Contains(container.Id))
                             continue;
                         if (!worldBounds.Contains(container.Position))
                             continue;
@@ -1099,6 +1106,9 @@ namespace eft_dma_radar.Silk.UI
                 if (ImGui.MenuItem("\u2328 Hotkeys", null, HotkeyManagerPanel.IsOpen))
                     HotkeyManagerPanel.IsOpen = !HotkeyManagerPanel.IsOpen;
 
+                if (ImGui.MenuItem("\U0001f3e0 Hideout", "H", HideoutPanel.IsOpen))
+                    HideoutPanel.IsOpen = !HideoutPanel.IsOpen;
+
                 ImGui.Separator();
 
                 // Widgets
@@ -1120,6 +1130,7 @@ namespace eft_dma_radar.Silk.UI
                     SettingsPanel.IsOpen = false;
                     LootFiltersPanel.IsOpen = false;
                     HotkeyManagerPanel.IsOpen = false;
+                    HideoutPanel.IsOpen = false;
                     PlayerInfoWidget.IsOpen = false;
                     LootWidget.IsOpen = false;
                     AimviewWidget.IsOpen = false;
@@ -1129,7 +1140,7 @@ namespace eft_dma_radar.Silk.UI
             }
 
             // ── Right-aligned info ──────────────────────────────────────────
-            string mapName = MapManager.Map?.Config?.Name ?? "No Map";
+            string mapName = Memory.InHideout ? "Hideout" : MapManager.Map?.Config?.Name ?? "No Map";
             string rightText = $"{mapName}  |  {_fps} FPS";
             float rightTextWidth = ImGui.CalcTextSize(rightText).X;
             ImGui.SetCursorPosX(ImGui.GetWindowWidth() - rightTextWidth - 12);
@@ -1141,7 +1152,7 @@ namespace eft_dma_radar.Silk.UI
 
         private static void DrawStatusBar()
         {
-            if (!InRaid)
+            if (!InRaid && !Memory.InHideout)
                 return;
 
             var viewport = ImGui.GetMainViewport();
@@ -1160,33 +1171,53 @@ namespace eft_dma_radar.Silk.UI
 
             if (ImGui.Begin("##StatusBar", flags))
             {
-                // Left: raid status indicators
-                var allPlayers = AllPlayers;
-                int playerCount = 0;
-                int pmcCount = 0;
-                if (allPlayers is not null)
+                if (Memory.InHideout)
                 {
-                    foreach (var p in allPlayers)
+                    // Hideout status
+                    ImGui.TextColored(new Vector4(1.00f, 0.84f, 0.00f, 1f), "\u25cf");
+                    ImGui.SameLine(0, 4);
+                    ImGui.TextColored(new Vector4(0.60f, 0.62f, 0.65f, 1f), "In Hideout");
+
+                    var hideout = Memory.Hideout;
+                    if (hideout.Items.Count > 0)
                     {
-                        if (p.IsLocalPlayer || !p.IsActive || !p.IsAlive)
-                            continue;
-                        playerCount++;
-                        if (p.Type is PlayerType.USEC or PlayerType.BEAR)
-                            pmcCount++;
+                        ImGui.SameLine(0, 16);
+                        ImGui.TextColored(new Vector4(0.50f, 0.52f, 0.55f, 1f), "\u2502");
+                        ImGui.SameLine(0, 16);
+                        ImGui.TextColored(new Vector4(0.60f, 0.62f, 0.65f, 1f),
+                            $"Stash: {hideout.Items.Count} items  \u00b7  \u20bd{hideout.TotalBestValue:N0}");
                     }
                 }
+                else
+                {
+                    // Raid status
+                    var allPlayers = AllPlayers;
+                    int playerCount = 0;
+                    int pmcCount = 0;
+                    if (allPlayers is not null)
+                    {
+                        foreach (var p in allPlayers)
+                        {
+                            if (p.IsLocalPlayer || !p.IsActive || !p.IsAlive)
+                                continue;
+                            playerCount++;
+                            if (p.Type is PlayerType.USEC or PlayerType.BEAR)
+                                pmcCount++;
+                        }
+                    }
 
-                // Status dot
-                ImGui.TextColored(new Vector4(0.30f, 0.75f, 0.70f, 1f), "\u25cf");
-                ImGui.SameLine(0, 4);
-                ImGui.TextColored(new Vector4(0.60f, 0.62f, 0.65f, 1f), "In Raid");
+                    // Status dot
+                    ImGui.TextColored(new Vector4(0.30f, 0.75f, 0.70f, 1f), "\u25cf");
+                    ImGui.SameLine(0, 4);
+                    ImGui.TextColored(new Vector4(0.60f, 0.62f, 0.65f, 1f), "In Raid");
 
-                ImGui.SameLine(0, 16);
-                ImGui.TextColored(new Vector4(0.50f, 0.52f, 0.55f, 1f), "\u2502");
+                    ImGui.SameLine(0, 16);
+                    ImGui.TextColored(new Vector4(0.50f, 0.52f, 0.55f, 1f), "\u2502");
 
-                ImGui.SameLine(0, 16);
-                ImGui.TextColored(new Vector4(0.60f, 0.62f, 0.65f, 1f),
-                    $"Players: {playerCount}  ({pmcCount} PMC)");
+                    ImGui.SameLine(0, 16);
+                    ImGui.TextColored(new Vector4(0.60f, 0.62f, 0.65f, 1f),
+                        $"Players: {playerCount}  ({pmcCount} PMC)");
+                }
 
                 // Right: save notification
                 if (_saveNotifyTimer > 0f)
@@ -1217,6 +1248,9 @@ namespace eft_dma_radar.Silk.UI
 
             if (HotkeyManagerPanel.IsOpen)
                 HotkeyManagerPanel.Draw();
+
+            if (HideoutPanel.IsOpen)
+                HideoutPanel.Draw();
 
             if (PlayerInfoWidget.IsOpen && InRaid)
                 PlayerInfoWidget.Draw();
@@ -1732,10 +1766,14 @@ namespace eft_dma_radar.Silk.UI
                 case Key.A:
                     AimviewWidget.IsOpen = !AimviewWidget.IsOpen;
                     break;
+                case Key.H:
+                    HideoutPanel.IsOpen = !HideoutPanel.IsOpen;
+                    break;
                 case Key.Escape:
                     SettingsPanel.IsOpen = false;
                     LootFiltersPanel.IsOpen = false;
                     HotkeyManagerPanel.IsOpen = false;
+                    HideoutPanel.IsOpen = false;
                     PlayerInfoWidget.IsOpen = false;
                     LootWidget.IsOpen = false;
                     AimviewWidget.IsOpen = false;
@@ -1767,6 +1805,7 @@ namespace eft_dma_radar.Silk.UI
             Config.ShowSettingsOverlay = SettingsPanel.IsOpen;
             Config.ShowLootFiltersPanel = LootFiltersPanel.IsOpen;
             Config.ShowHotkeyPanel = HotkeyManagerPanel.IsOpen;
+            Config.ShowHideoutPanel = HideoutPanel.IsOpen;
 
             Config.Save();
 

@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Interactables;
+using eft_dma_radar.Silk.Tarkov.Hideout;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using eft_dma_radar.Silk.Tarkov.Unity.IL2CPP;
 using GameObjectManager = eft_dma_radar.Silk.Tarkov.Unity.GOM;
@@ -59,8 +60,12 @@ namespace eft_dma_radar.Silk.DMA
         public static ulong UnityBase { get; private set; }
         public static ulong GOM { get; private set; }
         public static ulong GameAssemblyBase { get; private set; }
-        public static bool Ready => _state is MemoryState.ProcessFound or MemoryState.InRaid;
+        public static bool Ready => _state is MemoryState.ProcessFound or MemoryState.InRaid or MemoryState.InHideout;
         public static bool InRaid => _state is MemoryState.InRaid;
+        public static bool InHideout => _state is MemoryState.InHideout;
+
+        /// <summary>Hideout manager instance — persists across hideout entries.</summary>
+        public static HideoutManager Hideout { get; } = new();
 
         public static LocalGameWorld? Game { get; private set; }
         public static string? MapID => Game?.MapID;
@@ -85,6 +90,10 @@ namespace eft_dma_radar.Silk.DMA
         public static event EventHandler<EventArgs>? RaidStarted;
         /// <summary>Raised when a raid ends.</summary>
         public static event EventHandler<EventArgs>? RaidStopped;
+        /// <summary>Raised when the player enters the hideout.</summary>
+        public static event EventHandler<EventArgs>? HideoutEntered;
+        /// <summary>Raised when the player leaves the hideout.</summary>
+        public static event EventHandler<EventArgs>? HideoutExited;
 
         private static void OnGameStarted()
         {
@@ -115,11 +124,26 @@ namespace eft_dma_radar.Silk.DMA
 
         private static void OnRaidStopped()
         {
-            if (_state is MemoryState.InRaid)
+            if (_state is MemoryState.InRaid or MemoryState.InHideout)
                 SetState(MemoryState.ProcessFound);
             GCSettings.LatencyMode = GCLatencyMode.Interactive;
             Game = null;
             RaidStopped?.Invoke(null, EventArgs.Empty);
+        }
+
+        private static void OnHideoutEntered()
+        {
+            SetState(MemoryState.InHideout);
+            HideoutEntered?.Invoke(null, EventArgs.Empty);
+        }
+
+        private static void OnHideoutExited()
+        {
+            if (_state is MemoryState.InHideout)
+                SetState(MemoryState.ProcessFound);
+            Game = null;
+            Hideout.Reset();
+            HideoutExited?.Invoke(null, EventArgs.Empty);
         }
 
         private static void SetState(MemoryState s)
@@ -308,6 +332,20 @@ namespace eft_dma_radar.Silk.DMA
 
                     using var game = Game = LocalGameWorld.Create(ct);
 
+                    if (game.IsHideout)
+                    {
+                        if (SilkProgram.Config.HideoutEnabled)
+                        {
+                            Log.WriteLine("[Memory] Entered hideout.");
+                            RunHideoutLoop(game, ct);
+                        }
+                        else
+                        {
+                            Log.WriteLine("[Memory] Hideout detected but disabled by config — skipping.");
+                        }
+                        continue;
+                    }
+
                     Log.WriteLine($"[Memory] Raid started. Map = '{game.MapID}'");
                     OnRaidStarted();
                     game.Start();
@@ -366,11 +404,73 @@ namespace eft_dma_radar.Silk.DMA
             }
         }
 
+        /// <summary>
+        /// Lightweight loop for hideout mode. No worker threads, no loot/player tracking.
+        /// Automatically refreshes the HideoutManager, then polls until the GameWorld
+        /// changes (player queued for raid or returned to main menu).
+        /// </summary>
+        private static void RunHideoutLoop(LocalGameWorld game, CancellationToken ct)
+        {
+            OnHideoutEntered();
+
+            try
+            {
+                // Auto-refresh hideout data on entry (if enabled)
+                if (SilkProgram.Config.HideoutAutoRefresh)
+                {
+                    try
+                    {
+                        var status = Hideout.RefreshAll();
+                        Log.WriteLine($"[Memory] Hideout auto-refresh: {status}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.WriteLine($"[Memory] Hideout auto-refresh failed: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    Log.WriteLine("[Memory] Hideout auto-refresh disabled by config.");
+                }
+
+                // Poll until hideout GameWorld is no longer valid
+                int validityTick = 0;
+                while (!_shutdown)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    if (_restartRequested)
+                    {
+                        _restartRequested = false;
+                        RequestRestart();
+                        break;
+                    }
+
+                    // Every 4th tick (~2s) verify the hideout GameWorld is still alive.
+                    // When the player queues for a raid or returns to the main menu,
+                    // the hideout scene is torn down and MainPlayer becomes invalid.
+                    if ((++validityTick & 0x3) == 0 && !game.IsHideoutAlive())
+                    {
+                        Log.WriteLine("[Memory] Hideout GameWorld no longer valid.");
+                        break;
+                    }
+
+                    Thread.Sleep(500);
+                }
+
+                Log.WriteLine("[Memory] Left hideout.");
+            }
+            finally
+            {
+                OnHideoutExited();
+            }
+        }
+
         private static volatile bool _restartRequested;
 
         public static bool RestartRadar
         {
-            set { if (InRaid) _restartRequested = value; }
+            set { if (InRaid || InHideout) _restartRequested = value; }
         }
 
         #endregion
@@ -720,7 +820,8 @@ namespace eft_dma_radar.Silk.DMA
         WaitingForProcess,
         Initializing,
         ProcessFound,
-        InRaid
+        InRaid,
+        InHideout,
     }
 
     /// <summary>Notification severity used by <see cref="Memory.ShowNotification"/>.</summary>

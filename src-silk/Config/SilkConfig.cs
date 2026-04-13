@@ -137,6 +137,17 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Whether the Hotkey Manager panel is open.</summary>
         public bool ShowHotkeyPanel { get; set; } = false;
 
+        /// <summary>Whether the Hideout panel is open.</summary>
+        public bool ShowHideoutPanel { get; set; } = false;
+
+        // ── Hideout ─────────────────────────────────────────────────────────────
+
+        /// <summary>Enable hideout stash/area reading when entering the hideout scene.</summary>
+        public bool HideoutEnabled { get; set; } = true;
+
+        /// <summary>Automatically refresh stash and area data on hideout entry.</summary>
+        public bool HideoutAutoRefresh { get; set; } = true;
+
         // ── Exfils ──────────────────────────────────────────────────────────────
 
         /// <summary>Master toggle for exfil rendering on the radar.</summary>

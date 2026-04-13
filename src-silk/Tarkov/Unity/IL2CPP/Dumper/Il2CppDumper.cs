@@ -229,7 +229,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             }
 
             // Dynamically resolve TypeIndex values for known singleton classes.
-            ResolveTypeIndices(nameToIndex);
+            ResolveTypeIndices(nameToIndex, classes);
 
             // Build schema AFTER TypeIndex resolution so it picks up updated values.
             var schema = BuildSchema();

@@ -1057,7 +1057,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     1 => 0.1,
                     2 => 0.2,
                     3 => 0.5,
-                    _ => Math.Min(entry.TransformInitFailures * 0.5, 2.0)
+                    _ => Math.Min(entry.TransformInitFailures * 0.5, 1.0)
                 };
                 entry.NextTransformRetry = now.AddSeconds(backoffSec);
             }
@@ -1069,7 +1069,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     1 => 0.1,
                     2 => 0.2,
                     3 => 0.5,
-                    _ => Math.Min(entry.RotationInitFailures * 0.5, 2.0)
+                    _ => Math.Min(entry.RotationInitFailures * 0.5, 1.0)
                 };
                 entry.NextRotationRetry = now.AddSeconds(backoffSec);
             }

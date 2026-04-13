@@ -91,6 +91,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private readonly List<SpawnGroupEntry> _spawnGroups = [];
         private int _nextSpawnGroupId = 1;
 
+        // Backoff for failed CreatePlayerEntry calls — prevents hammering uninitialized objects.
+        // Key: player address, Value: (failure count, earliest UTC time to retry).
+        // Entries are pruned when the address is either successfully created or removed from the list.
+        private readonly Dictionary<ulong, (int Failures, DateTime NextRetry)> _failedEntryBackoff = new();
+
+        // Reusable collections for backoff pruning — avoids per-tick allocation
+        private readonly HashSet<ulong> _failedBackoffPrune = new(MaxPlayerCount);
+        private readonly List<ulong> _failedBackoffRemove = [];
+
         #endregion
 
         #region Properties
@@ -292,6 +301,31 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 int invalidPtrs = 0;
                 int newDiscovered = 0;
                 int newFailed = 0;
+                var now = DateTime.UtcNow;
+
+                // Prune backoff entries for addresses no longer in the player list
+                // (player was removed before we ever managed to create it).
+                if (_failedEntryBackoff.Count > 0)
+                {
+                    // Build a quick set of current list addresses for O(1) lookup
+                    _failedBackoffPrune.Clear();
+                    for (int i = 0; i < ptrs.Count; i++)
+                    {
+                        var p = ptrs[i];
+                        if (p.IsValidVirtualAddress())
+                            _failedBackoffPrune.Add(p);
+                    }
+
+                    // Remove backoff entries that are no longer in the player list
+                    _failedBackoffRemove.Clear();
+                    foreach (var kvp in _failedEntryBackoff)
+                    {
+                        if (!_failedBackoffPrune.Contains(kvp.Key))
+                            _failedBackoffRemove.Add(kvp.Key);
+                    }
+                    foreach (var key in _failedBackoffRemove)
+                        _failedEntryBackoff.Remove(key);
+                }
 
                 // Discover new players
                 for (int i = 0; i < ptrs.Count; i++)
@@ -308,14 +342,25 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     if (_players.ContainsKey(ptr))
                         continue;
 
+                    // Check backoff — skip addresses that failed recently
+                    if (_failedEntryBackoff.TryGetValue(ptr, out var backoff) && now < backoff.NextRetry)
+                        continue;
+
                     var entry = CreatePlayerEntry(ptr, isLocal: false);
                     if (entry is not null)
                     {
                         _players.TryAdd(ptr, entry);
+                        _failedEntryBackoff.Remove(ptr);
                         newDiscovered++;
                     }
                     else
                     {
+                        // Exponential backoff: 0.5s, 1s, 2s... capped at 5s
+                        int failures = _failedEntryBackoff.TryGetValue(ptr, out var prev)
+                            ? prev.Failures + 1
+                            : 1;
+                        double backoffSec = Math.Min(0.5 * Math.Pow(2, failures - 1), 5.0);
+                        _failedEntryBackoff[ptr] = (failures, now.AddSeconds(backoffSec));
                         newFailed++;
                     }
                 }

@@ -357,7 +357,6 @@ namespace eft_dma_radar.Silk.UI.Widgets
             var config = SilkProgram.Config;
             bool hideSearched = config.HideSearchedContainers;
             var selectedIds = config.SelectedContainers;
-            bool hasFilter = selectedIds is { Count: > 0 };
 
             int count = 0;
             for (int i = 0; i < containers.Count; i++)
@@ -365,7 +364,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 var container = containers[i];
                 if (hideSearched && container.Searched)
                     continue;
-                if (hasFilter && !selectedIds!.Contains(container.Id))
+                if (!selectedIds.Contains(container.Id))
                     continue;
                 var worldPos = container.Position;
                 float dist = Vector3.Distance(eyePos, worldPos);

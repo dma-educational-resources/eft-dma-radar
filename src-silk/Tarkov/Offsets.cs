@@ -733,6 +733,8 @@ namespace SDK
             public static uint MatchingProgressView_TypeIndex = 15363;
             public static uint GamePlayerOwner_TypeIndex = 8574;
             public static uint TarkovApplication_TypeIndex = 7967;
+            public static uint HideoutArea_TypeIndex = 9178;
+            public static uint HideoutController_TypeIndex = 9189;
         }
         public readonly partial struct MatchingProgress
         {

@@ -36,6 +36,8 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             ("MatchingProgressView",  nameof(Offsets.Special.MatchingProgressView_TypeIndex)),
             ("GamePlayerOwner",       nameof(Offsets.Special.GamePlayerOwner_TypeIndex)),
             ("TarkovApplication",     nameof(Offsets.Special.TarkovApplication_TypeIndex)),
+            ("EFT.Hideout.HideoutArea",       nameof(Offsets.Special.HideoutArea_TypeIndex)),
+            ("EFT.Hideout.HideoutController", nameof(Offsets.Special.HideoutController_TypeIndex)),
         ];
 
         // ── State ────────────────────────────────────────────────────────────
@@ -263,17 +265,43 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
 
         // ── TypeIndex resolution ─────────────────────────────────────────────
 
-        private static void ResolveTypeIndices(Dictionary<string, int> nameToIndex)
+        private static void ResolveTypeIndices(
+            Dictionary<string, int> nameToIndex,
+            List<(string Name, string Namespace, ulong KlassPtr, int Index)> classes)
         {
             foreach (var (il2cppName, fieldName) in TypeIndexMap)
             {
                 var fi = GetTypeIndexField(fieldName);
                 if (fi is null) continue;
 
-                if (nameToIndex.TryGetValue(il2cppName, out var index))
+                // Namespace-qualified entry (e.g. "EFT.Hideout.HideoutController"):
+                // search the raw classes list by namespace + short name.
+                int dotIdx = il2cppName.LastIndexOf('.');
+                if (dotIdx > 0)
+                {
+                    var ns = il2cppName[..dotIdx];
+                    var shortName = il2cppName[(dotIdx + 1)..];
+                    bool found = false;
+                    foreach (var (cName, cNs, _, cIdx) in classes)
+                    {
+                        if (cName == shortName && cNs == ns)
+                        {
+                            UpdateTypeIndexField(fi, (uint)cIdx);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found)
+                        Log.WriteLine($"{LogTag} WARN: '{il2cppName}' not found in type table — {fieldName} using fallback ({fi.GetValue(null) ?? 0u}).");
+                }
+                else if (nameToIndex.TryGetValue(il2cppName, out var index))
+                {
                     UpdateTypeIndexField(fi, (uint)index);
+                }
                 else
+                {
                     Log.WriteLine($"{LogTag} WARN: '{il2cppName}' not found in type table — {fieldName} using fallback ({fi.GetValue(null) ?? 0u}).");
+                }
             }
         }
 

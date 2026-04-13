@@ -110,6 +110,46 @@ namespace eft_dma_radar.Silk.UI.Panels
                 ImGui.SetTooltip("Hide loot and clutter; focus on players only  [B]");
 
             ImGui.Spacing();
+            ImGui.SeparatorText("Hideout");
+
+            bool hideoutEnabled = Config.HideoutEnabled;
+            if (ImGui.Checkbox("Enable Hideout", ref hideoutEnabled))
+                Config.HideoutEnabled = hideoutEnabled;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Read stash items and area upgrades when entering the hideout");
+
+            if (Config.HideoutEnabled)
+            {
+                ImGui.Indent(16);
+                bool autoRefresh = Config.HideoutAutoRefresh;
+                if (ImGui.Checkbox("Auto Refresh", ref autoRefresh))
+                    Config.HideoutAutoRefresh = autoRefresh;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Automatically refresh stash and area data on hideout entry");
+                ImGui.Unindent(16);
+            }
+
+            ImGui.Spacing();
+            ImGui.SeparatorText("Radar");
+
+            {
+                bool canRestart = Memory.InRaid || Memory.InHideout;
+                if (!canRestart)
+                    ImGui.BeginDisabled();
+
+                if (ImGui.Button("\u21bb Restart Radar"))
+                    Memory.RestartRadar = true;
+
+                if (!canRestart)
+                    ImGui.EndDisabled();
+
+                if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                    ImGui.SetTooltip(canRestart
+                        ? "Restart the radar (re-detect game world, players, loot)"
+                        : "Only available during a raid or in the hideout");
+            }
+
+            ImGui.Spacing();
             ImGui.SeparatorText("Web Radar");
 
             bool webEnabled = Config.WebRadarEnabled;

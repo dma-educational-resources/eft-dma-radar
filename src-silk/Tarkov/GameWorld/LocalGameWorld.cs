@@ -75,8 +75,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         // Cooldown after raid ends — prevents rapid re-detection of stale GameWorld
         private static long _raidCooldownUntilTicks;
 
-        private static readonly TimeSpan TransformValidationInterval = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan TransformValidationInterval = TimeSpan.FromSeconds(5);
         private DateTime _lastTransformValidation;
+
+        /// <summary>EFT uses this LocationId when the player is in the hideout scene.</summary>
+        internal const string HideoutMapID = "hideout";
 
         // Map-change detection counter — only check every 64 IsRaidActive() calls (expensive string read)
         private int _mapCheckTick;
@@ -90,6 +93,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>Whether the raid is still active (becomes <c>false</c> after disposal).</summary>
         public bool InRaid => _disposed == 0;
+
+        /// <summary>True when the GameWorld is the hideout scene (no actual raid).</summary>
+        public bool IsHideout { get; }
 
         /// <summary>The registered players manager for this raid session.</summary>
         public RegisteredPlayers RegisteredPlayers => _registeredPlayers;
@@ -263,9 +269,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             _base = gameWorldBase;
             MapID = mapId;
             _ct = ct;
+            IsHideout = mapId.Equals(HideoutMapID, StringComparison.OrdinalIgnoreCase);
+
             _registeredPlayers = new RegisteredPlayers(gameWorldBase, mapId);
             _lootManager = new LootManager(gameWorldBase);
             _interactablesManager = new InteractablesManager(gameWorldBase);
+
+            // In hideout mode, skip creating the expensive worker threads.
+            // The hideout has no enemies, loot, or exfils to track.
+            if (IsHideout)
+                return;
 
             _realtimeWorker = new WorkerThread
             {
@@ -298,6 +311,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// </summary>
         public void Start()
         {
+            // In hideout mode, no workers to start — the Memory game loop
+            // handles the hideout lifecycle directly.
+            if (IsHideout)
+            {
+                Log.WriteLine("[LocalGameWorld] Hideout mode — skipping worker threads.");
+                return;
+            }
+
             // Initialise timing baselines — give the raid a grace period before
             // firing transform-validation checks.
             _lastTransformValidation = DateTime.UtcNow;
@@ -327,8 +348,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             Log.WriteLine("[LocalGameWorld] Disposed — entering cooldown.");
 
-            // Start cooldown to prevent rapid re-detection of the stale GameWorld
-            BeginCooldown(12);
+            // Hideout exits need only a brief cooldown — the stale guard + structural
+            // validation in Create() already reject dead GameWorlds.  Raids need a longer
+            // cooldown because the post-raid stats screen keeps the GameWorld alive.
+            BeginCooldown(IsHideout ? 1 : 12);
 
             _realtimeWorker?.Dispose();
             _registrationWorker?.Dispose();
@@ -719,6 +742,34 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     return false;
 
                 return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        #endregion
+
+        #region Hideout Validation
+
+        /// <summary>
+        /// Lightweight check used by the hideout polling loop (no workers running).
+        /// Reads MainPlayer from the GameWorld and verifies the pointer is still valid.
+        /// Returns <c>false</c> when the player leaves the hideout scene.
+        /// </summary>
+        internal bool IsHideoutAlive()
+        {
+            try
+            {
+                if (!Memory.TryReadPtr(_base + Offsets.ClientLocalGameWorld.MainPlayer, out var mainPlayer, false))
+                    return false;
+                if (!mainPlayer.IsValidVirtualAddress())
+                    return false;
+
+                // Verify the LocationId still reads as "hideout"
+                var currentMap = ReadMapID(_base);
+                return currentMap.Equals(HideoutMapID, StringComparison.OrdinalIgnoreCase);
             }
             catch
             {
