@@ -1,5 +1,3 @@
-using eft_dma_radar.Silk.Tarkov;
-using eft_dma_radar.Silk.Tarkov.GameWorld.Player;
 using ImGuiNET;
 
 namespace eft_dma_radar.Silk.UI.Widgets

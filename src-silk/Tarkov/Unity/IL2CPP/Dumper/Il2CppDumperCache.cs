@@ -213,7 +213,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                     var raw = fi.GetValue(null);
                     if (raw is null) continue;
 
-                    string value = raw switch
+                    string? value = raw switch
                     {
                         uint[] arr => arr.Length > 0 ? arr[0].ToString() : null,
                         uint u => u.ToString(),
@@ -273,7 +273,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                     {
                         if (uint.TryParse(rawValue, out var v))
                         {
-                            var arr = (uint[])fi.GetValue(null);
+                            var arr = (uint[]?)fi.GetValue(null);
                             if (arr is { Length: > 0 }) { arr[0] = v; applied++; }
                         }
                     }

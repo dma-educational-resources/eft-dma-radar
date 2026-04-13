@@ -89,6 +89,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                 var entry = new PlayerEntry(playerBase, player, isObserved);
 
+                // Stagger initial gear/hands refresh times so newly discovered players
+                // don't all fire in the same registration tick (thundering herd).
+                // Each player gets an incrementing slot that spaces out refreshes.
+                int slot = _staggerIndex++;
+                var now = DateTime.UtcNow;
+                entry.NextGearRefresh = now.AddMilliseconds(slot * 250);
+                entry.NextHandsRefresh = now.AddMilliseconds(slot * 150);
+
                 // Transform + rotation init is deferred to BatchInitTransformsAndRotations()
                 // which runs after all new players are discovered in a single batched scatter.
                 // For the local player (single init) we still do it inline.

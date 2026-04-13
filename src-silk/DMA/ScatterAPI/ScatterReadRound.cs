@@ -1,5 +1,3 @@
-using eft_dma_radar.Silk.Misc.Pools;
-
 namespace eft_dma_radar.Silk.DMA.ScatterAPI
 {
     /// <summary>

@@ -1,4 +1,5 @@
 using eft_dma_radar.Silk.Tarkov;
+using eft_dma_radar.Silk.Tarkov.Unity.IL2CPP;
 using eft_dma_radar.Silk.UI.Panels;
 using eft_dma_radar.Silk.UI.Widgets;
 using ImGuiNET;
@@ -55,15 +56,6 @@ namespace eft_dma_radar.Silk.UI
         private static readonly Dictionary<int, List<SKPoint>> _connectorGroups = new(8);
         private static readonly List<List<SKPoint>> _connectorPointPool = [];
         private static int _connectorPoolIndex;
-
-        // Ping effects
-        private static readonly List<PingEffect> _activePings = [];
-        private static readonly SKPaint _pingPaint = new()
-        {
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 4,
-            IsAntialias = true
-        };
 
         // Resource purge rate limiter
         private static long _lastPurgeTick;
@@ -411,7 +403,17 @@ namespace eft_dma_radar.Silk.UI
                 }
                 else if (!InRaid)
                 {
-                    DrawStatusMessage(canvas, "Waiting for Raid Start", scale, animated: true);
+                    var matchingStage = MatchingProgressResolver.GetCachedStage();
+                    string statusMsg;
+                    if (matchingStage != EMatchingStage.None)
+                    {
+                        statusMsg = matchingStage.ToDisplayString();
+                    }
+                    else
+                    {
+                        statusMsg = "Waiting for Raid Start";
+                    }
+                    DrawStatusMessage(canvas, statusMsg, scale, animated: true);
                 }
             }
             finally
@@ -597,9 +599,6 @@ namespace eft_dma_radar.Silk.UI
                     player.Draw(canvas, sp, localPlayer);
                 }
             }
-
-            // Pings
-            DrawPings(canvas, map, mapParams);
 
             // Mouseover tooltips — drawn last so they're always on top
             DrawMouseoverTooltip(canvas, mapParams, map.Config, localPlayer);
@@ -918,32 +917,6 @@ namespace eft_dma_radar.Silk.UI
                         grp[i + 1].X, grp[i + 1].Y,
                         SKPaints.PaintConnectorGroup);
                 }
-            }
-        }
-
-        private static void DrawPings(SKCanvas canvas, RadarMap map, MapParams mapParams)
-        {
-            if (_activePings.Count == 0)
-                return;
-
-            var now = DateTime.UtcNow;
-            for (int i = _activePings.Count - 1; i >= 0; i--)
-            {
-                var ping = _activePings[i];
-                var elapsed = (float)(now - ping.StartTime).TotalSeconds;
-                if (elapsed > ping.DurationSeconds)
-                {
-                    _activePings.RemoveAt(i);
-                    continue;
-                }
-
-                float progress = elapsed / ping.DurationSeconds;
-                float radius = 10 + 50 * progress;
-                float alpha = 1f - progress;
-
-                var center = mapParams.ToScreenPos(MapParams.ToMapPos(ping.Position, map.Config));
-                _pingPaint.Color = new SKColor(0, 255, 255, (byte)(alpha * 255));
-                canvas.DrawCircle(center.X, center.Y, radius, _pingPaint);
             }
         }
 
@@ -1791,21 +1764,5 @@ namespace eft_dma_radar.Silk.UI
         }
 
         #endregion
-    }
-
-    /// <summary>
-    /// Ping effect data.
-    /// </summary>
-    internal struct PingEffect
-    {
-        public Vector3 Position;
-        public DateTime StartTime;
-        public float DurationSeconds;
-
-        public PingEffect()
-        {
-            DurationSeconds = 2f;
-            StartTime = DateTime.UtcNow;
-        }
     }
 }

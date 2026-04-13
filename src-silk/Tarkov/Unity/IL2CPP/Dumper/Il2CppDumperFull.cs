@@ -152,8 +152,8 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
 
             for (int i = 0; i < rawFields.Length; i++)
             {
-                string name = nameEntries[i] is not null && !nameEntries[i].IsFailed
-                    ? (string)(UTF8String)nameEntries[i].Result
+                string? name = nameEntries[i] is not null && !nameEntries[i].IsFailed
+                    ? (string?)(UTF8String?)nameEntries[i].Result
                     : null;
                 if (string.IsNullOrEmpty(name)) continue;
 
@@ -256,7 +256,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                     // For generic definitions, try to use the inflated klass for field offsets.
                     bool isGenericDef = name.Contains('`');
                     ulong fieldKlassPtr = klassPtr;
-                    string inflatedNote = null;
+                    string? inflatedNote = null;
                     if (isGenericDef && inflatedGenericLookup.TryGetValue(klassPtr, out var inflated))
                     {
                         fieldKlassPtr = inflated;
@@ -419,7 +419,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                 }
 
                 // Round 3: Scatter-read name strings in chunks.
-                var nameStrings = new string[validParentIndices.Count];
+                var nameStrings = new string?[validParentIndices.Count];
                 for (int chunkStart = 0; chunkStart < validParentIndices.Count; chunkStart += ScatterChunkSize)
                 {
                     int chunkEnd = Math.Min(chunkStart + ScatterChunkSize, validParentIndices.Count);
@@ -439,7 +439,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                     for (int k = 0; k < chunkLen; k++)
                     {
                         if (typed[k] is not null && !typed[k].IsFailed)
-                            nameStrings[chunkStart + k] = (string)(UTF8String)typed[k].Result;
+                            nameStrings[chunkStart + k] = (string?)(UTF8String?)typed[k].Result;
                     }
                 }
 
@@ -450,7 +450,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                     int j = validParentIndices[k];
                     int classIdx = active[j];
 
-                    string parentName = nameStrings[k];
+                    string? parentName = nameStrings[k];
                     if (parentName != null && genericDefs.TryGetValue(parentName, out var defKlass))
                     {
                         if (result.TryAdd(defKlass, parentPtrs[j]))

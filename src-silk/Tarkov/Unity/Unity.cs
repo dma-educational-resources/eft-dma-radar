@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-using eft_dma_radar.Silk.DMA;
 using SilkUtils = eft_dma_radar.Silk.Misc.Utils;
 
 namespace eft_dma_radar.Silk.Tarkov.Unity
@@ -450,6 +448,131 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Walks the GOM active linked list and searches each GameObject's component array
+        /// for a component whose IL2CPP klass pointer matches <paramref name="klassPtr"/>.
+        /// Returns the objectClass pointer of the first matching component, or 0.
+        /// Much faster than name-based search (saves ~2 DMA reads per component).
+        /// </summary>
+        public ulong FindBehaviourByKlassPtr(ulong klassPtr)
+        {
+            if (!SilkUtils.IsValidVirtualAddress(klassPtr))
+                return 0;
+
+            if (!Memory.TryReadValue<LinkedListObject>(ActiveNodes, out var first, false)) return 0;
+            if (!Memory.TryReadValue<LinkedListObject>(LastActiveNode, out var last, false)) return 0;
+
+            ulong result = WalkList(first, last, forward: true,
+                node => GetComponentByKlassPtr(node.ThisObject, klassPtr));
+
+            if (result == 0)
+                result = WalkList(last, first, forward: false,
+                    node => GetComponentByKlassPtr(node.ThisObject, klassPtr));
+
+            return result;
+        }
+
+        /// <summary>
+        /// Walks the GOM active linked list and searches each GameObject's component array
+        /// for a component whose IL2CPP class name matches <paramref name="className"/>.
+        /// Returns the objectClass pointer of the first matching component, or 0.
+        /// </summary>
+        public ulong FindBehaviourByClassName(string className)
+        {
+            if (string.IsNullOrEmpty(className))
+                return 0;
+
+            if (!Memory.TryReadValue<LinkedListObject>(ActiveNodes, out var first, false)) return 0;
+            if (!Memory.TryReadValue<LinkedListObject>(LastActiveNode, out var last, false)) return 0;
+
+            ulong result = WalkList(first, last, forward: true,
+                node => GetComponentByClassName(node.ThisObject, className));
+
+            if (result == 0)
+                result = WalkList(last, first, forward: false,
+                    node => GetComponentByClassName(node.ThisObject, className));
+
+            return result;
+        }
+
+        /// <summary>
+        /// Searches a single GameObject's component array for a component with a matching klass pointer.
+        /// Returns the objectClass pointer, or 0.
+        /// </summary>
+        private static ulong GetComponentByKlassPtr(ulong gameObject, ulong klassPtr)
+        {
+            if (!Memory.TryReadValue<GameObject>(gameObject, out var go, false))
+                return 0;
+
+            ref readonly var compArr = ref go.Components;
+            if (!SilkUtils.IsValidVirtualAddress(compArr.ArrayBase) || compArr.Size == 0)
+                return 0;
+
+            int count = (int)Math.Min(compArr.Size, 0x400);
+            Span<ComponentArray.Entry> entries = count <= 64
+                ? stackalloc ComponentArray.Entry[count]
+                : new ComponentArray.Entry[count];
+
+            if (!Memory.TryReadBuffer(compArr.ArrayBase, entries, false))
+                return 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                var compPtr = entries[i].Component;
+                if (!SilkUtils.IsValidVirtualAddress(compPtr))
+                    continue;
+
+                if (!Memory.TryReadPtr(compPtr + UnityOffsets.Comp_ObjectClass, out var objectClass, false)
+                    || !SilkUtils.IsValidVirtualAddress(objectClass))
+                    continue;
+
+                if (!Memory.TryReadPtr(objectClass, out var klass, false))
+                    continue;
+
+                if (klass == klassPtr)
+                    return objectClass;
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// Searches a single GameObject's component array for a component whose IL2CPP class name matches.
+        /// Returns the objectClass pointer, or 0.
+        /// </summary>
+        private static ulong GetComponentByClassName(ulong gameObject, string className)
+        {
+            if (!Memory.TryReadValue<GameObject>(gameObject, out var go, false))
+                return 0;
+
+            ref readonly var compArr = ref go.Components;
+            if (!SilkUtils.IsValidVirtualAddress(compArr.ArrayBase) || compArr.Size == 0)
+                return 0;
+
+            int count = (int)Math.Min(compArr.Size, 0x400);
+            Span<ComponentArray.Entry> entries = count <= 64
+                ? stackalloc ComponentArray.Entry[count]
+                : new ComponentArray.Entry[count];
+
+            if (!Memory.TryReadBuffer(compArr.ArrayBase, entries, false))
+                return 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                var compPtr = entries[i].Component;
+                if (!SilkUtils.IsValidVirtualAddress(compPtr))
+                    continue;
+
+                if (!Memory.TryReadPtr(compPtr + UnityOffsets.Comp_ObjectClass, out var objectClass, false)
+                    || !SilkUtils.IsValidVirtualAddress(objectClass))
+                    continue;
+
+                var name = Il2CppClass.ReadName(objectClass);
+                if (name is not null && name.Equals(className, StringComparison.Ordinal))
+                    return objectClass;
+            }
+            return 0;
         }
 
         // ── Generic linked-list walker ───────────────────────────────────────

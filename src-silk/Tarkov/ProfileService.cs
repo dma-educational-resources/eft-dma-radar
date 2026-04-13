@@ -101,7 +101,7 @@ namespace eft_dma_radar.Silk.Tarkov
                 profile = data;
                 return true;
             }
-            profile = default;
+            profile = null!;
             return false;
         }
 

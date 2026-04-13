@@ -1,10 +1,9 @@
 using System.IO;
 using System.Runtime;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
-using eft_dma_radar.Silk.Tarkov.GameWorld.Exits;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Interactables;
-using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 using eft_dma_radar.Silk.Tarkov.Unity;
+using eft_dma_radar.Silk.Tarkov.Unity.IL2CPP;
 using GameObjectManager = eft_dma_radar.Silk.Tarkov.Unity.GOM;
 using VmmSharpEx;
 using VmmSharpEx.Extensions;
@@ -102,6 +101,7 @@ namespace eft_dma_radar.Silk.DMA
             GameAssemblyBase = default;
             _pid = default;
             GameObjectManager.ResetCachedAddresses();
+            MatchingProgressResolver.Reset();
             GameStopped?.Invoke(null, EventArgs.Empty);
         }
 

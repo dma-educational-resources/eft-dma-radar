@@ -291,5 +291,29 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
         internal static void DebugDumpResolverState(int classCount, int updated, int fallback, int skipped) =>
             Log.WriteBlock(BuildUserReportBox(classCount, updated, fallback, skipped));
 
+        /// <summary>
+        /// Resolves an Il2CppClass pointer from the TypeInfoTable using a TypeIndex.
+        /// Returns a valid klass pointer, or 0 on failure.
+        /// Callers should cache the result.
+        /// </summary>
+        internal static ulong ResolveKlassByTypeIndex(uint typeIndex)
+        {
+            if (typeIndex == 0)
+                return 0;
+
+            var gaBase = Memory.GameAssemblyBase;
+            if (!gaBase.IsValidVirtualAddress() || Offsets.Special.TypeInfoTableRva == 0)
+                return 0;
+
+            if (!Memory.TryReadPtr(gaBase + Offsets.Special.TypeInfoTableRva, out var tablePtr, false)
+                || !tablePtr.IsValidVirtualAddress())
+                return 0;
+
+            return Memory.TryReadValue<ulong>(tablePtr + (ulong)typeIndex * 8, out var ptr, false)
+                && ptr.IsValidVirtualAddress()
+                ? ptr
+                : 0;
+        }
+
             }
         }

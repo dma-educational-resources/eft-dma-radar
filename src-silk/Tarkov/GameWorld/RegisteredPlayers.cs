@@ -1,5 +1,3 @@
-using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
-using eft_dma_radar.Silk.Tarkov.GameWorld.Player;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using VmmSharpEx;
 using VmmSharpEx.Options;
@@ -42,6 +40,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         // transform invalidation — covers cases where the pointer chain is valid but data isn't populated yet.
         private const int ReinitThreshold = 5;
 
+        // Lower threshold for players that have never had a valid position (just spawned) —
+        // their game data is likely still initializing, so re-init faster.
+        private const int ReinitThresholdNew = 2;
+
         // Maximum transform/rotation init retries before giving up (exponential backoff)
         private const int MaxInitRetries = 15;
 
@@ -50,6 +52,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         // Hands refresh interval per player (seconds) — faster than gear since items swap often
         private const int HandsRefreshIntervalSec = 3;
+
+        // Maximum gear + hands refreshes per registration tick — prevents thundering-herd spikes
+        // when many players are discovered at once or periodic timers align.
+        private const int MaxRefreshesPerTick = 2;
+
+        // Random jitter range (seconds) added to gear refresh intervals to prevent timer re-alignment.
+        private const double GearRefreshJitterSec = 2.0;
 
         #endregion
 
@@ -68,6 +77,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         // Backoff for repeated invalid player counts (e.g., after raid ends)
         private int _invalidCountStreak;
+
+        // Monotonic counter used to stagger initial gear/hands refresh times for newly
+        // discovered players. Each new player gets a slot offset so refreshes spread
+        // across multiple registration ticks instead of thundering-herding.
+        private int _staggerIndex;
+
+        // Per-thread RNG for jittering refresh intervals (avoids contention).
+        [ThreadStatic] private static Random? t_rng;
+        private static Random Rng => t_rng ??= new Random();
 
         // Spawn-group tracking (position-proximity-based)
         private readonly List<SpawnGroupEntry> _spawnGroups = [];
@@ -129,6 +147,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             public int ConsecutiveErrors;
             public int RecoveryCount;
             public bool HasError;
+
+            // Set after the first successful realtime position read — distinguishes
+            // "init-only position" from "confirmed by realtime scatter loop".
+            // Used to select a lower auto-reinit threshold for newly spawned players
+            // whose game data may still be initializing.
+            public bool RealtimeEstablished;
 
             // Transform init retry tracking — exponential backoff for persistent failures
             public int TransformInitFailures;
@@ -244,7 +268,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                     // Player count dropping to 0 is a strong signal the raid has ended
                     if (count == 0 && LocalPlayer is not null)
+                    {
                         LocalPlayerLost = true;
+                        LocalPlayer = null;
+                    }
 
                     // Exponential backoff: sleep longer when we keep getting invalid counts (e.g., after raid ends)
                     if (_invalidCountStreak > 3)
@@ -358,11 +385,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>
         /// Updates existing player states based on the current registered set.
-        /// Uses scatter-batched reads for lifecycle checks.
+        /// Budgets expensive gear/hands refreshes to <see cref="MaxRefreshesPerTick"/> per tick
+        /// to keep registration worker tick times bounded and predictable.
         /// </summary>
         private void UpdateExistingPlayers(HashSet<ulong> registered)
         {
             List<ulong>? toRemove = null;
+            int refreshBudget = MaxRefreshesPerTick;
 
             foreach (var kvp in _players)
             {
@@ -374,17 +403,25 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     entry.Player.IsActive = true;
                     entry.Player.IsAlive = true;
 
-                    var now = DateTime.UtcNow;
-
                     // Transform + rotation init/re-init is handled by BatchInitTransformsAndRotations()
                     // which runs before UpdateExistingPlayers in the registration worker cycle.
 
-                    // Gear refresh (rate-limited per player)
+                    // Skip expensive gear/hands work if budget is exhausted this tick.
+                    // Players that missed their window will catch up in subsequent ticks.
+                    if (refreshBudget <= 0)
+                        continue;
+
+                    var now = DateTime.UtcNow;
+
+                    // Gear refresh (rate-limited per player, budgeted per tick)
                     if (now >= entry.NextGearRefresh)
                     {
-                        entry.NextGearRefresh = now.AddSeconds(GearRefreshIntervalSec);
+                        // Jitter the next interval to prevent long-term timer re-alignment
+                        double jitter = Rng.NextDouble() * GearRefreshJitterSec;
+                        entry.NextGearRefresh = now.AddSeconds(GearRefreshIntervalSec + jitter);
                         GearManager.Refresh(entry.Base, entry.Player, entry.IsObserved);
                         entry.Player.GearReady = true;
+                        refreshBudget--;
 
                         // Re-check DogtagCache for players with a ProfileId but no resolved name yet.
                         // Corpse dogtags may have been seeded since the last gear refresh.
@@ -392,12 +429,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                             DogtagCache.TryApplyIdentity(entry.Player);
                     }
 
-                    // Hands refresh (rate-limited per player, faster than gear)
+                    // Hands refresh (rate-limited per player, budgeted per tick)
                     if (now >= entry.NextHandsRefresh)
                     {
                         entry.NextHandsRefresh = now.AddSeconds(HandsRefreshIntervalSec);
                         HandsManager.Refresh(entry.Base, entry.Player, entry.IsObserved);
                         entry.Player.HandsReady = true;
+                        refreshBudget--;
                     }
                 }
                 else
@@ -421,6 +459,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         if (removed.Player.IsLocalPlayer)
                         {
                             LocalPlayerLost = true;
+                            LocalPlayer = null;
                             Log.WriteLine("[RegisteredPlayers] Local player lost — raid is likely ending.");
                         }
                     }

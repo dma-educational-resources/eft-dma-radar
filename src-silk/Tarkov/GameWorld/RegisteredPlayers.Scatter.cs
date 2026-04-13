@@ -111,10 +111,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 entry.RecoveryCount = 0;
                 entry.ConsecutiveErrors++;
 
-                // Only enter error state for players that previously had a valid position.
-                // Players that never had a valid position (just spawned, game data not ready yet)
-                // are in a "warming up" state — the registration worker will keep retrying.
-                if (entry.ConsecutiveErrors >= ErrorThreshold && !entry.HasError && entry.Player.HasValidPosition)
+                // Only enter error state for players confirmed by the realtime loop.
+                // Players still warming up (init-only position, no successful realtime read)
+                // should silently re-init rather than flash error indicators.
+                if (entry.ConsecutiveErrors >= ErrorThreshold && !entry.HasError && entry.RealtimeEstablished)
                 {
                     entry.HasError = true;
                     entry.Player.IsError = true;
@@ -124,7 +124,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 // If position keeps failing despite TransformReady, the pointer chain data may not
                 // be populated yet (e.g., player just spawned). Invalidate the transform so the
                 // registration worker re-walks the pointer chain with fresh data.
-                if (!posOk && entry.TransformReady && entry.ConsecutiveErrors >= ReinitThreshold)
+                // Players that have never had a valid position (just spawned) get a lower threshold
+                // for faster recovery — the game data is likely still initializing.
+                int reinitThreshold = entry.RealtimeEstablished ? ReinitThreshold : ReinitThresholdNew;
+                if (!posOk && entry.TransformReady && entry.ConsecutiveErrors >= reinitThreshold)
                 {
                     Log.WriteLine($"[RegisteredPlayers] Auto-invalidating transform for '{entry.Player.Name}' after {entry.ConsecutiveErrors} consecutive position failures");
                     entry.TransformReady = false;
@@ -181,6 +184,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 {
                     entry.Player.Position = worldPos;
                     entry.Player.HasValidPosition = true;
+                    entry.RealtimeEstablished = true;
                     return true;
                 }
 
@@ -376,7 +380,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                 // Validate that position data is actually readable before committing.
                 var testVertices = Memory.ReadArray<TrsX>(verticesAddr, count, false);
-                if (testVertices is null || !TestPositionCompute(taIndex, indices, testVertices))
+                if (testVertices is null || !TestPositionCompute(taIndex, indices, testVertices, out var initPos))
                 {
                     Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitTransform '{entry.Player.Name}' 0x{playerBase:X}: " +
                         $"pointer chain OK but vertex data not ready (idx={taIndex}, verts=0x{verticesAddr:X})");
@@ -388,6 +392,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 entry.VerticesAddr = verticesAddr;
                 entry.CachedIndices = indices;
                 entry.TransformReady = true;
+
+                // Apply the validated position immediately so the player appears on radar
+                // without waiting for the next realtime scatter tick.
+                entry.Player.Position = initPos;
+                entry.Player.HasValidPosition = true;
 
                 Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitTransform OK '{entry.Player.Name}': " +
                     $"transformInternal=0x{transformInternal:X}, idx={taIndex}, verts=0x{verticesAddr:X}");
@@ -428,7 +437,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 var indices = Memory.ReadArray<int>(indicesAddr, count, false);
                 var testVertices = Memory.ReadArray<TrsX>(verticesAddr, count, false);
 
-                if (testVertices is null || !TestPositionCompute(taIndex, indices, testVertices))
+                if (testVertices is null || !TestPositionCompute(taIndex, indices, testVertices, out var reinitPos))
                     return false;
 
                 // Commit — TransformInternal stays the same, only refresh downstream data
@@ -436,6 +445,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 entry.VerticesAddr = verticesAddr;
                 entry.CachedIndices = indices;
                 entry.TransformReady = true;
+
+                // Apply the validated position immediately so the player doesn't flicker
+                // at a stale location while waiting for the next realtime scatter tick.
+                entry.Player.Position = reinitPos;
+                entry.Player.HasValidPosition = true;
                 return true;
             }
             catch
@@ -445,20 +459,22 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         }
 
         /// <summary>
-        /// Tests whether vertex data produces a valid world position (no side effects).
-        /// Used during TryInitTransform to verify game data is actually populated.
+        /// Tests whether vertex data produces a valid world position.
+        /// On success, outputs the computed position so callers can apply it immediately
+        /// without waiting for the next realtime scatter tick.
         /// </summary>
-        private static bool TestPositionCompute(int transformIndex, int[] indices, TrsX[] vertices)
+        private static bool TestPositionCompute(int transformIndex, int[] indices, TrsX[] vertices, out Vector3 worldPos)
         {
             try
             {
-                var worldPos = TrsX.ComputeWorldPosition(vertices, indices, transformIndex, MaxHierarchyIterations);
+                worldPos = TrsX.ComputeWorldPosition(vertices, indices, transformIndex, MaxHierarchyIterations);
 
                 return float.IsFinite(worldPos.X) && float.IsFinite(worldPos.Y) && float.IsFinite(worldPos.Z)
                     && (worldPos.X != 0f || worldPos.Y != 0f || worldPos.Z != 0f);
             }
             catch
             {
+                worldPos = default;
                 return false;
             }
         }
@@ -837,7 +853,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     var indices = Memory.ReadArray<int>(indicesPtrs[i], count, false);
                     var testVertices = Memory.ReadArray<TrsX>(verticesPtrs[i], count, false);
 
-                    if (testVertices is null || !TestPositionCompute(taIndices[i], indices, testVertices))
+                    if (testVertices is null || !TestPositionCompute(taIndices[i], indices, testVertices, out var initPos))
                     {
                         Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] BatchInitTransform '{entry.Player.Name}': " +
                             $"pointer chain OK but vertex data not ready (idx={taIndices[i]}, verts=0x{verticesPtrs[i]:X})");
@@ -850,6 +866,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     entry.VerticesAddr = verticesPtrs[i];
                     entry.CachedIndices = indices;
                     entry.TransformReady = true;
+
+                    // Apply the validated position immediately so the player appears on radar
+                    // without waiting for the next realtime scatter tick.
+                    entry.Player.Position = initPos;
+                    entry.Player.HasValidPosition = true;
 
                     if (entry.TransformInitFailures > 0)
                         Log.WriteLine($"[RegisteredPlayers] BatchInitTransform OK '{entry.Player.Name}' after {entry.TransformInitFailures} prior failures");

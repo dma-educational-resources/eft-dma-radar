@@ -1,4 +1,3 @@
-using eft_dma_radar.Silk.Misc.Pools;
 using VmmSharpEx.Scatter;
 using SilkUtils = eft_dma_radar.Silk.Misc.Utils;
 

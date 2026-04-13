@@ -1,5 +1,4 @@
 using ImGuiNET;
-using eft_dma_radar.Silk.Config;
 
 namespace eft_dma_radar.Silk.UI.Panels
 {

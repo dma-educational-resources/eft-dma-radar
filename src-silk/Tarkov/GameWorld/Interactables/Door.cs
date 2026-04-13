@@ -1,5 +1,3 @@
-using eft_dma_radar.Silk.Misc.Data;
-using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 using eft_dma_radar.Silk.Tarkov.Unity;
 
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Interactables

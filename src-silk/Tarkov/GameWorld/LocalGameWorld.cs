@@ -1,7 +1,5 @@
 using eft_dma_radar.Silk.Misc.Workers;
-using eft_dma_radar.Silk.Tarkov.GameWorld.Exits;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Interactables;
-using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using eft_dma_radar.Silk.Tarkov.Unity.IL2CPP;
 using VmmSharpEx;
@@ -46,16 +44,28 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private readonly LootManager _lootManager;
         private readonly InteractablesManager _interactablesManager;
         private ExfilManager? _exfilManager;
-        private volatile bool _disposed;
+        private int _disposed; // 0 = active, 1 = disposed (int for Interlocked.Exchange)
         private WorkerThread? _realtimeWorker;
         private WorkerThread? _registrationWorker;
 
         // The address of the LocalPlayer at raid start — used to detect extraction/death
         private ulong _localPlayerAddr;
 
-        // Stale GameWorld rejection: after a raid ends, the GameWorld persists in Unity
-        // while the player views stats/loading. Reject it until a new one appears.
+        /// <summary>
+        /// Address of the last disposed LocalGameWorld instance.
+        /// Used to reject stale GameWorld objects that Unity keeps alive
+        /// in the scene graph after a raid ends (post-raid menu).
+        /// Accessed via <see cref="Interlocked"/> (ulong cannot be volatile).
+        /// </summary>
         private static ulong _lastDisposedBase;
+
+        /// <summary>
+        /// When set, <see cref="Dispose"/> will NOT record <see cref="_base"/> into
+        /// <see cref="_lastDisposedBase"/>.  This allows a user-initiated restart
+        /// to re-detect the same (still-live) GameWorld.
+        /// Accessed via <see cref="Interlocked"/>.
+        /// </summary>
+        private static int _suppressStaleGuard;
 
         /// <summary>
         /// Cached GamePlayerOwner Il2CppClass pointer — resolved once from the TypeInfoTable.
@@ -66,9 +76,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private static long _raidCooldownUntilTicks;
 
         private static readonly TimeSpan TransformValidationInterval = TimeSpan.FromSeconds(30);
-        private static readonly TimeSpan RaidEndedCheckInterval = TimeSpan.FromSeconds(3);
-        private DateTime _lastRaidEndedCheck;   // set in Start() so first check has a grace period
         private DateTime _lastTransformValidation;
+
+        // Map-change detection counter — only check every 64 IsRaidActive() calls (expensive string read)
+        private int _mapCheckTick;
 
         #endregion
 
@@ -78,7 +89,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         public string MapID { get; }
 
         /// <summary>Whether the raid is still active (becomes <c>false</c> after disposal).</summary>
-        public bool InRaid => !_disposed;
+        public bool InRaid => _disposed == 0;
 
         /// <summary>The registered players manager for this raid session.</summary>
         public RegisteredPlayers RegisteredPlayers => _registeredPlayers;
@@ -102,12 +113,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         public IReadOnlyList<Door> Doors => _interactablesManager.Doors;
 
         /// <summary>
-        /// Clears the stale GameWorld guard and cooldown so a user-initiated restart
-        /// can re-detect the same (still-live) GameWorld.
+        /// Suppresses the stale GameWorld guard for the next <see cref="Dispose"/> call
+        /// and clears the cooldown, so a user-initiated restart can re-detect the same
+        /// (still-live) GameWorld without waiting.
         /// </summary>
         public static void ClearStaleGuard()
         {
-            Interlocked.Exchange(ref _lastDisposedBase, 0);
+            Interlocked.Exchange(ref _suppressStaleGuard, 1);
             Interlocked.Exchange(ref _raidCooldownUntilTicks, 0);
         }
 
@@ -164,6 +176,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     Memory.ThrowIfNotInGame();
                 }
 
+                // Resolve MatchingProgressView once, then update the live stage on every tick.
+                if (!MatchingProgressResolver.TryGetCached(out _))
+                    MatchingProgressResolver.ResolveAsync();
+
+                MatchingProgressResolver.TryUpdateStage();
+
                 try
                 {
                     var gameWorld = FindGameWorld();
@@ -216,6 +234,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     // Accepted — clear the stale guard so we don't reject this address
                     // if the user later restarts manually.
                     Interlocked.Exchange(ref _lastDisposedBase, 0);
+
+                    // Matching phase is over — stop the stage poller and freeze the timer
+                    MatchingProgressResolver.NotifyRaidStarted();
 
                     var mapId = ReadMapID(gameWorld);
                     Log.WriteLine($"[LocalGameWorld] Found live GameWorld @ 0x{gameWorld:X}, map = '{mapId}'");
@@ -275,10 +296,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         public void Start()
         {
             // Initialise timing baselines — give the raid a grace period before
-            // firing raid-ended and transform-validation checks.
-            var now = DateTime.UtcNow;
-            _lastRaidEndedCheck = now;
-            _lastTransformValidation = now;
+            // firing transform-validation checks.
+            _lastTransformValidation = DateTime.UtcNow;
 
             // Start workers immediately — registration worker discovers the
             // local player in the background, realtime worker starts reading
@@ -290,14 +309,20 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <summary>
         /// Tears down the raid session — stops worker threads, marks the GameWorld as stale,
         /// and begins a cooldown to prevent re-detection of the same GameWorld address.
+        /// Thread-safe: only the first caller performs cleanup.
         /// </summary>
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+                return; // Already disposed by another thread
 
-            // Record stale GameWorld address so Create() rejects it
-            Interlocked.Exchange(ref _lastDisposedBase, _base);
+            // Record stale GameWorld address so Create() rejects it on the post-raid
+            // menu screen.  Skip when the user explicitly requested a restart — the
+            // GameWorld is still live and should be re-detectable.
+            if (Interlocked.Exchange(ref _suppressStaleGuard, 0) == 0)
+                Interlocked.Exchange(ref _lastDisposedBase, _base);
+
+            Log.WriteLine("[LocalGameWorld] Disposed — entering cooldown.");
 
             // Start cooldown to prevent rapid re-detection of the stale GameWorld
             BeginCooldown(12);
@@ -307,6 +332,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             _realtimeWorker = null;
             _registrationWorker = null;
 
+            MatchingProgressResolver.Reset();
             DogtagCache.Clear();
         }
 
@@ -317,21 +343,47 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <summary>
         /// Realtime work tick (DynamicSleep: 8ms target, AboveNormal priority).
         /// Scatter-batched position + rotation reads — single DMA round-trip per tick.
+        /// <para>
+        /// <b>Raid-ended detection:</b> <see cref="ThrowIfRaidEnded"/> runs at the start of every
+        /// tick. If the raid has ended (MainPlayer gone, player count 0, etc.), a <see cref="RaidEnded"/>
+        /// exception propagates up to the <see cref="WorkerThread"/> loop, which logs it and exits.
+        /// This ensures stale-data reads are cut off within one tick (~8ms) of raid end.
+        /// </para>
         /// </summary>
         private void RealtimeWorker_PerformWork(CancellationToken ct)
         {
-            if (_disposed) return;
+            if (_disposed != 0) return;
+
+            // Fast bail: registration worker already detected local player removal.
+            // The stale GameWorld keeps MainPlayer valid for seconds — IsRaidActive()
+            // won't catch it, but this flag is set immediately. Without this guard,
+            // scatter reads hit freed transform data and cause native AVE (0xFFFFFFFF).
+            if (_registeredPlayers.LocalPlayerLost)
+            {
+                HandleRaidEnded("Realtime Worker");
+                return;
+            }
+
             try
             {
+                ThrowIfRaidEnded();
                 _registeredPlayers.UpdateRealtimeData();
+            }
+            catch (RaidEnded)
+            {
+                HandleRaidEnded("Realtime Worker");
             }
             catch (ObjectDisposedException)
             {
-                // Race: Vmm handle disposed during scatter.Execute() — raid is ending, safe to ignore.
+                Dispose();
             }
-            catch (VmmException) when (_disposed)
+            catch (Exception ex)
             {
-                // Race: scatter failed because we're shutting down.
+                // Any unhandled exception = game data corrupted → dispose.
+                // Mirrors WPF RealtimeWorker catch-all (L803-807).
+                Log.WriteRateLimited(AppLogLevel.Warning, "rt_error", TimeSpan.FromSeconds(5),
+                    $"[RealtimeWorker] Error: {ex.GetType().Name}: {ex.Message}");
+                Dispose();
             }
         }
 
@@ -342,8 +394,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <list type="number">
         ///   <item>Local player discovery (blocks everything else until found).</item>
         ///   <item>Player list refresh — always runs every tick.</item>
-        ///   <item>Early raid-ended detection — if local player was lost, skip expensive work.</item>
-        ///   <item>Secondary work (loot, transform validation, raid-ended) — runs only
+        ///   <item>Secondary work (loot, transform validation) — runs only
         ///         after players are handled. New features added here will never starve
         ///         player discovery or registration.</item>
         /// </list>
@@ -351,58 +402,69 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// </summary>
         private void RegistrationWorker_PerformWork(CancellationToken ct)
         {
-            if (_disposed) return;
+            if (_disposed != 0) return;
 
-            long regStart = Stopwatch.GetTimestamp();
-
-            // ── Priority 1: Local player discovery ─────────────────────────────
-            // Until the local player is found, skip ALL other work. The radar shows
-            // "Waiting for Raid Start" and transitions seamlessly once position is available.
-            if (_localPlayerAddr == 0)
+            try
             {
-                if (!TryDiscoverLocalPlayer())
-                    return;
-            }
+                ThrowIfRaidEnded();
 
-            // ── Priority 2: Player registration (always runs every tick) ───────
-            _registeredPlayers.RefreshRegistration();
+                long regStart = Stopwatch.GetTimestamp();
 
-            var regElapsed = Stopwatch.GetElapsedTime(regStart);
-
-            // ── Priority 2.5: Early raid-ended detection ───────────────────────
-            // If the local player disappeared from the registered list or player count dropped to 0,
-            // this is a high-confidence signal the raid has ended. Skip all expensive secondary work
-            // (transform validation, loot refresh, etc.) and immediately verify via IsRaidActive().
-            if (_registeredPlayers.LocalPlayerLost)
-            {
-                Log.WriteRateLimited(AppLogLevel.Info, "lgw_lp_lost", TimeSpan.FromSeconds(3),
-                    "[LocalGameWorld] Local player lost — checking raid status...");
-                if (!IsRaidActive())
+                // ── Priority 1: Local player discovery ─────────────────────────────
+                // Until the local player is found, skip ALL other work. The radar shows
+                // "Waiting for Raid Start" and transitions seamlessly once position is available.
+                if (_localPlayerAddr == 0)
                 {
-                    Log.WriteLine("[LocalGameWorld] Raid ended (local player lost).");
-                    Memory.ShowNotification?.Invoke("Raid has ended", NotificationLevel.Info);
-                    Dispose();
+                    if (!TryDiscoverLocalPlayer())
+                        return;
                 }
-                return; // Skip secondary work either way — data is unreliable
+
+                // ── Priority 2: Player registration (always runs every tick) ───────
+                _registeredPlayers.RefreshRegistration();
+
+                // Fast bail: if RefreshRegistration just detected the local player was
+                // removed, end the raid NOW — don't continue to secondary work.
+                if (_registeredPlayers.LocalPlayerLost)
+                {
+                    Log.WriteLine("[LocalGameWorld] Local player lost — ending raid.");
+                    HandleRaidEnded("Registration Worker");
+                    return;
+                }
+
+                var regElapsed = Stopwatch.GetElapsedTime(regStart);
+
+                // ── Priority 3: Secondary work (never starves player registration) ─
+                long secStart = Stopwatch.GetTimestamp();
+                DoSecondaryWork();
+                var secElapsed = Stopwatch.GetElapsedTime(secStart);
+
+                // Periodic summary (every ~5s)
+                Log.WriteRateLimited(AppLogLevel.Info,
+                    "reg_worker_timing", TimeSpan.FromSeconds(5),
+                    $"[RegistrationWorker] Tick: players={regElapsed.TotalMilliseconds:F1}ms, " +
+                    $"world={secElapsed.TotalMilliseconds:F1}ms (loot/exfils/doors/validation), " +
+                    $"total={Stopwatch.GetElapsedTime(regStart).TotalMilliseconds:F1}ms, tracked={_registeredPlayers.Count}");
             }
-
-            // ── Priority 3: Secondary work (never starves player registration) ─
-            long secStart = Stopwatch.GetTimestamp();
-            DoSecondaryWork();
-            var secElapsed = Stopwatch.GetElapsedTime(secStart);
-
-            // Periodic summary (every ~5s)
-            Log.WriteRateLimited(AppLogLevel.Info,
-                "reg_worker_timing", TimeSpan.FromSeconds(5),
-                $"[RegistrationWorker] Tick: players={regElapsed.TotalMilliseconds:F1}ms, " +
-                $"world={secElapsed.TotalMilliseconds:F1}ms (loot/exfils/doors/validation), " +
-                $"total={Stopwatch.GetElapsedTime(regStart).TotalMilliseconds:F1}ms, tracked={_registeredPlayers.Count}");
+            catch (RaidEnded)
+            {
+                HandleRaidEnded("Registration Worker");
+            }
+            catch (Exception ex)
+            {
+                Log.WriteRateLimited(AppLogLevel.Warning, "reg_error", TimeSpan.FromSeconds(5),
+                    $"[RegistrationWorker] Error: {ex.GetType().Name}: {ex.Message}");
+                Dispose();
+            }
         }
 
         /// <summary>
         /// Secondary work that runs after player registration is complete each tick.
-        /// All lower-priority tasks go here — loot, transform validation, raid-ended checks.
+        /// All lower-priority tasks go here — loot, transform validation.
         /// Adding new features here guarantees they cannot delay player discovery or registration.
+        /// <para>
+        /// Raid-ended checks are no longer needed here — <see cref="ThrowIfRaidEnded"/> at the start
+        /// of every worker tick handles detection within one tick of the raid ending.
+        /// </para>
         /// </summary>
         private void DoSecondaryWork()
         {
@@ -435,18 +497,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 _lastTransformValidation = now;
                 _registeredPlayers.ValidateTransforms();
             }
-
-            // Periodic raid-ended check (detects death, extraction, stats screen, map change)
-            if ((now - _lastRaidEndedCheck) >= RaidEndedCheckInterval)
-            {
-                _lastRaidEndedCheck = now;
-                if (!IsRaidActive())
-                {
-                    Log.WriteLine("[LocalGameWorld] Raid is no longer active — disposing.");
-                    Memory.ShowNotification?.Invoke("Raid has ended", NotificationLevel.Info);
-                    Dispose();
-                }
-            }
         }
 
         /// <summary>
@@ -468,10 +518,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 _exfilManager = new ExfilManager(_base, MapID, lp?.IsPmc ?? true);
 
                 // Reset timing baselines now that the local player is confirmed —
-                // gives raid-ended and transform checks a fresh grace period.
-                var now = DateTime.UtcNow;
-                _lastRaidEndedCheck = now;
-                _lastTransformValidation = now;
+                // gives transform checks a fresh grace period.
+                _lastTransformValidation = DateTime.UtcNow;
 
                 Log.WriteLine($"[LocalGameWorld] Local player discovered — radar is live.");
                 return true;
@@ -489,45 +537,66 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         #region Raid Active Check
 
         /// <summary>
-        /// Checks whether the current raid is still active by validating:
-        /// <list type="number">
-        ///   <item>The game process is still running.</item>
-        ///   <item>MainPlayer pointer still matches our LocalPlayer (disappears on extract/death → stats → menu).</item>
-        ///   <item>RegisteredPlayers count is > 0 (drops to 0 when GameWorld is torn down).</item>
-        ///   <item>Map ID hasn't changed (detects map transitions).</item>
-        /// </list>
-        /// Retries up to 3 times for transient DMA read failures.
+        /// Verifies the raid is still active. Called at the start of every worker tick.
+        /// If the raid has ended, throws <see cref="RaidEnded"/> which propagates to the
+        /// worker's catch block for clean disposal.
+        /// <para>
+        /// <b>Why 5 attempts:</b> DMA reads can transiently fail due to page-out, cache
+        /// eviction, or bus contention. A single false-negative would incorrectly end
+        /// a live raid. Five attempts (50ms total) absorbs transient failures while still
+        /// detecting a real raid-end within one worker tick.
+        /// </para>
         /// </summary>
-        private bool IsRaidActive()
+        /// <exception cref="RaidEnded">Thrown when all 5 attempts confirm the raid is over.</exception>
+        private void ThrowIfRaidEnded()
         {
-            for (int attempt = 0; attempt < 3; attempt++)
+            // Skip until the local player has been discovered — without a stored address,
+            // the MainPlayer equality check in IsRaidActive() is meaningless and would
+            // immediately false-positive (mainPlayer != 0 when _localPlayerAddr == 0).
+            if (_localPlayerAddr == 0)
+                return;
+
+            for (int i = 0; i < 5; i++) // Re-attempt if read fails — 5 times
             {
                 try
                 {
-                    // 1. MainPlayer pointer still valid and matches our LocalPlayer?
-                    if (!Memory.TryReadPtr(_base + Offsets.ClientLocalGameWorld.MainPlayer, out var mainPlayer, false)
-                        || mainPlayer == 0
-                        || mainPlayer != _localPlayerAddr)
-                    {
-                        if (attempt == 0)
-                            Log.Write(AppLogLevel.Debug, $"[LocalGameWorld] IsRaidActive: MainPlayer mismatch " +
-                                $"(read=0x{mainPlayer:X}, expected=0x{_localPlayerAddr:X})");
-                        Thread.Sleep(25);
-                        continue;
-                    }
+                    if (IsRaidActive())
+                        return;
+                }
+                catch { }
+                Thread.Sleep(10); // short delay between attempts
+            }
 
-                    // 2. Player count > 0?
-                    var rgtPlayersAddr = Memory.ReadPtr(_base + Offsets.ClientLocalGameWorld.RegisteredPlayers, false);
-                    var count = Memory.ReadValue<int>(rgtPlayersAddr + 0x18, false);
-                    if (count <= 0)
-                    {
-                        if (attempt == 0)
-                            Log.Write(AppLogLevel.Debug, $"[LocalGameWorld] IsRaidActive: player count={count}");
-                        Thread.Sleep(25);
-                        continue;
-                    }
+            // Definitively over.
+            MatchingProgressResolver.Reset();
 
-                    // 3. Map hasn't changed?
+            throw new RaidEnded();
+        }
+
+        /// <summary>
+        /// Checks if the current raid is active, and LocalPlayer is alive/active.
+        /// Mirrors WPF IsRaidActive() exactly.
+        /// </summary>
+        private bool IsRaidActive()
+        {
+            try
+            {
+                // 1) MainPlayer sanity
+                var mainPlayer = Memory.ReadPtr(_base + Offsets.ClientLocalGameWorld.MainPlayer, false);
+                if (!mainPlayer.IsValidVirtualAddress())
+                    return false;
+
+                ArgumentOutOfRangeException.ThrowIfNotEqual(mainPlayer, _localPlayerAddr, nameof(mainPlayer));
+
+                // 2) Player count sanity
+                var rgtPlayersAddr = Memory.ReadPtr(_base + Offsets.ClientLocalGameWorld.RegisteredPlayers, false);
+                var count = Memory.ReadValue<int>(rgtPlayersAddr + 0x18, false);
+                if (count <= 0)
+                    return false;
+
+                // 3) Map transition detection — but not on every single call
+                if ((_mapCheckTick++ & 0x3F) == 0) // every 64 calls
+                {
                     var currentMapId = ReadMapID(_base);
                     if (!string.IsNullOrEmpty(currentMapId) &&
                         !string.IsNullOrEmpty(MapID) &&
@@ -536,23 +605,34 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         Log.WriteLine($"[LocalGameWorld] Map changed: '{MapID}' → '{currentMapId}'. Ending raid.");
                         return false;
                     }
+                }
 
-                    return true; // All checks passed
-                }
-                catch (Memory.GameNotRunningException)
-                {
-                    return false; // Game process gone
-                }
-                catch (Exception ex)
-                {
-                    if (attempt == 0)
-                        Log.Write(AppLogLevel.Debug, $"[LocalGameWorld] IsRaidActive attempt {attempt}: {ex.Message}");
-                    Thread.Sleep(25);
-                }
+                return true;
             }
+            catch
+            {
+                return false;
+            }
+        }
 
-            // All 3 attempts failed — raid has ended
-            return false;
+        /// <summary>
+        /// Handles the <see cref="RaidEnded"/> exception from a worker thread.
+        /// Shows a notification and disposes the raid session.
+        /// </summary>
+        private void HandleRaidEnded(string workerName)
+        {
+            Log.WriteLine($"[LocalGameWorld] Raid ended (detected by {workerName}).");
+            MatchingProgressResolver.Reset();
+            NotifyRaidEnded();
+            Dispose();
+        }
+
+        /// <summary>
+        /// Shows a notification that the raid has ended.
+        /// </summary>
+        private static void NotifyRaidEnded()
+        {
+            Memory.ShowNotification?.Invoke("Raid has ended", NotificationLevel.Info);
         }
 
         #endregion
@@ -798,6 +878,19 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             catch { }
 
             return "unknown";
+        }
+
+        #endregion
+
+        #region Types
+
+        /// <summary>
+        /// Sentinel exception thrown by <see cref="ThrowIfRaidEnded"/> when the raid has definitively ended.
+        /// Caught by worker tick handlers to trigger clean disposal.
+        /// </summary>
+        private sealed class RaidEnded : Exception
+        {
+            public RaidEnded() { }
         }
 
         #endregion

@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
-using eft_dma_radar.Silk.Misc.Data;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using VmmSharpEx;
 using VmmSharpEx.Options;
@@ -231,7 +230,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                                     !x3.TryGetResult<UTF8String>(6, out var classNameRaw))
                                     return;
 
-                                string className = classNameRaw;
+                                string? className = classNameRaw;
                                 if (string.IsNullOrEmpty(className))
                                     return;
 

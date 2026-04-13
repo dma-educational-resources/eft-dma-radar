@@ -1,6 +1,3 @@
-using eft_dma_radar.Silk.Config;
-using eft_dma_radar.Silk.Misc.Data;
-
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 {
     /// <summary>

@@ -278,7 +278,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                             break;
 
                         ulong parentNamePtr = ReadPtr(parentPtr + K_Name);
-                        string parentName = ReadStr(parentNamePtr);
+                        string? parentName = ReadStr(parentNamePtr);
 
                         if (parentName != null && parentName == sc.Il2CppName)
                         {
@@ -542,14 +542,14 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                 int i = validIndices[j];
 
                 string? name = nameEntries[j] is not null && !nameEntries[j].IsFailed
-                    ? (string)(UTF8String)nameEntries[j].Result
+                    ? (string?)(UTF8String?)nameEntries[j].Result
                     : null;
 
                 if (string.IsNullOrEmpty(name))
                     continue;
 
                 string? ns = nsEntries[j] is not null && !nsEntries[j].IsFailed
-                    ? (string)(UTF8String)nsEntries[j].Result
+                    ? (string?)(UTF8String?)nsEntries[j].Result
                     : string.Empty;
 
                 result.Add((name, ns ?? string.Empty, ptrs[i], i));
@@ -592,7 +592,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             for (int i = 0; i < rawFields.Length; i++)
             {
                 string? name = nameEntries[i] is not null && !nameEntries[i].IsFailed
-                    ? (string)(UTF8String)nameEntries[i].Result
+                    ? (string?)(UTF8String?)nameEntries[i].Result
                     : null;
 
                 if (string.IsNullOrEmpty(name)) continue;
@@ -711,7 +711,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
         /// </code>
         /// </para>
         /// </summary>
-        public static void DumpClassFields(ulong objectAddress, string label = null)
+        public static void DumpClassFields(ulong objectAddress, string? label = null)
         {
             try
             {
@@ -817,7 +817,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             for (int i = 0; i < rawFields.Length; i++)
             {
                 string? name = nameEntries[i] is not null && !nameEntries[i].IsFailed
-                    ? (string)(UTF8String)nameEntries[i].Result
+                    ? (string?)(UTF8String?)nameEntries[i].Result
                     : "<unreadable>";
 
                 // Resolve type name

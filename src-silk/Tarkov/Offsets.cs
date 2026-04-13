@@ -765,6 +765,7 @@ namespace SDK
         {
             public static uint _myPlayer = 0x8;
         }
+
         public readonly partial struct Il2CppClass
         {
             public const uint Name = 0x10;
@@ -852,5 +853,69 @@ namespace SDK
             [FieldOffset(0x8)]
             public readonly ulong Renderers;
         }
+    }
+
+    // ── Matching / Loading progress enums ────────────────────────────────────
+
+    public enum EMatchingStage
+    {
+        None = 0,
+        GameWorldCreating = 1,
+        BundlesLoading = 2,
+        PoolsCreating = 3,
+        MapLoading = 4,
+        DataCaching = 5,
+        PlayersSearching = 6,
+        ServerSearching = 7,
+        ServerStartAwaiting = 8,
+        GamePreparing = 9,
+        ServerConnecting = 10,
+        ServerResponseAwaiting = 11,
+        LootBundlesLoading = 12,
+        LootPoolsCreating = 13,
+        SessionStartAwaiting = 14,
+        LocalGameStarting = 15,
+        PlayersAwaiting = 16,
+        SynchronizationWithOtherPlayers = 17,
+        GameLeaving = 18,
+    }
+
+    public enum EMatchingStageGroup
+    {
+        GameWorldCreating = 0,
+        MapLoading = 1,
+        PlayersSearching = 2,
+        ServerSearching = 3,
+        ServerStartAwaiting = 4,
+        ServerConnecting = 5,
+        LootLoading = 6,
+        SessionStartAwaiting = 7,
+        PlayersAwaiting = 8,
+    }
+
+    public static class EMatchingStageExtensions
+    {
+        public static string ToDisplayString(this EMatchingStage stage) => stage switch
+        {
+            EMatchingStage.GameWorldCreating => "Creating Game World",
+            EMatchingStage.BundlesLoading => "Loading Bundles",
+            EMatchingStage.PoolsCreating => "Creating Pools",
+            EMatchingStage.MapLoading => "Loading Map",
+            EMatchingStage.DataCaching => "Caching Data",
+            EMatchingStage.PlayersSearching => "Searching for Players",
+            EMatchingStage.ServerSearching => "Searching for Server",
+            EMatchingStage.ServerStartAwaiting => "Awaiting Server Start",
+            EMatchingStage.GamePreparing => "Preparing Game",
+            EMatchingStage.ServerConnecting => "Connecting to Server",
+            EMatchingStage.ServerResponseAwaiting => "Awaiting Server Response",
+            EMatchingStage.LootBundlesLoading => "Loading Loot Bundles",
+            EMatchingStage.LootPoolsCreating => "Creating Loot Pools",
+            EMatchingStage.SessionStartAwaiting => "Awaiting Session Start",
+            EMatchingStage.LocalGameStarting => "Starting Game",
+            EMatchingStage.PlayersAwaiting => "Awaiting Players",
+            EMatchingStage.SynchronizationWithOtherPlayers => "Synchronizing Players",
+            EMatchingStage.GameLeaving => "Leaving Game",
+            _ => $"Stage {(int)stage}",
+        };
     }
 }
