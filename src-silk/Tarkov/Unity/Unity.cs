@@ -461,15 +461,15 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
             if (!SilkUtils.IsValidVirtualAddress(klassPtr))
                 return 0;
 
-            if (!Memory.TryReadValue<LinkedListObject>(ActiveNodes, out var first, false)) return 0;
-            if (!Memory.TryReadValue<LinkedListObject>(LastActiveNode, out var last, false)) return 0;
+            if (!Memory.TryReadValue<LinkedListObject>(ActiveNodes, out var first, true)) return 0;
+            if (!Memory.TryReadValue<LinkedListObject>(LastActiveNode, out var last, true)) return 0;
 
             ulong result = WalkList(first, last, forward: true,
-                node => GetComponentByKlassPtr(node.ThisObject, klassPtr));
+                node => GetComponentByKlassPtr(node.ThisObject, klassPtr), useCache: true);
 
             if (result == 0)
                 result = WalkList(last, first, forward: false,
-                    node => GetComponentByKlassPtr(node.ThisObject, klassPtr));
+                    node => GetComponentByKlassPtr(node.ThisObject, klassPtr), useCache: true);
 
             return result;
         }
@@ -484,15 +484,15 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
             if (string.IsNullOrEmpty(className))
                 return 0;
 
-            if (!Memory.TryReadValue<LinkedListObject>(ActiveNodes, out var first, false)) return 0;
-            if (!Memory.TryReadValue<LinkedListObject>(LastActiveNode, out var last, false)) return 0;
+            if (!Memory.TryReadValue<LinkedListObject>(ActiveNodes, out var first, true)) return 0;
+            if (!Memory.TryReadValue<LinkedListObject>(LastActiveNode, out var last, true)) return 0;
 
             ulong result = WalkList(first, last, forward: true,
-                node => GetComponentByClassName(node.ThisObject, className));
+                node => GetComponentByClassName(node.ThisObject, className), useCache: true);
 
             if (result == 0)
                 result = WalkList(last, first, forward: false,
-                    node => GetComponentByClassName(node.ThisObject, className));
+                    node => GetComponentByClassName(node.ThisObject, className), useCache: true);
 
             return result;
         }
@@ -503,7 +503,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
         /// </summary>
         private static ulong GetComponentByKlassPtr(ulong gameObject, ulong klassPtr)
         {
-            if (!Memory.TryReadValue<GameObject>(gameObject, out var go, false))
+            if (!Memory.TryReadValue<GameObject>(gameObject, out var go, true))
                 return 0;
 
             ref readonly var compArr = ref go.Components;
@@ -515,7 +515,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
                 ? stackalloc ComponentArray.Entry[count]
                 : new ComponentArray.Entry[count];
 
-            if (!Memory.TryReadBuffer(compArr.ArrayBase, entries, false))
+            if (!Memory.TryReadBuffer(compArr.ArrayBase, entries, true))
                 return 0;
 
             for (int i = 0; i < count; i++)
@@ -524,11 +524,11 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
                 if (!SilkUtils.IsValidVirtualAddress(compPtr))
                     continue;
 
-                if (!Memory.TryReadPtr(compPtr + UnityOffsets.Comp_ObjectClass, out var objectClass, false)
+                if (!Memory.TryReadPtr(compPtr + UnityOffsets.Comp_ObjectClass, out var objectClass, true)
                     || !SilkUtils.IsValidVirtualAddress(objectClass))
                     continue;
 
-                if (!Memory.TryReadPtr(objectClass, out var klass, false))
+                if (!Memory.TryReadPtr(objectClass, out var klass, true))
                     continue;
 
                 if (klass == klassPtr)
@@ -540,10 +540,13 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
         /// <summary>
         /// Searches a single GameObject's component array for a component whose IL2CPP class name matches.
         /// Returns the objectClass pointer, or 0.
+        /// Uses read caching by default — class names are stable within a session and
+        /// caching avoids thousands of redundant DMA reads when walking the GOM
+        /// (many GameObjects share the same component types like Transform, MeshRenderer, etc.).
         /// </summary>
         private static ulong GetComponentByClassName(ulong gameObject, string className)
         {
-            if (!Memory.TryReadValue<GameObject>(gameObject, out var go, false))
+            if (!Memory.TryReadValue<GameObject>(gameObject, out var go, true))
                 return 0;
 
             ref readonly var compArr = ref go.Components;
@@ -555,7 +558,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
                 ? stackalloc ComponentArray.Entry[count]
                 : new ComponentArray.Entry[count];
 
-            if (!Memory.TryReadBuffer(compArr.ArrayBase, entries, false))
+            if (!Memory.TryReadBuffer(compArr.ArrayBase, entries, true))
                 return 0;
 
             for (int i = 0; i < count; i++)
@@ -564,11 +567,11 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
                 if (!SilkUtils.IsValidVirtualAddress(compPtr))
                     continue;
 
-                if (!Memory.TryReadPtr(compPtr + UnityOffsets.Comp_ObjectClass, out var objectClass, false)
+                if (!Memory.TryReadPtr(compPtr + UnityOffsets.Comp_ObjectClass, out var objectClass, true)
                     || !SilkUtils.IsValidVirtualAddress(objectClass))
                     continue;
 
-                var name = Il2CppClass.ReadName(objectClass);
+                var name = Il2CppClass.ReadName(objectClass, useCache: true);
                 if (name is not null && name.Equals(className, StringComparison.Ordinal))
                     return objectClass;
             }
@@ -586,7 +589,8 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
             LinkedListObject start,
             LinkedListObject end,
             bool forward,
-            Func<LinkedListObject, ulong> visitor)
+            Func<LinkedListObject, ulong> visitor,
+            bool useCache = false)
         {
             var current = start;
             for (int i = 0; i < MaxWalkNodes; i++)
@@ -602,7 +606,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
                     break;
 
                 var nextLink = forward ? current.NextObjectLink : current.PreviousObjectLink;
-                if (!Memory.TryReadValue<LinkedListObject>(nextLink, out current, false))
+                if (!Memory.TryReadValue<LinkedListObject>(nextLink, out current, useCache))
                     break;
             }
             return 0;
@@ -631,13 +635,13 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
         /// <summary>
         /// Returns the IL2CPP class name for <paramref name="objectClass"/>, or null on failure.
         /// </summary>
-        public static string? ReadName(ulong objectClass, int maxLength = 64)
+        public static string? ReadName(ulong objectClass, int maxLength = 64, bool useCache = false)
         {
-            if (!Memory.TryReadPtrChain(objectClass, UnityOffsets.ObjClass_ToNamePtr, out ulong namePtr, false))
+            if (!Memory.TryReadPtrChain(objectClass, UnityOffsets.ObjClass_ToNamePtr, out ulong namePtr, useCache))
                 return null;
             if (!SilkUtils.IsValidVirtualAddress(namePtr))
                 return null;
-            return Memory.TryReadString(namePtr, out var name, maxLength, false) ? name : null;
+            return Memory.TryReadString(namePtr, out var name, maxLength, useCache) ? name : null;
         }
     }
 }

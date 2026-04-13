@@ -246,9 +246,9 @@ namespace eft_dma_radar.Silk.Tarkov.Hideout
         public bool IsAreasValid => AreasControllerBase.IsValidVirtualAddress();
 
         /// <summary>
-        /// Scans the GOM for the HideoutArea component and walks the pointer chain
-        /// to the stash Grid[] array. Returns true when the grid is reachable.
-        /// Uses class name lookup with klass pointer caching for fast subsequent calls.
+        /// Scans the GOM for the HideoutArea and HideoutController components.
+        /// Skips targets that are already resolved to avoid redundant GOM walks.
+        /// Returns true when at least the stash grid is reachable.
         /// </summary>
         public bool TryFind()
         {
@@ -267,40 +267,42 @@ namespace eft_dma_radar.Silk.Tarkov.Hideout
 
                 var gom = GOM.Get(gomAddr);
 
-                // ── Resolve HideoutArea ──────────────────────────────────────
-                var behaviour = FindBehaviourCached(gom,
-                    ref _cachedHideoutAreaKlass,
-                    HideoutAreaClassName);
-
-                if (!behaviour.IsValidVirtualAddress())
+                // ── Resolve HideoutArea (skip if already valid) ──────────────
+                if (!IsValid)
                 {
-                    Log.WriteLine($"[HideoutManager] \"{HideoutAreaClassName}\" not found in GOM.");
-                    return false;
+                    var behaviour = FindBehaviourCached(gom,
+                        ref _cachedHideoutAreaKlass,
+                        HideoutAreaClassName);
+
+                    if (!behaviour.IsValidVirtualAddress())
+                    {
+                        Log.WriteLine($"[HideoutManager] \"{HideoutAreaClassName}\" not found in GOM.");
+                        return false;
+                    }
+
+                    var gridsPtr = Memory.ReadPtrChain(behaviour,
+                        [OffStashCtrl, OffInvCtrl, OffInventory, OffStash, OffGrids]);
+                    if (!gridsPtr.IsValidVirtualAddress()) return false;
+
+                    Base = behaviour;
+                    StashGridPtr = gridsPtr;
+                    Log.WriteLine($"[HideoutManager] Ready. Base=0x{Base:X} StashGridPtr=0x{StashGridPtr:X}");
                 }
 
-                var gridsPtr = Memory.ReadPtrChain(behaviour,
-                    [OffStashCtrl, OffInvCtrl, OffInventory, OffStash, OffGrids]);
-                if (!gridsPtr.IsValidVirtualAddress()) return false;
-
-                Base = behaviour;
-                StashGridPtr = gridsPtr;
-
-                // ── Resolve HideoutController ────────────────────────────────
-                var ctrlBehaviour = FindBehaviourCached(gom,
-                    ref _cachedHideoutControllerKlass,
-                    HideoutControllerClassName);
-
-                if (ctrlBehaviour.IsValidVirtualAddress())
+                // ── Resolve HideoutController (skip if already valid) ────────
+                if (!IsAreasValid)
                 {
-                    AreasControllerBase = ctrlBehaviour;
-                    Log.WriteLine($"[HideoutManager] HideoutController @ 0x{AreasControllerBase:X}");
-                }
-                else
-                {
-                    Log.WriteLine("[HideoutManager] HideoutController not found in GOM.");
+                    var ctrlBehaviour = FindBehaviourCached(gom,
+                        ref _cachedHideoutControllerKlass,
+                        HideoutControllerClassName);
+
+                    if (ctrlBehaviour.IsValidVirtualAddress())
+                    {
+                        AreasControllerBase = ctrlBehaviour;
+                        Log.WriteLine($"[HideoutManager] HideoutController @ 0x{AreasControllerBase:X}");
+                    }
                 }
 
-                Log.WriteLine($"[HideoutManager] Ready. Base=0x{Base:X} StashGridPtr=0x{StashGridPtr:X}");
                 return true;
             }
             catch (Exception ex)
@@ -1045,6 +1047,17 @@ namespace eft_dma_radar.Silk.Tarkov.Hideout
                 }
             }
             catch { }
+        }
+
+        /// <summary>
+        /// Invalidates cached GOM pointers so the next <see cref="TryFind"/> re-resolves them.
+        /// Preserves item/area data so the UI can still display it until the next refresh.
+        /// </summary>
+        public void InvalidatePointers()
+        {
+            Base = 0;
+            StashGridPtr = 0;
+            AreasControllerBase = 0;
         }
 
         /// <summary>

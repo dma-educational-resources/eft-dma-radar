@@ -112,6 +112,7 @@ namespace eft_dma_radar.Silk.DMA
             _pid = default;
             GameObjectManager.ResetCachedAddresses();
             MatchingProgressResolver.Reset();
+            Hideout.Reset();
             GameStopped?.Invoke(null, EventArgs.Empty);
         }
 
@@ -142,7 +143,7 @@ namespace eft_dma_radar.Silk.DMA
             if (_state is MemoryState.InHideout)
                 SetState(MemoryState.ProcessFound);
             Game = null;
-            Hideout.Reset();
+            Hideout.InvalidatePointers();
             HideoutExited?.Invoke(null, EventArgs.Empty);
         }
 
