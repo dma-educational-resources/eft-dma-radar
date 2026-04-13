@@ -68,6 +68,7 @@ namespace eft_dma_radar.Silk.DMA
         public static Player? LocalPlayer => Game?.LocalPlayer;
         public static IReadOnlyList<LootItem>? Loot => Game?.Loot;
         public static IReadOnlyList<LootCorpse>? Corpses => Game?.Corpses;
+        public static IReadOnlyList<LootContainer>? Containers => Game?.Containers;
         public static IReadOnlyList<Exfil>? Exfils => Game?.Exfils;
         public static IReadOnlyList<TransitPoint>? Transits => Game?.Transits;
         public static IReadOnlyList<Door>? Doors => Game?.Doors;

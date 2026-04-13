@@ -9,9 +9,15 @@ namespace eft_dma_radar.Silk.Misc.Data
     internal static class EftDataManager
     {
         /// <summary>
-        /// All items keyed by BSG ID.
+        /// All items keyed by BSG ID (excludes static containers).
         /// </summary>
         public static FrozenDictionary<string, TarkovMarketItem> AllItems { get; private set; }
+            = FrozenDictionary<string, TarkovMarketItem>.Empty;
+
+        /// <summary>
+        /// Static containers keyed by BSG ID (e.g. duffle-bag, toolbox, weapon box).
+        /// </summary>
+        public static FrozenDictionary<string, TarkovMarketItem> AllContainers { get; private set; }
             = FrozenDictionary<string, TarkovMarketItem>.Empty;
 
         /// <summary>
@@ -42,15 +48,22 @@ namespace eft_dma_radar.Silk.Misc.Data
                     return;
                 }
 
-                var builder = new Dictionary<string, TarkovMarketItem>(data.Items.Count, StringComparer.Ordinal);
+                var itemBuilder = new Dictionary<string, TarkovMarketItem>(data.Items.Count, StringComparer.Ordinal);
+                var containerBuilder = new Dictionary<string, TarkovMarketItem>(64, StringComparer.Ordinal);
                 foreach (var item in data.Items)
                 {
-                    if (!string.IsNullOrEmpty(item.BsgId))
-                        builder.TryAdd(item.BsgId, item);
+                    if (string.IsNullOrEmpty(item.BsgId))
+                        continue;
+
+                    if (item.IsStaticContainer)
+                        containerBuilder.TryAdd(item.BsgId, item);
+                    else
+                        itemBuilder.TryAdd(item.BsgId, item);
                 }
 
-                AllItems = builder.ToFrozenDictionary(StringComparer.Ordinal);
-                Log.WriteLine($"[EftDataManager] Loaded {AllItems.Count} items.");
+                AllItems = itemBuilder.ToFrozenDictionary(StringComparer.Ordinal);
+                AllContainers = containerBuilder.ToFrozenDictionary(StringComparer.Ordinal);
+                Log.WriteLine($"[EftDataManager] Loaded {AllItems.Count} items, {AllContainers.Count} containers.");
 
                 // Load map data (extracts + transits)
                 if (data.Maps is { Count: > 0 })

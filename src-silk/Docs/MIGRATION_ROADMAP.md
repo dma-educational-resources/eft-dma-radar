@@ -1,10 +1,11 @@
 # WPF → Silk.NET Migration Roadmap
 
 ## Current State
-**Phase 4 complete.** `src-silk` is a feature-rich standalone radar with full player model
+**Phase 5 in progress.** `src-silk` is a feature-rich standalone radar with full player model
 (gear, hands, dogtag identity, profile lookups), aimview widget, exfils/transits/doors,
-loot filtering with wishlist/blacklist, web radar server, and polished rendering.
-**73 source files, ~16K lines of C#.**
+loot filtering with wishlist/blacklist, static loot containers, web radar server, DMA-based
+input/hotkeys with standalone panel, matching progress tracking, and hardened raid lifecycle.
+**78 source files, ~18K lines of C#.**
 
 - **Silk.NET project** (`src-silk`): Silk.NET + SkiaSharp + ImGui window — **running independently**
   - Own `Memory.cs` (DMA layer): state machine, worker thread, full scatter read/write API
@@ -26,8 +27,9 @@ loot filtering with wishlist/blacklist, web radar server, and polished rendering
     - `Tarkov/GameWorld/RegisteredPlayers.Discovery.cs` — player discovery & classification
     - `Tarkov/GameWorld/RegisteredPlayers.Scatter.cs` — scatter-batched transform reads
     - `Tarkov/GameWorld/LocalGameWorld.cs` — raid lifecycle, non-blocking startup, two-tier workers
-    - `Tarkov/GameWorld/Loot/LootManager.cs` — 6-round scatter chain + corpse dogtag + equipment extraction
+    - `Tarkov/GameWorld/Loot/LootManager.cs` — 6-round scatter chain + corpse dogtag + equipment + container extraction
     - `Tarkov/GameWorld/Loot/LootItem.cs` — loot rendering with price tiers, wishlist/category awareness
+    - `Tarkov/GameWorld/Loot/LootContainer.cs` — static container model (BSG ID, name, searched state, radar + aimview rendering)
     - `Tarkov/GameWorld/Loot/LootCorpse.cs` — corpse model with equipment, total value, dogtag name
     - `Tarkov/GameWorld/Loot/LootFilter.cs` — full pipeline: blacklist → wishlist → category → price → name
     - `Tarkov/GameWorld/Loot/LootFilterData.cs` — persistent wishlist/blacklist (FrozenSet lookups)
@@ -41,9 +43,14 @@ loot filtering with wishlist/blacklist, web radar server, and polished rendering
     - `Tarkov/GameWorld/Interactables/Door.cs` — keyed door with state, key identity, near-loot flag
     - `Tarkov/GameWorld/Interactables/InteractablesManager.cs` — door discovery + state refresh
     - `Tarkov/ProfileService.cs` — tarkov.dev profile fetcher (KD, hours, survival rate)
+  - DMA input system:
+    - `DMA/InputManager.cs` — DMA-based keyboard input via VmmSharpEx (~100 Hz polling)
+    - `DMA/HotkeyManager.cs` — configurable hotkey bindings with rebind UI support
+  - Pre-raid tracking:
+    - `Tarkov/Unity/IL2CPP/MatchingProgressResolver.cs` — matching stage tracking with timer-based polling
   - Own data layer:
-    - `Misc/Data/EftDataManager.cs` — embedded item + map database (FrozenDictionary), transit positions
-    - `Misc/Data/TarkovMarketItem.cs` — item model with category helpers (IsMeds, IsKey, IsBackpack, etc.)
+    - `Misc/Data/EftDataManager.cs` — embedded item + container + map database (FrozenDictionary), transit positions
+    - `Misc/Data/TarkovMarketItem.cs` — item model with category helpers (IsMeds, IsKey, IsStaticContainer, etc.)
   - Own map system mirroring WPF structure:
     - `UI/Radar/Maps/IRadarMap.cs`, `IMapEntity.cs` — interfaces
     - `UI/Radar/Maps/MapConfig.cs`, `MapParams.cs`, `MapManager.cs`, `RadarMap.cs`
@@ -51,7 +58,8 @@ loot filtering with wishlist/blacklist, web radar server, and polished rendering
   - Own `SKPaints.cs`, `CustomFonts.cs` — immutable per-type paints, blur-based text shadows
   - `RadarWindow` draws via `Player.Draw()` — rendering logic lives on the player, not the window
   - Hover tooltips on radar canvas (SkiaSharp) + PlayerInfoWidget (ImGui) with column-aligned layout
-  - Aimview widget — synthetic camera from player position + rotation, projected players/loot/corpses
+  - Aimview widget — synthetic camera from player position + rotation, projected players/loot/corpses/containers
+  - Standalone HotkeyManagerPanel — full rebind + clear UI with DMA status
   - Web radar server — Kestrel HTTP, `/api/radar` JSON endpoint, background worker thread
   - **No WPF ProjectReference** — fully standalone
 - **WPF project** (`src-wpf`): renamed from `src`, removed from solution, still functional standalone
@@ -300,12 +308,14 @@ loot filtering with wishlist/blacklist, web radar server, and polished rendering
 | ~~Loot Filter (wishlist/blacklist/categories)~~ | ~~Phase 3~~ | ✅ Done (Phase 3) |
 | ~~Config system (multi-profile, IConfig)~~ | ~~Phase 2~~ | ✅ Done (Phase 2 — simplified) |
 | ~~Own SKPaints (remove WPF project ref)~~ | ~~Phase 2~~ | ✅ Done (Phase 1) |
+| ~~InputManager (DMA-based input)~~ | ~~Phase 5~~ | ✅ Done (Phase 5A) |
+| ~~HotkeyManager (configurable bindings)~~ | ~~Phase 5~~ | ✅ Done (Phase 5A) |
 | FeatureManager (chams, memory writes) | Phase 5+ | ❌ Not started |
 | ResourceJanitor (GC pressure mgmt) | Phase 5+ | ❌ Not started |
 | HideoutManager | Phase 6+ | ❌ Not started |
-| InputManager (DMA-based input) | Phase 5 | ❌ Not started |
 | QuestManager & quest rendering | Phase 5+ | ❌ Not started |
-| StaticLootContainers | Phase 5+ | ❌ Not started |
+| ~~StaticLootContainers~~ | ~~Phase 5~~ | ✅ Done (Phase 5D) |
+| ~~HotkeyManagerPanel~~ | ~~Phase 5~~ | ✅ Done (Phase 5D) |
 
 ---
 
@@ -477,16 +487,75 @@ loot filtering with wishlist/blacklist, web radar server, and polished rendering
   `AimviewShowLoot`, `AimviewShowCorpses`, `AimviewWidth`, `AimviewHeight`
 - [x] **Settings Panel** — Aimview section with all toggles and sliders
 
-## Phase 5 — Hotkeys, Input, Memory Writes & Remaining Game Features
-> Interactive features, advanced game systems, and remaining WPF ports.
+## Phase 5 — Input, Hotkeys, Raid Lifecycle Hardening & Performance ✅ (Partial — 5A–5C Done)
+> DMA-based input, configurable hotkeys, hardened raid lifecycle, and registration worker performance.
 
-- [ ] `HotkeyManager` class with configurable key bindings
-- [ ] `HotkeyManagerPanel` ImGui UI for editing bindings
-- [ ] `InputManager` port (DMA-based keyboard/mouse input via VmmSharpEx)
+### 5A. DMA Input & Hotkeys ✅
+- [x] **InputManager** (`DMA/InputManager.cs`) — DMA-based keyboard input via VmmSharpEx:
+  - ~100 Hz polling on dedicated worker thread (10ms interval)
+  - Win10/Win11 automatic resolution with fallback
+  - Edge detection: `IsKeyDown`, `IsKeyUp`, `IsKeyHeld` per-frame state
+  - Double-tap detection (300ms window)
+  - Safe mode after 3 failed init attempts (graceful degradation)
+  - Clean lifecycle: `Initialize()` / `Shutdown()` with CancellationToken
+- [x] **HotkeyManager** (`DMA/HotkeyManager.cs`) — configurable key bindings:
+  - 5 default bindings: Battle Mode (B), Free Mode (F), Toggle Loot (L), Zoom In/Out (Num+/-)
+  - `HotkeyAction` model with getter/setter/callback delegates
+  - Live rebinding support (wait-for-keypress flow)
+  - `RegisterAll()` / `UnregisterAll()` lifecycle
+  - Config-backed via `SilkConfig.HotkeyBattleMode`, etc.
+- [x] **Settings Panel** — Hotkeys section in SettingsPanel with rebind buttons
+
+### 5B. Matching Progress Tracking ✅
+- [x] **MatchingProgressResolver** (`Tarkov/Unity/IL2CPP/MatchingProgressResolver.cs`):
+  - GOM scan by klass pointer (primary) or class name (fallback) to find `MatchingProgressView`
+  - Background timer polls `CurrentStage` every 100ms and logs transitions
+  - Stage enum: `None → Matching → MapLoading → GamePreparing → GameStarting → GameStarted`
+  - High-water mark tracking, per-stage timing, total elapsed timer
+  - Integrated into `LocalGameWorld.Create()` loop — polls during pre-raid waiting
+  - `NotifyRaidStarted()` freezes timer when raid is confirmed
+
+### 5C. Raid Lifecycle Hardening & Performance ✅
+- [x] **Thread-safe disposal** — `Interlocked.Exchange` replaces `bool _disposed`; only first
+  caller performs cleanup, second+ callers are no-ops
+- [x] **LocalPlayerLost fast-bail** — `RegisteredPlayers.LocalPlayerLost` volatile flag set
+  immediately when local player leaves the registered list; both Realtime and Registration
+  workers check this flag at tick start, preventing scatter reads against freed transform
+  data (was causing native AVE crashes)
+- [x] **Stale GameWorld guard** — `_lastDisposedBase` tracks the disposed GameWorld address;
+  `Create()` rejects matching addresses on the post-raid menu screen (Unity keeps them alive)
+- [x] **Suppress stale guard** — `ClearStaleGuard()` allows user-initiated restarts to
+  re-detect the same live GameWorld without waiting for address change
+- [x] **Post-raid cooldown** — 12-second cooldown after raid ends prevents rapid re-detection
+  of stale GameWorld; `WaitForCooldown()` blocks with `WaitHandle` (no busy-loop)
+- [x] **ThrowIfRaidEnded per tick** — runs at the start of every worker tick for sub-8ms
+  raid-end detection; 5 retry attempts (50ms total) absorbs transient DMA failures
+- [x] **Player recovery speed** — `TestPositionCompute` outputs `Vector3 worldPos` via `out`
+  parameter; all transform init paths (`TryInitTransform`, `TryReinitFromTransformInternal`,
+  `BatchInitTransforms`) apply position immediately so players appear on radar without
+  waiting for the next realtime scatter tick
+- [x] **RealtimeEstablished flag** — new field on `PlayerEntry`; gates error-state entry and
+  selects reinit threshold: `ReinitThresholdNew=2` for spawning players vs `ReinitThreshold=5`
+  for established ones — faster recovery for newly-discovered players
+- [x] **Registration worker tick stability** — gear/hands refresh thundering-herd fix:
+  - `MaxRefreshesPerTick=2` — caps expensive serial DMA reads per tick
+  - Stagger initial gear/hands refresh times via `_staggerIndex` (gear: slot×250ms,
+    hands: slot×150ms) so bulk-discovered players don't all fire simultaneously
+  - Random jitter (0–2s) on gear refresh interval prevents long-term timer re-alignment
+  - Hands refresh now shares the per-tick budget
+- [x] **Code quality** — fixed all 15 CS8600/CS8601/CS8625 nullable warnings across IL2CPP
+  Dumper (5 files), ProfileService, LootManager; removed redundant usings across 20+ files;
+  removed dead PingEffect code from RadarWindow
+
+### 5D. Remaining Phase 5 Work
+- [x] `StaticLootContainers` — static container discovery, scatter-batched resolution
+  (4-batch Phase 2: MongoID → BSG ID → AllContainers lookup), radar + aimview rendering,
+  searched-state filtering, config toggles (ShowContainers, ShowContainerNames, AimviewShowContainers)
+- [x] `HotkeyManagerPanel` — standalone ImGui panel extracted from Settings hotkeys tab;
+  own open/close toggle in View menu, config-persisted visibility, full rebind + clear UI
 - [ ] `FeatureManager` port (chams, memory write features)
 - [ ] Memory writes gated by config flag
 - [ ] `QuestManager` & quest rendering on radar
-- [ ] `StaticLootContainers` — containers with item lists
 - [ ] `ResourceJanitor` (GC pressure management)
 
 ## Phase 6 — Color Picker, Theming & Advanced UI
@@ -504,7 +573,7 @@ loot filtering with wishlist/blacklist, web radar server, and polished rendering
 - [ ] Window icon (Win32 interop)
 - [ ] Dark mode title bar (DwmSetWindowAttribute)
 - [ ] ImGui layout persistence (imgui.ini)
-- [ ] Custom ImGui fonts (load from embedded resources)
+- [x] ~~Custom ImGui fonts (load from embedded resources)~~ — done (CustomFonts.cs, 13px + symbol merge)
 - [ ] ImGui DPI scaling
 - [ ] SilkDispatcher for async UI operations
 
@@ -520,12 +589,14 @@ loot filtering with wishlist/blacklist, web radar server, and polished rendering
 
 ---
 
-## File Structure (current — 73 source files, ~16K LOC)
+## File Structure (current — 76 source files, ~17.4K LOC)
 
 ```
 src-silk/
 ├── DMA/
 │   ├── Memory.cs                          ← Standalone DMA layer (state machine, worker, R/W API)
+│   ├── InputManager.cs                    ← DMA-based keyboard input (~100 Hz, Win10/Win11)
+│   ├── HotkeyManager.cs                   ← Configurable hotkey bindings + rebind support
 │   └── ScatterAPI/                        ← Scatter read/write API
 │       ├── IScatterEntry.cs
 │       ├── MemPointer.cs
@@ -541,12 +612,14 @@ src-silk/
 │   │   ├── Collections/
 │   │   │   ├── MemArray.cs                ← Pooled DMA wrapper for IL2CPP T[]
 │   │   │   └── MemList.cs                 ← Pooled DMA wrapper for List<T>
-│   │   └── IL2CPP/Dumper/                 ← IL2CPP dumper (5 partial files)
-│   │       ├── Il2CppDumper.cs
-│   │       ├── Il2CppDumperCache.cs
-│   │       ├── Il2CppDumperFull.cs
-│   │       ├── Il2CppDumperSchema.cs
-│   │       └── TypeInfoTableResolver.cs
+│   │   └── IL2CPP/
+│   │       ├── MatchingProgressResolver.cs ← Pre-raid matching stage tracking + timer
+│   │       └── Dumper/                    ← IL2CPP dumper (5 partial files)
+│   │           ├── Il2CppDumper.cs
+│   │           ├── Il2CppDumperCache.cs
+│   │           ├── Il2CppDumperFull.cs
+│   │           ├── Il2CppDumperSchema.cs
+│   │           └── TypeInfoTableResolver.cs
 │   └── GameWorld/
 │       ├── LocalGameWorld.cs              ← Raid lifecycle, non-blocking startup, two-tier workers
 │       ├── RegisteredPlayers.cs           ← Player collection (partial — core + public API)
@@ -561,8 +634,9 @@ src-silk/
 │       │   ├── GearItem.cs                ← Equipment slot model (BSG ID, short name, price)
 │       │   └── HandsManager.cs            ← In-hands item reader (cached, change-detection)
 │       ├── Loot/
-│       │   ├── LootManager.cs             ← 6-round scatter chain + corpse dogtag/equipment
+│       │   ├── LootManager.cs             ← 6-round scatter chain + corpse dogtag/equipment + containers
 │       │   ├── LootItem.cs                ← Loot rendering with price tiers, wishlist awareness
+│       │   ├── LootContainer.cs           ← Static container model (BSG ID, name, searched state)
 │       │   ├── LootCorpse.cs              ← Corpse model with equipment, value, dogtag name
 │       │   ├── LootFilter.cs              ← Full pipeline: blacklist→wishlist→category→price→name
 │       │   ├── LootFilterData.cs           ← Persistent wishlist/blacklist (FrozenSet lookups)
@@ -597,7 +671,8 @@ src-silk/
 │   ├── CustomFonts.cs                     ← Embedded font loading
 │   ├── Panels/
 │   │   ├── SettingsPanel.cs               ← ImGui settings (General, Players, Loot, Map tabs)
-│   │   └── LootFiltersPanel.cs            ← Wishlist/blacklist/category filter editor (ImGui)
+│   │   ├── LootFiltersPanel.cs            ← Wishlist/blacklist/category filter editor (ImGui)
+│   │   └── HotkeyManagerPanel.cs          ← Standalone hotkey editing panel (rebind + clear)
 │   ├── Widgets/
 │   │   ├── PlayerInfoWidget.cs            ← Human hostile table + column-aligned tooltips
 │   │   ├── LootWidget.cs                  ← Sortable loot table with wishlist coloring (ImGui)

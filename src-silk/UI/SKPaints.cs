@@ -137,6 +137,12 @@ namespace eft_dma_radar.Silk.UI
         /// <summary>Corpse label text — muted orange.</summary>
         public static SKPaint TextCorpse { get; } = NewTextPaint(new SKColor(200, 150, 80, 200));
 
+        /// <summary>Container marker stroke — light blue/teal.</summary>
+        public static SKPaint PaintContainer { get; } = NewFillPaint(new SKColor(100, 200, 220, 200));
+
+        /// <summary>Container label text — light blue/teal.</summary>
+        public static SKPaint TextContainer { get; } = NewTextPaint(new SKColor(100, 200, 220, 200));
+
         #endregion
 
         #region Exfil Paints

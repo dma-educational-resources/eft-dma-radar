@@ -3,6 +3,33 @@ using System.IO;
 namespace eft_dma_radar.Silk.Config
 {
     /// <summary>
+    /// Mode for how a hotkey triggers its action.
+    /// </summary>
+    public enum HotkeyMode
+    {
+        Toggle = 0,
+        OnKey = 1
+    }
+
+    /// <summary>
+    /// Individual hotkey entry for each action.
+    /// </summary>
+    public sealed class HotkeyEntry
+    {
+        /// <summary>If the hotkey is enabled.</summary>
+        [JsonPropertyName("enabled")]
+        public bool Enabled { get; set; }
+
+        /// <summary>Hotkey trigger mode: Toggle or OnKey (Hold).</summary>
+        [JsonPropertyName("mode")]
+        public HotkeyMode Mode { get; set; } = HotkeyMode.Toggle;
+
+        /// <summary>Virtual keycode (int) for the hotkey. -1 = unset.</summary>
+        [JsonPropertyName("key")]
+        public int Key { get; set; } = -1;
+    }
+
+    /// <summary>
     /// Minimal configuration for the Silk.NET radar.
     /// Loaded from / saved to a JSON file in %AppData%\eft-dma-radar-silk\.
     /// </summary>
@@ -69,6 +96,9 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Show nearby corpses with gear value in the aimview widget.</summary>
         public bool AimviewShowCorpses { get; set; } = true;
 
+        /// <summary>Show nearby static containers in the aimview widget.</summary>
+        public bool AimviewShowContainers { get; set; } = true;
+
         /// <summary>Max distance (meters) for players to appear in the aimview.</summary>
         public float AimviewPlayerDistance { get; set; } = 300f;
 
@@ -103,6 +133,9 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>Whether the Loot Filters panel is open.</summary>
         public bool ShowLootFiltersPanel { get; set; } = false;
+
+        /// <summary>Whether the Hotkey Manager panel is open.</summary>
+        public bool ShowHotkeyPanel { get; set; } = false;
 
         // ── Exfils ──────────────────────────────────────────────────────────────
 
@@ -141,6 +174,12 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>Show corpse X markers on the radar (when loot is enabled).</summary>
         public bool ShowCorpses { get; set; } = true;
+
+        /// <summary>Show static loot containers on the radar (when loot is enabled).</summary>
+        public bool ShowContainers { get; set; } = true;
+
+        /// <summary>Show container name labels next to container markers.</summary>
+        public bool ShowContainerNames { get; set; } = true;
 
         /// <summary>Minimum price (roubles) below which loot is hidden from the radar.</summary>
         public int LootMinPrice { get; set; } = 50_000;
@@ -194,20 +233,22 @@ namespace eft_dma_radar.Silk.Config
 
         // ── Hotkeys ─────────────────────────────────────────────────────────────
 
-        /// <summary>Virtual key code for toggling Battle Mode (default: B = 0x42).</summary>
-        public int HotkeyBattleMode { get; set; } = 0x42; // B
+        /// <summary>
+        /// All configured hotkeys keyed by action ID (e.g. "BattleMode", "ZoomIn").
+        /// Only enabled entries with a valid key code are active.
+        /// </summary>
+        public Dictionary<string, HotkeyEntry> Hotkeys { get; set; } = [];
 
-        /// <summary>Virtual key code for toggling Free Mode (default: F = 0x46).</summary>
-        public int HotkeyFreeMode { get; set; } = 0x46; // F
+        // ── Containers ──────────────────────────────────────────────────────────
 
-        /// <summary>Virtual key code for toggling loot overlay (default: L = 0x4C).</summary>
-        public int HotkeyToggleLoot { get; set; } = 0x4C; // L
+        /// <summary>
+        /// BSG IDs of the container types the user has selected to display.
+        /// Empty = show none. Populated by the container selection UI.
+        /// </summary>
+        public List<string> SelectedContainers { get; set; } = [];
 
-        /// <summary>Virtual key code for zooming in (default: Numpad+ = 0x6B).</summary>
-        public int HotkeyZoomIn { get; set; } = 0x6B; // Numpad+
-
-        /// <summary>Virtual key code for zooming out (default: Numpad- = 0x6D).</summary>
-        public int HotkeyZoomOut { get; set; } = 0x6D; // Numpad-
+        /// <summary>Hide containers that have been searched/opened.</summary>
+        public bool HideSearchedContainers { get; set; } = true;
 
         // ── Persistence ─────────────────────────────────────────────────────────
 
@@ -237,11 +278,8 @@ namespace eft_dma_radar.Silk.Config
             WebRadarPort = Math.Clamp(WebRadarPort, 1024, 65535);
             WebRadarTickMs = Math.Clamp(WebRadarTickMs, 16, 1000);
 
-            HotkeyBattleMode = Math.Clamp(HotkeyBattleMode, 0, 255);
-            HotkeyFreeMode = Math.Clamp(HotkeyFreeMode, 0, 255);
-            HotkeyToggleLoot = Math.Clamp(HotkeyToggleLoot, 0, 255);
-            HotkeyZoomIn = Math.Clamp(HotkeyZoomIn, 0, 255);
-            HotkeyZoomOut = Math.Clamp(HotkeyZoomOut, 0, 255);
+            Hotkeys ??= [];
+            SelectedContainers ??= [];
 
             if (string.IsNullOrWhiteSpace(DeviceStr))
                 DeviceStr = "fpga";

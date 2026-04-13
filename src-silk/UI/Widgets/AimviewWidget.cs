@@ -11,6 +11,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
     {
         private const int MaxVisibleLoot = 12;
         private const int MaxVisibleCorpses = 6;
+        private const int MaxVisibleContainers = 8;
         private const float LabelLineHeight = 14f;
 
         // Cached ImGui colors — initialized on first use (ImGui context must exist)
@@ -18,7 +19,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
         private static uint _colorTeammate, _colorUsec, _colorBear, _colorScav, _colorRaider;
         private static uint _colorBoss, _colorPScav, _colorSpecial, _colorStreamer;
         private static uint _colorCrosshair, _colorBg, _colorDotOutline, _colorShadow, _colorBorder;
-        private static uint _colorLoot, _colorLootImportant, _colorLootWishlist, _colorCorpse;
+        private static uint _colorLoot, _colorLootImportant, _colorLootWishlist, _colorCorpse, _colorContainer;
 
         /// <summary>Whether the aimview widget is open.</summary>
         public static bool IsOpenField;
@@ -33,6 +34,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
         // Reusable buffers — avoid per-frame allocation
         private static readonly ProjectedItem[] _lootBuf = new ProjectedItem[128];
         private static readonly ProjectedItem[] _corpseBuf = new ProjectedItem[32];
+        private static readonly ProjectedItem[] _containerBuf = new ProjectedItem[64];
         private static readonly float[] _usedLabelYs = new float[64];
 
         private static void EnsureColors()
@@ -56,6 +58,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
             _colorLootImportant = ImGui.GetColorU32(new Vector4(0.20f, 1.0f, 0.20f, 1.0f));
             _colorLootWishlist  = ImGui.GetColorU32(new Vector4(0.0f, 0.90f, 1.0f, 1.0f));
             _colorCorpse        = ImGui.GetColorU32(new Vector4(0.85f, 0.55f, 0.20f, 0.9f));
+            _colorContainer     = ImGui.GetColorU32(new Vector4(0.39f, 0.78f, 0.86f, 0.85f));
             _colorsReady = true;
         }
 
@@ -134,7 +137,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
             float maxPlayerDist = config.AimviewPlayerDistance;
             float maxLootDist = config.AimviewLootDistance;
 
-            // ── Draw order: loot/corpses first, players on top ──
+            // ── Draw order: loot/corpses/containers first, players on top ──
 
             // 1) Loot items — collect, sort by distance (far→near), cap count
             if (config.AimviewShowLoot && config.ShowLoot)
@@ -147,6 +150,13 @@ namespace eft_dma_radar.Silk.UI.Widgets
             if (config.AimviewShowCorpses)
             {
                 DrawCorpses(drawList, eyePos, forward, right, up,
+                    contentMin, widgetW, widgetH, contentMax, zoom, maxLootDist);
+            }
+
+            // 1c) Static containers
+            if (config.AimviewShowContainers && config.ShowContainers)
+            {
+                DrawContainers(drawList, eyePos, forward, right, up,
                     contentMin, widgetW, widgetH, contentMax, zoom, maxLootDist);
             }
 
@@ -325,6 +335,79 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 ref var p = ref _corpseBuf[i];
                 float s = float.Clamp(4f - p.Dist * 0.08f, 2.5f, 4f);
                 float baseY = p.ScreenY + s + 2f;
+                float labelY = DeconflictY(baseY, _usedLabelYs, ref usedCount,
+                    contentMin.Y + 2, contentMax.Y - LabelLineHeight - 2);
+                DrawLabelAt(drawList, p.Label, p.ScreenX, labelY, p.Color, contentMin, contentMax);
+            }
+        }
+
+        /// <summary>
+        /// Collect visible containers, sort by distance, draw square markers then labels.
+        /// </summary>
+        private static void DrawContainers(
+            ImDrawListPtr drawList, Vector3 eyePos,
+            Vector3 forward, Vector3 right, Vector3 up,
+            Vector2 contentMin, int widgetW, int widgetH, Vector2 contentMax,
+            float zoom, float maxDistance)
+        {
+            var containers = Memory.Containers;
+            if (containers is null)
+                return;
+
+            var config = SilkProgram.Config;
+            bool hideSearched = config.HideSearchedContainers;
+            var selectedIds = config.SelectedContainers;
+            bool hasFilter = selectedIds is { Count: > 0 };
+
+            int count = 0;
+            for (int i = 0; i < containers.Count; i++)
+            {
+                var container = containers[i];
+                if (hideSearched && container.Searched)
+                    continue;
+                if (hasFilter && !selectedIds!.Contains(container.Id))
+                    continue;
+                var worldPos = container.Position;
+                float dist = Vector3.Distance(eyePos, worldPos);
+                if (dist > maxDistance || dist < 0.3f)
+                    continue;
+
+                if (!TryProject(worldPos, eyePos, forward, right, up,
+                        contentMin, widgetW, widgetH, contentMax, zoom, out float sx, out float sy))
+                    continue;
+
+                string label = $"{container.Name} ({(int)dist}m)";
+                _containerBuf[count++] = new ProjectedItem(sx, sy, dist, 0, _colorContainer, label);
+
+                if (count >= _containerBuf.Length)
+                    break;
+            }
+
+            if (count == 0)
+                return;
+
+            SortProjected(_containerBuf.AsSpan(0, count));
+            int visible = Math.Min(count, MaxVisibleContainers);
+
+            // Draw square markers
+            for (int i = 0; i < visible; i++)
+            {
+                ref var p = ref _containerBuf[i];
+                float half = float.Clamp(3.5f - p.Dist * 0.06f, 2f, 3.5f);
+                var pos = new Vector2(p.ScreenX, p.ScreenY);
+                var tl = pos + new Vector2(-half, -half);
+                var br = pos + new Vector2(half, half);
+                drawList.AddRect(tl, br, _colorDotOutline, 0f, ImDrawFlags.None, 2.5f);
+                drawList.AddRect(tl, br, _colorContainer, 0f, ImDrawFlags.None, 1.4f);
+            }
+
+            // Draw labels with deconfliction
+            int usedCount = 0;
+            for (int i = 0; i < visible; i++)
+            {
+                ref var p = ref _containerBuf[i];
+                float half = float.Clamp(3.5f - p.Dist * 0.06f, 2f, 3.5f);
+                float baseY = p.ScreenY + half + 2f;
                 float labelY = DeconflictY(baseY, _usedLabelYs, ref usedCount,
                     contentMin.Y + 2, contentMax.Y - LabelLineHeight - 2);
                 DrawLabelAt(drawList, p.Label, p.ScreenX, labelY, p.Color, contentMin, contentMax);

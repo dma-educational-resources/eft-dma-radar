@@ -254,6 +254,7 @@ namespace eft_dma_radar.Silk.UI
                 AimviewWidget.IsOpen = Config.ShowAimviewWidget;
                 SettingsPanel.IsOpen = Config.ShowSettingsOverlay;
                 LootFiltersPanel.IsOpen = Config.ShowLootFiltersPanel;
+                HotkeyManagerPanel.IsOpen = Config.ShowHotkeyPanel;
 
                 // Wire up the notification callback into the silk Memory module
                 Memory.ShowNotification ??= static (msg, level) =>
@@ -518,6 +519,33 @@ namespace eft_dma_radar.Silk.UI
                             continue;
                         var sp = mapParams.ToScreenPos(MapParams.ToMapPos(corpse.Position, mapCfg));
                         corpse.Draw(canvas, sp);
+                    }
+                }
+            }
+
+            // Static containers
+            if (!Config.BattleMode && Config.ShowLoot && Config.ShowContainers)
+            {
+                var containers = Memory.Containers;
+                if (containers is not null)
+                {
+                    float playerY = localPlayerPos.Y;
+                    bool showNames = Config.ShowContainerNames;
+                    bool hideSearched = Config.HideSearchedContainers;
+                    var selectedIds = Config.SelectedContainers;
+                    bool hasFilter = selectedIds is { Count: > 0 };
+
+                    foreach (var container in containers)
+                    {
+                        if (hideSearched && container.Searched)
+                            continue;
+                        if (hasFilter && !selectedIds!.Contains(container.Id))
+                            continue;
+                        if (!worldBounds.Contains(container.Position))
+                            continue;
+                        var sp = mapParams.ToScreenPos(MapParams.ToMapPos(container.Position, mapCfg));
+                        float dist = Vector3.Distance(localPlayerPos, container.Position);
+                        container.Draw(canvas, sp, showNames, false, dist);
                     }
                 }
             }
@@ -1068,6 +1096,9 @@ namespace eft_dma_radar.Silk.UI
                 if (ImGui.MenuItem("\u25a3 Loot Filters", "L", LootFiltersPanel.IsOpen))
                     LootFiltersPanel.IsOpen = !LootFiltersPanel.IsOpen;
 
+                if (ImGui.MenuItem("\u2328 Hotkeys", null, HotkeyManagerPanel.IsOpen))
+                    HotkeyManagerPanel.IsOpen = !HotkeyManagerPanel.IsOpen;
+
                 ImGui.Separator();
 
                 // Widgets
@@ -1088,6 +1119,7 @@ namespace eft_dma_radar.Silk.UI
                 {
                     SettingsPanel.IsOpen = false;
                     LootFiltersPanel.IsOpen = false;
+                    HotkeyManagerPanel.IsOpen = false;
                     PlayerInfoWidget.IsOpen = false;
                     LootWidget.IsOpen = false;
                     AimviewWidget.IsOpen = false;
@@ -1175,13 +1207,16 @@ namespace eft_dma_radar.Silk.UI
 
         private static void DrawWindows()
         {
-            HotkeyManager.TryCaptureRebind();
+            HotkeyManagerPanel.ProcessCapture();
 
             if (SettingsPanel.IsOpen)
                 SettingsPanel.Draw();
 
             if (LootFiltersPanel.IsOpen)
                 LootFiltersPanel.Draw();
+
+            if (HotkeyManagerPanel.IsOpen)
+                HotkeyManagerPanel.Draw();
 
             if (PlayerInfoWidget.IsOpen && InRaid)
                 PlayerInfoWidget.Draw();
@@ -1700,6 +1735,7 @@ namespace eft_dma_radar.Silk.UI
                 case Key.Escape:
                     SettingsPanel.IsOpen = false;
                     LootFiltersPanel.IsOpen = false;
+                    HotkeyManagerPanel.IsOpen = false;
                     PlayerInfoWidget.IsOpen = false;
                     LootWidget.IsOpen = false;
                     AimviewWidget.IsOpen = false;
@@ -1730,6 +1766,7 @@ namespace eft_dma_radar.Silk.UI
             Config.ShowAimviewWidget = AimviewWidget.IsOpen;
             Config.ShowSettingsOverlay = SettingsPanel.IsOpen;
             Config.ShowLootFiltersPanel = LootFiltersPanel.IsOpen;
+            Config.ShowHotkeyPanel = HotkeyManagerPanel.IsOpen;
 
             Config.Save();
 

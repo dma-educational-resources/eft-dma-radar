@@ -234,6 +234,12 @@ namespace eft_dma_radar.Silk.UI.Panels
                 if (ImGui.IsItemHovered())
                     ImGui.SetTooltip("Show nearby corpses with gear value in the aimview");
 
+                bool aimviewContainers = Config.AimviewShowContainers;
+                if (ImGui.Checkbox("Show Containers", ref aimviewContainers))
+                    Config.AimviewShowContainers = aimviewContainers;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Show nearby static containers in the aimview");
+
                 ImGui.Spacing();
 
                 ImGui.SetNextItemWidth(160);
@@ -305,6 +311,35 @@ namespace eft_dma_radar.Silk.UI.Panels
                 Config.ShowCorpses = showCorpses;
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Show corpse X markers on the radar");
+
+            ImGui.Spacing();
+            ImGui.SeparatorText("Containers");
+
+            bool showContainers = Config.ShowContainers;
+            if (ImGui.Checkbox("Show Containers", ref showContainers))
+                Config.ShowContainers = showContainers;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Show static loot containers on the radar (duffle bags, toolboxes, etc.)");
+
+            if (Config.ShowContainers)
+            {
+                ImGui.Indent(16);
+                bool showContainerNames = Config.ShowContainerNames;
+                if (ImGui.Checkbox("Show Names", ref showContainerNames))
+                    Config.ShowContainerNames = showContainerNames;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Show container name labels next to markers");
+
+                bool hideSearched = Config.HideSearchedContainers;
+                if (ImGui.Checkbox("Hide Searched", ref hideSearched))
+                    Config.HideSearchedContainers = hideSearched;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Hide containers that have been opened/searched");
+
+                ImGui.Spacing();
+                DrawContainerSelection();
+                ImGui.Unindent(16);
+            }
 
             ImGui.Spacing();
             ImGui.SeparatorText("Exfils");
@@ -404,81 +439,157 @@ namespace eft_dma_radar.Silk.UI.Panels
                 return;
             }
 
-            ImGui.SeparatorText("Key Bindings");
-            ImGui.TextWrapped("Click a key button to rebind. Press Escape to cancel.");
+            ImGui.TextWrapped("Manage hotkeys in the dedicated Hotkeys panel.");
             ImGui.Spacing();
 
-            bool isRebinding = HotkeyManager.RebindingAction is not null;
+            if (ImGui.Button("\u2328 Open Hotkey Manager", new Vector2(200, 0)))
+                HotkeyManagerPanel.IsOpen = true;
 
-            foreach (var action in HotkeyManager.Actions)
+            ImGui.Spacing();
+            ImGui.SeparatorText("Active Hotkeys");
+
+            var hotkeys = Config.Hotkeys;
+            if (hotkeys.Count == 0)
             {
-                bool isThisRebinding = ReferenceEquals(HotkeyManager.RebindingAction, action);
-                int vk = action.GetKeyCode();
-
-                // Action label (fixed width for alignment)
-                ImGui.AlignTextToFramePadding();
-                ImGui.Text(action.DisplayName);
-                ImGui.SameLine(160);
-
-                // Key binding button
-                string buttonLabel = isThisRebinding
-                    ? "[ Press a key... ]"
-                    : vk > 0 ? VK.GetName(vk) : "(None)";
-
-                float buttonWidth = 140;
-                ImGui.SetNextItemWidth(buttonWidth);
-
-                // Highlight the active rebind button
-                if (isThisRebinding)
+                ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "No hotkeys configured.");
+            }
+            else
+            {
+                foreach (var (id, entry) in hotkeys)
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.8f, 0.5f, 0.1f, 1f));
-                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.6f, 0.2f, 1f));
-                    ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.7f, 0.4f, 0.1f, 1f));
-                }
+                    if (!entry.Enabled || entry.Key < 1)
+                        continue;
 
-                bool disabled = isRebinding && !isThisRebinding;
-                if (disabled)
-                    ImGui.BeginDisabled();
+                    var def = HotkeyManager.GetAction(id);
+                    string name = def?.DisplayName ?? id;
+                    string mode = entry.Mode == HotkeyMode.Toggle ? "Toggle" : "OnKey";
 
-                if (ImGui.Button($"{buttonLabel}##{action.Id}", new Vector2(buttonWidth, 0)))
-                {
-                    if (isThisRebinding)
-                        HotkeyManager.RebindingAction = null; // Cancel
-                    else
-                        HotkeyManager.RebindingAction = action; // Start capture
-                }
-
-                if (disabled)
-                    ImGui.EndDisabled();
-
-                if (isThisRebinding)
-                    ImGui.PopStyleColor(3);
-
-                if (ImGui.IsItemHovered())
-                    ImGui.SetTooltip(action.Tooltip);
-
-                // Clear button
-                if (vk > 0 && !isRebinding)
-                {
-                    ImGui.SameLine();
-                    if (ImGui.SmallButton($"\u2715##{action.Id}_clear"))
-                    {
-                        HotkeyManager.ClearBinding(action);
-                        Log.WriteLine($"[HotkeyManager] Cleared binding for '{action.DisplayName}'");
-                    }
-                    if (ImGui.IsItemHovered())
-                        ImGui.SetTooltip("Clear this binding");
+                    ImGui.BulletText($"{name}  [{VK.GetName(entry.Key)}]  ({mode})");
                 }
             }
 
-            ImGui.Spacing();
-            ImGui.Separator();
-            ImGui.Spacing();
-
-            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f),
-                "Hotkeys work via DMA — they read the gaming PC's keyboard state.");
-
             ImGui.EndTabItem();
+        }
+
+        // ── Container Selection ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Unique container types from AllContainers, sorted by name.
+        /// Built once (lazy), keyed by ShortName to deduplicate display names.
+        /// </summary>
+        private static (string Name, string Id)[]? _containerEntries;
+        private static string _containerFilter = string.Empty;
+
+        private static (string Name, string Id)[] GetContainerEntries()
+        {
+            if (_containerEntries is not null)
+                return _containerEntries;
+
+            // Deduplicate by ShortName — take first BSG ID per unique name
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var entries = new List<(string Name, string Id)>();
+
+            foreach (var kvp in EftDataManager.AllContainers)
+            {
+                var item = kvp.Value;
+                if (seen.Add(item.ShortName))
+                    entries.Add((item.ShortName, item.BsgId));
+            }
+
+            entries.Sort(static (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+            _containerEntries = [.. entries];
+            return _containerEntries;
+        }
+
+        private static void DrawContainerSelection()
+        {
+            var entries = GetContainerEntries();
+            if (entries.Length == 0)
+                return;
+
+            var selected = Config.SelectedContainers;
+            int selectedCount = 0;
+            foreach (var (_, id) in entries)
+            {
+                if (selected.Contains(id))
+                    selectedCount++;
+            }
+
+            // Select All / Deselect All toggle
+            bool allSelected = selectedCount == entries.Length;
+            bool noneSelected = selectedCount == 0;
+
+            if (allSelected)
+            {
+                // Show as checked — clicking deselects all
+                bool allVal = true;
+                if (ImGui.Checkbox("Select All Containers", ref allVal) && !allVal)
+                {
+                    selected.Clear();
+                    Config.MarkDirty();
+                }
+            }
+            else
+            {
+                // Mixed or none — clicking selects all
+                bool mixedVal = !noneSelected; // Will show unchecked if none, or we handle below
+                if (!noneSelected)
+                {
+                    // Push a mixed-state visual hint (dim the check mark area)
+                    ImGui.PushStyleColor(ImGuiCol.CheckMark, new Vector4(0.6f, 0.6f, 0.6f, 1f));
+                }
+
+                if (ImGui.Checkbox("Select All Containers", ref mixedVal))
+                {
+                    selected.Clear();
+                    foreach (var (_, id) in entries)
+                        selected.Add(id);
+                    Config.MarkDirty();
+                }
+
+                if (!noneSelected)
+                    ImGui.PopStyleColor();
+            }
+
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip($"{selectedCount}/{entries.Length} container types selected");
+
+            // Search filter
+            ImGui.SetNextItemWidth(180);
+            ImGui.InputTextWithHint("##containerFilter", "Filter...", ref _containerFilter, 64);
+            ImGui.SameLine();
+            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), $"({selectedCount}/{entries.Length})");
+
+            // Scrollable list of container checkboxes
+            float listHeight = Math.Min(entries.Length * ImGui.GetTextLineHeightWithSpacing(), 200f);
+            if (ImGui.BeginChild("ContainerList", new Vector2(0, listHeight), ImGuiChildFlags.Borders))
+            {
+                for (int i = 0; i < entries.Length; i++)
+                {
+                    var (name, id) = entries[i];
+
+                    // Apply search filter
+                    if (_containerFilter.Length > 0
+                        && !name.Contains(_containerFilter, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    bool isSelected = selected.Contains(id);
+                    if (ImGui.Checkbox($"{name}##cnt_{i}", ref isSelected))
+                    {
+                        if (isSelected)
+                        {
+                            if (!selected.Contains(id))
+                                selected.Add(id);
+                        }
+                        else
+                        {
+                            selected.Remove(id);
+                        }
+                        Config.MarkDirty();
+                    }
+                }
+            }
+            ImGui.EndChild();
         }
     }
 }

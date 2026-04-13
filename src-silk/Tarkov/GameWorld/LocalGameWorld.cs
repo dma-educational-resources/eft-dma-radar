@@ -103,6 +103,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <summary>Current snapshot of corpses in the raid.</summary>
         public IReadOnlyList<LootCorpse> Corpses => _lootManager.Corpses;
 
+        /// <summary>Current snapshot of static containers in the raid.</summary>
+        public IReadOnlyList<LootContainer> Containers => _lootManager.Containers;
+
         /// <summary>Current snapshot of exfiltration points in the raid.</summary>
         public IReadOnlyList<Exfil>? Exfils => _exfilManager?.Exfils;
 

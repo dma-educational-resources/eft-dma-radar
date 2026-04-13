@@ -45,6 +45,7 @@ namespace eft_dma_radar.Silk.Misc.Data
         [JsonIgnore] public bool IsWeapon => HasCategory("Weapon");
         [JsonIgnore] public bool IsWeaponMod => HasCategory("Weapon mod");
         [JsonIgnore] public bool IsCurrency => HasCategory("Money");
+        [JsonIgnore] public bool IsStaticContainer => HasCategory("Static Container");
 
         private bool HasCategory(string category)
         {
