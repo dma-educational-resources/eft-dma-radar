@@ -140,6 +140,9 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Whether the Hideout panel is open.</summary>
         public bool ShowHideoutPanel { get; set; } = false;
 
+        /// <summary>Whether the Quest Info panel is open.</summary>
+        public bool ShowQuestPanel { get; set; } = false;
+
         // ── Hideout ─────────────────────────────────────────────────────────────
 
         /// <summary>Enable hideout stash/area reading when entering the hideout scene.</summary>
@@ -155,6 +158,26 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>Hide exfils that are closed or not available to the local player.</summary>
         public bool HideInactiveExfils { get; set; } = true;
+
+        // ── Quests ──────────────────────────────────────────────────────────────
+
+        /// <summary>Master toggle for quest zone rendering on the radar.</summary>
+        public bool ShowQuests { get; set; } = true;
+
+        /// <summary>Only show quests required for Kappa container.</summary>
+        public bool QuestKappaFilter { get; set; } = false;
+
+        /// <summary>Show optional quest objectives.</summary>
+        public bool QuestShowOptional { get; set; } = true;
+
+        /// <summary>Show quest zone names on the radar.</summary>
+        public bool QuestShowNames { get; set; } = true;
+
+        /// <summary>Show quest zone distances on the radar.</summary>
+        public bool QuestShowDistance { get; set; } = true;
+
+        /// <summary>Quest IDs blacklisted from display (user-hidden).</summary>
+        public List<string> QuestBlacklist { get; set; } = [];
 
         // ── Transits ────────────────────────────────────────────────────────────
 
@@ -291,6 +314,7 @@ namespace eft_dma_radar.Silk.Config
 
             Hotkeys ??= [];
             SelectedContainers ??= [];
+            QuestBlacklist ??= [];
 
             if (string.IsNullOrWhiteSpace(DeviceStr))
                 DeviceStr = "fpga";

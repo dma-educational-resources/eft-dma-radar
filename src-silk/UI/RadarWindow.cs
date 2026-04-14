@@ -256,6 +256,7 @@ namespace eft_dma_radar.Silk.UI
                 LootFiltersPanel.IsOpen = Config.ShowLootFiltersPanel;
                 HotkeyManagerPanel.IsOpen = Config.ShowHotkeyPanel;
                 HideoutPanel.IsOpen = Config.ShowHideoutPanel;
+                QuestPanel.IsOpen = Config.ShowQuestPanel;
 
                 // Auto-open the hideout panel when the player enters the hideout
                 Memory.HideoutEntered += static (_, _) => HideoutPanel.IsOpen = true;
@@ -551,8 +552,7 @@ namespace eft_dma_radar.Silk.UI
                         if (!worldBounds.Contains(container.Position))
                             continue;
                         var sp = mapParams.ToScreenPos(MapParams.ToMapPos(container.Position, mapCfg));
-                        float dist = Vector3.Distance(localPlayerPos, container.Position);
-                        container.Draw(canvas, sp, showNames, false, dist);
+                        container.Draw(canvas, sp, showNames, false, 0f);
                     }
                 }
             }
@@ -610,6 +610,30 @@ namespace eft_dma_radar.Silk.UI
                             continue;
                         var sp = mapParams.ToScreenPos(MapParams.ToMapPos(door.Position, mapCfg));
                         door.Draw(canvas, sp, localPlayer);
+                    }
+                }
+            }
+
+            // Quest zones
+            if (!Config.BattleMode && Config.ShowQuests)
+            {
+                var questLocations = Memory.QuestLocations;
+                if (questLocations is not null)
+                {
+                    bool showOptional = Config.QuestShowOptional;
+
+                    foreach (var loc in questLocations)
+                    {
+                        if (!showOptional && loc.Optional)
+                            continue;
+                        if (!worldBounds.Contains(loc.Position))
+                            continue;
+
+                        // Draw outline polygon first (behind marker)
+                        loc.DrawOutlineProjected(canvas, mapParams, mapCfg);
+
+                        var sp = mapParams.ToScreenPos(MapParams.ToMapPos(loc.Position, mapCfg));
+                        loc.Draw(canvas, sp, localPlayer);
                     }
                 }
             }
@@ -1109,6 +1133,9 @@ namespace eft_dma_radar.Silk.UI
                 if (ImGui.MenuItem("\U0001f3e0 Hideout", "H", HideoutPanel.IsOpen))
                     HideoutPanel.IsOpen = !HideoutPanel.IsOpen;
 
+                if (ImGui.MenuItem("\U0001f4cb Quests", "Q", QuestPanel.IsOpen))
+                    QuestPanel.IsOpen = !QuestPanel.IsOpen;
+
                 ImGui.Separator();
 
                 // Widgets
@@ -1131,6 +1158,7 @@ namespace eft_dma_radar.Silk.UI
                     LootFiltersPanel.IsOpen = false;
                     HotkeyManagerPanel.IsOpen = false;
                     HideoutPanel.IsOpen = false;
+                    QuestPanel.IsOpen = false;
                     PlayerInfoWidget.IsOpen = false;
                     LootWidget.IsOpen = false;
                     AimviewWidget.IsOpen = false;
@@ -1251,6 +1279,9 @@ namespace eft_dma_radar.Silk.UI
 
             if (HideoutPanel.IsOpen)
                 HideoutPanel.Draw();
+
+            if (QuestPanel.IsOpen)
+                QuestPanel.Draw();
 
             if (PlayerInfoWidget.IsOpen && InRaid)
                 PlayerInfoWidget.Draw();
@@ -1769,11 +1800,15 @@ namespace eft_dma_radar.Silk.UI
                 case Key.H:
                     HideoutPanel.IsOpen = !HideoutPanel.IsOpen;
                     break;
+                case Key.Q:
+                    QuestPanel.IsOpen = !QuestPanel.IsOpen;
+                    break;
                 case Key.Escape:
                     SettingsPanel.IsOpen = false;
                     LootFiltersPanel.IsOpen = false;
                     HotkeyManagerPanel.IsOpen = false;
                     HideoutPanel.IsOpen = false;
+                    QuestPanel.IsOpen = false;
                     PlayerInfoWidget.IsOpen = false;
                     LootWidget.IsOpen = false;
                     AimviewWidget.IsOpen = false;
@@ -1806,6 +1841,7 @@ namespace eft_dma_radar.Silk.UI
             Config.ShowLootFiltersPanel = LootFiltersPanel.IsOpen;
             Config.ShowHotkeyPanel = HotkeyManagerPanel.IsOpen;
             Config.ShowHideoutPanel = HideoutPanel.IsOpen;
+            Config.ShowQuestPanel = QuestPanel.IsOpen;
 
             Config.Save();
 

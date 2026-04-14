@@ -460,6 +460,46 @@ namespace eft_dma_radar.Silk.UI.Panels
                 ImGui.Unindent(16);
             }
 
+            ImGui.Spacing();
+            ImGui.SeparatorText("Quests");
+
+            bool showQuests = Config.ShowQuests;
+            if (ImGui.Checkbox("Show Quest Zones", ref showQuests))
+                Config.ShowQuests = showQuests;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Show quest objective zones on the radar");
+
+            if (Config.ShowQuests)
+            {
+                ImGui.Indent(16);
+
+                bool kappaFilter = Config.QuestKappaFilter;
+                if (ImGui.Checkbox("Kappa Only", ref kappaFilter))
+                    Config.QuestKappaFilter = kappaFilter;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Only show quests required for the Kappa container");
+
+                bool showOptional = Config.QuestShowOptional;
+                if (ImGui.Checkbox("Show Optional", ref showOptional))
+                    Config.QuestShowOptional = showOptional;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Show optional quest objectives");
+
+                bool showNames = Config.QuestShowNames;
+                if (ImGui.Checkbox("Show Names", ref showNames))
+                    Config.QuestShowNames = showNames;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Show quest names next to zone markers");
+
+                bool showDistance = Config.QuestShowDistance;
+                if (ImGui.Checkbox("Show Distance", ref showDistance))
+                    Config.QuestShowDistance = showDistance;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Show distance to quest zones");
+
+                ImGui.Unindent(16);
+            }
+
             ImGui.EndTabItem();
         }
 

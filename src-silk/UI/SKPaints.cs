@@ -201,6 +201,26 @@ namespace eft_dma_radar.Silk.UI
 
         #endregion
 
+        #region Quest Paints
+
+        /// <summary>Quest zone marker — bright gold/amber.</summary>
+        public static SKPaint PaintQuest { get; } = NewFillPaint(new SKColor(255, 200, 50));
+        public static SKPaint TextQuest { get; } = NewTextPaint(new SKColor(255, 200, 50));
+
+        /// <summary>Quest zone outline fill — translucent gold.</summary>
+        public static SKPaint PaintQuestOutlineFill { get; } = NewFillPaint(new SKColor(255, 200, 50, 50));
+
+        /// <summary>Quest zone outline stroke — solid gold.</summary>
+        public static SKPaint PaintQuestOutlineStroke { get; } = new()
+        {
+            Color = new SKColor(255, 200, 50),
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 2f,
+            IsAntialias = true,
+        };
+
+        #endregion
+
         #region Tooltip Paints
 
         /// <summary>Semi-transparent dark background for mouseover tooltips.</summary>

@@ -4,8 +4,9 @@
 **Phase 5 in progress.** `src-silk` is a feature-rich standalone radar with full player model
 (gear, hands, dogtag identity, profile lookups), aimview widget, exfils/transits/doors,
 loot filtering with wishlist/blacklist, static loot containers, web radar server, DMA-based
-input/hotkeys with standalone panel, matching progress tracking, and hardened raid lifecycle.
-**78 source files, ~18K lines of C#.**
+input/hotkeys with standalone panel, matching progress tracking, hardened raid lifecycle,
+and hideout stash/area reading with persistent data across raid transitions.
+**80 source files, ~19.9K lines of C#.**
 
 - **Silk.NET project** (`src-silk`): Silk.NET + SkiaSharp + ImGui window — **running independently**
   - Own `Memory.cs` (DMA layer): state machine, worker thread, full scatter read/write API
@@ -312,7 +313,7 @@ input/hotkeys with standalone panel, matching progress tracking, and hardened ra
 | ~~HotkeyManager (configurable bindings)~~ | ~~Phase 5~~ | ✅ Done (Phase 5A) |
 | FeatureManager (chams, memory writes) | Phase 5+ | ❌ Not started |
 | ResourceJanitor (GC pressure mgmt) | Phase 5+ | ❌ Not started |
-| HideoutManager | Phase 6+ | ❌ Not started |
+| ~~HideoutManager~~ | ~~Phase 5~~ | ✅ Done (Phase 5E) |
 | QuestManager & quest rendering | Phase 5+ | ❌ Not started |
 | ~~StaticLootContainers~~ | ~~Phase 5~~ | ✅ Done (Phase 5D) |
 | ~~HotkeyManagerPanel~~ | ~~Phase 5~~ | ✅ Done (Phase 5D) |
@@ -558,6 +559,27 @@ input/hotkeys with standalone panel, matching progress tracking, and hardened ra
 - [ ] `QuestManager` & quest rendering on radar
 - [ ] `ResourceJanitor` (GC pressure management)
 
+### 5E. Hideout Manager ✅
+*(See below for full details)*
+
+### 5E. Hideout Manager ✅
+- [x] **HideoutManager** (`Tarkov/Hideout/HideoutManager.cs`) — hideout stash & area reader:
+  - GOM component lookup for HideoutArea + HideoutController with klass caching
+  - Scatter-batched stash item reading (grid → slot → item template → EftDataManager lookup)
+  - Area level + upgrade requirement reading (items, tools, traders, skills)
+  - Per-area `NeededItemIds` / `NeededItemCounts` for upgrade tracking
+  - `InvalidatePointers()` — clears GOM pointers on hideout exit while preserving data
+  - `Reset()` — full clear on game process stop
+  - GOM walk performance: `useCache: true` for all reads (matches WPF ~3.7s discovery time)
+- [x] **HideoutPanel** (`UI/Panels/HideoutPanel.cs`) — ImGui stash/upgrade UI:
+  - Stash item table with search, grouping, sorting (name/qty/price columns)
+  - Area upgrade progress display with requirement breakdown
+  - Manual refresh button, auto-refresh on hideout entry (config toggle)
+  - Price totals (best/trader/flea)
+- [x] **Memory integration** — `Memory.Hideout` singleton, hideout loop with auto-refresh,
+  data persists across hideout→raid transitions (only pointers invalidated on exit)
+- [x] **Config**: `HideoutEnabled`, `HideoutAutoRefresh` toggles in Settings Panel
+
 ## Phase 6 — Color Picker, Theming & Advanced UI
 > Customizable colors and additional panels.
 
@@ -565,7 +587,6 @@ input/hotkeys with standalone panel, matching progress tracking, and hardened ra
 - [ ] Color categories: Players, Loot tiers, UI elements
 - [ ] Map Setup Helper panel
 - [ ] Debug Info Widget (memory stats, FPS graph)
-- [ ] `HideoutManager` port
 
 ## Phase 7 — Platform Polish
 > Production quality touches.
@@ -589,7 +610,7 @@ input/hotkeys with standalone panel, matching progress tracking, and hardened ra
 
 ---
 
-## File Structure (current — 76 source files, ~17.4K LOC)
+## File Structure (current — 80 source files, ~19.9K LOC)
 
 ```
 src-silk/
@@ -607,6 +628,8 @@ src-silk/
 ├── Tarkov/
 │   ├── Offsets.cs                         ← Game SDK offsets (379 fields, IL2CPP-updated)
 │   ├── ProfileService.cs                  ← tarkov.dev profile fetcher (KD, hours, SR%)
+│   ├── Hideout/
+│   │   └── HideoutManager.cs              ← Stash items, area upgrades, klass-cached GOM lookup
 │   ├── Unity/
 │   │   ├── Unity.cs                       ← UnityOffsets, GOM, ComponentArray, GameObject, TrsX
 │   │   ├── Collections/
@@ -672,6 +695,7 @@ src-silk/
 │   ├── Panels/
 │   │   ├── SettingsPanel.cs               ← ImGui settings (General, Players, Loot, Map tabs)
 │   │   ├── LootFiltersPanel.cs            ← Wishlist/blacklist/category filter editor (ImGui)
+│   │   ├── HideoutPanel.cs                ← Stash items, area upgrades, search/sort/group (ImGui)
 │   │   └── HotkeyManagerPanel.cs          ← Standalone hotkey editing panel (rebind + clear)
 │   ├── Widgets/
 │   │   ├── PlayerInfoWidget.cs            ← Human hostile table + column-aligned tooltips

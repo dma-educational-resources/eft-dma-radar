@@ -44,6 +44,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private readonly LootManager _lootManager;
         private readonly InteractablesManager _interactablesManager;
         private ExfilManager? _exfilManager;
+        private Quests.QuestManager? _questManager;
         private int _disposed; // 0 = active, 1 = disposed (int for Interlocked.Exchange)
         private WorkerThread? _realtimeWorker;
         private WorkerThread? _registrationWorker;
@@ -120,6 +121,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>Current snapshot of keyed doors in the raid.</summary>
         public IReadOnlyList<Door> Doors => _interactablesManager.Doors;
+
+        /// <summary>Quest manager for the current raid session (null until local player discovered).</summary>
+        public Quests.QuestManager? QuestManager => _questManager;
+
+        /// <summary>Quest zone locations for the current map.</summary>
+        public IReadOnlyList<Quests.QuestLocation>? QuestLocations => _questManager?.LocationConditions;
 
         /// <summary>
         /// Suppresses the stale GameWorld guard for the next <see cref="Dispose"/> call
@@ -500,6 +507,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             // Exfil status refresh
             _exfilManager?.Refresh();
 
+            // Quest data refresh (rate-limited internally to once per 2s)
+            _questManager?.Refresh();
+
             // Interactables (doors) — discovery + state refresh (rate-limited internally)
             _interactablesManager.Refresh();
 
@@ -542,6 +552,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 // Initialize ExfilManager now that we know the local player's side
                 var lp = _registeredPlayers.LocalPlayer as Player.LocalPlayer;
                 _exfilManager = new ExfilManager(_base, MapID, lp?.IsPmc ?? true);
+
+                // Initialize QuestManager with the local player's profile pointer
+                if (lp is not null && lp.ProfilePtr != 0)
+                {
+                    _questManager = new Quests.QuestManager(lp.ProfilePtr, MapID);
+                    Log.WriteLine($"[LocalGameWorld] QuestManager initialized — profile @ 0x{lp.ProfilePtr:X}");
+                }
 
                 // Reset timing baselines now that the local player is confirmed —
                 // gives transform checks a fresh grace period.

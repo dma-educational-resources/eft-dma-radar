@@ -49,6 +49,44 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
             public const uint ArrStartOffset = 0x20;
         }
 
+        // ── IL2CPP Managed List<T> ──────────────────────────────────────────
+        public static class ManagedList
+        {
+            public const uint ItemsPtr = 0x10;  // Pointer to items array
+            public const uint Count = 0x18;     // Count of items (_size)
+        }
+
+        // ── IL2CPP Managed Array header ─────────────────────────────────────
+        public static class ManagedArray
+        {
+            public const uint FirstElement = 0x20;  // First element (after header)
+            public const int ElementSize = 0x8;     // Size of pointer element
+        }
+
+        // ── MongoID struct layout ───────────────────────────────────────────
+        public static class MongoID
+        {
+            public const uint TimeStamp = 0x00;     // uint
+            public const uint Counter = 0x08;       // ulong
+            public const uint StringID = 0x10;      // string pointer
+        }
+
+        // ── HashSet<T> with inline MongoID storage ──────────────────────────
+        public static class IL2CPPHashSet
+        {
+            public const uint Entries = 0x18;           // Pointer to entries array
+            public const uint Count = 0x1C;             // int — count
+            public const int EntrySize = 0x20;          // 32 bytes per entry
+            public const uint EntryValueOffset = 0x08;  // MongoID value starts here
+
+            // Entry layout:
+            //   +0x00: hashCode (int) + next (int)
+            //   +0x08: MongoID value (struct inline)
+            //     +0x00: _timeStamp (uint)
+            //     +0x08: _counter (ulong)
+            //     +0x10: _stringID (string pointer)
+        }
+
         // ── TransformInternal native layout ──────────────────────────────────
         public static class TransformAccess
         {

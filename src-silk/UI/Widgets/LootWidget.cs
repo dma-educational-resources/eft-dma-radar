@@ -24,6 +24,10 @@ namespace eft_dma_radar.Silk.UI.Widgets
         private static readonly Dictionary<string, LootGroup> _groups = new(128);
         private static readonly List<LootGroup> _sorted = new(128);
 
+        // Object pool for LootGroup — avoids per-frame allocation
+        private static readonly List<LootGroup> _groupPool = new(128);
+        private static int _groupPoolIndex;
+
         // Cached sort state — persists across frames while data is rebuilt
         private static uint _sortColumnId = 1; // Default: Price
         private static ImGuiSortDirection _sortDirection = ImGuiSortDirection.Descending;
@@ -51,13 +55,13 @@ namespace eft_dma_radar.Silk.UI.Widgets
             // Build grouped snapshot
             _groups.Clear();
             _sorted.Clear();
+            _groupPoolIndex = 0;
             long totalValue = 0;
             int visibleCount = 0;
 
             if (loot is not null)
             {
                 var localPos = localPlayer.Position;
-                var filterData = LootFilter.FilterData;
 
                 for (int i = 0; i < loot.Count; i++)
                 {
@@ -85,17 +89,15 @@ namespace eft_dma_radar.Silk.UI.Widgets
                     }
                     else
                     {
-                        var g = new LootGroup
-                        {
-                            ShortName = item.ShortName,
-                            FullName = item.Name,
-                            PricePerItem = price,
-                            TotalValue = price,
-                            Quantity = 1,
-                            NearestDist = dist,
-                            IsImportant = important,
-                            IsWishlisted = wishlisted,
-                        };
+                        var g = RentGroup();
+                        g.ShortName = item.ShortName;
+                        g.FullName = item.Name;
+                        g.PricePerItem = price;
+                        g.TotalValue = price;
+                        g.Quantity = 1;
+                        g.NearestDist = dist;
+                        g.IsImportant = important;
+                        g.IsWishlisted = wishlisted;
                         _groups[item.ShortName] = g;
                         _sorted.Add(g);
                     }
@@ -193,26 +195,31 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 if (g.Quantity > 1)
                     ImGui.TextColored(color, g.Quantity.ToString());
                 else
-                    ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 0.7f), "1");
+                    ImGui.TextColored(ColorDimQty, "1");
 
                 // Total value
                 ImGui.TableNextColumn();
                 if (g.Quantity > 1)
                     ImGui.TextColored(color, LootFilter.FormatPrice(g.TotalValue));
                 else
-                    ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 0.7f), "-");
+                    ImGui.TextColored(ColorDimDash, "-");
 
                 // Distance
                 ImGui.TableNextColumn();
-                ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), $"{(int)g.NearestDist}m");
+                ImGui.TextColored(ColorDistLabel, g.DistText);
             }
 
             if (_sorted.Count > MAX_ROWS)
             {
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
-                ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f),
-                    $"... and {_sorted.Count - MAX_ROWS} more");
+                int overflow = _sorted.Count - MAX_ROWS;
+                if (overflow != _lastOverflow)
+                {
+                    _lastOverflow = overflow;
+                    _overflowText = $"... and {overflow} more";
+                }
+                ImGui.TextColored(ColorDimLabel, _overflowText);
             }
 
             ImGui.EndTable();
@@ -250,6 +257,26 @@ namespace eft_dma_radar.Silk.UI.Widgets
             });
         }
 
+        // Static color fields — avoid per-row Vector4 allocation
+        private static readonly Vector4 ColorDistLabel = new(0.6f, 0.6f, 0.6f, 1f);
+        private static readonly Vector4 ColorDimLabel = new(0.5f, 0.5f, 0.5f, 1f);
+        private static readonly Vector4 ColorDimQty = new(0.5f, 0.5f, 0.5f, 0.7f);
+        private static readonly Vector4 ColorDimDash = new(0.5f, 0.5f, 0.5f, 0.7f);
+
+        // Overflow text caching
+        private static int _lastOverflow;
+        private static string _overflowText = "";
+
+        private static LootGroup RentGroup()
+        {
+            if (_groupPoolIndex < _groupPool.Count)
+                return _groupPool[_groupPoolIndex++];
+            var g = new LootGroup();
+            _groupPool.Add(g);
+            _groupPoolIndex++;
+            return g;
+        }
+
         /// <summary>
         /// A group of identical items (same ShortName) with aggregated stats.
         /// </summary>
@@ -263,6 +290,23 @@ namespace eft_dma_radar.Silk.UI.Widgets
             public float NearestDist;
             public bool IsImportant;
             public bool IsWishlisted;
+
+            // Cached distance text — rebuilt when NearestDist changes
+            private int _cachedDistInt = -1;
+            private string _cachedDistText = "";
+            public string DistText
+            {
+                get
+                {
+                    int d = (int)NearestDist;
+                    if (d != _cachedDistInt)
+                    {
+                        _cachedDistInt = d;
+                        _cachedDistText = $"{d}m";
+                    }
+                    return _cachedDistText;
+                }
+            }
         }
     }
 }

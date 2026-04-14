@@ -21,6 +21,7 @@ global using eft_dma_radar.Silk.Tarkov.GameWorld;
 global using eft_dma_radar.Silk.Tarkov.GameWorld.Exits;
 global using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 global using eft_dma_radar.Silk.Tarkov.GameWorld.Player;
+global using eft_dma_radar.Silk.Tarkov.GameWorld.Quests;
 global using eft_dma_radar.Silk.Config;
 global using eft_dma_radar.Silk.Tarkov.Unity.Collections;
 global using eft_dma_radar.Silk.UI;

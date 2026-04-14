@@ -77,6 +77,8 @@ namespace eft_dma_radar.Silk.DMA
         public static IReadOnlyList<Exfil>? Exfils => Game?.Exfils;
         public static IReadOnlyList<TransitPoint>? Transits => Game?.Transits;
         public static IReadOnlyList<Door>? Doors => Game?.Doors;
+        public static IReadOnlyList<QuestLocation>? QuestLocations => Game?.QuestLocations;
+        public static eft_dma_radar.Silk.Tarkov.GameWorld.Quests.QuestManager? QuestManager => Game?.QuestManager ?? LobbyQuestReader.QuestManager;
 
         #endregion
 
@@ -99,6 +101,7 @@ namespace eft_dma_radar.Silk.DMA
         {
             SetState(MemoryState.ProcessFound);
             GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
+            LobbyQuestReader.Start();
             GameStarted?.Invoke(null, EventArgs.Empty);
         }
 
@@ -113,6 +116,7 @@ namespace eft_dma_radar.Silk.DMA
             GameObjectManager.ResetCachedAddresses();
             MatchingProgressResolver.Reset();
             Hideout.Reset();
+            LobbyQuestReader.InvalidateCache();
             GameStopped?.Invoke(null, EventArgs.Empty);
         }
 
@@ -784,6 +788,7 @@ namespace eft_dma_radar.Silk.DMA
         {
             if (_shutdown) return; // idempotent
             _shutdown = true;
+            LobbyQuestReader.Stop();
             try { _cts.Cancel(); } catch { }
 
             // Wait for the worker thread to finish — bounded to prevent hung shutdown

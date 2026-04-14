@@ -30,6 +30,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// <summary>Profile ID (used for Scav exfil eligibility).</summary>
         public string? LocalProfileId { get; set; }
 
+        /// <summary>Profile pointer (used by QuestManager to read quest data).</summary>
+        public ulong ProfilePtr { get; set; }
+
         protected override (SKPaint dot, SKPaint text, SKPaint chevron, SKPaint aimline) GetPaints()
         {
             return (SKPaints.PaintLocalPlayer, SKPaints.TextLocalPlayer, SKPaints.ChevronLocalPlayer, SKPaints.AimlineLocalPlayer);

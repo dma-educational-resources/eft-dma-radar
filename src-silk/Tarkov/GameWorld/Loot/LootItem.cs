@@ -12,6 +12,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         private string? _cachedLabel;
         private int _cachedLabelKey = int.MinValue;
 
+        // Cached importance flag — updated by LootManager after each loot refresh
+        private bool _cachedImportant;
+
         public string Id { get; }
         public string Name => _item.Name;
         public string ShortName => _item.ShortName;
@@ -32,8 +35,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// <summary>Whether the item passes current filter criteria (pre-computed price).</summary>
         public bool ShouldDraw(int displayPrice) => LootFilter.ShouldDraw(_item, displayPrice);
 
-        /// <summary>Whether the item is highlighted as important.</summary>
-        public bool IsImportant => LootFilter.IsImportant(DisplayPrice);
+        /// <summary>Whether the item is highlighted as important (cached — call <see cref="RefreshImportance"/> to update).</summary>
+        public bool IsImportant => _cachedImportant;
+
+        /// <summary>
+        /// Refreshes the cached importance flag from the current price/config state.
+        /// Called after loot list construction to avoid per-frame/per-door recomputation.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RefreshImportance() => _cachedImportant = LootFilter.IsImportant(DisplayPrice);
 
         public LootItem(TarkovMarketItem item, Vector3 position)
         {

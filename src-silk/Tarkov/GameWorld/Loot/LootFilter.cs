@@ -76,6 +76,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             /// <summary>Whether the item was shown due to a category toggle.</summary>
             public bool CategoryMatch { get; init; }
 
+            /// <summary>Whether the item is required for an active quest.</summary>
+            public bool QuestRequired { get; init; }
+
             public static readonly FilterResult Hidden = new() { Visible = false };
         }
 
@@ -125,6 +128,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                     Important = IsImportant(displayPrice),
                     Wishlisted = true,
                 };
+            }
+
+            // Quest items — always visible if quests are enabled and item is needed
+            if (config.ShowQuests)
+            {
+                var qm = Memory.QuestManager;
+                if (qm is not null && qm.IsItemRequired(item.BsgId))
+                {
+                    return new FilterResult
+                    {
+                        Visible = true,
+                        Important = true,
+                        QuestRequired = true,
+                    };
+                }
             }
 
             // Category toggle bypass (show regardless of price)

@@ -21,6 +21,12 @@ namespace eft_dma_radar.Silk.Misc.Data
             = FrozenDictionary<string, TarkovMarketItem>.Empty;
 
         /// <summary>
+        /// Quest/task data keyed by task ID.
+        /// </summary>
+        public static FrozenDictionary<string, TaskElement> TaskData { get; private set; }
+            = FrozenDictionary<string, TaskElement>.Empty;
+
+        /// <summary>
         /// Map data (extracts, transits) keyed by map nameId.
         /// </summary>
         public static FrozenDictionary<string, MapElement> MapData { get; private set; }
@@ -65,6 +71,19 @@ namespace eft_dma_radar.Silk.Misc.Data
                 AllContainers = containerBuilder.ToFrozenDictionary(StringComparer.Ordinal);
                 Log.WriteLine($"[EftDataManager] Loaded {AllItems.Count} items, {AllContainers.Count} containers.");
 
+                // Load task/quest data
+                if (data.Tasks is { Count: > 0 })
+                {
+                    var taskBuilder = new Dictionary<string, TaskElement>(data.Tasks.Count, StringComparer.OrdinalIgnoreCase);
+                    foreach (var task in data.Tasks)
+                    {
+                        if (!string.IsNullOrEmpty(task.Id))
+                            taskBuilder.TryAdd(task.Id, task);
+                    }
+                    TaskData = taskBuilder.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+                    Log.WriteLine($"[EftDataManager] Loaded {TaskData.Count} tasks.");
+                }
+
                 // Load map data (extracts + transits)
                 if (data.Maps is { Count: > 0 })
                 {
@@ -93,6 +112,9 @@ namespace eft_dma_radar.Silk.Misc.Data
         {
             [JsonPropertyName("items")]
             public List<TarkovMarketItem> Items { get; set; } = [];
+
+            [JsonPropertyName("tasks")]
+            public List<TaskElement> Tasks { get; set; } = [];
 
             [JsonPropertyName("maps")]
             public List<MapElement> Maps { get; set; } = [];

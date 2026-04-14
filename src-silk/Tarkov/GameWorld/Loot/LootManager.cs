@@ -529,7 +529,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                         if (pos == Vector3.Zero)
                             continue;
 
-                        result.Add(new LootItem(marketItem, pos));
+                        var item = new LootItem(marketItem, pos);
+                        item.RefreshImportance();
+                        result.Add(item);
                     }
                     catch { }
                 }

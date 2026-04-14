@@ -22,6 +22,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 
         // ── Draw helpers ────────────────────────────────────────────────────
 
+        // Cached distance label — avoids per-frame string allocation
+        private int _cachedDistVal = -1;
+        private string _cachedDistText = "";
+
         // Stroke paint for the container square marker
         private static readonly SKPaint _markerStroke = new()
         {
@@ -71,11 +75,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 
             if (showDistance)
             {
-                var distText = $"{(int)distance}m";
+                int d = (int)distance;
+                if (d != _cachedDistVal)
+                {
+                    _cachedDistVal = d;
+                    _cachedDistText = $"{d}m";
+                }
                 float lx = screenPos.X + 7f;
                 float ly = screenPos.Y + (showName ? 16.5f : 4.5f);
-                canvas.DrawText(distText, lx + 1f, ly + 1f, SKPaints.FontRegular11, SKPaints.LootShadow);
-                canvas.DrawText(distText, lx, ly, SKPaints.FontRegular11, SKPaints.TextContainer);
+                canvas.DrawText(_cachedDistText, lx + 1f, ly + 1f, SKPaints.FontRegular11, SKPaints.LootShadow);
+                canvas.DrawText(_cachedDistText, lx, ly, SKPaints.FontRegular11, SKPaints.TextContainer);
             }
         }
     }

@@ -142,6 +142,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 var profilePtr = Memory.ReadPtr(playerBase + Offsets.Player.Profile, false);
                 var infoPtr = Memory.ReadPtr(profilePtr + Offsets.Profile.Info, false);
 
+                // Store profile pointer for QuestManager
+                lp.ProfilePtr = profilePtr;
+
                 // Entry point (PMC exfil eligibility)
                 if (lp.IsPmc)
                 {
