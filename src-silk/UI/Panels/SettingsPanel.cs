@@ -19,7 +19,8 @@ namespace eft_dma_radar.Silk.UI.Panels
                 {
                     await eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.StartAsync(
                         Config.WebRadarPort,
-                        TimeSpan.FromMilliseconds(Config.WebRadarTickMs));
+                        TimeSpan.FromMilliseconds(Config.WebRadarTickMs),
+                        Config.WebRadarUPnP);
                 }
                 else
                 {
@@ -182,10 +183,72 @@ namespace eft_dma_radar.Silk.UI.Panels
                 if (ImGui.IsItemHovered())
                     ImGui.SetTooltip("Update interval for the web radar data");
 
+                bool upnp = Config.WebRadarUPnP;
+                if (ImGui.Checkbox("UPnP / NAT-PMP", ref upnp))
+                    Config.WebRadarUPnP = upnp;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Automatically forward the port on your router via UPnP.\nEnables access from outside your network.\nTakes effect on next server start.");
+
                 if (eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.IsRunning)
                 {
                     ImGui.TextColored(new Vector4(0.26f, 0.84f, 0.50f, 1f),
                         $"\u25cf Running on port {Config.WebRadarPort}");
+
+                    // Private address
+                    ImGui.Spacing();
+                    var privateAddr = eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.PrivateAddress;
+                    if (!string.IsNullOrEmpty(privateAddr))
+                    {
+                        ImGui.Text("Private:");
+                        ImGui.SameLine();
+                        ImGui.TextColored(new Vector4(0.55f, 0.83f, 1f, 1f), privateAddr);
+                        ImGui.SameLine();
+                        if (ImGui.SmallButton("\uf0c5 Copy##private"))
+                            ImGui.SetClipboardText(privateAddr);
+                        if (ImGui.IsItemHovered())
+                            ImGui.SetTooltip("Copy private (LAN) address to clipboard");
+                        ImGui.SameLine();
+                        if (ImGui.SmallButton("\u2197 Open##private"))
+                        {
+                            try
+                            {
+                                Process.Start(new ProcessStartInfo(privateAddr) { UseShellExecute = true });
+                            }
+                            catch { }
+                        }
+                        if (ImGui.IsItemHovered())
+                            ImGui.SetTooltip("Open in default browser");
+                    }
+
+                    // Public address
+                    var publicAddr = eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.PublicAddress;
+                    if (!string.IsNullOrEmpty(publicAddr))
+                    {
+                        ImGui.Text("Public: ");
+                        ImGui.SameLine();
+                        ImGui.TextColored(new Vector4(1f, 0.85f, 0.40f, 1f), publicAddr);
+                        ImGui.SameLine();
+                        if (ImGui.SmallButton("\uf0c5 Copy##public"))
+                            ImGui.SetClipboardText(publicAddr);
+                        if (ImGui.IsItemHovered())
+                            ImGui.SetTooltip("Copy public (WAN) address to clipboard");
+                        ImGui.SameLine();
+                        if (ImGui.SmallButton("\u2197 Open##public"))
+                        {
+                            try
+                            {
+                                Process.Start(new ProcessStartInfo(publicAddr) { UseShellExecute = true });
+                            }
+                            catch { }
+                        }
+                        if (ImGui.IsItemHovered())
+                            ImGui.SetTooltip("Open in default browser");
+                    }
+                    else if (string.IsNullOrEmpty(publicAddr) && !string.IsNullOrEmpty(privateAddr))
+                    {
+                        ImGui.TextColored(new Vector4(0.60f, 0.60f, 0.60f, 1f),
+                            "Public:  Detecting...");
+                    }
                 }
                 else
                 {
@@ -309,6 +372,45 @@ namespace eft_dma_radar.Silk.UI.Panels
                     Config.AimviewZoom = zoom;
                 if (ImGui.IsItemHovered())
                     ImGui.SetTooltip("Zoom level (1.0 = ~90\u00b0 FOV, higher = zoomed in)");
+
+                ImGui.Spacing();
+                ImGui.SeparatorText("Advanced Aimview");
+
+                bool advancedAimview = Config.UseAdvancedAimview;
+                if (ImGui.Checkbox("Use Advanced Aimview", ref advancedAimview))
+                    Config.UseAdvancedAimview = advancedAimview;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Use real game camera data (ViewMatrix) for pixel-accurate\nprojection. Requires CameraManager — falls back to synthetic\ncamera if unavailable.");
+
+                if (Config.UseAdvancedAimview)
+                {
+                    ImGui.SetNextItemWidth(160);
+                    int monW = Config.GameMonitorWidth;
+                    if (ImGui.InputInt("Game Monitor Width", ref monW, 0, 0))
+                    {
+                        monW = Math.Clamp(monW, 640, 7680);
+                        Config.GameMonitorWidth = monW;
+                        CameraManager.UpdateViewportRes(Config.GameMonitorWidth, Config.GameMonitorHeight);
+                    }
+                    if (ImGui.IsItemHovered())
+                        ImGui.SetTooltip("Width of the monitor running EFT (pixels)");
+
+                    ImGui.SetNextItemWidth(160);
+                    int monH = Config.GameMonitorHeight;
+                    if (ImGui.InputInt("Game Monitor Height", ref monH, 0, 0))
+                    {
+                        monH = Math.Clamp(monH, 480, 4320);
+                        Config.GameMonitorHeight = monH;
+                        CameraManager.UpdateViewportRes(Config.GameMonitorWidth, Config.GameMonitorHeight);
+                    }
+                    if (ImGui.IsItemHovered())
+                        ImGui.SetTooltip("Height of the monitor running EFT (pixels)");
+
+                    if (!CameraManager.IsActive)
+                    {
+                        ImGui.TextColored(new Vector4(1f, 0.6f, 0.2f, 1f), "CameraManager not active — waiting for raid");
+                    }
+                }
 
                 ImGui.Unindent(16);
             }

@@ -111,6 +111,20 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Zoom level for the aimview (1.0 = ~90° FOV, higher = narrower/zoomed in).</summary>
         public float AimviewZoom { get; set; } = 1.0f;
 
+        /// <summary>
+        /// Use the advanced aimview mode that reads the game's real camera ViewMatrix
+        /// via <see cref="CameraManager"/> for pixel-accurate W2S projection.
+        /// When false (default), the aimview uses a synthetic camera built from
+        /// the local player's position + rotation.
+        /// </summary>
+        public bool UseAdvancedAimview { get; set; } = false;
+
+        /// <summary>Game monitor width (pixels) — used by CameraManager for W2S viewport math.</summary>
+        public int GameMonitorWidth { get; set; } = 2560;
+
+        /// <summary>Game monitor height (pixels) — used by CameraManager for W2S viewport math.</summary>
+        public int GameMonitorHeight { get; set; } = 1440;
+
         /// <summary>Aimline length in pixels for human players (PMC/PScav).</summary>
         public int AimlineLength { get; set; } = 15;
 
@@ -265,6 +279,9 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Web radar update interval in milliseconds.</summary>
         public int WebRadarTickMs { get; set; } = 50;
 
+        /// <summary>Enable UPnP/NAT-PMP automatic port forwarding for the web radar.</summary>
+        public bool WebRadarUPnP { get; set; } = false;
+
         // ── Hotkeys ─────────────────────────────────────────────────────────────
 
         /// <summary>
@@ -302,6 +319,9 @@ namespace eft_dma_radar.Silk.Config
             AimviewEyeHeight = Math.Clamp(AimviewEyeHeight, 0f, 5f);
             AimviewZoom = Math.Clamp(AimviewZoom, 0.5f, 5.0f);
             AimlineLength = Math.Clamp(AimlineLength, 0, 500);
+
+            GameMonitorWidth = Math.Clamp(GameMonitorWidth, 640, 7680);
+            GameMonitorHeight = Math.Clamp(GameMonitorHeight, 480, 4320);
 
             DoorLootProximity = Math.Clamp(DoorLootProximity, 1f, 200f);
 

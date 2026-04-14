@@ -157,6 +157,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 
         #endregion
 
+        /// <summary>
+        /// Per-player skeleton for advanced aimview bone rendering.
+        /// Set by the camera worker, read by the render thread.
+        /// </summary>
+        internal volatile Skeleton? Skeleton;
+
         public override string ToString() => $"{Type} [{Name}]";
     }
 }

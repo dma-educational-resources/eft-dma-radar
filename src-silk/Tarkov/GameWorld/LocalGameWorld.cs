@@ -22,7 +22,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
     /// <list type="bullet">
     ///   <item><b>RealtimeWorker</b> (8ms target, DynamicSleep, AboveNormal priority) — scatter-batched
     ///   position + rotation for all active players in a single DMA round-trip.
-    ///   Actual sleep = max(0, 8ms - workTime). <b>Never</b> touches loot or registration.</item>
+    ///   Actual sleep = max(0, 8ms - workTime). <b>Never</b> touches loot, camera, or skeletons.</item>
+    ///   <item><b>CameraWorker</b> (16ms target, DynamicSleep, Normal priority) — camera ViewMatrix/FOV
+    ///   reads via CameraManager, per-player skeleton bone position reads. Isolated from the realtime
+    ///   worker so camera/skeleton DMA never blocks or delays position + rotation updates.</item>
     ///   <item><b>RegistrationWorker</b> (100ms target, DynamicSleep, BelowNormal priority) — strict priority ordering:
     ///     <list type="number">
     ///       <item><b>Local player discovery</b> — blocks everything until found.</item>
@@ -45,9 +48,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private readonly InteractablesManager _interactablesManager;
         private ExfilManager? _exfilManager;
         private Quests.QuestManager? _questManager;
+        private CameraManager? _cameraManager;
         private int _disposed; // 0 = active, 1 = disposed (int for Interlocked.Exchange)
         private WorkerThread? _realtimeWorker;
         private WorkerThread? _registrationWorker;
+        private WorkerThread? _cameraWorker;
 
         // The address of the LocalPlayer at raid start — used to detect extraction/death
         private ulong _localPlayerAddr;
@@ -246,7 +251,23 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         continue;
                     }
 
-                    // ── Phase 2: Accept — construct instance ────────────────────
+                    // ── Phase 2: Map validation ─────────────────────────────
+                    // The main menu scene contains a valid GameWorld with a NarratePlayer
+                    // that passes all structural checks above, but has no real LocationId
+                    // (reads as "unknown"). Reject GameWorlds whose map is not a known
+                    // raid map or "hideout" — this mirrors the WPF version's
+                    // GameData.MapNames.ContainsKey() guard.
+                    var mapId = ReadMapID(gameWorld);
+                    if (!mapId.Equals(HideoutMapID, StringComparison.OrdinalIgnoreCase)
+                        && !MapManager.IsKnownMap(mapId))
+                    {
+                        Log.WriteRateLimited(AppLogLevel.Debug, "gw_unknown_map", TimeSpan.FromSeconds(10),
+                            $"[LocalGameWorld] GameWorld @ 0x{gameWorld:X} has unrecognised map '{mapId}' — not a raid. Waiting...");
+                        Thread.Sleep(1000);
+                        continue;
+                    }
+
+                    // ── Phase 3: Accept — construct instance ────────────────────
                     // Accepted — clear the stale guard so we don't reject this address
                     // if the user later restarts manually.
                     Interlocked.Exchange(ref _lastDisposedBase, 0);
@@ -254,7 +275,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     // Matching phase is over — stop the stage poller and freeze the timer
                     MatchingProgressResolver.NotifyRaidStarted();
 
-                    var mapId = ReadMapID(gameWorld);
                     Log.WriteLine($"[LocalGameWorld] Found live GameWorld @ 0x{gameWorld:X}, map = '{mapId}'");
                     return new LocalGameWorld(gameWorld, mapId, ct);
                 }
@@ -282,6 +302,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             _lootManager = new LootManager(gameWorldBase);
             _interactablesManager = new InteractablesManager(gameWorldBase);
 
+            // Pre-warm CameraManager static data (sig scans, offset cache)
+            // Non-blocking: if it fails, advanced aimview simply won't activate.
+            CameraManager.Initialize();
+            CameraManager.UpdateViewportRes(
+                SilkProgram.Config.GameMonitorWidth,
+                SilkProgram.Config.GameMonitorHeight);
+
             // In hideout mode, skip creating the expensive worker threads.
             // The hideout has no enemies, loot, or exfils to track.
             if (IsHideout)
@@ -295,6 +322,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 SleepMode = WorkerSleepMode.DynamicSleep
             };
             _realtimeWorker.PerformWork += RealtimeWorker_PerformWork;
+
+            _cameraWorker = new WorkerThread
+            {
+                Name = "Camera Worker",
+                ThreadPriority = ThreadPriority.Normal,
+                SleepDuration = TimeSpan.FromMilliseconds(16),
+                SleepMode = WorkerSleepMode.DynamicSleep
+            };
+            _cameraWorker.PerformWork += CameraWorker_PerformWork;
 
             _registrationWorker = new WorkerThread
             {
@@ -332,9 +368,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             // Start workers immediately — registration worker discovers the
             // local player in the background, realtime worker starts reading
-            // positions as soon as players are registered.
+            // positions as soon as players are registered. Camera worker handles
+            // CameraManager + skeleton bone reads on a separate thread.
             _registrationWorker?.Start();
             _realtimeWorker?.Start();
+            _cameraWorker?.Start();
         }
 
         /// <summary>
@@ -361,8 +399,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             BeginCooldown(IsHideout ? 1 : 12);
 
             _realtimeWorker?.Dispose();
+            _cameraWorker?.Dispose();
             _registrationWorker?.Dispose();
             _realtimeWorker = null;
+            _cameraWorker = null;
             _registrationWorker = null;
 
             MatchingProgressResolver.Reset();
@@ -376,6 +416,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <summary>
         /// Realtime work tick (DynamicSleep: 8ms target, AboveNormal priority).
         /// Scatter-batched position + rotation reads — single DMA round-trip per tick.
+        /// <b>SACRED PRIORITY</b>: This worker ONLY reads position + rotation. Camera, skeleton,
+        /// and all other DMA work lives on other workers so it can never delay or block this path.
         /// <para>
         /// <b>Raid-ended detection:</b> <see cref="ThrowIfRaidEnded"/> runs at the start of every
         /// tick. If the raid has ended (MainPlayer gone, player count 0, etc.), a <see cref="RaidEnded"/>
@@ -417,6 +459,48 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 Log.WriteRateLimited(AppLogLevel.Warning, "rt_error", TimeSpan.FromSeconds(5),
                     $"[RealtimeWorker] Error: {ex.GetType().Name}: {ex.Message}");
                 Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Camera work tick (DynamicSleep: 16ms target, Normal priority).
+        /// Reads CameraManager ViewMatrix/FOV and updates skeleton bone positions for all players.
+        /// Runs on its own thread so it never delays or blocks the realtime position + rotation worker.
+        /// </summary>
+        private void CameraWorker_PerformWork(CancellationToken ct)
+        {
+            if (_disposed != 0) return;
+
+            if (_registeredPlayers.LocalPlayerLost)
+            {
+                HandleRaidEnded("Camera Worker");
+                return;
+            }
+
+            try
+            {
+                // Update camera ViewMatrix/FOV from DMA (for advanced aimview + future ESP)
+                _cameraManager?.UpdateCamera(_registeredPlayers.LocalPlayer as LocalPlayer);
+
+                // Skeleton: init any new skeletons, then update all bone positions
+                if (SilkProgram.Config.UseAdvancedAimview && CameraManager.IsActive)
+                {
+                    _registeredPlayers.TryInitSkeletons();
+                    _registeredPlayers.UpdateSkeletons();
+                }
+            }
+            catch (RaidEnded)
+            {
+                HandleRaidEnded("Camera Worker");
+            }
+            catch (ObjectDisposedException)
+            {
+                Dispose();
+            }
+            catch (Exception ex)
+            {
+                Log.WriteRateLimited(AppLogLevel.Warning, "cam_error", TimeSpan.FromSeconds(5),
+                    $"[CameraWorker] Error: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -558,6 +642,19 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 {
                     _questManager = new Quests.QuestManager(lp.ProfilePtr, MapID);
                     Log.WriteLine($"[LocalGameWorld] QuestManager initialized — profile @ 0x{lp.ProfilePtr:X}");
+                }
+
+                // Create CameraManager instance (resolves FPS/Optic cameras).
+                // Non-fatal: if it fails, advanced aimview stays disabled.
+                try
+                {
+                    _cameraManager = new CameraManager();
+                    Log.WriteLine("[LocalGameWorld] CameraManager initialized.");
+                }
+                catch (Exception cmEx)
+                {
+                    Log.WriteLine($"[LocalGameWorld] CameraManager init failed (advanced aimview disabled): {cmEx.Message}");
+                    _cameraManager = null;
                 }
 
                 // Reset timing baselines now that the local player is confirmed —

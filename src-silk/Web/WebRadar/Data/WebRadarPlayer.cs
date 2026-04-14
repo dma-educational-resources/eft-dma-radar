@@ -21,8 +21,12 @@ namespace eft_dma_radar.Silk.Web.WebRadar.Data
         public float WorldY { get; set; }
         public float WorldZ { get; set; }
 
-        // Rotation (radians, pre-converted for JS canvas)
+        // Rotation (radians, pre-converted for JS canvas — map rotation, yaw-90°)
         public float Yaw { get; set; }
+
+        // Raw game rotation in radians — used by aimview 3D projection
+        public float RawYaw { get; set; }
+        public float Pitch { get; set; }
 
         /// <summary>
         /// Creates a web radar player snapshot from a Silk player instance.
@@ -43,8 +47,9 @@ namespace eft_dma_radar.Silk.Web.WebRadar.Data
                 };
 
             var pos = player.Position;
-            var yawDeg = player.MapRotation;
-            var yawRad = yawDeg * (MathF.PI / 180f);
+            var mapYawRad = player.MapRotation * (MathF.PI / 180f);
+            var rawYawRad = player.RotationYaw * (MathF.PI / 180f);
+            var pitchRad = player.RotationPitch * (MathF.PI / 180f);
 
             return new WebRadarPlayer
             {
@@ -60,7 +65,9 @@ namespace eft_dma_radar.Silk.Web.WebRadar.Data
                 WorldX = pos.X,
                 WorldY = pos.Y,
                 WorldZ = pos.Z,
-                Yaw = yawRad,
+                Yaw = mapYawRad,
+                RawYaw = rawYawRad,
+                Pitch = pitchRad,
             };
         }
     }

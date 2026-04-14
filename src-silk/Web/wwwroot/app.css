@@ -480,6 +480,12 @@ button.small:active { transform: scale(.97); }
   color: var(--text-dim);
 }
 
+.hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin: 4px 0 0;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    TOOLTIP
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -577,6 +583,91 @@ button.small:active { transform: scale(.97); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   CONTAINER SELECTION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.container-select {
+  margin-top: 6px;
+}
+.container-select summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--accent);
+  padding: 4px 0;
+  user-select: none;
+}
+.container-select summary:hover {
+  color: var(--text);
+}
+.container-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+}
+.container-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+}
+.container-item:hover {
+  background: var(--surface-hover);
+}
+.container-item .cname {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.toggle-switch.small {
+  width: 28px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.toggle-switch.small .slider::before {
+  width: 12px;
+  height: 12px;
+}
+.toggle-switch.small input:checked + .slider::before {
+  transform: translateX(12px);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AIMVIEW WIDGET
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.aimview {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  border-radius: var(--radius-lg);
+  background: rgba(11, 18, 32, .88);
+  border: 1px solid var(--border-strong);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, .5);
+  z-index: 10000;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+.aimview.dragging { cursor: grabbing; }
+.aimview.hidden { display: none; }
+
+.aimview canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -584,6 +675,7 @@ button.small:active { transform: scale(.97); }
   :root { --sidebar-w: 100vw; }
   #menuBtn { width: 36px; height: 36px; }
   .section { padding: 10px; }
+  .aimview { bottom: 8px; right: 8px; }
 }
 
 @media (min-width: 481px) and (max-width: 768px) {

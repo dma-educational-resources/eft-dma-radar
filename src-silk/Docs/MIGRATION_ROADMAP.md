@@ -1,12 +1,14 @@
 # WPF → Silk.NET Migration Roadmap
 
 ## Current State
-**Phase 5 in progress.** `src-silk` is a feature-rich standalone radar with full player model
+**Phase 5 complete. Phase 6 not yet started.** `src-silk` is a feature-rich standalone radar with full player model
 (gear, hands, dogtag identity, profile lookups), aimview widget, exfils/transits/doors,
 loot filtering with wishlist/blacklist, static loot containers, web radar server, DMA-based
 input/hotkeys with standalone panel, matching progress tracking, hardened raid lifecycle,
-and hideout stash/area reading with persistent data across raid transitions.
-**80 source files, ~19.9K lines of C#.**
+hideout stash/area reading with persistent data across raid transitions, and a full
+quest system (QuestManager, QuestPanel, quest zone radar rendering, lobby quest reader,
+loot quest-item integration, and LobbyQuestReader lifecycle).
+**85 source files, ~21.5K lines of C#.**
 
 - **Silk.NET project** (`src-silk`): Silk.NET + SkiaSharp + ImGui window — **running independently**
   - Own `Memory.cs` (DMA layer): state machine, worker thread, full scatter read/write API
@@ -314,7 +316,7 @@ and hideout stash/area reading with persistent data across raid transitions.
 | FeatureManager (chams, memory writes) | Phase 5+ | ❌ Not started |
 | ResourceJanitor (GC pressure mgmt) | Phase 5+ | ❌ Not started |
 | ~~HideoutManager~~ | ~~Phase 5~~ | ✅ Done (Phase 5E) |
-| QuestManager & quest rendering | Phase 5+ | ❌ Not started |
+| ~~QuestManager & quest rendering~~ | ~~Phase 5~~ | ✅ Done (Phase 5F) |
 | ~~StaticLootContainers~~ | ~~Phase 5~~ | ✅ Done (Phase 5D) |
 | ~~HotkeyManagerPanel~~ | ~~Phase 5~~ | ✅ Done (Phase 5D) |
 
@@ -556,11 +558,9 @@ and hideout stash/area reading with persistent data across raid transitions.
   own open/close toggle in View menu, config-persisted visibility, full rebind + clear UI
 - [ ] `FeatureManager` port (chams, memory write features)
 - [ ] Memory writes gated by config flag
-- [ ] `QuestManager` & quest rendering on radar
+- [x] `QuestManager` & quest rendering on radar — see Phase 5F below
+- [x] **Hot-path performance audit & optimizations** \u2014 see Phase 5G below
 - [ ] `ResourceJanitor` (GC pressure management)
-
-### 5E. Hideout Manager ✅
-*(See below for full details)*
 
 ### 5E. Hideout Manager ✅
 - [x] **HideoutManager** (`Tarkov/Hideout/HideoutManager.cs`) — hideout stash & area reader:
@@ -579,6 +579,60 @@ and hideout stash/area reading with persistent data across raid transitions.
 - [x] **Memory integration** — `Memory.Hideout` singleton, hideout loop with auto-refresh,
   data persists across hideout→raid transitions (only pointers invalidated on exit)
 - [x] **Config**: `HideoutEnabled`, `HideoutAutoRefresh` toggles in Settings Panel
+
+### 5F. Quest System ✅
+- [x] **QuestManager** (`Tarkov/GameWorld/Quests/QuestManager.cs`) — reads active quests from
+  local player profile via scatter reads; resolves `ConditionZone`/`ConditionVisitPlace`
+  conditions per map; rate-limited 2s refresh; exposes `LocationConditions` list and
+  `IsItemRequired(bsgId)` for loot integration
+- [x] **QuestLocation** (`Tarkov/GameWorld/Quests/QuestLocation.cs`) — quest zone data model
+  with `Draw()` (gold dot + name label) and `DrawOutlineProjected()` (polygon outline on radar)
+- [x] **TaskElement** (`Misc/Data/TaskElement.cs`) — task/condition data model (task ID,
+  trader, map filter, required keys, Kappa flag)
+- [x] **QuestPanel** (`UI/Panels/QuestPanel.cs`) — ImGui panel with trader-grouped quest list,
+  per-map filter, required keys display, optional objective toggle; opened with Q hotkey
+- [x] **LobbyQuestReader** (`DMA/LobbyQuestReader.cs`) — background reader for quest data
+  while in lobby; started/stopped with Memory lifecycle; `InvalidateCache()` on game stop
+- [x] **LocalPlayer.ProfilePtr** — stored during player discovery for QuestManager initialization
+- [x] **Memory integration** — `Memory.QuestManager` + `Memory.QuestLocations` accessors;
+  `LobbyQuestReader.Start/Stop/InvalidateCache` wired to `GameStarted`/`GameStopped` events
+- [x] **LocalGameWorld integration** — `QuestManager` initialized when local player confirmed;
+  `Refresh()` called in `DoSecondaryWork` (rate-limited internally to 2s)
+- [x] **Radar rendering** — quest zone layer drawn after containers; respects `BattleMode`
+  and `ShowQuests` config; outline polygon rendered behind marker; optional zones filtered
+- [x] **LootFilter integration** — `Evaluate()` checks `QuestManager.IsItemRequired(bsgId)`
+  and flags matching items as `Important + QuestRequired` (shown highlighted on radar/aimview)
+- [x] **SKPaints** — `PaintQuest`, `TextQuest`, `PaintQuestOutlineFill`, `PaintQuestOutlineStroke`
+  (gold/amber theme)
+- [x] **Unity layout constants** — `ManagedList`, `ManagedArray`, `MongoID`, `IL2CPPHashSet`
+  added to `Unity.cs` for QuestManager scatter reads
+- [x] **Config** — `ShowQuests`, `QuestKappaFilter`, `QuestShowOptional`, `QuestShowNames`,
+  `QuestShowDistance`, `ShowQuestPanel`, `QuestBlacklist` in `SilkConfig`
+- [x] **SettingsPanel** — Quest section with Kappa-only, show optional, show names,
+  show distance toggles
+- [x] **RadarWindow** — Q hotkey toggles QuestPanel; Escape closes QuestPanel;
+  `ShowQuestPanel` persisted to config
+- [x] **GlobalUsings** — `eft_dma_radar.Silk.Tarkov.GameWorld.Quests` added
+
+### 5G. Hot-Path Performance Optimizations ✅
+- [x] **LootItem.IsImportant cached** — replaced per-call `LootFilter.GetDisplayPrice` +
+  `LootFilter.IsImportant` recomputation with a cached `_cachedImportant` bool field;
+  `RefreshImportance()` called once after construction in `LootManager.ResolveLootBatched`;
+  eliminates O(doors × loot) redundant price calculations in `Door.UpdateNearLootFlag` per
+  registration worker tick
+- [x] **LootWidget LootGroup object pooling** — replaced per-frame `new LootGroup()` heap
+  allocations with a pool (`_groupPool` list + `_groupPoolIndex` reset pattern); zero
+  allocations after warm-up; `RentGroup()` grows pool to high-water mark automatically
+- [x] **LootWidget static color fields** — extracted all inline `new Vector4(r,g,b,a)`
+  ImGui color literals to `static readonly` fields (`ColorDistLabel`, `ColorDimLabel`,
+  `ColorDimQty`, `ColorDimDash`); eliminates per-row struct construction in tight table loops
+- [x] **LootWidget distance/overflow string caching** — `LootGroup.DistText` property caches
+  formatted distance string (only reallocates when distance int changes); overflow message
+  cached in `_lastOverflow`/`_overflowText` fields
+- [x] **LootContainer distance string caching** — added `_cachedDistVal`/`_cachedDistText`
+  fields matching the Door/Exfil pattern; eliminates per-frame `$"{(int)dist}m"` allocation
+- [x] **RadarWindow container loop** — pass `0f` directly to `container.Draw()` when
+  `showDistance=false` instead of computing `Vector3.Distance` for every container
 
 ## Phase 6 — Color Picker, Theming & Advanced UI
 > Customizable colors and additional panels.
@@ -610,7 +664,7 @@ and hideout stash/area reading with persistent data across raid transitions.
 
 ---
 
-## File Structure (current — 80 source files, ~19.9K LOC)
+## File Structure (current — 85 source files, ~21.5K LOC)
 
 ```
 src-silk/
@@ -618,6 +672,7 @@ src-silk/
 │   ├── Memory.cs                          ← Standalone DMA layer (state machine, worker, R/W API)
 │   ├── InputManager.cs                    ← DMA-based keyboard input (~100 Hz, Win10/Win11)
 │   ├── HotkeyManager.cs                   ← Configurable hotkey bindings + rebind support
+│   ├── LobbyQuestReader.cs                ← Background quest reader for lobby (lifecycle-managed)
 │   └── ScatterAPI/                        ← Scatter read/write API
 │       ├── IScatterEntry.cs
 │       ├── MemPointer.cs
@@ -671,9 +726,12 @@ src-silk/
 │       │   ├── ExfilStatus.cs             ← Closed/Pending/Open/Countdown enum
 │       │   ├── ExfilNames.cs              ← Per-map friendly name mappings (FrozenDictionary)
 │       │   └── MapNames.cs                ← Map ID → display name mapping
-│       └── Interactables/
-│           ├── InteractablesManager.cs    ← Door discovery + state refresh
-│           └── Door.cs                    ← Keyed door: state, key identity, near-loot flag
+│       ├── Interactables/
+│       │   ├── InteractablesManager.cs    ← Door discovery + state refresh
+│       │   └── Door.cs                    ← Keyed door: state, key identity, near-loot flag
+│       └── Quests/
+│           ├── QuestManager.cs            ← Scatter-based quest reader, zone resolver, item filter
+│           └── QuestLocation.cs           ← Quest zone: dot + outline polygon rendering
 ├── Config/
 │   └── SilkConfig.cs                      ← JSON config + Validate() + debounced save
 ├── Misc/
@@ -687,16 +745,18 @@ src-silk/
 │   │   └── SharedArray.cs                 ← Pooled buffer with struct Enumerator
 │   └── Data/
 │       ├── EftDataManager.cs              ← Embedded item + map database (FrozenDictionary)
-│       └── TarkovMarketItem.cs            ← Item model with 9 category helpers
+│       ├── TarkovMarketItem.cs            ← Item model with 9 category helpers
+│       └── TaskElement.cs                 ← Quest task/condition data model
 ├── UI/
 │   ├── RadarWindow.cs                     ← Silk.NET window, SkiaSharp GPU + ImGui overlay
 │   ├── SKPaints.cs                        ← Immutable per-type paints, shadows, wishlist colors
 │   ├── CustomFonts.cs                     ← Embedded font loading
 │   ├── Panels/
-│   │   ├── SettingsPanel.cs               ← ImGui settings (General, Players, Loot, Map tabs)
+│   │   ├── SettingsPanel.cs               ← ImGui settings (General, Players, Loot, Map, Quest tabs)
 │   │   ├── LootFiltersPanel.cs            ← Wishlist/blacklist/category filter editor (ImGui)
 │   │   ├── HideoutPanel.cs                ← Stash items, area upgrades, search/sort/group (ImGui)
-│   │   └── HotkeyManagerPanel.cs          ← Standalone hotkey editing panel (rebind + clear)
+│   │   ├── HotkeyManagerPanel.cs          ← Standalone hotkey editing panel (rebind + clear)
+│   │   └── QuestPanel.cs                  ← Quest list grouped by trader, map filter, keys display
 │   ├── Widgets/
 │   │   ├── PlayerInfoWidget.cs            ← Human hostile table + column-aligned tooltips
 │   │   ├── LootWidget.cs                  ← Sortable loot table with wishlist coloring (ImGui)

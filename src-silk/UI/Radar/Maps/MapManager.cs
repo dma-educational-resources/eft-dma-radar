@@ -82,6 +82,19 @@ namespace eft_dma_radar.Silk.UI.Radar.Maps
         }
 
         /// <summary>
+        /// Returns <c>true</c> if the given map ID is a known/valid map in our config set.
+        /// Used by <see cref="LocalGameWorld.Create"/> to reject menu/narrate GameWorlds
+        /// that have no real LocationId.
+        /// </summary>
+        internal static bool IsKnownMap(string mapId)
+        {
+            if (string.IsNullOrEmpty(mapId))
+                return false;
+
+            return _configs.ContainsKey(mapId);
+        }
+
+        /// <summary>
         /// Kicks off a background load for the map matching <paramref name="mapId"/>.
         /// Returns immediately — the render thread should check <see cref="IsLoading"/>
         /// and <see cref="Map"/> each frame. No-ops if the requested map is already

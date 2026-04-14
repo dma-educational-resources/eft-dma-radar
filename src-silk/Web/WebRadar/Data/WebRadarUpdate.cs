@@ -13,5 +13,9 @@ namespace eft_dma_radar.Silk.Web.WebRadar.Data
 
         public WebRadarMapInfo? Map { get; set; }
         public WebRadarPlayer[]? Players { get; set; }
+        public WebRadarLootItem[]? Loot { get; set; }
+        public WebRadarCorpse[]? Corpses { get; set; }
+        public WebRadarContainer[]? Containers { get; set; }
+        public WebRadarExfil[]? Exfils { get; set; }
     }
 }

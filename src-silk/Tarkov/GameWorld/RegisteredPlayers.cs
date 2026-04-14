@@ -180,6 +180,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             // TransformInternal/Vertices/Indices are identical — no separate fields needed.
             // This flag simply tracks whether the look transform has been synced.
             public volatile bool LookTransformReady;
+
+            // Cached PWA _isAiming address (local player only) — set once during discovery,
+            // batched into the realtime scatter so the ADS state is read without extra DMA calls.
+            public ulong IsAimingAddr;
+
+            // Per-player skeleton — created on the registration worker, updated on the camera worker.
+            // Written by registration/camera worker, read by render thread — volatile on the skeleton ref
+            // ensures cross-core visibility.
+            public volatile Player.Skeleton? Skeleton;
         }
 
         #endregion
@@ -511,6 +520,90 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 }
             }
         }
+
+        #endregion
+
+        #region Skeleton
+
+        // Skeleton init is expensive (~96 sequential DMA reads per player) — limit to once per 500ms.
+        private DateTime _nextSkeletonInit;
+        private static readonly TimeSpan SkeletonInitInterval = TimeSpan.FromMilliseconds(500);
+
+        /// <summary>
+        /// Attempts to initialize skeletons for players that don't have one yet.
+        /// Rate-limited to avoid hammering DMA with pointer chain walks every tick.
+        /// Called from the camera worker.
+        /// </summary>
+        internal void TryInitSkeletons()
+        {
+            var now = DateTime.UtcNow;
+            if (now < _nextSkeletonInit)
+                return;
+            _nextSkeletonInit = now + SkeletonInitInterval;
+
+            foreach (var kvp in _players)
+            {
+                var entry = kvp.Value;
+                if (!entry.Player.IsActive || !entry.Player.IsAlive)
+                    continue;
+
+                // Skip the local player — we don't draw skeleton for ourselves
+                if (entry.Player.IsLocalPlayer)
+                    continue;
+
+                // Already has a skeleton
+                if (entry.Skeleton is not null)
+                    continue;
+
+                // Need a valid transform first (position must be working)
+                if (!entry.TransformReady)
+                    continue;
+
+                entry.Skeleton = Player.Skeleton.TryCreate(entry.Base, entry.IsObserved);
+
+                // Sync to Player for O(1) render-thread access
+                if (entry.Skeleton is not null)
+                    entry.Player.Skeleton = entry.Skeleton;
+            }
+        }
+
+        /// <summary>
+        /// Updates all active player skeleton bone positions via a single batched DMA scatter.
+        /// Called from the camera worker thread.
+        /// </summary>
+        internal void UpdateSkeletons()
+        {
+            // Collect active skeletons
+            int count = 0;
+            Player.Skeleton?[] skeletons = _skeletonUpdateBuf;
+            foreach (var kvp in _players)
+            {
+                var entry = kvp.Value;
+                if (!entry.Player.IsActive || !entry.Player.IsAlive)
+                    continue;
+
+                var skeleton = entry.Skeleton;
+                if (skeleton is null || !skeleton.TransformsReady)
+                    continue;
+
+                if (count < skeletons.Length)
+                    skeletons[count++] = skeleton;
+            }
+
+            if (count == 0)
+                return;
+
+            // Single scatter for ALL bone vertex arrays across ALL players
+            Player.Skeleton.UpdateBonePositionsBatched(skeletons.AsSpan(0, count));
+
+            // Clear refs to avoid holding them across ticks
+            Array.Clear(skeletons, 0, count);
+        }
+
+        // Reusable buffer for skeleton update — avoids per-tick allocation
+        private readonly Player.Skeleton?[] _skeletonUpdateBuf = new Player.Skeleton?[MaxPlayerCount];
+
+
 
         #endregion
     }

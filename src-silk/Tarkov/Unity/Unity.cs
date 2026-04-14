@@ -39,6 +39,31 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
 
         // ── ModuleBase (UnityPlayer.dll offsets) ────────────────────────────
         public const uint GomFallback        = 0x1A233A0;  // UnityPlayer.dll Dec 2025
+        public const uint AllCameras         = 0x19F3080;  // AllCameras static (Dec 2025)
+
+        // ── ObjectClass helpers ──────────────────────────────────────────────
+        public static class ObjectClass
+        {
+            /// <summary>ObjectClass + 0x10 → MonoBehaviour.</summary>
+            public const uint MonoBehaviourOffset = 0x10;
+        }
+
+        // ── Camera struct offsets (sig-scanned at runtime, fallback values) ──
+        public static class Camera
+        {
+            /// <summary>Camera + offset → 4×4 ViewProjection matrix (Matrix4x4).</summary>
+            public static uint ViewMatrix = 0x128;
+
+            /// <summary>Camera + offset → Field of View (float, degrees).</summary>
+            public static uint FOV = 0x1A8;
+
+            /// <summary>Camera + offset → Aspect Ratio (float).</summary>
+            public static uint AspectRatio = 0x518;
+
+            /// <summary>IsAdded offset after +0x10 dereference (DEC 2025).</summary>
+            public const uint DerefIsAddedOffset = 0x35;
+        }
+
         // ── Il2Cpp generic List<T> layout ────────────────────────────────────
         public static class List
         {

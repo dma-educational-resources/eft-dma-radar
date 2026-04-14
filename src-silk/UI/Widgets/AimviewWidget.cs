@@ -1,4 +1,5 @@
 using ImGuiNET;
+using Skeleton = eft_dma_radar.Silk.Tarkov.GameWorld.Player.Skeleton;
 
 namespace eft_dma_radar.Silk.UI.Widgets
 {
@@ -120,45 +121,51 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 eyePos = new Vector3(localPlayer.Position.X, localPlayer.Position.Y + config.AimviewEyeHeight, localPlayer.Position.Z);
             }
 
-            float yaw = localPlayer.RotationYaw * (MathF.PI / 180f);
-            float pitch = localPlayer.RotationPitch * (MathF.PI / 180f); // EFT: positive = looking down
-
-            (float sy, float cy) = MathF.SinCos(yaw);
-            (float sp, float cp) = MathF.SinCos(pitch);
-
-            // Basis vectors (matches Lone's construction)
-            var forward = Vector3.Normalize(new Vector3(sy * cp, -sp, cy * cp));
-            var right = Vector3.Normalize(new Vector3(cy, 0f, -sy));
-            var up = -Vector3.Normalize(Vector3.Cross(right, forward));
-
             int widgetW = (int)contentSize.X;
             int widgetH = (int)contentSize.Y;
-            float zoom = config.AimviewZoom;
             float maxPlayerDist = config.AimviewPlayerDistance;
             float maxLootDist = config.AimviewLootDistance;
+
+            // ── Advanced mode: real game camera via CameraManager ──
+            bool useAdvanced = config.UseAdvancedAimview && CameraManager.IsActive && CameraManager.ViewportWidth > 0;
+
+            // Build projection context — captures all state needed by TryProjectCtx
+            var projCtx = new ProjectionContext
+            {
+                ContentMin = contentMin,
+                ContentMax = contentMax,
+                WidgetW = widgetW,
+                WidgetH = widgetH,
+                UseAdvanced = useAdvanced,
+            };
+
+            if (!useAdvanced)
+            {
+                float yaw = localPlayer.RotationYaw * (MathF.PI / 180f);
+                float pitch = localPlayer.RotationPitch * (MathF.PI / 180f); // EFT: positive = looking down
+
+                (float sy, float cy) = MathF.SinCos(yaw);
+                (float sp, float cp) = MathF.SinCos(pitch);
+
+                projCtx.Forward = Vector3.Normalize(new Vector3(sy * cp, -sp, cy * cp));
+                projCtx.Right = Vector3.Normalize(new Vector3(cy, 0f, -sy));
+                projCtx.Up = -Vector3.Normalize(Vector3.Cross(projCtx.Right, projCtx.Forward));
+                projCtx.Zoom = config.AimviewZoom;
+            }
 
             // ── Draw order: loot/corpses/containers first, players on top ──
 
             // 1) Loot items — collect, sort by distance (far→near), cap count
             if (config.AimviewShowLoot && config.ShowLoot)
-            {
-                DrawLoot(drawList, eyePos, forward, right, up,
-                    contentMin, widgetW, widgetH, contentMax, zoom, maxLootDist);
-            }
+                DrawLootItems(drawList, eyePos, ref projCtx, maxLootDist);
 
             // 1b) Corpses
             if (config.AimviewShowCorpses)
-            {
-                DrawCorpses(drawList, eyePos, forward, right, up,
-                    contentMin, widgetW, widgetH, contentMax, zoom, maxLootDist);
-            }
+                DrawCorpseItems(drawList, eyePos, ref projCtx, maxLootDist);
 
             // 1c) Static containers
             if (config.AimviewShowContainers && config.ShowContainers)
-            {
-                DrawContainers(drawList, eyePos, forward, right, up,
-                    contentMin, widgetW, widgetH, contentMax, zoom, maxLootDist);
-            }
+                DrawContainerItems(drawList, eyePos, ref projCtx, maxLootDist);
 
             // 2) Players — always on top
             if (allPlayers is not null)
@@ -173,35 +180,64 @@ namespace eft_dma_radar.Silk.UI.Widgets
                     if (dist > maxPlayerDist || dist < 0.5f)
                         continue;
 
-                    if (!TryProject(worldPos, eyePos, forward, right, up,
-                            contentMin, widgetW, widgetH, contentMax, zoom, out float screenX, out float screenY))
+                    float screenX, screenY;
+                    bool projected;
+
+                    projected = TryProjectCtx(worldPos, eyePos, ref projCtx, out screenX, out screenY);
+
+                    if (!projected)
                         continue;
 
                     uint color = GetPlayerColor(player);
 
-                    float dotRadius = float.Clamp(6f - dist * 0.015f, 2f, 6f);
-                    drawList.AddCircleFilled(new Vector2(screenX, screenY), dotRadius, color);
-                    drawList.AddCircle(new Vector2(screenX, screenY), dotRadius, _colorDotOutline);
+                    // Draw skeleton bones in advanced mode — replaces the dot when available
+                    bool drewSkeleton = false;
+                    if (projCtx.UseAdvanced)
+                    {
+                        var skeleton = player.Skeleton;
+                        if (skeleton is not null && skeleton.IsInitialized)
+                        {
+                            // Project bones to screen space (pure math, no DMA)
+                            skeleton.UpdateScreenBuffer(projCtx.ContentMin, projCtx.WidgetW, projCtx.WidgetH);
+                            if (skeleton.HasScreenData)
+                            {
+                                DrawSkeletonBones(drawList, skeleton, projCtx.ContentMin, projCtx.ContentMax, color);
+                                drewSkeleton = true;
+                            }
+                        }
+                    }
+
+                    // Fall back to dot when skeleton isn't available (synthetic mode or skeleton not ready)
+                    float labelOffset;
+                    if (!drewSkeleton)
+                    {
+                        float dotRadius = float.Clamp(6f - dist * 0.015f, 2f, 6f);
+                        drawList.AddCircleFilled(new Vector2(screenX, screenY), dotRadius, color);
+                        drawList.AddCircle(new Vector2(screenX, screenY), dotRadius, _colorDotOutline);
+                        labelOffset = dotRadius + 2f;
+                    }
+                    else
+                    {
+                        labelOffset = 4f;
+                    }
 
                     string label = $"{player.Name} ({(int)dist}m)";
-                    DrawLabel(drawList, label, screenX, screenY, dotRadius + 2f, color,
-                        contentMin, contentMax);
+                    DrawLabel(drawList, label, screenX, screenY, labelOffset, color,
+                        projCtx.ContentMin, projCtx.ContentMax);
                 }
             }
 
-            drawList.AddRect(contentMin, contentMax, _colorBorder);
+            drawList.AddRect(projCtx.ContentMin, projCtx.ContentMax, _colorBorder);
             ImGui.End();
         }
 
         /// <summary>
-        /// Collect visible loot, sort by distance (far→near), draw markers then labels
-        /// with vertical deconfliction so nearby items don't overlap.
+        /// Collect visible loot, sort by distance (far→near), draw diamond markers then labels.
+        /// Unified for both synthetic and advanced projection modes.
         /// </summary>
-        private static void DrawLoot(
+        private static void DrawLootItems(
             ImDrawListPtr drawList, Vector3 eyePos,
-            Vector3 forward, Vector3 right, Vector3 up,
-            Vector2 contentMin, int widgetW, int widgetH, Vector2 contentMax,
-            float zoom, float maxDistance)
+            ref ProjectionContext ctx, float maxDistance)
         {
             var loot = Memory.Loot;
             if (loot is null)
@@ -221,8 +257,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 if (dist > maxDistance || dist < 0.3f)
                     continue;
 
-                if (!TryProject(worldPos, eyePos, forward, right, up,
-                        contentMin, widgetW, widgetH, contentMax, zoom, out float sx, out float sy))
+                if (!TryProjectCtx(worldPos, eyePos, ref ctx, out float sx, out float sy))
                     continue;
 
                 uint color = result.Wishlisted ? _colorLootWishlist
@@ -239,13 +274,9 @@ namespace eft_dma_radar.Silk.UI.Widgets
             if (count == 0)
                 return;
 
-            // Sort far→near so closer items draw on top; prefer important items
             SortProjected(_lootBuf.AsSpan(0, count));
-
-            // Cap visible count
             int visible = Math.Min(count, MaxVisibleLoot);
 
-            // Pass 1: draw all markers
             for (int i = 0; i < visible; i++)
             {
                 ref var p = ref _lootBuf[i];
@@ -261,7 +292,6 @@ namespace eft_dma_radar.Silk.UI.Widgets
                     _colorDotOutline);
             }
 
-            // Pass 2: draw labels with vertical deconfliction
             int usedCount = 0;
             for (int i = 0; i < visible; i++)
             {
@@ -269,19 +299,18 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 float half = float.Clamp(4.5f - p.Dist * 0.1f, 2.5f, 4.5f);
                 float baseY = p.ScreenY + half + 2f;
                 float labelY = DeconflictY(baseY, _usedLabelYs, ref usedCount,
-                    contentMin.Y + 2, contentMax.Y - LabelLineHeight - 2);
-                DrawLabelAt(drawList, p.Label, p.ScreenX, labelY, p.Color, contentMin, contentMax);
+                    ctx.ContentMin.Y + 2, ctx.ContentMax.Y - LabelLineHeight - 2);
+                DrawLabelAt(drawList, p.Label, p.ScreenX, labelY, p.Color, ctx.ContentMin, ctx.ContentMax);
             }
         }
 
         /// <summary>
         /// Collect visible corpses, sort by distance, draw X markers then labels.
+        /// Unified for both synthetic and advanced projection modes.
         /// </summary>
-        private static void DrawCorpses(
+        private static void DrawCorpseItems(
             ImDrawListPtr drawList, Vector3 eyePos,
-            Vector3 forward, Vector3 right, Vector3 up,
-            Vector2 contentMin, int widgetW, int widgetH, Vector2 contentMax,
-            float zoom, float maxDistance)
+            ref ProjectionContext ctx, float maxDistance)
         {
             var corpses = Memory.Corpses;
             if (corpses is null)
@@ -296,8 +325,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 if (dist > maxDistance || dist < 0.3f)
                     continue;
 
-                if (!TryProject(worldPos, eyePos, forward, right, up,
-                        contentMin, widgetW, widgetH, contentMax, zoom, out float sx, out float sy))
+                if (!TryProjectCtx(worldPos, eyePos, ref ctx, out float sx, out float sy))
                     continue;
 
                 string label = corpse.TotalValue > 0
@@ -305,7 +333,6 @@ namespace eft_dma_radar.Silk.UI.Widgets
                     : corpse.Name;
 
                 _corpseBuf[count++] = new ProjectedItem(sx, sy, dist, corpse.TotalValue, _colorCorpse, label);
-
                 if (count >= _corpseBuf.Length)
                     break;
             }
@@ -316,7 +343,6 @@ namespace eft_dma_radar.Silk.UI.Widgets
             SortProjected(_corpseBuf.AsSpan(0, count));
             int visible = Math.Min(count, MaxVisibleCorpses);
 
-            // Draw X markers
             for (int i = 0; i < visible; i++)
             {
                 ref var p = ref _corpseBuf[i];
@@ -328,7 +354,6 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 drawList.AddLine(pos + new Vector2(-s, s), pos + new Vector2(s, -s), _colorCorpse, 1.5f);
             }
 
-            // Draw labels with deconfliction
             int usedCount = 0;
             for (int i = 0; i < visible; i++)
             {
@@ -336,19 +361,18 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 float s = float.Clamp(4f - p.Dist * 0.08f, 2.5f, 4f);
                 float baseY = p.ScreenY + s + 2f;
                 float labelY = DeconflictY(baseY, _usedLabelYs, ref usedCount,
-                    contentMin.Y + 2, contentMax.Y - LabelLineHeight - 2);
-                DrawLabelAt(drawList, p.Label, p.ScreenX, labelY, p.Color, contentMin, contentMax);
+                    ctx.ContentMin.Y + 2, ctx.ContentMax.Y - LabelLineHeight - 2);
+                DrawLabelAt(drawList, p.Label, p.ScreenX, labelY, p.Color, ctx.ContentMin, ctx.ContentMax);
             }
         }
 
         /// <summary>
         /// Collect visible containers, sort by distance, draw square markers then labels.
+        /// Unified for both synthetic and advanced projection modes.
         /// </summary>
-        private static void DrawContainers(
+        private static void DrawContainerItems(
             ImDrawListPtr drawList, Vector3 eyePos,
-            Vector3 forward, Vector3 right, Vector3 up,
-            Vector2 contentMin, int widgetW, int widgetH, Vector2 contentMax,
-            float zoom, float maxDistance)
+            ref ProjectionContext ctx, float maxDistance)
         {
             var containers = Memory.Containers;
             if (containers is null)
@@ -371,13 +395,11 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 if (dist > maxDistance || dist < 0.3f)
                     continue;
 
-                if (!TryProject(worldPos, eyePos, forward, right, up,
-                        contentMin, widgetW, widgetH, contentMax, zoom, out float sx, out float sy))
+                if (!TryProjectCtx(worldPos, eyePos, ref ctx, out float sx, out float sy))
                     continue;
 
                 string label = $"{container.Name} ({(int)dist}m)";
                 _containerBuf[count++] = new ProjectedItem(sx, sy, dist, 0, _colorContainer, label);
-
                 if (count >= _containerBuf.Length)
                     break;
             }
@@ -388,7 +410,6 @@ namespace eft_dma_radar.Silk.UI.Widgets
             SortProjected(_containerBuf.AsSpan(0, count));
             int visible = Math.Min(count, MaxVisibleContainers);
 
-            // Draw square markers
             for (int i = 0; i < visible; i++)
             {
                 ref var p = ref _containerBuf[i];
@@ -400,7 +421,6 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 drawList.AddRect(tl, br, _colorContainer, 0f, ImDrawFlags.None, 1.4f);
             }
 
-            // Draw labels with deconfliction
             int usedCount = 0;
             for (int i = 0; i < visible; i++)
             {
@@ -408,8 +428,8 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 float half = float.Clamp(3.5f - p.Dist * 0.06f, 2f, 3.5f);
                 float baseY = p.ScreenY + half + 2f;
                 float labelY = DeconflictY(baseY, _usedLabelYs, ref usedCount,
-                    contentMin.Y + 2, contentMax.Y - LabelLineHeight - 2);
-                DrawLabelAt(drawList, p.Label, p.ScreenX, labelY, p.Color, contentMin, contentMax);
+                    ctx.ContentMin.Y + 2, ctx.ContentMax.Y - LabelLineHeight - 2);
+                DrawLabelAt(drawList, p.Label, p.ScreenX, labelY, p.Color, ctx.ContentMin, ctx.ContentMax);
             }
         }
 
@@ -432,40 +452,98 @@ namespace eft_dma_radar.Silk.UI.Widgets
         };
 
         /// <summary>
-        /// Projects a world position into widget screen coordinates using Lone-style
-        /// simple perspective divide (no explicit FOV/aspect parameters).
-        /// Returns false if behind camera or outside the clipped content area.
+        /// Draws skeleton bone lines from the pre-computed screen buffer.
+        /// The buffer contains 26 points (13 segments × 2 endpoints), drawn as line pairs.
+        /// Clips to the content area to avoid rendering outside the widget.
+        /// </summary>
+        private static void DrawSkeletonBones(
+            ImDrawListPtr drawList, Skeleton skeleton,
+            Vector2 contentMin, Vector2 contentMax, uint playerColor)
+        {
+            var buf = skeleton.ScreenBuffer;
+            float minX = contentMin.X - 10;
+            float maxX = contentMax.X + 10;
+            float minY = contentMin.Y - 10;
+            float maxY = contentMax.Y + 10;
+
+            for (int i = 0; i < Skeleton.JOINTS_COUNT; i += 2)
+            {
+                var a = buf[i];
+                var b = buf[i + 1];
+
+                // Skip degenerate segments (both endpoints at the same fallback position)
+                if (MathF.Abs(a.X - b.X) < 0.5f && MathF.Abs(a.Y - b.Y) < 0.5f)
+                    continue;
+
+                // Clip check — skip segments entirely outside the widget
+                if ((a.X < minX && b.X < minX) || (a.X > maxX && b.X > maxX) ||
+                    (a.Y < minY && b.Y < minY) || (a.Y > maxY && b.Y > maxY))
+                    continue;
+
+                drawList.AddLine(a, b, playerColor, 1.5f);
+            }
+        }
+
+        /// <summary>
+        /// Captures all projection state needed for both synthetic and advanced modes.
+        /// Passed by ref to avoid copying 96 bytes of Vector3 fields.
+        /// </summary>
+        private struct ProjectionContext
+        {
+            public Vector2 ContentMin, ContentMax;
+            public int WidgetW, WidgetH;
+            public bool UseAdvanced;
+            // Synthetic mode fields
+            public Vector3 Forward, Right, Up;
+            public float Zoom;
+        }
+
+        /// <summary>
+        /// Unified projection — dispatches to synthetic or advanced based on context.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool TryProject(
+        private static bool TryProjectCtx(
             Vector3 worldPos, Vector3 eyePos,
-            Vector3 forward, Vector3 right, Vector3 up,
-            Vector2 contentMin, int widgetW, int widgetH, Vector2 contentMax,
-            float zoom,
+            ref ProjectionContext ctx,
             out float screenX, out float screenY)
         {
-            var dir = worldPos - eyePos;
-            float dz = Vector3.Dot(dir, forward);
-            if (dz <= 0f)
+            if (ctx.UseAdvanced)
             {
-                screenX = screenY = 0;
-                return false;
+                if (!CameraManager.WorldToScreen(ref worldPos, out var scrPos))
+                {
+                    screenX = screenY = 0;
+                    return false;
+                }
+
+                float nx = scrPos.X / CameraManager.ViewportWidth;
+                float ny = scrPos.Y / CameraManager.ViewportHeight;
+                screenX = ctx.ContentMin.X + nx * ctx.WidgetW;
+                screenY = ctx.ContentMin.Y + ny * ctx.WidgetH;
+            }
+            else
+            {
+                var dir = worldPos - eyePos;
+                float dz = Vector3.Dot(dir, ctx.Forward);
+                if (dz <= 0f)
+                {
+                    screenX = screenY = 0;
+                    return false;
+                }
+
+                float dx = Vector3.Dot(dir, ctx.Right);
+                float dy = Vector3.Dot(dir, ctx.Up);
+
+                float nxS = dx / dz * ctx.Zoom;
+                float nyS = dy / dz * ctx.Zoom;
+
+                float halfW = ctx.WidgetW * 0.5f;
+                float halfH = ctx.WidgetH * 0.5f;
+                screenX = ctx.ContentMin.X + halfW + nxS * halfW;
+                screenY = ctx.ContentMin.Y + halfH - nyS * halfH;
             }
 
-            float dx = Vector3.Dot(dir, right);
-            float dy = Vector3.Dot(dir, up);
-
-            // Simple perspective divide with zoom (1.0 = ~90° FOV, higher = narrower)
-            float nx = dx / dz * zoom;
-            float ny = dy / dz * zoom;
-
-            float halfW = widgetW * 0.5f;
-            float halfH = widgetH * 0.5f;
-            screenX = contentMin.X + halfW + nx * halfW;
-            screenY = contentMin.Y + halfH - ny * halfH;
-
-            return screenX >= contentMin.X - 20 && screenX <= contentMax.X + 20 &&
-                   screenY >= contentMin.Y - 20 && screenY <= contentMax.Y + 20;
+            return screenX >= ctx.ContentMin.X - 20 && screenX <= ctx.ContentMax.X + 20 &&
+                   screenY >= ctx.ContentMin.Y - 20 && screenY <= ctx.ContentMax.Y + 20;
         }
 
         /// <summary>

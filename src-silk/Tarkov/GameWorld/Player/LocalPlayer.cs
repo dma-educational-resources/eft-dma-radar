@@ -33,6 +33,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// <summary>Profile pointer (used by QuestManager to read quest data).</summary>
         public ulong ProfilePtr { get; set; }
 
+        /// <summary>
+        /// ProceduralWeaponAnimation pointer — resolved at player creation,
+        /// used by <see cref="CameraManager"/> for scope detection.
+        /// </summary>
+        public ulong PWA { get; set; }
+
+        /// <summary>Whether the local player is currently Aiming Down Sights.</summary>
+        public bool IsADS { get; set; }
+
         protected override (SKPaint dot, SKPaint text, SKPaint chevron, SKPaint aimline) GetPaints()
         {
             return (SKPaints.PaintLocalPlayer, SKPaints.TextLocalPlayer, SKPaints.ChevronLocalPlayer, SKPaints.AimlineLocalPlayer);

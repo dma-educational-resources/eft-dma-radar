@@ -43,6 +43,7 @@
 
   <div class="tabbar">
     <div class="tab active" data-tab="players">Players</div>
+    <div class="tab" data-tab="loot">Loot</div>
     <div class="tab" data-tab="general">General</div>
   </div>
 
@@ -92,6 +93,80 @@
     </div>
   </div>
 
+  <!-- ── Loot Tab ── -->
+  <div class="tab-content" id="loot">
+    <div class="section">
+      <h3>Loot</h3>
+      <label>
+        Show Loot
+        <span class="toggle-switch"><input type="checkbox" id="showLoot"><span class="slider"></span></span>
+      </label>
+      <label>
+        Min Price
+        <span class="range-wrap">
+          <input type="range" id="lootMinPrice" min="0" max="500000" step="5000">
+          <span class="range-val" id="lootMinPriceVal">50K</span>
+        </span>
+      </label>
+      <label>
+        Loot Names
+        <span class="toggle-switch"><input type="checkbox" id="showLootNames"><span class="slider"></span></span>
+      </label>
+    </div>
+
+    <div class="section">
+      <h3>Containers</h3>
+      <label>
+        Show Containers
+        <span class="toggle-switch"><input type="checkbox" id="showContainers"><span class="slider"></span></span>
+      </label>
+      <label>
+        Container Names
+        <span class="toggle-switch"><input type="checkbox" id="showContainerNames"><span class="slider"></span></span>
+      </label>
+      <label>
+        Max Distance
+        <span class="range-wrap">
+          <input type="range" id="containerMaxDist" min="0" max="500" step="10">
+          <span class="range-val" id="containerMaxDistVal">Off</span>
+        </span>
+      </label>
+      <details class="container-select">
+        <summary>Select Containers</summary>
+        <div class="row" id="containerBtns"></div>
+        <div class="container-list" id="containerList"></div>
+      </details>
+    </div>
+
+    <div class="section">
+      <h3>Corpses</h3>
+      <label>
+        Show Corpses
+        <span class="toggle-switch"><input type="checkbox" id="showCorpses"><span class="slider"></span></span>
+      </label>
+    </div>
+
+    <div class="section">
+      <h3>Exfils</h3>
+      <label>
+        Show Exfils
+        <span class="toggle-switch"><input type="checkbox" id="showExfils"><span class="slider"></span></span>
+      </label>
+    </div>
+
+    <div class="section">
+      <h3>Colors</h3>
+      <label>Loot <input type="color" id="lootColor"></label>
+      <label>Important <input type="color" id="lootImportantColor"></label>
+      <label>Wishlist <input type="color" id="lootWishlistColor"></label>
+      <label>Container <input type="color" id="containerColor"></label>
+      <label>Corpse <input type="color" id="corpseColor"></label>
+      <label>Exfil Open <input type="color" id="exfilOpenColor"></label>
+      <label>Exfil Pending <input type="color" id="exfilPendingColor"></label>
+      <label>Exfil Closed <input type="color" id="exfilClosedColor"></label>
+    </div>
+  </div>
+
   <!-- ── General Tab ── -->
   <div class="tab-content" id="general">
     <div class="section">
@@ -126,6 +201,7 @@
         <button class="small" id="centerOnLocal">Center on Local</button>
         <span class="badge mono" id="modeBadge">follow</span>
       </div>
+      <p class="hint">Double-click a player to follow them</p>
     </div>
 
     <div class="section">
@@ -133,6 +209,17 @@
       <label>
         Hover-open Sidebar
         <span class="toggle-switch"><input type="checkbox" id="hoverOpenSidebar"><span class="slider"></span></span>
+      </label>
+      <label>
+        Aimview
+        <span class="toggle-switch"><input type="checkbox" id="showAimview"><span class="slider"></span></span>
+      </label>
+      <label>
+        Aimview Size
+        <span class="range-wrap">
+          <input type="range" id="aimviewSize" min="150" max="500" step="10">
+          <span class="range-val" id="aimviewSizeVal">250</span>
+        </span>
       </label>
     </div>
 
@@ -145,6 +232,11 @@
       <div class="kv"><span>Map cache</span><span class="mono" id="mapCacheInfo">0</span></div>
     </div>
   </div>
+</div>
+
+<!-- Aimview widget (bottom-right) -->
+<div id="aimview" class="aimview hidden">
+  <canvas id="aimviewCanvas"></canvas>
 </div>
 
 <!-- Tooltip (populated via JS) -->

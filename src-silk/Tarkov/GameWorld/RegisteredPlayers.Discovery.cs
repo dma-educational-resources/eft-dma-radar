@@ -104,6 +104,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 {
                     TryInitTransform(playerBase, entry);
                     TryInitRotation(playerBase, entry);
+
+                    // Cache IsAiming address for batched scatter reads (CameraManager ADS detection)
+                    if (player is LocalPlayer lp2 && lp2.PWA != 0)
+                        entry.IsAimingAddr = lp2.PWA + Offsets.ProceduralWeaponAnimation._isAiming;
                 }
 
                 Log.WriteLine($"[RegisteredPlayers] Discovered: {player} @ 0x{playerBase:X} (class='{className}', observed={isObserved}, " +
@@ -144,6 +148,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                 // Store profile pointer for QuestManager
                 lp.ProfilePtr = profilePtr;
+
+                // Resolve ProceduralWeaponAnimation pointer (for CameraManager scope detection)
+                if (Memory.TryReadPtr(playerBase + Offsets.Player.ProceduralWeaponAnimation, out var pwa))
+                {
+                    lp.PWA = pwa;
+                    Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] LocalPlayer PWA @ 0x{pwa:X}");
+                }
 
                 // Entry point (PMC exfil eligibility)
                 if (lp.IsPmc)

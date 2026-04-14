@@ -6,6 +6,10 @@
 const canvas = document.getElementById("radar");
 const ctx    = canvas.getContext("2d", { alpha: true });
 
+const aimviewEl     = document.getElementById("aimview");
+const aimviewCanvas = document.getElementById("aimviewCanvas");
+const avCtx         = aimviewCanvas.getContext("2d", { alpha: true });
+
 const statusEl    = document.getElementById("status");
 const statusLabel = statusEl.querySelector(".label");
 const subline     = document.getElementById("subline");
@@ -113,6 +117,21 @@ const defaults = {
   showGroups: true,
   playerSize: 6,
 
+  showLoot: true,
+  showLootNames: true,
+  lootMinPrice: 50000,
+  showContainers: true,
+  showContainerNames: true,
+  containerMaxDist: 0,
+  selectedContainers: [],
+  showCorpses: true,
+  showExfils: true,
+  showAimview: false,
+  aimviewSize: 250,
+  aimviewX: null,
+  aimviewY: null,
+  followTarget: null,
+
   colors: {
     local:    "#22c55e",
     teammate: "#4ade80",
@@ -122,6 +141,14 @@ const defaults = {
     raider:   "#fb7185",
     boss:     "#ef4444",
     dead:     "#9ca3af",
+    loot:     "#a78bfa",
+    lootImportant: "#4ade80",
+    lootWishlist:  "#fbbf24",
+    container:     "#60a5fa",
+    corpse:        "#9ca3af",
+    exfilOpen:     "#4ade80",
+    exfilPending:  "#facc15",
+    exfilClosed:   "#f87171",
   }
 };
 
@@ -133,6 +160,7 @@ function mergeState(parsed) {
     ...parsed,
     colors: { ...deepClone(defaults.colors), ...(parsed.colors || {}) },
     zoom: clamp(Number(parsed.zoom) || 1, ZOOM_MIN, ZOOM_MAX),
+    selectedContainers: Array.isArray(parsed.selectedContainers) ? parsed.selectedContainers : [],
   };
 }
 
@@ -178,6 +206,8 @@ const inputs = {
   centerOnLocal:   $("centerOnLocal"),
   modeBadge:       $("modeBadge"),
   hoverOpenSidebar:$("hoverOpenSidebar"),
+  showAimview:     $("showAimview"),
+  aimviewSize:     $("aimviewSize"),
 
   showPlayers:     $("showPlayers"),
   showAim:         $("showAim"),
@@ -185,6 +215,15 @@ const inputs = {
   showHeight:      $("showHeight"),
   showGroups:      $("showGroups"),
   playerSize:      $("playerSize"),
+
+  showLoot:        $("showLoot"),
+  showLootNames:   $("showLootNames"),
+  lootMinPrice:    $("lootMinPrice"),
+  showContainers:  $('showContainers'),
+  showContainerNames: $('showContainerNames'),
+  containerMaxDist: $('containerMaxDist'),
+  showCorpses:     $('showCorpses'),
+  showExfils:      $("showExfils"),
 
   localColor:      $("localColor"),
   teammateColor:   $("teammateColor"),
@@ -194,6 +233,14 @@ const inputs = {
   raiderColor:     $("raiderColor"),
   bossColor:       $("bossColor"),
   deadColor:       $("deadColor"),
+  lootColor:       $("lootColor"),
+  lootImportantColor: $("lootImportantColor"),
+  lootWishlistColor:  $("lootWishlistColor"),
+  containerColor:  $("containerColor"),
+  corpseColor:     $("corpseColor"),
+  exfilOpenColor:  $("exfilOpenColor"),
+  exfilPendingColor: $("exfilPendingColor"),
+  exfilClosedColor:  $("exfilClosedColor"),
 
   resetSettings:   $("resetSettings"),
 };
@@ -203,6 +250,9 @@ const rangeValueEls = {
   playerSize: $("playerSizeVal"),
   zoom:       $("zoomVal"),
   pollMs:     $("pollMsVal"),
+  lootMinPrice: $("lootMinPriceVal"),
+  aimviewSize:  $("aimviewSizeVal"),
+  containerMaxDist: $("containerMaxDistVal"),
 };
 
 function updateRangeValue(key) {
@@ -213,6 +263,10 @@ function updateRangeValue(key) {
     el.textContent = Number(v).toFixed(2);
   } else if (key === "pollMs") {
     el.innerHTML = v + "<small>ms</small>";
+  } else if (key === "lootMinPrice") {
+    el.textContent = formatPrice(v);
+  } else if (key === "containerMaxDist") {
+    el.textContent = v <= 0 ? "Off" : v + "m";
   } else {
     el.textContent = v;
   }
@@ -241,6 +295,8 @@ function bindAllInputs() {
   bind(inputs.pollMs, "pollMs");
   bind(inputs.freeMode, "freeMode");
   bind(inputs.hoverOpenSidebar, "hoverOpenSidebar");
+  bind(inputs.showAimview, "showAimview");
+  bind(inputs.aimviewSize, "aimviewSize");
 
   bind(inputs.showPlayers, "showPlayers");
   bind(inputs.showAim, "showAim");
@@ -248,6 +304,15 @@ function bindAllInputs() {
   bind(inputs.showHeight, "showHeight");
   bind(inputs.showGroups, "showGroups");
   bind(inputs.playerSize, "playerSize");
+
+  bind(inputs.showLoot, "showLoot");
+  bind(inputs.showLootNames, "showLootNames");
+  bind(inputs.lootMinPrice, "lootMinPrice");
+  bind(inputs.showContainers, "showContainers");
+  bind(inputs.showContainerNames, "showContainerNames");
+  bind(inputs.containerMaxDist, "containerMaxDist");
+  bind(inputs.showCorpses, "showCorpses");
+  bind(inputs.showExfils, "showExfils");
 
   bind(inputs.localColor, "local", true);
   bind(inputs.teammateColor, "teammate", true);
@@ -257,6 +322,14 @@ function bindAllInputs() {
   bind(inputs.raiderColor, "raider", true);
   bind(inputs.bossColor, "boss", true);
   bind(inputs.deadColor, "dead", true);
+  bind(inputs.lootColor, "loot", true);
+  bind(inputs.lootImportantColor, "lootImportant", true);
+  bind(inputs.lootWishlistColor, "lootWishlist", true);
+  bind(inputs.containerColor, "container", true);
+  bind(inputs.corpseColor, "corpse", true);
+  bind(inputs.exfilOpenColor, "exfilOpen", true);
+  bind(inputs.exfilPendingColor, "exfilPending", true);
+  bind(inputs.exfilClosedColor, "exfilClosed", true);
 }
 
 function listen(el, key, isColor, transform) {
@@ -268,8 +341,7 @@ function listen(el, key, isColor, transform) {
     else state[key] = v;
     saveSettings();
     updateRangeValue(key);
-    if (key === "freeMode" && inputs.modeBadge)
-      inputs.modeBadge.textContent = state.freeMode ? "free" : "follow";
+    if (key === "freeMode") updateFollowBadge();
     if (key === "pollMs") startPolling();
   });
 }
@@ -280,6 +352,8 @@ listen(inputs.rotateWithLocal, "rotateWithLocal");
 listen(inputs.pollMs, "pollMs", false, Number);
 listen(inputs.freeMode, "freeMode");
 listen(inputs.hoverOpenSidebar, "hoverOpenSidebar");
+listen(inputs.showAimview, "showAimview");
+listen(inputs.aimviewSize, "aimviewSize", false, Number);
 
 listen(inputs.showPlayers, "showPlayers");
 listen(inputs.showAim, "showAim");
@@ -287,6 +361,15 @@ listen(inputs.showNames, "showNames");
 listen(inputs.showHeight, "showHeight");
 listen(inputs.showGroups, "showGroups");
 listen(inputs.playerSize, "playerSize", false, Number);
+
+listen(inputs.showLoot, "showLoot");
+listen(inputs.showLootNames, "showLootNames");
+listen(inputs.lootMinPrice, "lootMinPrice", false, Number);
+listen(inputs.showContainers, "showContainers");
+listen(inputs.showContainerNames, "showContainerNames");
+listen(inputs.containerMaxDist, "containerMaxDist", false, Number);
+listen(inputs.showCorpses, "showCorpses");
+listen(inputs.showExfils, "showExfils");
 
 listen(inputs.localColor, "local", true);
 listen(inputs.teammateColor, "teammate", true);
@@ -296,15 +379,61 @@ listen(inputs.pscavColor, "pscav", true);
 listen(inputs.raiderColor, "raider", true);
 listen(inputs.bossColor, "boss", true);
 listen(inputs.deadColor, "dead", true);
+listen(inputs.lootColor, "loot", true);
+listen(inputs.lootImportantColor, "lootImportant", true);
+listen(inputs.lootWishlistColor, "lootWishlist", true);
+listen(inputs.containerColor, "container", true);
+listen(inputs.corpseColor, "corpse", true);
+listen(inputs.exfilOpenColor, "exfilOpen", true);
+listen(inputs.exfilPendingColor, "exfilPending", true);
+listen(inputs.exfilClosedColor, "exfilClosed", true);
 
 if (inputs.centerOnLocal) {
   inputs.centerOnLocal.onclick = () => {
     state.freeMode = false;
+    state.followTarget = null;
     freeAnchor = { x: 0, y: 0, mapId: "" };
     if (inputs.freeMode) inputs.freeMode.checked = false;
-    if (inputs.modeBadge) inputs.modeBadge.textContent = "follow";
+    updateFollowBadge();
     saveSettings();
   };
+}
+
+// Double-click on a player to follow them
+canvas.addEventListener("dblclick", e => {
+  const mx = e.clientX, my = e.clientY;
+  let best = null, bestDist = Infinity;
+  for (const h of hitList) {
+    if (h.kind !== "player") continue;
+    const dx = mx - h.px, dy = my - h.py;
+    const d = dx * dx + dy * dy;
+    if (d < h.r * h.r && d < bestDist) { bestDist = d; best = h; }
+  }
+  if (best) {
+    const p = best.data;
+    if (p.isLocal) {
+      state.followTarget = null;
+    } else {
+      state.followTarget = p.name || null;
+    }
+    state.freeMode = false;
+    freeAnchor = { x: 0, y: 0, mapId: "" };
+    if (inputs.freeMode) inputs.freeMode.checked = false;
+    updateFollowBadge();
+    saveSettings();
+  }
+});
+
+function updateFollowBadge() {
+  if (inputs.modeBadge) {
+    if (state.followTarget) {
+      inputs.modeBadge.textContent = state.followTarget;
+      inputs.modeBadge.style.color = "var(--accent)";
+    } else {
+      inputs.modeBadge.textContent = state.freeMode ? "free" : "follow";
+      inputs.modeBadge.style.color = "";
+    }
+  }
 }
 if (inputs.resetSettings) {
   inputs.resetSettings.onclick = () => resetSettings();
@@ -757,6 +886,423 @@ function drawPlayers(players, map, cx, cy, rotRad, mapRect, localWorldY, hitList
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   PRICE FORMATTER
+   ═══════════════════════════════════════════════════════════════════════════ */
+function formatPrice(p) {
+  if (p >= 1000000) return (p / 1000000).toFixed(1) + "M";
+  if (p >= 1000) return (p / 1000).toFixed(0) + "K";
+  return String(p);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOOT DRAWING
+   ═══════════════════════════════════════════════════════════════════════════ */
+function lootColor(item) {
+  if (item.wishlisted) return state.colors.lootWishlist;
+  if (item.important)  return state.colors.lootImportant;
+  return state.colors.loot;
+}
+
+function drawLoot(lootItems, map, cx, cy, rotRad, mapRect, localWorldY, hitList) {
+  if (!lootItems || !lootItems.length) return;
+
+  for (const item of lootItems) {
+    if (!item) continue;
+    if (item.price < state.lootMinPrice && !item.wishlisted && !item.questItem) continue;
+
+    const pm = worldToMapUnzoomed(item.worldX, item.worldZ, map);
+    const s = mapXYToScreen(pm.x, pm.y, mapRect, cx, cy, rotRad);
+    const px = s.px, py = s.py;
+    const col = lootColor(item);
+
+    // Diamond marker
+    const r = 3.5;
+    ctx.save();
+    ctx.fillStyle = col;
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(px, py - r);
+    ctx.lineTo(px + r, py);
+    ctx.lineTo(px, py + r);
+    ctx.lineTo(px - r, py);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // Label
+    if (state.showLootNames) {
+      const label = item.price > 0 ? `${item.shortName} (${formatPrice(item.price)})` : item.shortName;
+      ctx.save();
+      ctx.fillStyle = col;
+      ctx.font = "500 10px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.shadowColor = "rgba(0,0,0,.7)";
+      ctx.shadowBlur = 2;
+      ctx.fillText(label, px + 6, py + 3.5);
+      ctx.restore();
+    }
+
+    hitList.push({
+      kind: "loot", px, py, r: 12,
+      data: { name: item.shortName, price: item.price, wishlisted: item.wishlisted, questItem: item.questItem }
+    });
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONTAINER DRAWING
+   ═══════════════════════════════════════════════════════════════════════════ */
+function drawContainers(containers, map, cx, cy, rotRad, mapRect, hitList, local) {
+  if (!containers || !containers.length) return;
+  const col = state.colors.container;
+  const maxDist = Number(state.containerMaxDist) || 0;
+  const hasLocal = local && Number.isFinite(local.worldX);
+  const selNames = state.selectedContainers;
+  const hasFilter = Array.isArray(selNames) && selNames.length > 0;
+
+  for (const c of containers) {
+    if (!c) continue;
+
+    // Name-based selection filter (client-side)
+    if (hasFilter && !selNames.includes(c.name)) continue;
+
+    // Distance filter
+    if (maxDist > 0 && hasLocal) {
+      const dx = c.worldX - local.worldX;
+      const dz = c.worldZ - local.worldZ;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist > maxDist) continue;
+    }
+
+    const pm = worldToMapUnzoomed(c.worldX, c.worldZ, map);
+    const s = mapXYToScreen(pm.x, pm.y, mapRect, cx, cy, rotRad);
+    const px = s.px, py = s.py;
+
+    // Square marker
+    const hs = 3.5;
+    ctx.save();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.6;
+    ctx.globalAlpha = c.searched ? 0.4 : 0.9;
+    ctx.strokeRect(px - hs, py - hs, hs * 2, hs * 2);
+    ctx.restore();
+
+    if (state.showContainerNames) {
+      ctx.save();
+      ctx.fillStyle = col;
+      ctx.globalAlpha = c.searched ? 0.4 : 0.85;
+      ctx.font = "500 10px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.shadowColor = "rgba(0,0,0,.7)";
+      ctx.shadowBlur = 2;
+      ctx.fillText(c.name, px + 6, py + 3.5);
+      ctx.restore();
+    }
+
+    hitList.push({ kind: "container", px, py, r: 10, data: c });
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CORPSE DRAWING
+   ═══════════════════════════════════════════════════════════════════════════ */
+function drawCorpses(corpses, map, cx, cy, rotRad, mapRect, hitList) {
+  if (!corpses || !corpses.length) return;
+  const col = state.colors.corpse;
+
+  for (const c of corpses) {
+    if (!c) continue;
+    const pm = worldToMapUnzoomed(c.worldX, c.worldZ, map);
+    const s = mapXYToScreen(pm.x, pm.y, mapRect, cx, cy, rotRad);
+    const px = s.px, py = s.py;
+
+    // X marker
+    const d = 4;
+    ctx.save();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(px - d, py - d); ctx.lineTo(px + d, py + d);
+    ctx.moveTo(px + d, py - d); ctx.lineTo(px - d, py + d);
+    ctx.stroke();
+    ctx.restore();
+
+    hitList.push({ kind: "corpse", px, py, r: 10, data: c });
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EXFIL DRAWING
+   ═══════════════════════════════════════════════════════════════════════════ */
+function exfilColor(status) {
+  // 0=Closed, 1=Pending, 2=Open
+  switch (status) {
+    case 2: return state.colors.exfilOpen;
+    case 1: return state.colors.exfilPending;
+    default: return state.colors.exfilClosed;
+  }
+}
+
+function drawExfils(exfils, map, cx, cy, rotRad, mapRect, hitList) {
+  if (!exfils || !exfils.length) return;
+
+  for (const e of exfils) {
+    if (!e) continue;
+    const pm = worldToMapUnzoomed(e.worldX, e.worldZ, map);
+    const s = mapXYToScreen(pm.x, pm.y, mapRect, cx, cy, rotRad);
+    const px = s.px, py = s.py;
+    const col = exfilColor(e.status);
+
+    // Circle marker
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(px, py, 5, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(0,0,0,.5)";
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.restore();
+
+    // Name label
+    ctx.save();
+    ctx.fillStyle = col;
+    ctx.font = "600 10px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.shadowColor = "rgba(0,0,0,.7)";
+    ctx.shadowBlur = 3;
+    ctx.fillText(e.name, px, py - 9);
+    ctx.restore();
+
+    hitList.push({ kind: "exfil", px, py, r: 14, data: e });
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AIMVIEW DRAG
+   ═══════════════════════════════════════════════════════════════════════════ */
+let avDragging = false;
+let avDragStart = { x: 0, y: 0 };
+let avDragOrigin = { x: 0, y: 0 };
+
+aimviewEl.addEventListener("mousedown", e => {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  avDragging = true;
+  aimviewEl.classList.add("dragging");
+  const rect = aimviewEl.getBoundingClientRect();
+  avDragOrigin = { x: rect.left, y: rect.top };
+  avDragStart = { x: e.clientX, y: e.clientY };
+});
+
+window.addEventListener("mousemove", e => {
+  if (!avDragging) return;
+  const nx = avDragOrigin.x + (e.clientX - avDragStart.x);
+  const ny = avDragOrigin.y + (e.clientY - avDragStart.y);
+  applyAimviewPos(nx, ny);
+});
+
+window.addEventListener("mouseup", () => {
+  if (!avDragging) return;
+  avDragging = false;
+  aimviewEl.classList.remove("dragging");
+  saveSettings();
+});
+
+// Touch support
+aimviewEl.addEventListener("touchstart", e => {
+  if (e.touches.length !== 1) return;
+  e.preventDefault();
+  avDragging = true;
+  aimviewEl.classList.add("dragging");
+  const rect = aimviewEl.getBoundingClientRect();
+  avDragOrigin = { x: rect.left, y: rect.top };
+  avDragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}, { passive: false });
+
+aimviewEl.addEventListener("touchmove", e => {
+  if (!avDragging || e.touches.length !== 1) return;
+  e.preventDefault();
+  const nx = avDragOrigin.x + (e.touches[0].clientX - avDragStart.x);
+  const ny = avDragOrigin.y + (e.touches[0].clientY - avDragStart.y);
+  applyAimviewPos(nx, ny);
+}, { passive: false });
+
+aimviewEl.addEventListener("touchend", () => {
+  if (!avDragging) return;
+  avDragging = false;
+  aimviewEl.classList.remove("dragging");
+  saveSettings();
+});
+
+function applyAimviewPos(x, y) {
+  const size = Number(state.aimviewSize) || 250;
+  const maxX = window.innerWidth - size;
+  const maxY = window.innerHeight - size;
+  x = Math.max(0, Math.min(x, maxX));
+  y = Math.max(0, Math.min(y, maxY));
+  state.aimviewX = Math.round(x);
+  state.aimviewY = Math.round(y);
+  aimviewEl.style.left = x + "px";
+  aimviewEl.style.top = y + "px";
+  aimviewEl.style.right = "auto";
+  aimviewEl.style.bottom = "auto";
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AIMVIEW WIDGET
+   ═══════════════════════════════════════════════════════════════════════════ */
+function drawAimview(camera, players, lootItems, containers) {
+  if (!state.showAimview || !camera) {
+    aimviewEl.classList.add("hidden");
+    return;
+  }
+
+  aimviewEl.classList.remove("hidden");
+
+  const size = Number(state.aimviewSize) || 250;
+  aimviewEl.style.width = size + "px";
+  aimviewEl.style.height = size + "px";
+
+  // Apply saved position (or default to bottom-right)
+  if (state.aimviewX != null && state.aimviewY != null) {
+    const maxX = window.innerWidth - size;
+    const maxY = window.innerHeight - size;
+    aimviewEl.style.left = Math.max(0, Math.min(state.aimviewX, maxX)) + "px";
+    aimviewEl.style.top = Math.max(0, Math.min(state.aimviewY, maxY)) + "px";
+    aimviewEl.style.right = "auto";
+    aimviewEl.style.bottom = "auto";
+  }
+
+  const avDpr = window.devicePixelRatio || 1;
+  const bw = Math.round(size * avDpr);
+  const bh = Math.round(size * avDpr);
+  if (aimviewCanvas.width !== bw) aimviewCanvas.width = bw;
+  if (aimviewCanvas.height !== bh) aimviewCanvas.height = bh;
+
+  avCtx.setTransform(avDpr, 0, 0, avDpr, 0, 0);
+  avCtx.clearRect(0, 0, size, size);
+
+  // Background
+  avCtx.fillStyle = "rgba(11, 18, 32, 0.6)";
+  avCtx.fillRect(0, 0, size, size);
+
+  // Crosshair
+  const mid = size / 2;
+  avCtx.strokeStyle = "rgba(255,255,255,.15)";
+  avCtx.lineWidth = 1;
+  avCtx.beginPath();
+  avCtx.moveTo(mid - 8, mid); avCtx.lineTo(mid + 8, mid);
+  avCtx.moveTo(mid, mid - 8); avCtx.lineTo(mid, mid + 8);
+  avCtx.stroke();
+
+  // Build synthetic forward/right/up from camera player's raw yaw + pitch
+  const yaw = Number(camera.rawYaw) || 0;
+  const pitch = Number(camera.pitch) || 0;
+  const cosY = Math.cos(yaw);
+  const sinY = Math.sin(yaw);
+  const cosP = Math.cos(pitch);
+  const sinP = Math.sin(pitch);
+
+  // EFT coordinate system — matches AimviewWidget.cs exactly
+  const fwd   = { x: sinY * cosP, y: -sinP, z: cosY * cosP };
+  const right = { x: cosY, y: 0, z: -sinY };
+  // Up = -(right × forward)
+  const upX = right.y * fwd.z - right.z * fwd.y;
+  const upY = right.z * fwd.x - right.x * fwd.z;
+  const upZ = right.x * fwd.y - right.y * fwd.x;
+  const up = { x: -upX, y: -upY, z: -upZ };
+
+  // Eye position: body root + eye height offset
+  const eyeHeight = 1.35;
+  const localPos = { x: camera.worldX, y: camera.worldY + eyeHeight, z: camera.worldZ };
+  const zoom = 1.0;
+  const maxDist = 300;
+  const cameraName = camera.name;
+
+  function projectAV(wx, wy, wz) {
+    const dx = wx - localPos.x;
+    const dy = wy - localPos.y;
+    const dz = wz - localPos.z;
+
+    const dotF = dx * fwd.x + dy * fwd.y + dz * fwd.z;
+    if (dotF < 0.5) return null; // Behind
+    if (dotF > maxDist) return null; // Too far
+
+    const dotR = dx * right.x + dy * right.y + dz * right.z;
+    const dotU = dx * up.x + dy * up.y + dz * up.z;
+
+    const sx = mid + (dotR / dotF) * zoom * mid;
+    const sy = mid - (dotU / dotF) * zoom * mid;
+
+    if (sx < -10 || sx > size + 10 || sy < -10 || sy > size + 10) return null;
+    return { sx, sy, dist: dotF };
+  }
+
+  // Draw players (skip the camera player — they ARE the viewpoint)
+  if (players) {
+    for (const p of players) {
+      if (!p || !p.isActive || p.isAlive === false) continue;
+      if (p.name === cameraName) continue;
+      const proj = projectAV(p.worldX, p.worldY, p.worldZ);
+      if (!proj) continue;
+      const col = playerColor(p);
+      const r = Math.max(2, 5 - proj.dist * 0.03);
+      avCtx.beginPath();
+      avCtx.arc(proj.sx, proj.sy, r, 0, Math.PI * 2);
+      avCtx.fillStyle = col;
+      avCtx.fill();
+    }
+  }
+
+  // Draw loot
+  if (state.showLoot && lootItems) {
+    for (const item of lootItems) {
+      if (!item) continue;
+      if (item.price < state.lootMinPrice && !item.wishlisted && !item.questItem) continue;
+      const proj = projectAV(item.worldX, item.worldY, item.worldZ);
+      if (!proj) continue;
+      const col = lootColor(item);
+      const r = 2;
+      avCtx.save();
+      avCtx.fillStyle = col;
+      avCtx.globalAlpha = 0.8;
+      avCtx.beginPath();
+      avCtx.moveTo(proj.sx, proj.sy - r);
+      avCtx.lineTo(proj.sx + r, proj.sy);
+      avCtx.lineTo(proj.sx, proj.sy + r);
+      avCtx.lineTo(proj.sx - r, proj.sy);
+      avCtx.closePath();
+      avCtx.fill();
+      avCtx.restore();
+    }
+  }
+
+  // Draw containers
+  if (state.showContainers && containers) {
+    for (const c of containers) {
+      if (!c) continue;
+      const proj = projectAV(c.worldX, c.worldY, c.worldZ);
+      if (!proj) continue;
+      avCtx.save();
+      avCtx.strokeStyle = state.colors.container;
+      avCtx.lineWidth = 1.2;
+      avCtx.globalAlpha = 0.7;
+      avCtx.strokeRect(proj.sx - 2, proj.sy - 2, 4, 4);
+      avCtx.restore();
+    }
+  }
+
+  // Border
+  avCtx.strokeStyle = "rgba(255,255,255,.08)";
+  avCtx.lineWidth = 1;
+  avCtx.strokeRect(0.5, 0.5, size - 1, size - 1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    TOOLTIP
    ═══════════════════════════════════════════════════════════════════════════ */
 let hitList = [];
@@ -786,26 +1332,62 @@ function updateHover() {
 
   if (!found) { hideTooltip(); return; }
 
-  const p = found.data;
-  const col = playerColor(p);
-  const typeName = typeNames[p.type] || "Bot";
-  const status = p.isAlive === false ? "Dead" : "Alive";
-  const statusClass = p.isAlive === false ? "bad" : "ok";
+  let html = "";
 
-  let html = `<div class="t-header"><span class="t-dot" style="background:${col}"></span><span class="t-name">${esc(p.name || "Unknown")}</span></div>`;
-  html += `<div class="t-type">${typeName} · <span style="color:var(--${statusClass})">${status}</span></div>`;
+  if (found.kind === "player") {
+    const p = found.data;
+    const col = playerColor(p);
+    const typeName = typeNames[p.type] || "Bot";
+    const status = p.isAlive === false ? "Dead" : "Alive";
+    const statusClass = p.isAlive === false ? "bad" : "ok";
 
-  const hasExtra = (p.gearValue > 0) || (readWorldY(p) != null);
-  if (hasExtra) {
+    html += `<div class="t-header"><span class="t-dot" style="background:${col}"></span><span class="t-name">${esc(p.name || "Unknown")}</span></div>`;
+    html += `<div class="t-type">${typeName} · <span style="color:var(--${statusClass})">${status}</span></div>`;
+
+    const hasExtra = (p.gearValue > 0) || (readWorldY(p) != null);
+    if (hasExtra) {
+      html += `<div class="t-sep"></div><div class="t-grid">`;
+      if (p.gearValue > 0) {
+        html += `<span class="k">Gear</span><span class="v">₽${p.gearValue.toLocaleString()}</span>`;
+      }
+      const wy = readWorldY(p);
+      if (wy != null) {
+        html += `<span class="k">Height</span><span class="v">${wy.toFixed(1)}</span>`;
+      }
+      html += `</div>`;
+    }
+  } else if (found.kind === "loot") {
+    const d = found.data;
+    const col = d.wishlisted ? state.colors.lootWishlist : (d.price >= (state.lootMinPrice * 2) ? state.colors.lootImportant : state.colors.loot);
+    html += `<div class="t-header"><span class="t-dot" style="background:${col}"></span><span class="t-name">${esc(d.name)}</span></div>`;
+    html += `<div class="t-type">Loot</div>`;
     html += `<div class="t-sep"></div><div class="t-grid">`;
-    if (p.gearValue > 0) {
-      html += `<span class="k">Gear</span><span class="v">₽${p.gearValue.toLocaleString()}</span>`;
-    }
-    const wy = readWorldY(p);
-    if (wy != null) {
-      html += `<span class="k">Height</span><span class="v">${wy.toFixed(1)}</span>`;
-    }
+    if (d.price > 0) html += `<span class="k">Price</span><span class="v">₽${d.price.toLocaleString()}</span>`;
+    if (d.wishlisted) html += `<span class="k">Status</span><span class="v" style="color:${state.colors.lootWishlist}">★ Wishlist</span>`;
+    if (d.questItem) html += `<span class="k">Status</span><span class="v" style="color:${state.colors.lootImportant}">Quest Item</span>`;
     html += `</div>`;
+  } else if (found.kind === "container") {
+    const c = found.data;
+    const col = state.colors.container;
+    html += `<div class="t-header"><span class="t-dot" style="background:${col}"></span><span class="t-name">${esc(c.name)}</span></div>`;
+    html += `<div class="t-type">Container${c.searched ? " · <span style='color:var(--text-dim)'>Searched</span>" : ""}</div>`;
+  } else if (found.kind === "corpse") {
+    const c = found.data;
+    const col = state.colors.corpse;
+    html += `<div class="t-header"><span class="t-dot" style="background:${col}"></span><span class="t-name">${esc(c.name)}</span></div>`;
+    html += `<div class="t-type">Corpse</div>`;
+    if (c.totalValue > 0) {
+      html += `<div class="t-sep"></div><div class="t-grid">`;
+      html += `<span class="k">Gear Value</span><span class="v">₽${c.totalValue.toLocaleString()}</span>`;
+      html += `</div>`;
+    }
+  } else if (found.kind === "exfil") {
+    const e = found.data;
+    const col = exfilColor(e.status);
+    const statusText = e.status === 2 ? "Open" : e.status === 1 ? "Pending" : "Closed";
+    const statusClass = e.status === 2 ? "ok" : e.status === 1 ? "warn" : "bad";
+    html += `<div class="t-header"><span class="t-dot" style="background:${col}"></span><span class="t-name">${esc(e.name)}</span></div>`;
+    html += `<div class="t-type">Exfil · <span style="color:var(--${statusClass})">${statusText}</span></div>`;
   }
 
   tooltipEl.innerHTML = html;
@@ -940,7 +1522,10 @@ function frame() {
   ctx.clearRect(0, 0, cw, ch);
   hitList = [];
 
-  if (!radarData) return;
+  if (!radarData) {
+    aimviewEl.classList.add("hidden");
+    return;
+  }
 
   const map = radarData.map || null;
   const players = Array.isArray(radarData.players) ? radarData.players : [];
@@ -950,17 +1535,30 @@ function frame() {
   const local = players.find(p => p?.isLocal) || null;
   lastLocalPlayer = local;
 
-  // Rotation
+  // Resolve follow target: a specific player name, or fall back to local
+  let focusPlayer = local;
+  if (state.followTarget) {
+    const target = players.find(p => p && p.name === state.followTarget && p.isActive);
+    if (target) {
+      focusPlayer = target;
+    } else {
+      // Target no longer available — clear follow
+      state.followTarget = null;
+      updateFollowBadge();
+    }
+  }
+
+  // Rotation — always based on local player yaw for map orientation
   const localYaw = local ? (Number(local.yaw) || 0) : 0;
   lastRotRad = localYaw;
 
-  // Anchor
+  // Anchor — center on the focus player
   let anchor = null;
   if (state.freeMode) {
     const mapId = radarData.mapID ?? "";
     if (freeAnchor.mapId !== mapId) {
-      if (local && map) {
-        const lm = readPlayerMapXY(local, map);
+      if (focusPlayer && map) {
+        const lm = readPlayerMapXY(focusPlayer, map);
         freeAnchor.x = lm.x;
         freeAnchor.y = lm.y;
       } else {
@@ -971,8 +1569,8 @@ function frame() {
     }
     anchor = freeAnchor;
   } else {
-    if (local && map) {
-      const tm = readPlayerMapXY(local, map);
+    if (focusPlayer && map) {
+      const tm = readPlayerMapXY(focusPlayer, map);
       anchor = { x: tm.x, y: tm.y };
     } else {
       anchor = { x: 0, y: 0 };
@@ -985,17 +1583,101 @@ function frame() {
     drawMap(map, localY, cx, cy, state.zoom, lastRotRad, anchor);
   }
 
-  if (!map) return;
+  // Map entities (require map for world-to-screen projection)
+  if (map) {
+    const mapRect = getMapScreenRect(map, cx, cy, state.zoom, anchor);
+    if (mapRect) {
+      if (state.showGroups) drawGroupConnectors(players, map, cx, cy, lastRotRad, mapRect);
+      if (state.showExfils) drawExfils(radarData.exfils, map, cx, cy, lastRotRad, mapRect, hitList);
+      if (state.showCorpses) drawCorpses(radarData.corpses, map, cx, cy, lastRotRad, mapRect, hitList);
+      if (state.showContainers) drawContainers(radarData.containers, map, cx, cy, lastRotRad, mapRect, hitList, local);
+      if (state.showLoot) drawLoot(radarData.loot, map, cx, cy, lastRotRad, mapRect, readWorldY(local), hitList);
+      if (state.showPlayers) drawPlayers(players, map, cx, cy, lastRotRad, mapRect, readWorldY(local), hitList);
+    }
+  }
 
-  const mapRect = getMapScreenRect(map, cx, cy, state.zoom, anchor);
-  if (!mapRect) return;
-
-  // Draw
-  if (state.showGroups) drawGroupConnectors(players, map, cx, cy, lastRotRad, mapRect);
-  if (state.showPlayers) drawPlayers(players, map, cx, cy, lastRotRad, mapRect, readWorldY(local), hitList);
+  // Aimview (independent of map — uses world-space projection)
+  drawAimview(focusPlayer, players, radarData.loot, radarData.containers);
 
   // Tooltip
   updateHover();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONTAINER SELECTION
+   ═══════════════════════════════════════════════════════════════════════════ */
+let containerTypes = []; // { id, name, selected }
+
+async function fetchContainerTypes() {
+  try {
+    const res = await fetch("/api/containers", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+    containerTypes = data;
+    buildContainerList();
+  } catch { /* ignore */ }
+}
+
+function buildContainerList() {
+  const wrap = document.getElementById("containerList");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  const sel = state.selectedContainers;
+
+  // Sort alphabetically by name
+  const sorted = [...containerTypes].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  for (const ct of sorted) {
+    const isOn = sel.length === 0 || sel.includes(ct.name);
+    const lbl = document.createElement("label");
+    lbl.className = "container-item";
+    lbl.innerHTML = `<span class="toggle-switch small"><input type="checkbox" ${isOn ? "checked" : ""}><span class="slider"></span></span><span class="cname">${esc(ct.name)}</span>`;
+    const cb = lbl.querySelector("input");
+    cb.addEventListener("change", () => {
+      if (cb.checked) {
+        // Remove from filter (show it)
+        const idx = state.selectedContainers.indexOf(ct.name);
+        if (idx >= 0) state.selectedContainers.splice(idx, 1);
+        // If all are now checked, clear the array (= show all)
+        const allChecked = wrap.querySelectorAll("input[type=checkbox]:not(:checked)").length === 0;
+        if (allChecked) state.selectedContainers = [];
+      } else {
+        // First time unchecking: populate all names then remove this one
+        if (state.selectedContainers.length === 0) {
+          state.selectedContainers = sorted.map(c => c.name);
+        }
+        const idx = state.selectedContainers.indexOf(ct.name);
+        if (idx >= 0) state.selectedContainers.splice(idx, 1);
+      }
+      saveSettings();
+    });
+    wrap.appendChild(lbl);
+  }
+
+  // Select All / Deselect All buttons
+  const btnWrap = document.getElementById("containerBtns");
+  if (btnWrap) {
+    btnWrap.innerHTML = "";
+    const btnAll = document.createElement("button");
+    btnAll.className = "small";
+    btnAll.textContent = "Select All";
+    btnAll.onclick = () => {
+      state.selectedContainers = [];
+      wrap.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = true);
+      saveSettings();
+    };
+    const btnNone = document.createElement("button");
+    btnNone.className = "small";
+    btnNone.textContent = "Deselect All";
+    btnNone.onclick = () => {
+      state.selectedContainers = ["__none__"];
+      wrap.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = false);
+      saveSettings();
+    };
+    btnWrap.appendChild(btnAll);
+    btnWrap.appendChild(btnNone);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1005,6 +1687,8 @@ loadSettings();
 bindAllInputs();
 applyUiFromState();
 updateAllRangeValues();
+updateFollowBadge();
 startPolling();
 fetchRadar();
+fetchContainerTypes();
 requestAnimationFrame(frame);

@@ -26,6 +26,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 int vertexCount = entry.TransformIndex + 1;
                 scatter.PrepareReadArray<TrsX>(entry.VerticesAddr, vertexCount);
             }
+
+            // Local player: batch ADS read into the same scatter round (zero extra DMA cost)
+            if (entry.IsAimingAddr != 0)
+                scatter.PrepareReadValue<bool>(entry.IsAimingAddr);
         }
 
         /// <summary>
@@ -106,6 +110,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             // --- Error state with debounce + recovery hysteresis ---
             bool tickFailed = !rotOk || !posOk;
+
+            // --- ADS state (local player only) ---
+            if (entry.IsAimingAddr != 0 && entry.Player is LocalPlayer localP)
+            {
+                localP.IsADS = scatter.ReadValue<bool>(entry.IsAimingAddr, out var isAiming) && isAiming;
+            }
+
             if (tickFailed)
             {
                 entry.RecoveryCount = 0;
