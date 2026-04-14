@@ -755,6 +755,58 @@ namespace eft_dma_radar.Silk.DMA
             VmmOrThrow().MemWriteSpan(_pid, addr, buf);
         }
 
+        /// <summary>
+        /// Write value to memory with verification — retries up to 3 times.
+        /// </summary>
+        public static unsafe void WriteValueEnsure<T>(ulong addr, T value)
+            where T : unmanaged
+        {
+            int cb = sizeof(T);
+            var b1 = new ReadOnlySpan<byte>(&value, cb);
+            for (int i = 0; i < 3; i++)
+            {
+                try
+                {
+                    WriteValue(addr, value);
+                    Thread.SpinWait(5);
+                    T temp = ReadValue<T>(addr, false);
+                    var b2 = new ReadOnlySpan<byte>(&temp, cb);
+                    if (b1.SequenceEqual(b2)) return;
+                }
+                catch { }
+            }
+            throw new VmmException("Memory write verification failed.");
+        }
+
+        /// <summary>Write a buffer of unmanaged values to memory.</summary>
+        public static void WriteBuffer<T>(ulong addr, Span<T> buffer)
+            where T : unmanaged
+        {
+            VmmOrThrow().MemWriteSpan(_pid, addr, buffer);
+        }
+
+        /// <summary>Write a buffer with verification — retries up to 3 times.</summary>
+        public static void WriteBufferEnsure<T>(ulong addr, Span<T> buffer)
+            where T : unmanaged
+        {
+            int cb = SizeChecker<T>.Size * buffer.Length;
+            Span<byte> temp = cb > 0x1000 ? new byte[cb] : stackalloc byte[cb];
+            ReadOnlySpan<byte> b1 = MemoryMarshal.Cast<T, byte>(buffer);
+            for (int i = 0; i < 3; i++)
+            {
+                try
+                {
+                    WriteBuffer(addr, buffer);
+                    Thread.SpinWait(5);
+                    temp.Clear();
+                    ReadBuffer(addr, temp, false);
+                    if (temp.SequenceEqual(b1)) return;
+                }
+                catch { }
+            }
+            throw new VmmException("Memory write buffer verification failed.");
+        }
+
         #endregion
 
         #region Misc

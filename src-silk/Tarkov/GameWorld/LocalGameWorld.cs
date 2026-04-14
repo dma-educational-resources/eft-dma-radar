@@ -109,6 +109,22 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <summary>The local (MainPlayer) player, or <c>null</c> if not yet discovered.</summary>
         public Player.Player? LocalPlayer => _registeredPlayers.LocalPlayer;
 
+        /// <summary>
+        /// True if the raid is still active and it is safe to write memory.
+        /// Used by <c>FeatureManager</c> as a final gate before executing scatter writes.
+        /// </summary>
+        public bool IsSafeToWriteMem
+        {
+            get
+            {
+                try { return InRaid && IsRaidActive(); }
+                catch { return false; }
+            }
+        }
+
+        /// <summary>The active camera manager, or <c>null</c> if not yet initialized.</summary>
+        public CameraManager? CameraManager => _cameraManager;
+
         /// <summary>Current snapshot of loose loot items in the raid.</summary>
         public IReadOnlyList<LootItem> Loot => _lootManager.Loot;
 

@@ -249,6 +249,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             LocalPlayer = entry.Player;
             LocalPlayerAddr = mainPlayerPtr;
+            entry.Player.Base = mainPlayerPtr;
             _players[mainPlayerPtr] = entry;
             Log.WriteLine($"[RegisteredPlayers] LocalPlayer found: {entry.Player.Name} (class='{className ?? "<null>"}')");
             return true;

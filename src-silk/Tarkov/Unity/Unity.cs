@@ -131,6 +131,28 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
             /// <summary>TransformHierarchy + 0x68 → pointer to vertices array (TrsX[]).</summary>
             public const uint VerticesOffset = 0x68;
         }
+
+        // ── Unity Animator ────────────────────────────────────────────────────
+        public static class UnityAnimator
+        {
+            /// <summary>Animator.m_Speed field offset.</summary>
+            public const uint Speed = 0x4B0;
+        }
+
+        // ── LevelSettings pointer chain ──────────────────────────────────────
+        public static class LevelSettings
+        {
+            /// <summary>
+            /// Chain from a "---Custom_levelsettings---" GameObject to the managed LevelSettings instance.
+            /// GO → ComponentArray → second component (0x18) → ObjectClass.
+            /// </summary>
+            public static readonly uint[] LevelSettingsChain =
+            [
+                GO_Components,      // 0x58 — GameObject → ComponentArray
+                0x18,               // Second component (LevelSettings)
+                Comp_ObjectClass,   // 0x20 — Component → ObjectClass
+            ];
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -639,6 +661,24 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
                     return objectClass;
             }
             return 0;
+        }
+
+        /// <summary>
+        /// Given a behaviour/component pointer, navigates to its parent GameObject via
+        /// <c>Comp_GameObject</c> (0x58) and then searches that single GameObject's component
+        /// array for a component whose IL2CPP class name matches <paramref name="className"/>.
+        /// Returns the objectClass pointer of the matching component, or 0.
+        /// </summary>
+        public static ulong GetComponentFromBehaviour(ulong behaviour, string className)
+        {
+            if (!SilkUtils.IsValidVirtualAddress(behaviour))
+                return 0;
+
+            if (!Memory.TryReadPtr(behaviour + UnityOffsets.Comp_GameObject, out var gameObject, false)
+                || !SilkUtils.IsValidVirtualAddress(gameObject))
+                return 0;
+
+            return GetComponentByClassName(gameObject, className);
         }
 
         // ── Generic linked-list walker ───────────────────────────────────────

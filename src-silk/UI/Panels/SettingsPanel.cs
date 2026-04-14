@@ -5,6 +5,7 @@ namespace eft_dma_radar.Silk.UI.Panels
     internal static class SettingsPanel
     {
         private static SilkConfig Config => SilkProgram.Config;
+        private static readonly string[] _wideLeanDirNames = ["Off", "Left", "Right", "Up"];
 
         /// <summary>
         /// Whether the settings panel is open.
@@ -54,6 +55,7 @@ namespace eft_dma_radar.Silk.UI.Panels
                 DrawPlayersTab();
                 DrawMapTab();
                 DrawHotkeysTab();
+                DrawMemWritesTab();
 
                 ImGui.EndTabBar();
             }
@@ -772,6 +774,343 @@ namespace eft_dma_radar.Silk.UI.Panels
                 }
             }
             ImGui.EndChild();
+        }
+
+        private static void DrawMemWritesTab()
+        {
+            if (!ImGui.BeginTabItem("\u270F Mem Writes"))
+                return;
+
+            ImGui.Spacing();
+
+            bool masterEnabled = Config.MemWritesEnabled;
+            if (ImGui.Checkbox("Enable Memory Writes", ref masterEnabled))
+            {
+                Config.MemWritesEnabled = masterEnabled;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Master toggle — enables all active memory write features");
+
+            if (!masterEnabled)
+                ImGui.BeginDisabled();
+
+            ImGui.Spacing();
+            ImGui.SeparatorText("Weapon");
+
+            // ── No Recoil ──
+            bool noRecoil = Config.MemWrites.NoRecoil;
+            if (ImGui.Checkbox("No Recoil", ref noRecoil))
+            {
+                Config.MemWrites.NoRecoil = noRecoil;
+                Config.MarkDirty();
+            }
+            if (noRecoil)
+            {
+                ImGui.Indent(16);
+                ImGui.SetNextItemWidth(180);
+                int recoilAmt = Config.MemWrites.NoRecoilAmount;
+                if (ImGui.SliderInt("Recoil Amount %##nr", ref recoilAmt, 0, 100))
+                {
+                    Config.MemWrites.NoRecoilAmount = recoilAmt;
+                    Config.MarkDirty();
+                }
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("0 = no recoil, 100 = full recoil");
+
+                ImGui.SetNextItemWidth(180);
+                int swayAmt = Config.MemWrites.NoSwayAmount;
+                if (ImGui.SliderInt("Sway Amount %##ns", ref swayAmt, 0, 100))
+                {
+                    Config.MemWrites.NoSwayAmount = swayAmt;
+                    Config.MarkDirty();
+                }
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("0 = no sway, 100 = full sway");
+                ImGui.Unindent(16);
+            }
+
+            ImGui.Spacing();
+            ImGui.SeparatorText("Movement");
+
+            // ── No Inertia ──
+            bool noInertia = Config.MemWrites.NoInertia;
+            if (ImGui.Checkbox("No Inertia", ref noInertia))
+            {
+                Config.MemWrites.NoInertia = noInertia;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Remove movement inertia for instant direction changes");
+
+            // ── Inf Stamina ──
+            bool infStamina = Config.MemWrites.InfStamina;
+            if (ImGui.Checkbox("Infinite Stamina", ref infStamina))
+            {
+                Config.MemWrites.InfStamina = infStamina;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Refill stamina and oxygen when they drop below 33%");
+
+            // ── Move Speed ──
+            bool moveSpeed = Config.MemWrites.MoveSpeed.Enabled;
+            if (ImGui.Checkbox("Move Speed", ref moveSpeed))
+            {
+                Config.MemWrites.MoveSpeed.Enabled = moveSpeed;
+                Config.MarkDirty();
+            }
+            if (moveSpeed)
+            {
+                ImGui.Indent(16);
+                ImGui.SetNextItemWidth(180);
+                float mult = Config.MemWrites.MoveSpeed.Multiplier;
+                if (ImGui.SliderFloat("Multiplier##ms", ref mult, 0.5f, 3.0f, "%.2fx"))
+                {
+                    Config.MemWrites.MoveSpeed.Multiplier = mult;
+                    Config.MarkDirty();
+                }
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Animator speed multiplier (1.0 = normal, disabled when overweight)");
+                ImGui.Unindent(16);
+            }
+
+            // ── Fast Duck ──
+            bool fastDuck = Config.MemWrites.FastDuck;
+            if (ImGui.Checkbox("Fast Duck", ref fastDuck))
+            {
+                Config.MemWrites.FastDuck = fastDuck;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Instant crouch/stand transitions");
+
+            // ── Long Jump ──
+            bool longJump = Config.MemWrites.LongJump.Enabled;
+            if (ImGui.Checkbox("Long Jump", ref longJump))
+            {
+                Config.MemWrites.LongJump.Enabled = longJump;
+                Config.MarkDirty();
+            }
+            if (longJump)
+            {
+                ImGui.Indent(16);
+                ImGui.SetNextItemWidth(180);
+                float ljMult = Config.MemWrites.LongJump.Multiplier;
+                if (ImGui.SliderFloat("Multiplier##lj", ref ljMult, 1f, 10f, "%.1fx"))
+                {
+                    Config.MemWrites.LongJump.Multiplier = ljMult;
+                    Config.MarkDirty();
+                }
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Air control multiplier (higher = longer jumps)");
+                ImGui.Unindent(16);
+            }
+
+            // ── Mule Mode ──
+            bool mule = Config.MemWrites.MuleMode;
+            if (ImGui.Checkbox("Mule Mode", ref mule))
+            {
+                Config.MemWrites.MuleMode = mule;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Remove overweight penalties (movement, sprint, inertia)");
+
+            // ── Instant Plant ──
+            bool instantPlant = Config.MemWrites.InstantPlant;
+            if (ImGui.Checkbox("Instant Plant", ref instantPlant))
+            {
+                Config.MemWrites.InstantPlant = instantPlant;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Near-instant planting (e.g. quest items)");
+
+            // ── Mag Drills ──
+            bool magDrills = Config.MemWrites.MagDrills;
+            if (ImGui.Checkbox("Mag Drills", ref magDrills))
+            {
+                Config.MemWrites.MagDrills = magDrills;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Fast magazine load/unload speed");
+
+            // ── Third Person ──
+            bool thirdPerson = Config.MemWrites.ThirdPerson;
+            if (ImGui.Checkbox("Third Person", ref thirdPerson))
+            {
+                Config.MemWrites.ThirdPerson = thirdPerson;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Move camera behind player for third-person view");
+
+            // ── Wide Lean ──
+            bool wideLean = Config.MemWrites.WideLean.Enabled;
+            if (ImGui.Checkbox("Wide Lean", ref wideLean))
+            {
+                Config.MemWrites.WideLean.Enabled = wideLean;
+                Config.MarkDirty();
+            }
+            if (wideLean)
+            {
+                ImGui.Indent(16);
+                ImGui.SetNextItemWidth(180);
+                float wlAmt = Config.MemWrites.WideLean.Amount;
+                if (ImGui.SliderFloat("Amount##wl", ref wlAmt, 0.1f, 5f, "%.1f"))
+                {
+                    Config.MemWrites.WideLean.Amount = wlAmt;
+                    Config.MarkDirty();
+                }
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Lean offset amount (higher = wider lean)");
+
+                var dirNames = _wideLeanDirNames;
+                int dirIdx = (int)WideLean.Direction;
+                ImGui.SetNextItemWidth(180);
+                if (ImGui.Combo("Direction##wl", ref dirIdx, dirNames, dirNames.Length))
+                {
+                    WideLean.Direction = (WideLean.EWideLeanDirection)dirIdx;
+                }
+                ImGui.Unindent(16);
+            }
+
+            ImGui.Spacing();
+            ImGui.SeparatorText("Vision");
+
+            // ── Night Vision ──
+            bool nv = Config.MemWrites.NightVision;
+            if (ImGui.Checkbox("Night Vision", ref nv))
+            {
+                Config.MemWrites.NightVision = nv;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Force NightVision component on (no NVG required)");
+
+            // ── Thermal Vision ──
+            bool thermal = Config.MemWrites.ThermalVision;
+            if (ImGui.Checkbox("Thermal Vision", ref thermal))
+            {
+                Config.MemWrites.ThermalVision = thermal;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Force ThermalVision component on (auto-disables while ADS)");
+
+            // ── Full Bright ──
+            bool fb = Config.MemWrites.FullBright.Enabled;
+            if (ImGui.Checkbox("Full Bright", ref fb))
+            {
+                Config.MemWrites.FullBright.Enabled = fb;
+                Config.MarkDirty();
+            }
+            if (fb)
+            {
+                ImGui.Indent(16);
+                ImGui.SetNextItemWidth(180);
+                float brightness = Config.MemWrites.FullBright.Brightness;
+                if (ImGui.SliderFloat("Brightness##fb", ref brightness, 0f, 2f, "%.2f"))
+                {
+                    Config.MemWrites.FullBright.Brightness = brightness;
+                    Config.MarkDirty();
+                }
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Ambient light intensity (1.0 = full white)");
+                ImGui.Unindent(16);
+            }
+
+            // ── No Visor ──
+            bool noVisor = Config.MemWrites.NoVisor;
+            if (ImGui.Checkbox("No Visor", ref noVisor))
+            {
+                Config.MemWrites.NoVisor = noVisor;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Remove visor overlay effect (e.g. face shield darkening)");
+
+            // ── Disable Frostbite ──
+            bool frostbite = Config.MemWrites.DisableFrostbite;
+            if (ImGui.Checkbox("Disable Frostbite", ref frostbite))
+            {
+                Config.MemWrites.DisableFrostbite = frostbite;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Remove frostbite screen overlay effect");
+
+            // ── Disable Inventory Blur ──
+            bool invBlur = Config.MemWrites.DisableInventoryBlur;
+            if (ImGui.Checkbox("Disable Inventory Blur", ref invBlur))
+            {
+                Config.MemWrites.DisableInventoryBlur = invBlur;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Remove background blur when inventory is open");
+
+            // ── Owl Mode ──
+            bool owl = Config.MemWrites.OwlMode;
+            if (ImGui.Checkbox("Owl Mode", ref owl))
+            {
+                Config.MemWrites.OwlMode = owl;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Remove mouse look limits (360° head rotation)");
+
+            ImGui.Spacing();
+            ImGui.SeparatorText("Interaction");
+
+            // ── Disable Weapon Collision ──
+            bool weapCol = Config.MemWrites.DisableWeaponCollision;
+            if (ImGui.Checkbox("Disable Weapon Collision", ref weapCol))
+            {
+                Config.MemWrites.DisableWeaponCollision = weapCol;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Prevent weapon from folding when near walls");
+
+            // ── Extended Reach ──
+            bool reach = Config.MemWrites.ExtendedReach.Enabled;
+            if (ImGui.Checkbox("Extended Reach", ref reach))
+            {
+                Config.MemWrites.ExtendedReach.Enabled = reach;
+                Config.MarkDirty();
+            }
+            if (reach)
+            {
+                ImGui.Indent(16);
+                ImGui.SetNextItemWidth(180);
+                float reachDist = Config.MemWrites.ExtendedReach.Distance;
+                if (ImGui.SliderFloat("Distance##er", ref reachDist, 1f, 20f, "%.1fm"))
+                {
+                    Config.MemWrites.ExtendedReach.Distance = reachDist;
+                    Config.MarkDirty();
+                }
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Loot/door interaction distance (default ~1.3m)");
+                ImGui.Unindent(16);
+            }
+
+            // ── Med Panel ──
+            bool medPanel = Config.MemWrites.MedPanel;
+            if (ImGui.Checkbox("Med Panel", ref medPanel))
+            {
+                Config.MemWrites.MedPanel = medPanel;
+                Config.MarkDirty();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Show med effect using panel (health effects UI)");
+
+            if (!masterEnabled)
+                ImGui.EndDisabled();
+
+            ImGui.EndTabItem();
         }
     }
 }

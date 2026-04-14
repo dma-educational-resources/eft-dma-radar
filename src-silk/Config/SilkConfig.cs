@@ -29,6 +29,136 @@ namespace eft_dma_radar.Silk.Config
         public int Key { get; set; } = -1;
     }
 
+    /// <summary>Move speed multiplier sub-config.</summary>
+    public sealed class MoveSpeedConfig
+    {
+        [JsonPropertyName("enabled")]
+        public bool Enabled { get; set; } = false;
+
+        /// <summary>Speed multiplier (e.g. 1.2 = 20% faster).</summary>
+        [JsonPropertyName("multiplier")]
+        public float Multiplier { get; set; } = 1.2f;
+    }
+
+    /// <summary>FullBright sub-config.</summary>
+    public sealed class FullBrightConfig
+    {
+        [JsonPropertyName("enabled")]
+        public bool Enabled { get; set; } = false;
+
+        /// <summary>Ambient brightness level [0..2].</summary>
+        [JsonPropertyName("brightness")]
+        public float Brightness { get; set; } = 1.0f;
+    }
+
+    /// <summary>Extended reach sub-config.</summary>
+    public sealed class ExtendedReachConfig
+    {
+        [JsonPropertyName("enabled")]
+        public bool Enabled { get; set; } = false;
+
+        /// <summary>Loot/door interact distance (default game: ~1.3m).</summary>
+        [JsonPropertyName("distance")]
+        public float Distance { get; set; } = 3.0f;
+    }
+
+    /// <summary>Long jump sub-config.</summary>
+    public sealed class LongJumpConfig
+    {
+        [JsonPropertyName("enabled")]
+        public bool Enabled { get; set; } = false;
+
+        /// <summary>Air control multiplier (higher = longer jumps).</summary>
+        [JsonPropertyName("multiplier")]
+        public float Multiplier { get; set; } = 2.0f;
+    }
+
+    /// <summary>Wide lean sub-config.</summary>
+    public sealed class WideLeanConfig
+    {
+        [JsonPropertyName("enabled")]
+        public bool Enabled { get; set; } = false;
+
+        /// <summary>Lean amount (multiplied by 0.2 internally).</summary>
+        [JsonPropertyName("amount")]
+        public float Amount { get; set; } = 1.0f;
+    }
+
+    /// <summary>Per-feature memory write settings.</summary>
+    public sealed class MemWritesConfig
+    {
+        [JsonPropertyName("noRecoil")]
+        public bool NoRecoil { get; set; } = false;
+
+        /// <summary>Recoil amount percent (0 = none, 100 = full).</summary>
+        [JsonPropertyName("noRecoilAmount")]
+        public int NoRecoilAmount { get; set; } = 0;
+
+        /// <summary>Sway amount percent (0 = none, 100 = full).</summary>
+        [JsonPropertyName("noSwayAmount")]
+        public int NoSwayAmount { get; set; } = 0;
+
+        [JsonPropertyName("noInertia")]
+        public bool NoInertia { get; set; } = false;
+
+        [JsonPropertyName("infStamina")]
+        public bool InfStamina { get; set; } = false;
+
+        [JsonPropertyName("nightVision")]
+        public bool NightVision { get; set; } = false;
+
+        [JsonPropertyName("thermalVision")]
+        public bool ThermalVision { get; set; } = false;
+
+        [JsonPropertyName("moveSpeed")]
+        public MoveSpeedConfig MoveSpeed { get; set; } = new();
+
+        [JsonPropertyName("fullBright")]
+        public FullBrightConfig FullBright { get; set; } = new();
+
+        [JsonPropertyName("noVisor")]
+        public bool NoVisor { get; set; } = false;
+
+        [JsonPropertyName("disableFrostbite")]
+        public bool DisableFrostbite { get; set; } = false;
+
+        [JsonPropertyName("disableInventoryBlur")]
+        public bool DisableInventoryBlur { get; set; } = false;
+
+        [JsonPropertyName("disableWeaponCollision")]
+        public bool DisableWeaponCollision { get; set; } = false;
+
+        [JsonPropertyName("extendedReach")]
+        public ExtendedReachConfig ExtendedReach { get; set; } = new();
+
+        [JsonPropertyName("fastDuck")]
+        public bool FastDuck { get; set; } = false;
+
+        [JsonPropertyName("longJump")]
+        public LongJumpConfig LongJump { get; set; } = new();
+
+        [JsonPropertyName("thirdPerson")]
+        public bool ThirdPerson { get; set; } = false;
+
+        [JsonPropertyName("instantPlant")]
+        public bool InstantPlant { get; set; } = false;
+
+        [JsonPropertyName("magDrills")]
+        public bool MagDrills { get; set; } = false;
+
+        [JsonPropertyName("muleMode")]
+        public bool MuleMode { get; set; } = false;
+
+        [JsonPropertyName("wideLean")]
+        public WideLeanConfig WideLean { get; set; } = new();
+
+        [JsonPropertyName("medPanel")]
+        public bool MedPanel { get; set; } = false;
+
+        [JsonPropertyName("owlMode")]
+        public bool OwlMode { get; set; } = false;
+    }
+
     /// <summary>
     /// Minimal configuration for the Silk.NET radar.
     /// Loaded from / saved to a JSON file in %AppData%\eft-dma-radar-silk\.
@@ -268,6 +398,9 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Master toggle for all memory write features.</summary>
         public bool MemWritesEnabled { get; set; } = false;
 
+        /// <summary>Per-feature memory write settings.</summary>
+        public MemWritesConfig MemWrites { get; set; } = new();
+
         // ── Web Radar ───────────────────────────────────────────────────────────
 
         /// <summary>Enable the web radar HTTP server on startup.</summary>
@@ -335,6 +468,20 @@ namespace eft_dma_radar.Silk.Config
             Hotkeys ??= [];
             SelectedContainers ??= [];
             QuestBlacklist ??= [];
+
+            MemWrites ??= new();
+            MemWrites.MoveSpeed ??= new();
+            MemWrites.FullBright ??= new();
+            MemWrites.ExtendedReach ??= new();
+            MemWrites.LongJump ??= new();
+            MemWrites.WideLean ??= new();
+            MemWrites.NoRecoilAmount  = Math.Clamp(MemWrites.NoRecoilAmount,  0, 100);
+            MemWrites.NoSwayAmount    = Math.Clamp(MemWrites.NoSwayAmount,    0, 100);
+            MemWrites.MoveSpeed.Multiplier = Math.Clamp(MemWrites.MoveSpeed.Multiplier, 0.5f, 5.0f);
+            MemWrites.FullBright.Brightness = Math.Clamp(MemWrites.FullBright.Brightness, 0f, 2f);
+            MemWrites.ExtendedReach.Distance = Math.Clamp(MemWrites.ExtendedReach.Distance, 1f, 20f);
+            MemWrites.LongJump.Multiplier = Math.Clamp(MemWrites.LongJump.Multiplier, 1f, 10f);
+            MemWrites.WideLean.Amount = Math.Clamp(MemWrites.WideLean.Amount, 0.1f, 5f);
 
             if (string.IsNullOrWhiteSpace(DeviceStr))
                 DeviceStr = "fpga";

@@ -5,10 +5,12 @@
 (gear, hands, dogtag identity, profile lookups), aimview widget, exfils/transits/doors,
 loot filtering with wishlist/blacklist, static loot containers, web radar server, DMA-based
 input/hotkeys with standalone panel, matching progress tracking, hardened raid lifecycle,
-hideout stash/area reading with persistent data across raid transitions, and a full
+hideout stash/area reading with persistent data across raid transitions, a full
 quest system (QuestManager, QuestPanel, quest zone radar rendering, lobby quest reader,
-loot quest-item integration, and LobbyQuestReader lifecycle).
-**85 source files, ~21.5K lines of C#.**
+loot quest-item integration, and LobbyQuestReader lifecycle), CameraManager with ViewMatrix
+and bone-based skeleton rendering, and a complete memory write system (FeatureManager with
+21 features including movement, vision, weapon, and interaction categories).
+**121 source files, ~26.1K lines of C#.**
 
 - **Silk.NET project** (`src-silk`): Silk.NET + SkiaSharp + ImGui window — **running independently**
   - Own `Memory.cs` (DMA layer): state machine, worker thread, full scatter read/write API
@@ -313,8 +315,8 @@ loot quest-item integration, and LobbyQuestReader lifecycle).
 | ~~Own SKPaints (remove WPF project ref)~~ | ~~Phase 2~~ | ✅ Done (Phase 1) |
 | ~~InputManager (DMA-based input)~~ | ~~Phase 5~~ | ✅ Done (Phase 5A) |
 | ~~HotkeyManager (configurable bindings)~~ | ~~Phase 5~~ | ✅ Done (Phase 5A) |
-| FeatureManager (chams, memory writes) | Phase 5+ | ❌ Not started |
-| ResourceJanitor (GC pressure mgmt) | Phase 5+ | ❌ Not started |
+| ~~FeatureManager (memory writes)~~ | ~~Phase 5~~ | ✅ Done (Phase 5H) — 21 features; chams still pending |
+| ResourceJanitor (GC pressure mgmt) | Phase 6+ | ❌ Not started |
 | ~~HideoutManager~~ | ~~Phase 5~~ | ✅ Done (Phase 5E) |
 | ~~QuestManager & quest rendering~~ | ~~Phase 5~~ | ✅ Done (Phase 5F) |
 | ~~StaticLootContainers~~ | ~~Phase 5~~ | ✅ Done (Phase 5D) |
@@ -556,10 +558,11 @@ loot quest-item integration, and LobbyQuestReader lifecycle).
   searched-state filtering, config toggles (ShowContainers, ShowContainerNames, AimviewShowContainers)
 - [x] `HotkeyManagerPanel` — standalone ImGui panel extracted from Settings hotkeys tab;
   own open/close toggle in View menu, config-persisted visibility, full rebind + clear UI
-- [ ] `FeatureManager` port (chams, memory write features)
-- [ ] Memory writes gated by config flag
+- [x] `FeatureManager` port (memory write features) — see Phase 5H below
+- [x] Memory writes gated by config flag (`MemWritesEnabled` master toggle + per-feature toggles)
 - [x] `QuestManager` & quest rendering on radar — see Phase 5F below
 - [x] **Hot-path performance audit & optimizations** \u2014 see Phase 5G below
+- [ ] Chams / visual ESP features (requires FeatureManager infrastructure \u2705, pending implementation)
 - [ ] `ResourceJanitor` (GC pressure management)
 
 ### 5E. Hideout Manager ✅
@@ -634,6 +637,51 @@ loot quest-item integration, and LobbyQuestReader lifecycle).
 - [x] **RadarWindow container loop** — pass `0f` directly to `container.Draw()` when
   `showDistance=false` instead of computing `Vector3.Distance` for every container
 
+### 5H. Memory Write System (FeatureManager + 21 Features) ✅
+- [x] **ScatterWriteHandle** (`DMA/ScatterAPI/ScatterWriteHandle.cs`) — batched DMA write API:
+  - `VmmScatter` wrapper with `AddValueEntry<T>`, `Execute(validationFunc)`, `Callbacks` action
+  - Validation callback pattern: write → read-back → verify; retry on failure
+- [x] **Feature abstractions** (`DMA/Features/`):
+  - `IFeature` — base interface with static `_features` ConcurrentBag for auto-registration
+  - `IMemWriteFeature` — extends IFeature with `Execute(LocalPlayer, ScatterWriteHandle)`
+  - `MemWriteFeature<T>` — abstract singleton base class; `IsActive()` config check,
+    `OnRaidStart()` cache invalidation, `SetIfChanged<V>` dedup helper
+- [x] **FeatureManager** (`Tarkov/Features/FeatureManager.cs`) — background feature driver:
+  - `ModuleInit()` triggers 21 `RuntimeHelpers.RunClassConstructor` calls (singleton registration)
+  - Background worker thread: creates `ScatterWriteHandle`, iterates all `IMemWriteFeature`,
+    calls `Execute()` on active features, disposes handle each tick
+  - Lifecycle: starts on `RaidStarted`, stops on `RaidStopped`; fires `OnRaidStart()` for cache reset
+- [x] **EftHardSettingsResolver** (`Tarkov/Unity/IL2CPP/EftHardSettingsResolver.cs`) —
+  IL2CPP TypeInfoTable → singleton pointer; used by 8 features
+- [x] **LevelSettingsResolver** (`Tarkov/Unity/IL2CPP/LevelSettingsResolver.cs`) —
+  GOM-based LevelSettings component lookup; used by FullBright
+- [x] **21 memory write features** (`Tarkov/Features/MemoryWrites/`):
+  - **Weapon**: NoRecoil (ProceduralWeaponAnimation masks)
+  - **Movement**: NoInertia (EFTHardSettings), MoveSpeed (configurable multiplier),
+    InfStamina (Physical.Stamina + HandsStamina + Oxygen), FastDuck (POSE_CHANGING_SPEED),
+    LongJump (AIR_CONTROL multipliers, configurable), MuleMode (14 writes: Physical +
+    MovementContext walk/sprint/overweight), InstantPlant (PlantState.PlantTime),
+    MagDrills (Skills.MagDrillsLoadSpeed/UnloadSpeed)
+  - **Vision**: NightVision (GOM camera component toggle), ThermalVision (GOM camera
+    component toggle), FullBright (LevelSettings ambient color), NoVisor (VisorEffect.Intensity),
+    DisableFrostbite (EffectsController→_frostbiteEffect→_opacity),
+    DisableInventoryBlur (InventoryBlur _blurCount + _upsampleTexDimension),
+    OwlMode (MOUSE_LOOK_HORIZONTAL/VERTICAL_LIMIT)
+  - **Interaction**: DisableWeaponCollision (WEAPON_OCCLUSION_LAYERS),
+    ExtendedReach (LOOT/DOOR_RAYCAST_DISTANCE, configurable), ThirdPerson
+    (HandsContainer.CameraOffset), WideLean (PWA.PositionZeroSum + direction enum),
+    MedPanel (MED_EFFECT_USING_PANEL)
+- [x] **Config** — `MemWritesConfig` with master `Enabled` toggle + 21 per-feature booleans;
+  5 sub-configs: `MoveSpeedConfig`, `FullBrightConfig`, `ExtendedReachConfig`,
+  `LongJumpConfig`, `WideLeanConfig`; validation/clamping in `Validate()`
+- [x] **Settings Panel** — "Mem Writes" tab with master toggle, grouped sections
+  (Weapon, Movement, Vision, Interaction), sliders for configurable features
+- [x] **Memory.cs integration** — `FeatureManager.ModuleInit()` in startup,
+  `FeatureManager.Start/Stop` wired to raid lifecycle events
+- [x] **GOM.GetComponentFromBehaviour** — static method on `GOM` struct for camera
+  component lookup; used by NightVision, ThermalVision, NoVisor, DisableFrostbite,
+  DisableInventoryBlur
+
 ## Phase 6 — Color Picker, Theming & Advanced UI
 > Customizable colors and additional panels.
 
@@ -664,7 +712,7 @@ loot quest-item integration, and LobbyQuestReader lifecycle).
 
 ---
 
-## File Structure (current — 85 source files, ~21.5K LOC)
+## File Structure (current — 121 source files, ~26.1K LOC)
 
 ```
 src-silk/
@@ -673,25 +721,58 @@ src-silk/
 │   ├── InputManager.cs                    ← DMA-based keyboard input (~100 Hz, Win10/Win11)
 │   ├── HotkeyManager.cs                   ← Configurable hotkey bindings + rebind support
 │   ├── LobbyQuestReader.cs                ← Background quest reader for lobby (lifecycle-managed)
+│   ├── Features/                          ← Feature abstractions
+│   │   ├── IFeature.cs                    ← Base interface + static ConcurrentBag registry
+│   │   ├── IMemWriteFeature.cs            ← Memory write feature contract
+│   │   └── MemWriteFeature.cs             ← Abstract singleton base (IsActive, OnRaidStart, SetIfChanged)
 │   └── ScatterAPI/                        ← Scatter read/write API
 │       ├── IScatterEntry.cs
 │       ├── MemPointer.cs
 │       ├── ScatterReadMap.cs
 │       ├── ScatterReadRound.cs
 │       ├── ScatterReadIndex.cs
-│       └── ScatterReadEntry.cs
+│       ├── ScatterReadEntry.cs
+│       └── ScatterWriteHandle.cs          ← Batched DMA write API (VmmScatter wrapper)
 ├── Tarkov/
 │   ├── Offsets.cs                         ← Game SDK offsets (379 fields, IL2CPP-updated)
 │   ├── ProfileService.cs                  ← tarkov.dev profile fetcher (KD, hours, SR%)
+│   ├── Features/
+│   │   ├── FeatureManager.cs              ← Background feature driver (21 features, raid lifecycle)
+│   │   └── MemoryWrites/                  ← 21 memory write feature implementations
+│   │       ├── NoRecoil.cs                ← PWA shot/breath/walk/moto masks
+│   │       ├── NoInertia.cs               ← EFTHardSettings inertia values
+│   │       ├── MoveSpeed.cs               ← Configurable speed multiplier
+│   │       ├── InfStamina.cs              ← Physical stamina/hands/oxygen
+│   │       ├── NightVision.cs             ← Camera component toggle
+│   │       ├── ThermalVision.cs           ← Camera component toggle
+│   │       ├── FullBright.cs              ← LevelSettings ambient color
+│   │       ├── NoVisor.cs                 ← VisorEffect.Intensity
+│   │       ├── DisableFrostbite.cs        ← EffectsController frostbite opacity
+│   │       ├── DisableInventoryBlur.cs    ← InventoryBlur blur count + upsample
+│   │       ├── DisableWeaponCollision.cs  ← WEAPON_OCCLUSION_LAYERS
+│   │       ├── ExtendedReach.cs           ← Loot/door raycast distance (configurable)
+│   │       ├── FastDuck.cs                ← POSE_CHANGING_SPEED
+│   │       ├── LongJump.cs               ← AIR_CONTROL multipliers (configurable)
+│   │       ├── ThirdPerson.cs             ← HandsContainer.CameraOffset
+│   │       ├── InstantPlant.cs            ← PlantState.PlantTime
+│   │       ├── MagDrills.cs               ← Skills mag load/unload speed
+│   │       ├── MuleMode.cs                ← 14 writes: Physical + MovementContext
+│   │       ├── WideLean.cs                ← PWA.PositionZeroSum + direction
+│   │       ├── MedPanel.cs                ← MED_EFFECT_USING_PANEL
+│   │       └── OwlMode.cs                 ← Mouse look H/V limits
 │   ├── Hideout/
 │   │   └── HideoutManager.cs              ← Stash items, area upgrades, klass-cached GOM lookup
 │   ├── Unity/
 │   │   ├── Unity.cs                       ← UnityOffsets, GOM, ComponentArray, GameObject, TrsX
+│   │   ├── ViewMatrix.cs                  ← 4x4 view matrix extraction from camera
+│   │   ├── Bones.cs                       ← Bone definitions (16 bones, BoneID enum)
 │   │   ├── Collections/
 │   │   │   ├── MemArray.cs                ← Pooled DMA wrapper for IL2CPP T[]
 │   │   │   └── MemList.cs                 ← Pooled DMA wrapper for List<T>
 │   │   └── IL2CPP/
 │   │       ├── MatchingProgressResolver.cs ← Pre-raid matching stage tracking + timer
+│   │       ├── EftHardSettingsResolver.cs ← IL2CPP TypeInfoTable → singleton pointer
+│   │       ├── LevelSettingsResolver.cs   ← GOM-based LevelSettings component lookup
 │   │       └── Dumper/                    ← IL2CPP dumper (5 partial files)
 │   │           ├── Il2CppDumper.cs
 │   │           ├── Il2CppDumperCache.cs
@@ -700,6 +781,7 @@ src-silk/
 │   │           └── TypeInfoTableResolver.cs
 │   └── GameWorld/
 │       ├── LocalGameWorld.cs              ← Raid lifecycle, non-blocking startup, two-tier workers
+│       ├── CameraManager.cs               ← ViewMatrix extraction, 3-worker model integration
 │       ├── RegisteredPlayers.cs           ← Player collection (partial — core + public API)
 │       ├── RegisteredPlayers.Discovery.cs ← Player discovery, classification, registration
 │       ├── RegisteredPlayers.Scatter.cs   ← Scatter-batched transform/rotation reads
@@ -710,7 +792,8 @@ src-silk/
 │       │   ├── PlayerType.cs              ← Player type enum (10 types)
 │       │   ├── GearManager.cs             ← Scatter-batched equipment + dogtag reader
 │       │   ├── GearItem.cs                ← Equipment slot model (BSG ID, short name, price)
-│       │   └── HandsManager.cs            ← In-hands item reader (cached, change-detection)
+│       │   ├── HandsManager.cs            ← In-hands item reader (cached, change-detection)
+│       │   └── Skeleton.cs                ← Bone transform scatter reads (16 bones, O(1) lookup)
 │       ├── Loot/
 │       │   ├── LootManager.cs             ← 6-round scatter chain + corpse dogtag/equipment + containers
 │       │   ├── LootItem.cs                ← Loot rendering with price tiers, wishlist awareness
@@ -752,7 +835,7 @@ src-silk/
 │   ├── SKPaints.cs                        ← Immutable per-type paints, shadows, wishlist colors
 │   ├── CustomFonts.cs                     ← Embedded font loading
 │   ├── Panels/
-│   │   ├── SettingsPanel.cs               ← ImGui settings (General, Players, Loot, Map, Quest tabs)
+│   │   ├── SettingsPanel.cs               ← ImGui settings (General, Players, Loot, Map, Quest, Mem Writes tabs)
 │   │   ├── LootFiltersPanel.cs            ← Wishlist/blacklist/category filter editor (ImGui)
 │   │   ├── HideoutPanel.cs                ← Stash items, area upgrades, search/sort/group (ImGui)
 │   │   ├── HotkeyManagerPanel.cs          ← Standalone hotkey editing panel (rebind + clear)
@@ -774,7 +857,11 @@ src-silk/
 │           ├── WebRadarPlayer.cs           ← Player data for web clients
 │           ├── WebRadarMapInfo.cs          ← Map metadata
 │           ├── WebRadarMapConverter.cs     ← Map coordinate conversion
-│           └── WebPlayerType.cs            ← Web-friendly player type enum
+│           ├── WebPlayerType.cs            ← Web-friendly player type enum
+│           ├── WebRadarLootItem.cs         ← Loot snapshot for web clients
+│           ├── WebRadarCorpse.cs           ← Corpse snapshot for web clients
+│           ├── WebRadarContainer.cs        ← Container snapshot for web clients
+│           └── WebRadarExfil.cs            ← Exfil snapshot for web clients
 ├── Docs/
 │   ├── MIGRATION_ROADMAP.md               ← This file
 │   └── DEBUG_OUTPUT_REFERENCE.md          ← Annotated live debug output reference

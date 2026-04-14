@@ -88,6 +88,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// <summary>Whether this player is the local (MainPlayer) player.</summary>
         public virtual bool IsLocalPlayer => false;
 
+        /// <summary>Raw memory base address of this player object. Set during discovery.</summary>
+        public ulong Base { get; internal set; }
+
         /// <summary>Whether this player is a human-controlled PMC or player scav.</summary>
         public bool IsHuman => Type is PlayerType.Default or PlayerType.Teammate
             or PlayerType.USEC or PlayerType.BEAR or PlayerType.PScav

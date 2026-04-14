@@ -47,6 +47,9 @@ namespace eft_dma_radar.Silk
                 };
                 Log.WriteLine("[SilkProgram] Memory module initialized.");
 
+                eft_dma_radar.Silk.Tarkov.Features.FeatureManager.ModuleInit();
+                Log.WriteLine("[SilkProgram] FeatureManager initialized.");
+
                 EftDataManager.ModuleInit();
 
                 LootFilter.LoadFilterData();

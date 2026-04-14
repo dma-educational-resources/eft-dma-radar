@@ -87,6 +87,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     ? CreateLocalPlayer(playerBase, name, type, sideRaw)
                     : new Player.Player { Name = name, Type = type, IsAlive = true, IsActive = true };
 
+                player.Base = playerBase;
                 var entry = new PlayerEntry(playerBase, player, isObserved);
 
                 // Stagger initial gear/hands refresh times so newly discovered players
