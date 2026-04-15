@@ -108,6 +108,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <summary>Optic Camera pointer (ads/scoped).</summary>
         public ulong OpticCamera { get; }
 
+        /// <summary>Counter for rate-limiting the scoped check (4 sequential DMA reads).</summary>
+        private int _scopeCheckTick;
+
+        /// <summary>How often to run the full scoped check (every Nth UpdateCamera call).</summary>
+        private const int ScopeCheckInterval = 4;
+
         #endregion
 
         #region Constructor / Init
@@ -126,17 +132,26 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             };
         }
 
-        public CameraManager()
+        private CameraManager(ulong fpsCamera, ulong opticCamera)
         {
-            if (!TryResolveCameras(out var fpsCam, out var opticCam))
-                throw new InvalidOperationException("[CameraManager] Failed to resolve FPS/Optic cameras.");
-
-            FPSCamera = fpsCam;
-            OpticCamera = opticCam;
+            FPSCamera = fpsCamera;
+            OpticCamera = opticCamera;
             IsActive = true;
 
             Log.WriteLine($"[CameraManager] FPSCamera:   0x{FPSCamera:X}");
             Log.WriteLine($"[CameraManager] OpticCamera: 0x{OpticCamera:X}");
+        }
+
+        /// <summary>
+        /// Non-throwing factory. Returns <c>null</c> when camera pointers cannot
+        /// be resolved (e.g. raid still loading). Safe to call repeatedly.
+        /// </summary>
+        public static CameraManager? TryCreate()
+        {
+            if (!TryResolveCameras(out var fpsCam, out var opticCam))
+                return null;
+
+            return new CameraManager(fpsCam, opticCam);
         }
 
         /// <summary>
@@ -280,7 +295,19 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         public void UpdateCamera(LocalPlayer? localPlayer)
         {
             IsADS = localPlayer?.IsADS ?? false;
-            IsScoped = IsADS && CheckIfScoped(localPlayer!);
+
+            // Rate-limit the scoped check — it does 4 sequential DMA reads.
+            // Only re-evaluate every Nth tick; when not ADS, skip entirely.
+            if (IsADS && ++_scopeCheckTick >= ScopeCheckInterval)
+            {
+                _scopeCheckTick = 0;
+                IsScoped = CheckIfScoped(localPlayer!);
+            }
+            else if (!IsADS)
+            {
+                IsScoped = false;
+                _scopeCheckTick = 0;
+            }
 
             ulong camera = (IsADS && IsScoped && OpticCamera.IsValidVirtualAddress())
                 ? OpticCamera

@@ -259,5 +259,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             config.LootShowWishlist = true;
             ClearSearch();
         }
+
+        /// <summary>
+        /// Clears runtime caches (price formatting, etc.) to free memory between raids.
+        /// </summary>
+        public static void ClearCaches()
+        {
+            _priceCache.Clear();
+        }
     }
 }

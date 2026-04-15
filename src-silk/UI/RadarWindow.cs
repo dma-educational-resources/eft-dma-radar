@@ -88,6 +88,40 @@ namespace eft_dma_radar.Silk.UI
         private static Vector2 _lastHitTestMousePos;
         private const float HitTestDeadZone = 3f; // pixels
 
+        // ── Cached ImGui strings (rebuilt only when values change) ──────────
+
+        // DrawMainMenuBar: right-aligned "MapName  |  FPS" text
+        private static string _cachedMenuBarMapName = "";
+        private static int _cachedMenuBarFps = -1;
+        private static string _cachedMenuBarRightText = "";
+
+        // DrawStatusBar: raid player counts
+        private static int _cachedStatusPlayerCount = -1;
+        private static int _cachedStatusPmcCount = -1;
+        private static string _cachedStatusPlayersText = "";
+
+        // DrawStatusBar: hideout stash info
+        private static int _cachedHideoutItemCount = -1;
+        private static long _cachedHideoutTotalValue = -1;
+        private static string _cachedHideoutStashText = "";
+
+        // DrawStatusMessage: cached composite text
+        private static string _cachedStatusMessage = "";
+        private static int _cachedStatusOrder = -1;
+        private static string _cachedStatusComposite = "";
+
+        // ── Cached ImGui Vector4 colors (avoid per-frame struct allocation) ─
+        private static readonly Vector4 ColorMenuBarRight = new(0.55f, 0.60f, 0.65f, 1.0f);
+        private static readonly Vector4 ColorStatusBarBg = new(0.10f, 0.10f, 0.12f, 0.92f);
+        private static readonly Vector4 ColorHideoutDot = new(1.00f, 0.84f, 0.00f, 1f);
+        private static readonly Vector4 ColorStatusText = new(0.60f, 0.62f, 0.65f, 1f);
+        private static readonly Vector4 ColorStatusSeparator = new(0.50f, 0.52f, 0.55f, 1f);
+        private static readonly Vector4 ColorRaidDot = new(0.30f, 0.75f, 0.70f, 1f);
+        private static readonly Vector4 ColorSaveNotify = new(0.30f, 0.80f, 0.50f, 1f);
+        private static readonly Vector4 ColorFreeModeBtn = new(0.18f, 0.48f, 0.48f, 1.0f);
+        private static readonly Vector4 ColorFreeModeBtnHover = new(0.24f, 0.58f, 0.58f, 1.0f);
+        private static readonly Vector4 ColorFreeModeBtnActive = new(0.15f, 0.42f, 0.42f, 1.0f);
+
         #endregion
 
         #region Properties
@@ -663,277 +697,6 @@ namespace eft_dma_radar.Silk.UI
             DrawMouseoverTooltip(canvas, mapParams, map.Config, localPlayer);
         }
 
-        #region Radar Mouseover Tooltip
-
-        // Reusable list for tooltip lines — avoids per-frame allocation
-        private static readonly List<(string text, SKPaint paint)> _tooltipLines = new(16);
-
-        /// <summary>
-        /// Draws a SkiaSharp tooltip near the hovered entity on the radar canvas.
-        /// </summary>
-        private static void DrawMouseoverTooltip(SKCanvas canvas, MapParams mapParams, MapConfig mapConfig, Player localPlayer)
-        {
-            var hoveredPlayer = _mouseOverPlayer;
-            var hoveredLoot = _mouseOverLoot;
-            var hoveredCorpse = _mouseOverCorpse;
-            var hoveredExfil = _mouseOverExfil;
-            var hoveredTransit = _mouseOverTransit;
-
-            if (hoveredPlayer is not null)
-            {
-                var screenPos = mapParams.ToScreenPos(MapParams.ToMapPos(hoveredPlayer.Position, mapConfig));
-                BuildPlayerTooltipLines(hoveredPlayer, localPlayer);
-                DrawTooltipBox(canvas, screenPos, _tooltipLines);
-            }
-            else if (hoveredCorpse is not null)
-            {
-                var screenPos = mapParams.ToScreenPos(MapParams.ToMapPos(hoveredCorpse.Position, mapConfig));
-                BuildCorpseTooltipLines(hoveredCorpse, localPlayer);
-                DrawTooltipBox(canvas, screenPos, _tooltipLines);
-            }
-            else if (hoveredLoot is not null)
-            {
-                var screenPos = mapParams.ToScreenPos(MapParams.ToMapPos(hoveredLoot.Position, mapConfig));
-                BuildLootTooltipLines(hoveredLoot, localPlayer);
-                DrawTooltipBox(canvas, screenPos, _tooltipLines);
-            }
-            else if (hoveredExfil is not null)
-            {
-                var screenPos = mapParams.ToScreenPos(MapParams.ToMapPos(hoveredExfil.Position, mapConfig));
-                BuildExfilTooltipLines(hoveredExfil, localPlayer);
-                DrawTooltipBox(canvas, screenPos, _tooltipLines);
-            }
-            else if (hoveredTransit is not null)
-            {
-                var screenPos = mapParams.ToScreenPos(MapParams.ToMapPos(hoveredTransit.Position, mapConfig));
-                BuildTransitTooltipLines(hoveredTransit, localPlayer);
-                DrawTooltipBox(canvas, screenPos, _tooltipLines);
-            }
-        }
-
-        private static void BuildPlayerTooltipLines(Player player, Player localPlayer)
-        {
-            _tooltipLines.Clear();
-            var textPaint = player.TextPaint;
-            int dist = (int)Vector3.Distance(localPlayer.Position, player.Position);
-
-            // Name + faction
-            string faction = player.Type switch
-            {
-                PlayerType.USEC => "USEC",
-                PlayerType.BEAR => "BEAR",
-                PlayerType.PScav => "PScav",
-                PlayerType.SpecialPlayer => "Special",
-                PlayerType.Streamer => "Streamer",
-                _ => "?"
-            };
-
-            string namePrefix = player.Level > 0 ? $"Lvl {player.Level} " : "";
-            _tooltipLines.Add(($"{faction}: {namePrefix}{player.Name}", textPaint));
-
-            // Profile stats (K/D, hours, survival rate)
-            if (player.Profile is { HasData: true } prof)
-            {
-                _tooltipLines.Add(($"K/D: {prof.KD:F1}  Raids: {prof.Sessions}  SR: {prof.SurvivedRate:F0}%  Hrs: {prof.Hours}  {prof.AccountType}", SKPaints.TooltipLabel));
-            }
-            else if (player.AccountId is not null && player.Profile is null
-                     && ProfileService.TryGetProfile(player.AccountId, out var fetchedProfile)
-                     && fetchedProfile.HasData)
-            {
-                player.Profile = fetchedProfile;
-                _tooltipLines.Add(($"K/D: {fetchedProfile.KD:F1}  Raids: {fetchedProfile.Sessions}  SR: {fetchedProfile.SurvivedRate:F0}%  Hrs: {fetchedProfile.Hours}  {fetchedProfile.AccountType}", SKPaints.TooltipLabel));
-            }
-
-            // Group
-            if (player.SpawnGroupID != -1)
-                _tooltipLines.Add(($"Group: {player.SpawnGroupID}", SKPaints.TooltipText));
-
-            // Distance
-            _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
-
-            // In hands
-            if (player.HandsReady && player.InHandsItem is not null)
-            {
-                string handsText = player.InHandsAmmo is not null
-                    ? $"Hands: {player.InHandsItem} ({player.InHandsAmmo})"
-                    : $"Hands: {player.InHandsItem}";
-                _tooltipLines.Add((handsText, SKPaints.TooltipText));
-            }
-
-            // Gear summary
-            if (player.GearReady)
-            {
-                if (player.GearValue > 0)
-                    _tooltipLines.Add(($"Value: {LootFilter.FormatPrice(player.GearValue)}", SKPaints.TooltipAccent));
-
-                if (player.HasThermal && player.HasNVG)
-                    _tooltipLines.Add(("Thermal + NVG", SKPaints.TooltipAccent));
-                else if (player.HasThermal)
-                    _tooltipLines.Add(("Thermal", SKPaints.TooltipAccent));
-                else if (player.HasNVG)
-                    _tooltipLines.Add(("NVG", SKPaints.TooltipAccent));
-
-                // Equipment list — compact
-                foreach (var kvp in player.Equipment)
-                {
-                    string price = kvp.Value.Price > 0 ? $" ({LootFilter.FormatPrice(kvp.Value.Price)})" : "";
-                    _tooltipLines.Add(($"  {kvp.Value.Short}{price}", SKPaints.TooltipText));
-                }
-            }
-        }
-
-        private static void BuildLootTooltipLines(LootItem loot, Player localPlayer)
-        {
-            _tooltipLines.Clear();
-            int dist = (int)Vector3.Distance(localPlayer.Position, loot.Position);
-            var filterData = LootFilter.FilterData;
-            bool wishlisted = filterData.IsWishlisted(loot.Id);
-            var paint = wishlisted ? SKPaints.TooltipWishlist
-                      : loot.IsImportant ? SKPaints.TooltipAccent
-                      : SKPaints.TooltipText;
-
-            _tooltipLines.Add((loot.Name, paint));
-
-            if (wishlisted)
-                _tooltipLines.Add(("\u2605 Wishlisted", SKPaints.TooltipWishlist));
-
-            if (loot.DisplayPrice > 0)
-                _tooltipLines.Add(($"Price: {LootFilter.FormatPrice(loot.DisplayPrice)}", SKPaints.TooltipAccent));
-
-            _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
-
-            // Warn if loot is far below the player (likely under the map / inaccessible)
-            if (loot.Position.Y < localPlayer.Position.Y - 15f)
-                _tooltipLines.Add(("Under map (inaccessible)", SKPaints.TooltipLabel));
-        }
-
-        private static void BuildCorpseTooltipLines(LootCorpse corpse, Player localPlayer)
-        {
-            _tooltipLines.Clear();
-            int dist = (int)Vector3.Distance(localPlayer.Position, corpse.Position);
-
-            _tooltipLines.Add((corpse.Name, SKPaints.TextCorpse));
-
-            if (corpse.TotalValue > 0)
-                _tooltipLines.Add(($"Value: {LootFilter.FormatPrice(corpse.TotalValue)}", SKPaints.TooltipAccent));
-
-            _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
-
-            if (corpse.GearReady && corpse.Equipment.Count > 0)
-            {
-                foreach (var kvp in corpse.Equipment)
-                {
-                    string price = kvp.Value.Price > 0 ? $" ({LootFilter.FormatPrice(kvp.Value.Price)})" : "";
-                    _tooltipLines.Add(($"  {kvp.Value.ShortName}{price}", SKPaints.TooltipText));
-                }
-            }
-        }
-
-        private static void BuildExfilTooltipLines(Exfil exfil, Player localPlayer)
-        {
-            _tooltipLines.Clear();
-            int dist = (int)Vector3.Distance(localPlayer.Position, exfil.Position);
-
-            // Name colored by status
-            var (_, textPaint) = exfil.Status switch
-            {
-                ExfilStatus.Open => (SKPaints.PaintExfilOpen, SKPaints.TextExfilOpen),
-                ExfilStatus.Pending => (SKPaints.PaintExfilPending, SKPaints.TextExfilPending),
-                _ => (SKPaints.PaintExfilClosed, SKPaints.TextExfilClosed),
-            };
-
-            _tooltipLines.Add((exfil.Name, textPaint));
-
-            // Status
-            string statusText = exfil.Status switch
-            {
-                ExfilStatus.Open => "Open",
-                ExfilStatus.Pending => "Pending",
-                _ => "Closed",
-            };
-            _tooltipLines.Add(($"Status: {statusText}", SKPaints.TooltipLabel));
-
-            // Distance
-            _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
-
-            // Availability for local player
-            if (localPlayer is LocalPlayer lp)
-            {
-                if (!exfil.IsAvailableFor(lp))
-                    _tooltipLines.Add(("Not available", SKPaints.TextExfilInactive));
-            }
-        }
-
-        private static void BuildTransitTooltipLines(TransitPoint transit, Player localPlayer)
-        {
-            _tooltipLines.Clear();
-            int dist = (int)Vector3.Distance(localPlayer.Position, transit.Position);
-
-            _tooltipLines.Add((transit.Name, SKPaints.TextTransit));
-            _tooltipLines.Add(($"Status: {(transit.IsActive ? "Active" : "Inactive")}", SKPaints.TooltipLabel));
-            _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
-        }
-
-        /// <summary>
-        /// Draws a rounded-rect tooltip box at an entity screen position, clamped to canvas bounds.
-        /// </summary>
-        private static void DrawTooltipBox(SKCanvas canvas, SKPoint anchor, List<(string text, SKPaint paint)> lines)
-        {
-            if (lines.Count == 0)
-                return;
-
-            const float padX = 6f;
-            const float padY = 4f;
-            const float lineH = 13f;
-            const float offsetX = 14f;
-            const float offsetY = -6f;
-            const float cornerRadius = 4f;
-            const float margin = 4f;
-
-            // Measure max line width
-            float maxWidth = 0;
-            foreach (var (text, paint) in lines)
-            {
-                float w = SKPaints.FontTooltip.MeasureText(text, paint);
-                if (w > maxWidth) maxWidth = w;
-            }
-
-            float boxW = maxWidth + padX * 2;
-            float boxH = lines.Count * lineH + padY * 2;
-
-            float left = anchor.X + offsetX;
-            float top = anchor.Y + offsetY;
-
-            // Clamp to canvas bounds
-            float canvasW = _window.Size.X;
-            float canvasH = _window.Size.Y;
-
-            if (left + boxW > canvasW - margin)
-                left = anchor.X - offsetX - boxW;
-            if (left < margin)
-                left = margin;
-            if (top + boxH > canvasH - margin)
-                top = canvasH - margin - boxH;
-            if (top < margin)
-                top = margin;
-
-            var rect = new SKRect(left, top, left + boxW, top + boxH);
-
-            canvas.DrawRoundRect(rect, cornerRadius, cornerRadius, SKPaints.TooltipBackground);
-            canvas.DrawRoundRect(rect, cornerRadius, cornerRadius, SKPaints.TooltipBorder);
-
-            float textX = rect.Left + padX;
-            float textY = rect.Top + padY + SKPaints.FontTooltip.Size;
-
-            foreach (var (text, paint) in lines)
-            {
-                canvas.DrawText(text, textX, textY, SKPaints.FontTooltip, paint);
-                textY += lineH;
-            }
-        }
-
-        #endregion
-
         private static void DrawGroupConnectors(SKCanvas canvas, List<Player> players, RadarMap map, MapParams mapParams)
         {
             // Reset pooled collections instead of allocating new ones each frame
@@ -994,13 +757,18 @@ namespace eft_dma_radar.Silk.UI
                 dots = _statusDots[_statusOrder];
             }
 
-            string text = message + dots;
+            if (!ReferenceEquals(message, _cachedStatusMessage) || _statusOrder != _cachedStatusOrder)
+            {
+                _cachedStatusMessage = message;
+                _cachedStatusOrder = _statusOrder;
+                _cachedStatusComposite = message + dots;
+            }
 
-            float textWidth = SKPaints.FontRegular48.MeasureText(text);
+            float textWidth = SKPaints.FontRegular48.MeasureText(_cachedStatusComposite);
             float x = (bounds.Width - textWidth) / 2f;
             float y = bounds.Height / 2f;
 
-            canvas.DrawText(text, x, y, SKPaints.FontRegular48, SKPaints.TextRadarStatus);
+            canvas.DrawText(_cachedStatusComposite, x, y, SKPaints.FontRegular48, SKPaints.TextRadarStatus);
         }
 
         #endregion
@@ -1042,9 +810,9 @@ namespace eft_dma_radar.Silk.UI
             int pushedColors = 0;
             if (_freeMode)
             {
-                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.18f, 0.48f, 0.48f, 1.0f));
-                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.24f, 0.58f, 0.58f, 1.0f));
-                ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.15f, 0.42f, 0.42f, 1.0f));
+                ImGui.PushStyleColor(ImGuiCol.Button, ColorFreeModeBtn);
+                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ColorFreeModeBtnHover);
+                ImGui.PushStyleColor(ImGuiCol.ButtonActive, ColorFreeModeBtnActive);
                 pushedColors = 3;
             }
 
@@ -1169,11 +937,16 @@ namespace eft_dma_radar.Silk.UI
 
             // ── Right-aligned info ──────────────────────────────────────────
             string mapName = Memory.InHideout ? "Hideout" : MapManager.Map?.Config?.Name ?? "No Map";
-            string rightText = $"{mapName}  |  {_fps} FPS";
-            float rightTextWidth = ImGui.CalcTextSize(rightText).X;
+            if (mapName != _cachedMenuBarMapName || _fps != _cachedMenuBarFps)
+            {
+                _cachedMenuBarMapName = mapName;
+                _cachedMenuBarFps = _fps;
+                _cachedMenuBarRightText = $"{mapName}  |  {_fps} FPS";
+            }
+            float rightTextWidth = ImGui.CalcTextSize(_cachedMenuBarRightText).X;
             ImGui.SetCursorPosX(ImGui.GetWindowWidth() - rightTextWidth - 12);
 
-            ImGui.TextColored(new Vector4(0.55f, 0.60f, 0.65f, 1.0f), rightText);
+            ImGui.TextColored(ColorMenuBarRight, _cachedMenuBarRightText);
 
             ImGui.EndMainMenuBar();
         }
@@ -1195,25 +968,32 @@ namespace eft_dma_radar.Silk.UI
                         ImGuiWindowFlags.NoFocusOnAppearing;
 
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 2));
-            ImGui.PushStyleColor(ImGuiCol.WindowBg, new Vector4(0.10f, 0.10f, 0.12f, 0.92f));
+            ImGui.PushStyleColor(ImGuiCol.WindowBg, ColorStatusBarBg);
 
             if (ImGui.Begin("##StatusBar", flags))
             {
                 if (Memory.InHideout)
                 {
                     // Hideout status
-                    ImGui.TextColored(new Vector4(1.00f, 0.84f, 0.00f, 1f), "\u25cf");
+                    ImGui.TextColored(ColorHideoutDot, "\u25cf");
                     ImGui.SameLine(0, 4);
-                    ImGui.TextColored(new Vector4(0.60f, 0.62f, 0.65f, 1f), "In Hideout");
+                    ImGui.TextColored(ColorStatusText, "In Hideout");
 
                     var hideout = Memory.Hideout;
                     if (hideout.Items.Count > 0)
                     {
+                        int itemCount = hideout.Items.Count;
+                        long totalValue = hideout.TotalBestValue;
+                        if (itemCount != _cachedHideoutItemCount || totalValue != _cachedHideoutTotalValue)
+                        {
+                            _cachedHideoutItemCount = itemCount;
+                            _cachedHideoutTotalValue = totalValue;
+                            _cachedHideoutStashText = $"Stash: {itemCount} items  \u00b7  \u20bd{totalValue:N0}";
+                        }
                         ImGui.SameLine(0, 16);
-                        ImGui.TextColored(new Vector4(0.50f, 0.52f, 0.55f, 1f), "\u2502");
+                        ImGui.TextColored(ColorStatusSeparator, "\u2502");
                         ImGui.SameLine(0, 16);
-                        ImGui.TextColored(new Vector4(0.60f, 0.62f, 0.65f, 1f),
-                            $"Stash: {hideout.Items.Count} items  \u00b7  \u20bd{hideout.TotalBestValue:N0}");
+                        ImGui.TextColored(ColorStatusText, _cachedHideoutStashText);
                     }
                 }
                 else
@@ -1234,17 +1014,23 @@ namespace eft_dma_radar.Silk.UI
                         }
                     }
 
+                    if (playerCount != _cachedStatusPlayerCount || pmcCount != _cachedStatusPmcCount)
+                    {
+                        _cachedStatusPlayerCount = playerCount;
+                        _cachedStatusPmcCount = pmcCount;
+                        _cachedStatusPlayersText = $"Players: {playerCount}  ({pmcCount} PMC)";
+                    }
+
                     // Status dot
-                    ImGui.TextColored(new Vector4(0.30f, 0.75f, 0.70f, 1f), "\u25cf");
+                    ImGui.TextColored(ColorRaidDot, "\u25cf");
                     ImGui.SameLine(0, 4);
-                    ImGui.TextColored(new Vector4(0.60f, 0.62f, 0.65f, 1f), "In Raid");
+                    ImGui.TextColored(ColorStatusText, "In Raid");
 
                     ImGui.SameLine(0, 16);
-                    ImGui.TextColored(new Vector4(0.50f, 0.52f, 0.55f, 1f), "\u2502");
+                    ImGui.TextColored(ColorStatusSeparator, "\u2502");
 
                     ImGui.SameLine(0, 16);
-                    ImGui.TextColored(new Vector4(0.60f, 0.62f, 0.65f, 1f),
-                        $"Players: {playerCount}  ({pmcCount} PMC)");
+                    ImGui.TextColored(ColorStatusText, _cachedStatusPlayersText);
                 }
 
                 // Right: save notification
@@ -1252,10 +1038,10 @@ namespace eft_dma_radar.Silk.UI
                 {
                     _saveNotifyTimer -= ImGui.GetIO().DeltaTime;
                     float alpha = Math.Clamp(_saveNotifyTimer, 0f, 1f);
-                    string savedText = "\u2713 Config saved";
+                    const string savedText = "\u2713 Config saved";
                     float savedWidth = ImGui.CalcTextSize(savedText).X;
                     ImGui.SameLine(ImGui.GetWindowWidth() - savedWidth - 14);
-                    ImGui.TextColored(new Vector4(0.30f, 0.80f, 0.50f, alpha), savedText);
+                    ImGui.TextColored(ColorSaveNotify with { W = alpha }, savedText);
                 }
             }
 
@@ -1465,355 +1251,6 @@ namespace eft_dma_radar.Silk.UI
         private static void ApplyImGuiFontScale()
         {
             ImGui.GetIO().FontGlobalScale = UIScale;
-        }
-
-        #endregion
-
-        #region Input Handling
-
-        private static void OnMouseDown(IMouse mouse, MouseButton button)
-        {
-            if (!InRaid)
-                return;
-
-            _mouseDown = true;
-            _lastMousePosition = new Vector2(mouse.Position.X, mouse.Position.Y);
-        }
-
-        private static void OnMouseUp(IMouse mouse, MouseButton button)
-        {
-            _mouseDown = false;
-        }
-
-        private static void OnMouseMove(IMouse mouse, Vector2 position)
-        {
-            if (_mouseDown && _freeMode)
-            {
-                var deltaX = position.X - _lastMousePosition.X;
-                var deltaY = position.Y - _lastMousePosition.Y;
-
-                _mapPanPosition.X -= deltaX;
-                _mapPanPosition.Y -= deltaY;
-
-                _lastMousePosition = position;
-                return;
-            }
-
-            if (!InRaid)
-            {
-                _mouseOverPlayer = null;
-                _mouseOverLoot = null;
-                _mouseOverCorpse = null;
-                _mouseOverExfil = null;
-                _mouseOverTransit = null;
-                MouseoverGroup = null;
-                return;
-            }
-
-            // Dead zone — skip expensive hit-testing when mouse barely moved
-            float dx = position.X - _lastHitTestMousePos.X;
-            float dy = position.Y - _lastHitTestMousePos.Y;
-            if (dx * dx + dy * dy < HitTestDeadZone * HitTestDeadZone)
-                return;
-            _lastHitTestMousePos = position;
-
-            var curParams = GetCurrentMapParams();
-            if (curParams is null)
-            {
-                _mouseOverPlayer = null;
-                _mouseOverLoot = null;
-                _mouseOverCorpse = null;
-                _mouseOverExfil = null;
-                _mouseOverTransit = null;
-                MouseoverGroup = null;
-                return;
-            }
-
-            var mp = curParams.Value;
-            var mousePos = position;
-            float hitRadius = 12f * UIScale;
-
-            // Pre-compute world bounds for culling — entities off-screen can't be hovered
-            var worldBounds = mp.GetWorldBounds(0f);
-
-            // Check players
-            Player? closestPlayer = null;
-            float closestPlayerDist = float.MaxValue;
-
-            var players = AllPlayers;
-            if (players is not null)
-            {
-                foreach (var p in players)
-                {
-                    if (p.IsLocalPlayer || !p.IsActive || !p.IsAlive)
-                        continue;
-                    if (!worldBounds.Contains(p.Position))
-                        continue;
-                    var screenPos = mp.ToScreenPos(MapParams.ToMapPos(p.Position, mp.Config));
-                    float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
-                    if (dist < closestPlayerDist)
-                    {
-                        closestPlayerDist = dist;
-                        closestPlayer = p;
-                    }
-                }
-            }
-
-            if (closestPlayerDist < hitRadius && closestPlayer is not null)
-            {
-                _mouseOverPlayer = closestPlayer;
-                _mouseOverLoot = null;
-                _mouseOverCorpse = null;
-                _mouseOverExfil = null;
-                _mouseOverTransit = null;
-                MouseoverGroup = closestPlayer.IsHuman && closestPlayer.IsHostile && closestPlayer.SpawnGroupID != -1
-                    ? closestPlayer.SpawnGroupID
-                    : null;
-                return;
-            }
-
-            // Check loot (only when loot is visible)
-            LootItem? closestLoot = null;
-            float closestLootDist = float.MaxValue;
-
-            if (!Config.BattleMode && Config.ShowLoot)
-            {
-                var loot = Memory.Loot;
-                if (loot is not null)
-                {
-                    foreach (var item in loot)
-                    {
-                        if (!item.ShouldDraw())
-                            continue;
-                        if (!worldBounds.Contains(item.Position))
-                            continue;
-                        var screenPos = mp.ToScreenPos(MapParams.ToMapPos(item.Position, mp.Config));
-                        float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
-                        if (dist < closestLootDist)
-                        {
-                            closestLootDist = dist;
-                            closestLoot = item;
-                        }
-                    }
-                }
-            }
-
-            // Check corpses (only when loot is visible)
-            LootCorpse? closestCorpse = null;
-            float closestCorpseDist = float.MaxValue;
-
-            if (!Config.BattleMode && Config.ShowLoot)
-            {
-                var corpses = Memory.Corpses;
-                if (corpses is not null)
-                {
-                    foreach (var c in corpses)
-                    {
-                        if (!worldBounds.Contains(c.Position))
-                            continue;
-                        var screenPos = mp.ToScreenPos(MapParams.ToMapPos(c.Position, mp.Config));
-                        float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
-                        if (dist < closestCorpseDist)
-                        {
-                            closestCorpseDist = dist;
-                            closestCorpse = c;
-                        }
-                    }
-                }
-            }
-
-            // Pick the closest between loot and corpse
-            if (closestCorpseDist < hitRadius && closestCorpse is not null
-                && closestCorpseDist <= closestLootDist)
-            {
-                _mouseOverCorpse = closestCorpse;
-                _mouseOverLoot = null;
-                _mouseOverPlayer = null;
-                _mouseOverExfil = null;
-                _mouseOverTransit = null;
-                MouseoverGroup = null;
-                return;
-            }
-
-            if (closestLootDist < hitRadius && closestLoot is not null)
-            {
-                _mouseOverLoot = closestLoot;
-                _mouseOverPlayer = null;
-                _mouseOverCorpse = null;
-                _mouseOverExfil = null;
-                _mouseOverTransit = null;
-                MouseoverGroup = null;
-                return;
-            }
-
-            // Check exfils (lowest priority)
-            Exfil? closestExfil = null;
-            float closestExfilDist = float.MaxValue;
-
-            if (Config.ShowExfils)
-            {
-                var exfils = Memory.Exfils;
-                if (exfils is not null)
-                {
-                    foreach (var e in exfils)
-                    {
-                        if (!worldBounds.Contains(e.Position))
-                            continue;
-                        var screenPos = mp.ToScreenPos(MapParams.ToMapPos(e.Position, mp.Config));
-                        float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
-                        if (dist < closestExfilDist)
-                        {
-                            closestExfilDist = dist;
-                            closestExfil = e;
-                        }
-                    }
-                }
-            }
-
-            if (closestExfilDist < hitRadius && closestExfil is not null)
-            {
-                _mouseOverExfil = closestExfil;
-                _mouseOverPlayer = null;
-                _mouseOverLoot = null;
-                _mouseOverCorpse = null;
-                _mouseOverTransit = null;
-                MouseoverGroup = null;
-                return;
-            }
-
-            // Check transits
-            TransitPoint? closestTransit = null;
-            float closestTransitDist = float.MaxValue;
-
-            if (Config.ShowTransits)
-            {
-                var transits = Memory.Transits;
-                if (transits is not null)
-                {
-                    foreach (var t in transits)
-                    {
-                        if (!worldBounds.Contains(t.Position))
-                            continue;
-                        var screenPos = mp.ToScreenPos(MapParams.ToMapPos(t.Position, mp.Config));
-                        float dist = Vector2.Distance(new Vector2(screenPos.X, screenPos.Y), mousePos);
-                        if (dist < closestTransitDist)
-                        {
-                            closestTransitDist = dist;
-                            closestTransit = t;
-                        }
-                    }
-                }
-            }
-
-            if (closestTransitDist < hitRadius && closestTransit is not null)
-            {
-                _mouseOverTransit = closestTransit;
-                _mouseOverPlayer = null;
-                _mouseOverLoot = null;
-                _mouseOverCorpse = null;
-                _mouseOverExfil = null;
-                MouseoverGroup = null;
-                return;
-            }
-
-            _mouseOverPlayer = null;
-            _mouseOverLoot = null;
-            _mouseOverCorpse = null;
-            _mouseOverExfil = null;
-            _mouseOverTransit = null;
-            MouseoverGroup = null;
-        }
-
-        /// <summary>Returns the current map params (approximate — for mouseover hit-testing only).</summary>
-        private static MapParams? GetCurrentMapParams()
-        {
-            var map = MapManager.Map;
-            if (map is null || LocalPlayer is null)
-                return null;
-            var scale = UIScale;
-            var canvasSize = new SKSize(_window.Size.X / scale, _window.Size.Y / scale);
-            var lp = MapParams.ToMapPos(LocalPlayer.Position, map.Config);
-            if (_freeMode)
-            {
-                var pan = _mapPanPosition;
-                return map.GetParameters(canvasSize, _zoom, ref pan);
-            }
-            return map.GetParameters(canvasSize, _zoom, ref lp);
-        }
-
-        private static void OnMouseScroll(IMouse mouse, ScrollWheel scroll)
-        {
-            if (!InRaid)
-                return;
-
-            int zoomChange = scroll.Y > 0 ? -ZOOM_STEP : ZOOM_STEP;
-            var newZoom = Math.Max(1, Math.Min(200, _zoom + zoomChange));
-
-            if (newZoom == _zoom)
-                return;
-
-            if (_freeMode && zoomChange < 0)
-            {
-                var zoomFactor = (float)newZoom / _zoom;
-                var canvasCenter = new Vector2(_window.Size.X / 2f, _window.Size.Y / 2f);
-                var mouseOffset = new Vector2(mouse.Position.X - canvasCenter.X, mouse.Position.Y - canvasCenter.Y);
-
-                var panAdjustment = mouseOffset * (1 - zoomFactor) * ZOOM_TO_MOUSE_STRENGTH;
-                _mapPanPosition.X += panAdjustment.X;
-                _mapPanPosition.Y += panAdjustment.Y;
-            }
-
-            _zoom = newZoom;
-        }
-
-        private static void OnKeyDown(IKeyboard keyboard, Key key, int scancode)
-        {
-            // Don't handle shortcuts when ImGui text inputs have focus
-            if (ImGui.GetIO().WantCaptureKeyboard)
-                return;
-
-            switch (key)
-            {
-                case Key.F:
-                    _freeMode = !_freeMode;
-                    if (!_freeMode)
-                        _mapPanPosition = default;
-                    break;
-                case Key.B:
-                    Config.BattleMode = !Config.BattleMode;
-                    break;
-                case Key.S:
-                    SettingsPanel.IsOpen = !SettingsPanel.IsOpen;
-                    break;
-                case Key.L:
-                    LootFiltersPanel.IsOpen = !LootFiltersPanel.IsOpen;
-                    break;
-                case Key.P:
-                    PlayerInfoWidget.IsOpen = !PlayerInfoWidget.IsOpen;
-                    break;
-                case Key.T:
-                    LootWidget.IsOpen = !LootWidget.IsOpen;
-                    break;
-                case Key.A:
-                    AimviewWidget.IsOpen = !AimviewWidget.IsOpen;
-                    break;
-                case Key.H:
-                    HideoutPanel.IsOpen = !HideoutPanel.IsOpen;
-                    break;
-                case Key.Q:
-                    QuestPanel.IsOpen = !QuestPanel.IsOpen;
-                    break;
-                case Key.Escape:
-                    SettingsPanel.IsOpen = false;
-                    LootFiltersPanel.IsOpen = false;
-                    HotkeyManagerPanel.IsOpen = false;
-                    HideoutPanel.IsOpen = false;
-                    QuestPanel.IsOpen = false;
-                    PlayerInfoWidget.IsOpen = false;
-                    LootWidget.IsOpen = false;
-                    AimviewWidget.IsOpen = false;
-                    break;
-            }
         }
 
         #endregion

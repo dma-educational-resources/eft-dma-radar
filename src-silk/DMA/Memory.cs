@@ -133,6 +133,7 @@ namespace eft_dma_radar.Silk.DMA
                 SetState(MemoryState.ProcessFound);
             GCSettings.LatencyMode = GCLatencyMode.Interactive;
             Game = null;
+            LootFilter.ClearCaches();
             RaidStopped?.Invoke(null, EventArgs.Empty);
         }
 

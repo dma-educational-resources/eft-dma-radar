@@ -13,6 +13,9 @@ namespace eft_dma_radar.Silk.Tarkov.Features
         /// <summary>Hard kill-switch — set to true to disable ALL writes at compile time.</summary>
         private const bool HARD_DISABLE_ALL_MEMWRITES = false;
 
+        /// <summary>Reusable list for active write features — avoids per-tick LINQ/List allocation.</summary>
+        private static readonly List<IMemWriteFeature> _activeFeatures = new(32);
+
         internal static void ModuleInit()
         {
             // Force static constructors so each feature self-registers
@@ -90,12 +93,14 @@ namespace eft_dma_radar.Silk.Tarkov.Features
 
                     while (SilkProgram.Config.MemWritesEnabled && Memory.Ready)
                     {
-                        var features = IFeature.AllFeatures
-                            .OfType<IMemWriteFeature>()
-                            .Where(f => f.CanRun)
-                            .ToList();
+                        _activeFeatures.Clear();
+                        foreach (var f in IFeature.AllFeatures)
+                        {
+                            if (f is IMemWriteFeature mw && mw.CanRun)
+                                _activeFeatures.Add(mw);
+                        }
 
-                        ExecuteMemWrites(features);
+                        ExecuteMemWrites(_activeFeatures);
                         Thread.Sleep(10);
                     }
                 }
@@ -107,7 +112,7 @@ namespace eft_dma_radar.Silk.Tarkov.Features
             }
         }
 
-        private static void ExecuteMemWrites(IEnumerable<IMemWriteFeature> features)
+        private static void ExecuteMemWrites(List<IMemWriteFeature> features)
         {
             try
             {

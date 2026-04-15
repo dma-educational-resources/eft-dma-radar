@@ -380,5 +380,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             float ny = scrPos.Y / CameraManager.ViewportHeight;
             return new Vector2(contentMin.X + nx * widgetW, contentMin.Y + ny * widgetH);
         }
-    }
-}
+
+            }
+        }

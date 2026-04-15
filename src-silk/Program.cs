@@ -75,6 +75,7 @@ namespace eft_dma_radar.Silk
                 }
 
                 RadarWindow.Initialize();
+
                 RadarWindow.Run();
 
                 Log.WriteLine("[SilkProgram] RadarWindow.Run() returned normally.");

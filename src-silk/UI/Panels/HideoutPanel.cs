@@ -25,6 +25,22 @@ namespace eft_dma_radar.Silk.UI.Panels
         private static bool _showStash = true;
         private static bool _refreshing;
 
+        // ── Cached upgrade section data ──────────────────────────────────────
+        private static IReadOnlyList<HideoutAreaInfo>? _cachedAreaSource;
+        private static List<HideoutAreaInfo>? _cachedSortedAreas;
+        private static int _cachedReady, _cachedUpgradeable, _cachedMaxed;
+        private static string _cachedAreaSummary = "";
+
+        // ── Cached stash display list ────────────────────────────────────────
+        private static IReadOnlyList<StashItem>? _cachedStashSource;
+        private static bool _cachedGrouped;
+        private static string _cachedSearchText = "";
+        private static int _cachedStashSortColumn = -1;
+        private static bool _cachedStashSortAsc = true;
+        private static List<StashItem>? _cachedDisplayList;
+        private static string _cachedStashSummary = "";
+        private static long _cachedStashTotalBest = -1;
+
         // ── Colours ──────────────────────────────────────────────────────────
         private static readonly Vector4 ColGreen  = new(0.30f, 0.69f, 0.31f, 1f);
         private static readonly Vector4 ColOrange = new(1.00f, 0.60f, 0.00f, 1f);
@@ -135,18 +151,42 @@ namespace eft_dma_radar.Silk.UI.Panels
                 return;
             }
 
-            // Summary
-            ImGui.TextColored(ColGold,
-                $"Stash: {items.Count} items  |  Best: {HideoutManager.FormatPrice(mgr.TotalBestValue)}  |  " +
-                $"Trader: {HideoutManager.FormatPrice(mgr.TotalTraderValue)}  |  Flea: {HideoutManager.FormatPrice(mgr.TotalFleaValue)}");
+            // Cache summary string — only rebuild when totals change
+            long totalBest = mgr.TotalBestValue;
+            if (!ReferenceEquals(items, _cachedStashSource) || totalBest != _cachedStashTotalBest)
+            {
+                _cachedStashTotalBest = totalBest;
+                _cachedStashSummary =
+                    $"Stash: {items.Count} items  |  Best: {HideoutManager.FormatPrice(totalBest)}  |  " +
+                    $"Trader: {HideoutManager.FormatPrice(mgr.TotalTraderValue)}  |  Flea: {HideoutManager.FormatPrice(mgr.TotalFleaValue)}";
+            }
+
+            ImGui.TextColored(ColGold, _cachedStashSummary);
 
             // Search
             ImGui.SetNextItemWidth(250);
             ImGui.InputTextWithHint("##stashSearch", "Search items...", ref _searchText, 128);
             ImGui.Spacing();
 
-            // Build display list (optionally grouped, filtered, sorted)
-            var displayItems = BuildDisplayList(items);
+            // Rebuild display list only when inputs change
+            bool needsRebuild = !ReferenceEquals(items, _cachedStashSource)
+                || _grouped != _cachedGrouped
+                || !string.Equals(_searchText, _cachedSearchText, StringComparison.Ordinal);
+
+            if (needsRebuild)
+            {
+                _cachedStashSource = items;
+                _cachedGrouped = _grouped;
+                _cachedSearchText = _searchText;
+                _cachedDisplayList = BuildDisplayList(items);
+                // Force re-sort with current settings
+                if (_sortColumn >= 0)
+                    SortDisplayList(_cachedDisplayList);
+                _cachedStashSortColumn = _sortColumn;
+                _cachedStashSortAsc = _sortAscending;
+            }
+
+            var displayItems = _cachedDisplayList!;
 
             // Table
             var flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Sortable
@@ -166,7 +206,7 @@ namespace eft_dma_radar.Silk.UI.Panels
                 ImGui.TableSetupScrollFreeze(0, 1);
                 ImGui.TableHeadersRow();
 
-                // Handle sorting
+                // Handle sorting — only re-sort when sort specs change
                 var sortSpecs = ImGui.TableGetSortSpecs();
                 if (sortSpecs.SpecsDirty)
                 {
@@ -174,10 +214,12 @@ namespace eft_dma_radar.Silk.UI.Panels
                     _sortColumn = spec.ColumnIndex;
                     _sortAscending = spec.SortDirection == ImGuiSortDirection.Ascending;
                     sortSpecs.SpecsDirty = false;
-                    SortDisplayList(displayItems);
                 }
-                else if (_sortColumn >= 0)
+
+                if (_sortColumn >= 0 && (_sortColumn != _cachedStashSortColumn || _sortAscending != _cachedStashSortAsc))
                 {
+                    _cachedStashSortColumn = _sortColumn;
+                    _cachedStashSortAsc = _sortAscending;
                     SortDisplayList(displayItems);
                 }
 
@@ -244,39 +286,53 @@ namespace eft_dma_radar.Silk.UI.Panels
             ImGui.Spacing();
             ImGui.Separator();
 
-            // Summary counts
-            int ready = 0, upgradeable = 0, maxed = 0;
-            for (int i = 0; i < areas.Count; i++)
+            // Rebuild sorted list + summary only when the underlying data changes
+            if (!ReferenceEquals(areas, _cachedAreaSource))
             {
-                if (areas[i].IsMaxLevel) maxed++;
+                _cachedAreaSource = areas;
+
+                int ready = 0, upgradeable = 0, maxed = 0;
+                for (int i = 0; i < areas.Count; i++)
+                {
+                    if (areas[i].IsMaxLevel) maxed++;
+                    else
+                    {
+                        upgradeable++;
+                        if (areas[i].Status is EAreaStatus.ReadyToUpgrade or EAreaStatus.ReadyToConstruct)
+                            ready++;
+                    }
+                }
+                _cachedReady = ready;
+                _cachedUpgradeable = upgradeable;
+                _cachedMaxed = maxed;
+                _cachedAreaSummary = $"Areas: {ready} ready  \u00b7  {upgradeable} upgradeable  \u00b7  {maxed} maxed";
+
+                if (_cachedSortedAreas is null)
+                    _cachedSortedAreas = new List<HideoutAreaInfo>(areas);
                 else
                 {
-                    upgradeable++;
-                    if (areas[i].Status is EAreaStatus.ReadyToUpgrade or EAreaStatus.ReadyToConstruct)
-                        ready++;
+                    _cachedSortedAreas.Clear();
+                    for (int i = 0; i < areas.Count; i++)
+                        _cachedSortedAreas.Add(areas[i]);
                 }
+                _cachedSortedAreas.Sort(static (a, b) =>
+                {
+                    int ma = a.IsMaxLevel ? 1 : 0;
+                    int mb = b.IsMaxLevel ? 1 : 0;
+                    if (ma != mb) return ma.CompareTo(mb);
+                    int pa = HideoutManager.GetStatusPriority(a.Status);
+                    int pb = HideoutManager.GetStatusPriority(b.Status);
+                    if (pa != pb) return pa.CompareTo(pb);
+                    return ((int)a.AreaType).CompareTo((int)b.AreaType);
+                });
             }
 
-            ImGui.TextColored(ColGold,
-                $"Areas: {ready} ready  ·  {upgradeable} upgradeable  ·  {maxed} maxed");
+            ImGui.TextColored(ColGold, _cachedAreaSummary);
             ImGui.Spacing();
 
-            // Sort areas: upgradeable first by priority, then maxed
-            var sorted = new List<HideoutAreaInfo>(areas);
-            sorted.Sort(static (a, b) =>
+            for (int i = 0; i < _cachedSortedAreas!.Count; i++)
             {
-                int ma = a.IsMaxLevel ? 1 : 0;
-                int mb = b.IsMaxLevel ? 1 : 0;
-                if (ma != mb) return ma.CompareTo(mb);
-                int pa = HideoutManager.GetStatusPriority(a.Status);
-                int pb = HideoutManager.GetStatusPriority(b.Status);
-                if (pa != pb) return pa.CompareTo(pb);
-                return ((int)a.AreaType).CompareTo((int)b.AreaType);
-            });
-
-            for (int i = 0; i < sorted.Count; i++)
-            {
-                var area = sorted[i];
+                var area = _cachedSortedAreas[i];
                 DrawAreaCard(area);
             }
         }

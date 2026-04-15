@@ -54,6 +54,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private WorkerThread? _registrationWorker;
         private WorkerThread? _cameraWorker;
 
+        // Deferred CameraManager retry state — used by the camera worker
+        private int _cameraRetryAttempts;
+        private DateTime _nextCameraRetry;
+        private const int MaxCameraRetries = 30;               // ~30 attempts
+        private static readonly TimeSpan CameraRetryInterval = TimeSpan.FromSeconds(1);
+
         // The address of the LocalPlayer at raid start — used to detect extraction/death
         private ulong _localPlayerAddr;
 
@@ -468,10 +474,17 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             {
                 Dispose();
             }
+            catch (VmmException ex)
+            {
+                // Transient DMA/scatter failure — log and continue.
+                // ThrowIfRaidEnded() already handles genuine raid-end detection
+                // with retry logic; a stray VmmException here is transient.
+                Log.WriteRateLimited(AppLogLevel.Warning, "rt_error", TimeSpan.FromSeconds(5),
+                    $"[RealtimeWorker] Transient DMA error (continuing): {ex.Message}");
+            }
             catch (Exception ex)
             {
                 // Any unhandled exception = game data corrupted → dispose.
-                // Mirrors WPF RealtimeWorker catch-all (L803-807).
                 Log.WriteRateLimited(AppLogLevel.Warning, "rt_error", TimeSpan.FromSeconds(5),
                     $"[RealtimeWorker] Error: {ex.GetType().Name}: {ex.Message}");
                 Dispose();
@@ -495,11 +508,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             try
             {
+                // Deferred CameraManager init — retry periodically if the initial
+                // attempt in TryDiscoverLocalPlayer() failed (raid was still loading).
+                if (_cameraManager is null)
+                {
+                    TryDeferredCameraInit();
+                    return; // Nothing else to do until camera is ready
+                }
+
                 // Update camera ViewMatrix/FOV from DMA (for advanced aimview + future ESP)
-                _cameraManager?.UpdateCamera(_registeredPlayers.LocalPlayer as LocalPlayer);
+                _cameraManager.UpdateCamera(_registeredPlayers.LocalPlayer as LocalPlayer);
 
                 // Skeleton: init any new skeletons, then update all bone positions
-                if (SilkProgram.Config.UseAdvancedAimview && CameraManager.IsActive)
+                bool needSkeletons = SilkProgram.Config.UseAdvancedAimview
+                    && CameraManager.IsActive;
+                if (needSkeletons)
                 {
                     _registeredPlayers.TryInitSkeletons();
                     _registeredPlayers.UpdateSkeletons();
@@ -517,6 +540,40 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             {
                 Log.WriteRateLimited(AppLogLevel.Warning, "cam_error", TimeSpan.FromSeconds(5),
                     $"[CameraWorker] Error: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Attempts to create the CameraManager on a rate-limited schedule.
+        /// Called from the camera worker when <see cref="_cameraManager"/> is null.
+        /// Gives up after <see cref="MaxCameraRetries"/> attempts.
+        /// </summary>
+        private void TryDeferredCameraInit()
+        {
+            if (_cameraRetryAttempts >= MaxCameraRetries)
+                return; // Exhausted — don't spam logs
+
+            var now = DateTime.UtcNow;
+            if (now < _nextCameraRetry)
+                return;
+
+            _nextCameraRetry = now + CameraRetryInterval;
+            _cameraRetryAttempts++;
+
+            _cameraManager = CameraManager.TryCreate();
+
+            if (_cameraManager is not null)
+            {
+                Log.WriteLine($"[CameraWorker] CameraManager initialized on deferred attempt #{_cameraRetryAttempts}.");
+            }
+            else if (_cameraRetryAttempts >= MaxCameraRetries)
+            {
+                Log.WriteLine($"[CameraWorker] CameraManager failed after {MaxCameraRetries} attempts — advanced aimview disabled for this raid.");
+            }
+            else
+            {
+                Log.WriteRateLimited(AppLogLevel.Debug, "cam_retry", TimeSpan.FromSeconds(5),
+                    $"[CameraWorker] CameraManager retry {_cameraRetryAttempts}/{MaxCameraRetries}...");
             }
         }
 
@@ -581,6 +638,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             catch (RaidEnded)
             {
                 HandleRaidEnded("Registration Worker");
+            }
+            catch (VmmException ex)
+            {
+                // Transient DMA/scatter failure — log and continue.
+                // These are common (page-out, bus contention, cache eviction)
+                // and do NOT indicate the raid has ended.
+                Log.WriteRateLimited(AppLogLevel.Warning, "reg_error", TimeSpan.FromSeconds(5),
+                    $"[RegistrationWorker] Transient DMA error (continuing): {ex.Message}");
             }
             catch (Exception ex)
             {
@@ -660,18 +725,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     Log.WriteLine($"[LocalGameWorld] QuestManager initialized — profile @ 0x{lp.ProfilePtr:X}");
                 }
 
-                // Create CameraManager instance (resolves FPS/Optic cameras).
-                // Non-fatal: if it fails, advanced aimview stays disabled.
-                try
-                {
-                    _cameraManager = new CameraManager();
+                // Attempt CameraManager init now — if it fails (raid still loading),
+                // the camera worker will retry automatically.
+                _cameraManager = CameraManager.TryCreate();
+                if (_cameraManager is not null)
                     Log.WriteLine("[LocalGameWorld] CameraManager initialized.");
-                }
-                catch (Exception cmEx)
-                {
-                    Log.WriteLine($"[LocalGameWorld] CameraManager init failed (advanced aimview disabled): {cmEx.Message}");
-                    _cameraManager = null;
-                }
+                else
+                    Log.WriteLine("[LocalGameWorld] CameraManager deferred — camera worker will retry.");
 
                 // Reset timing baselines now that the local player is confirmed —
                 // gives transform checks a fresh grace period.
