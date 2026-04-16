@@ -1,15 +1,17 @@
-using eft_dma_radar.Silk.DMA.ScatterAPI;
 using eft_dma_radar.Silk.Tarkov.Unity;
+using VmmSharpEx.Scatter;
 using static eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets;
 
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
 {
     /// <summary>
     /// A live grenade/throwable tracked on the radar.
-    /// Per-tick updates use scatter reads; initial position uses direct DMA.
+    /// Caches transform hierarchy at construction; per-tick updates use VmmScatter.
     /// </summary>
     internal sealed class Grenade : IExplosiveItem
     {
+        public static implicit operator ulong(Grenade x) => x.Addr;
+
         private static readonly Dictionary<string, float> EffectiveDistances =
             new(StringComparer.OrdinalIgnoreCase)
             {
@@ -17,16 +19,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
                 { "RGO", 7f }, { "V40", 5f }, { "VOG-17", 6f }, { "VOG-25", 7f }
             };
 
-        /// <summary>Offset for cached world position in Unity TransformInternal.</summary>
-        private const uint TRANSFORM_WORLD_POS = 0x90;
-
-        private static int _nextScatterId;
-
-        private readonly Stopwatch _sw = Stopwatch.StartNew();
         private readonly ConcurrentDictionary<ulong, IExplosiveItem> _parent;
-        private readonly ulong _transformInternal;
-        private readonly int _scatterIdDestroyed;
-        private readonly int _scatterIdPos;
+        private readonly Stopwatch _sw = Stopwatch.StartNew();
+        private readonly bool _isSmoke;
+
+        // Cached transform hierarchy (read once at construction)
+        private readonly ulong _verticesAddr;
+        private readonly int _vertexCount;
+        private readonly ReadOnlyMemory<int> _indices;
+        private readonly int _transformIndex;
 
         private Vector3 _position;
         private bool _forceInactive;
@@ -42,17 +43,43 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
             Addr = baseAddr;
             _parent = parent;
 
-            // Allocate unique scatter IDs
-            var baseId = Interlocked.Add(ref _nextScatterId, 2);
-            _scatterIdDestroyed = baseId;
-            _scatterIdPos = baseId + 1;
+            // Check if smoke grenade (they never leave the list, skip transform work)
+            var type = Il2CppClass.ReadName(baseAddr, 64, false);
+            if (type is not null && type.Contains("SmokeGrenade"))
+            {
+                _isSmoke = true;
+                Name = "Smoke";
+                return;
+            }
 
-            _transformInternal = Memory.ReadPtrChain(baseAddr, TransformChain, false);
+            // Read and cache transform hierarchy
+            var ti = Memory.ReadPtrChain(baseAddr, TransformChain, false);
 
-            if (IsDetonatedDirect())
+            var hierarchy = Memory.ReadValue<ulong>(ti + TransformAccess.HierarchyOffset, false);
+            if (!Extensions.IsValidVirtualAddress(hierarchy))
+                throw new InvalidOperationException("Invalid hierarchy pointer");
+
+            _transformIndex = Memory.ReadValue<int>(ti + TransformAccess.IndexOffset, false);
+            if (_transformIndex < 0 || _transformIndex > 128_000)
+                throw new ArgumentOutOfRangeException(nameof(_transformIndex));
+
+            _vertexCount = _transformIndex + 1;
+
+            var verticesPtr = Memory.ReadValue<ulong>(hierarchy + TransformHierarchy.VerticesOffset, false);
+            var indicesPtr = Memory.ReadValue<ulong>(hierarchy + TransformHierarchy.IndicesOffset, false);
+            if (!Extensions.IsValidVirtualAddress(verticesPtr) || !Extensions.IsValidVirtualAddress(indicesPtr))
+                throw new InvalidOperationException("Invalid vertices/indices pointer");
+
+            _verticesAddr = verticesPtr;
+
+            // Cache indices once (they don't change for the life of the grenade)
+            _indices = Memory.ReadArray<int>(indicesPtr, _vertexCount);
+
+            // Check detonated
+            if (Memory.ReadValue<bool>(baseAddr + Offsets.Grenade.IsDestroyed, false))
                 throw new InvalidOperationException("Grenade detonated at creation");
 
-            // Resolve grenade name from template
+            // Resolve name
             var templatePtr = Memory.ReadPtrChain(baseAddr,
                 [Offsets.Grenade.WeaponSource, Offsets.LootItem.Template], false);
             var id = Memory.ReadValue<SDK.Types.MongoID>(templatePtr + Offsets.ItemTemplate._id);
@@ -73,61 +100,41 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
                 ? dist
                 : 0f;
 
-            // Initial position read (direct DMA — only at creation)
-            Refresh();
+            // Initial position (direct read)
+            UpdatePositionDirect();
         }
 
-        public void Refresh()
+        public void OnRefresh(VmmScatter scatter)
         {
-            if (!IsActive)
+            if (_isSmoke || !IsActive)
                 return;
 
-            if (IsDetonatedDirect())
+            scatter.PrepareReadValue<bool>(this + Offsets.Grenade.IsDestroyed);
+            scatter.PrepareReadArray<TrsX>(_verticesAddr, _vertexCount);
+            scatter.Completed += (_, s) =>
             {
-                _parent.TryRemove(Addr, out _);
-                _forceInactive = true;
-                return;
-            }
+                if (s.ReadValue<bool>(this + Offsets.Grenade.IsDestroyed, out bool destroyed) && destroyed)
+                {
+                    _parent.TryRemove(Addr, out IExplosiveItem _);
+                    _forceInactive = true;
+                    return;
+                }
 
-            if (_transformInternal == 0)
-                return;
-
-            _position = ReadTransformPosition(_transformInternal);
-        }
-
-        public void QueueScatterReads(ScatterReadIndex idx)
-        {
-            if (!IsActive)
-                return;
-
-            idx.AddEntry<bool>(_scatterIdDestroyed, Addr + Offsets.Grenade.IsDestroyed);
-
-            if (_transformInternal != 0)
-                idx.AddEntry<Vector3>(_scatterIdPos, _transformInternal + TRANSFORM_WORLD_POS);
-        }
-
-        public void ApplyScatterResults(ScatterReadIndex idx)
-        {
-            if (!IsActive)
-                return;
-
-            if (idx.TryGetResult<bool>(_scatterIdDestroyed, out var isDead) && isDead)
-            {
-                _parent.TryRemove(Addr, out _);
-                _forceInactive = true;
-                return;
-            }
-
-            if (idx.TryGetResult<Vector3>(_scatterIdPos, out var pos) &&
-                float.IsFinite(pos.X) && float.IsFinite(pos.Y) && float.IsFinite(pos.Z))
-            {
-                _position = pos;
-            }
+                if (s.ReadPooled<TrsX>(_verticesAddr, _vertexCount) is IMemoryOwner<TrsX> vertices)
+                {
+                    using (vertices)
+                    {
+                        var pos = TrsX.ComputeWorldPosition(vertices.Memory.Span, _indices.Span, _transformIndex);
+                        if (float.IsFinite(pos.X) && float.IsFinite(pos.Y) && float.IsFinite(pos.Z))
+                            _position = pos;
+                    }
+                }
+            };
         }
 
         public void Draw(SKCanvas canvas, MapParams mapParams, MapConfig mapCfg, Player.Player localPlayer)
         {
-            if (!IsActive || _position == Vector3.Zero)
+            if (!IsActive || _isSmoke || _position == Vector3.Zero)
                 return;
 
             var dist = Vector3.Distance(localPlayer.Position, _position);
@@ -166,58 +173,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
             canvas.DrawText(distText, distPt, SKTextAlign.Left, SKPaints.FontRegular11, textPaint);
         }
 
-        private bool IsDetonatedDirect() =>
-            Memory.ReadValue<bool>(Addr + Offsets.Grenade.IsDestroyed, false);
-
-        /// <summary>
-        /// Reads world position from a TransformInternal pointer using the hierarchy walk.
-        /// </summary>
-        private static Vector3 ReadTransformPosition(ulong transformInternal)
+        private void UpdatePositionDirect()
         {
             try
             {
-                var hierarchy = Memory.ReadValue<ulong>(transformInternal + TransformAccess.HierarchyOffset);
-                if (!Extensions.IsValidVirtualAddress(hierarchy))
-                    return Vector3.Zero;
-
-                var index = Memory.ReadValue<int>(transformInternal + TransformAccess.IndexOffset);
-                if (index < 0 || index > 150_000)
-                    return Vector3.Zero;
-
-                var verticesPtr = Memory.ReadValue<ulong>(hierarchy + TransformHierarchy.VerticesOffset);
-                var indicesPtr = Memory.ReadValue<ulong>(hierarchy + TransformHierarchy.IndicesOffset);
-                if (!Extensions.IsValidVirtualAddress(verticesPtr) || !Extensions.IsValidVirtualAddress(indicesPtr))
-                    return Vector3.Zero;
-
-                int count = index + 1;
-                var vertices = Memory.ReadArray<TrsX>(verticesPtr, count);
-                var indices = Memory.ReadArray<int>(indicesPtr, count);
-
-                if (vertices.Length < count || indices.Length < count)
-                    return Vector3.Zero;
-
-                var pos = vertices[index].T;
-                int parent = indices[index];
-                int iter = 0;
-
-                while (parent >= 0 && parent < count && iter++ < 4096)
-                {
-                    ref readonly var p = ref vertices[parent];
-                    pos = Vector3.Transform(pos, p.Q);
-                    pos *= p.S;
-                    pos += p.T;
-                    parent = indices[parent];
-                }
-
-                if (!float.IsFinite(pos.X) || !float.IsFinite(pos.Y) || !float.IsFinite(pos.Z))
-                    return Vector3.Zero;
-
-                return pos;
+                var vertices = Memory.ReadArray<TrsX>(_verticesAddr, _vertexCount);
+                var pos = TrsX.ComputeWorldPosition(vertices, _indices.Span, _transformIndex);
+                if (float.IsFinite(pos.X) && float.IsFinite(pos.Y) && float.IsFinite(pos.Z))
+                    _position = pos;
             }
-            catch
-            {
-                return Vector3.Zero;
-            }
+            catch { }
         }
     }
 }

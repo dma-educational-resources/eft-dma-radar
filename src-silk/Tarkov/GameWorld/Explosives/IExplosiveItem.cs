@@ -1,4 +1,4 @@
-using eft_dma_radar.Silk.DMA.ScatterAPI;
+using VmmSharpEx.Scatter;
 
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
 {
@@ -18,22 +18,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
         ref Vector3 Position { get; }
 
         /// <summary>
-        /// Refresh this item's state via direct DMA reads.
-        /// Used for initial construction only; per-tick updates use scatter.
+        /// Queue scatter reads and register a Completed callback to process results.
+        /// Called once per tick before <see cref="VmmScatter.Execute"/>.
         /// </summary>
-        void Refresh();
-
-        /// <summary>
-        /// Queue scatter read entries for this explosive's per-tick state.
-        /// Called once per tick before <see cref="ScatterReadMap.Execute"/>.
-        /// </summary>
-        void QueueScatterReads(ScatterReadIndex idx);
-
-        /// <summary>
-        /// Apply results from the completed scatter read.
-        /// Called once per tick after <see cref="ScatterReadMap.Execute"/>.
-        /// </summary>
-        void ApplyScatterResults(ScatterReadIndex idx);
+        void OnRefresh(VmmScatter scatter);
 
         /// <summary>
         /// Draw this explosive on the radar canvas.

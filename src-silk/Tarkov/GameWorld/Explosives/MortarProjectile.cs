@@ -1,18 +1,16 @@
-using eft_dma_radar.Silk.DMA.ScatterAPI;
+using VmmSharpEx.Scatter;
 
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
 {
     /// <summary>
     /// A mortar/artillery projectile tracked on the radar.
-    /// Per-tick updates use scatter reads; initial state uses direct DMA.
+    /// Per-tick updates use VmmScatter with Completed callback.
     /// </summary>
     internal sealed class MortarProjectile : IExplosiveItem
     {
-        private static int _nextScatterId = 300_000;
+        public static implicit operator ulong(MortarProjectile x) => x.Addr;
 
         private readonly ConcurrentDictionary<ulong, IExplosiveItem> _parent;
-        private readonly int _scatterIdActive;
-        private readonly int _scatterIdPos;
         private Vector3 _position;
 
         public ulong Addr { get; }
@@ -24,56 +22,39 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
             _parent = parent;
             Addr = baseAddr;
 
-            var baseId = Interlocked.Add(ref _nextScatterId, 2);
-            _scatterIdActive = baseId;
-            _scatterIdPos = baseId + 1;
-
-            Refresh();
-            if (!IsActive)
-                throw new InvalidOperationException("Mortar projectile already exploded");
-        }
-
-        public void Refresh()
-        {
             var projectile = Memory.ReadValue<ArtilleryProjectile>(Addr, false);
             IsActive = projectile.IsActive;
-            if (IsActive)
-            {
-                _position = projectile.Position;
-            }
-            else
-            {
-                _parent.TryRemove(Addr, out _);
-            }
+            if (!IsActive)
+                throw new InvalidOperationException("Mortar projectile already exploded");
+            _position = projectile.Position;
         }
 
-        public void QueueScatterReads(ScatterReadIndex idx)
+        public void OnRefresh(VmmScatter scatter)
         {
             if (!IsActive)
                 return;
 
-            idx.AddEntry<bool>(_scatterIdActive, Addr + Offsets.ArtilleryProjectileClient.IsActive);
-            idx.AddEntry<Vector3>(_scatterIdPos, Addr + Offsets.ArtilleryProjectileClient.Position);
-        }
-
-        public void ApplyScatterResults(ScatterReadIndex idx)
-        {
-            if (idx.TryGetResult<bool>(_scatterIdActive, out var active))
+            scatter.PrepareReadValue<ArtilleryProjectile>(this);
+            scatter.Completed += (_, s) =>
             {
-                IsActive = active;
-            }
-
-            if (!IsActive)
-            {
-                _parent.TryRemove(Addr, out _);
-                return;
-            }
-
-            if (idx.TryGetResult<Vector3>(_scatterIdPos, out var pos) &&
-                float.IsFinite(pos.X) && float.IsFinite(pos.Y) && float.IsFinite(pos.Z))
-            {
-                _position = pos;
-            }
+                if (s.ReadValue<ArtilleryProjectile>(this, out var projectile))
+                {
+                    IsActive = projectile.IsActive;
+                    if (IsActive)
+                    {
+                        if (float.IsFinite(projectile.Position.X) &&
+                            float.IsFinite(projectile.Position.Y) &&
+                            float.IsFinite(projectile.Position.Z))
+                        {
+                            _position = projectile.Position;
+                        }
+                    }
+                    else
+                    {
+                        _parent.TryRemove(Addr, out IExplosiveItem _);
+                    }
+                }
+            };
         }
 
         public void Draw(SKCanvas canvas, MapParams mapParams, MapConfig mapCfg, Player.Player localPlayer)

@@ -846,6 +846,10 @@ namespace eft_dma_radar.Silk.DMA
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static VmmScatter GetScatter(VmmFlags flags) => new(VmmOrThrow(), _pid, flags);
 
+        /// <summary>Creates a new <see cref="VmmScatter"/> against the game process with cache control.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static VmmScatter CreateScatter(bool useCache = true) => new(VmmOrThrow(), _pid, ToFlags(useCache));
+
         /// <summary>Signals the worker to stop, waits for it to exit, and disposes the VMM handle.</summary>
         public static void Close()
         {

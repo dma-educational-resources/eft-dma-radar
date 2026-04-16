@@ -1,21 +1,18 @@
-using eft_dma_radar.Silk.DMA.ScatterAPI;
+using VmmSharpEx.Scatter;
 
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
 {
     /// <summary>
     /// A placed tripwire tracked on the radar.
-    /// Per-tick updates use scatter reads; initial state uses direct DMA.
+    /// Position is static (read once); per-tick scatter reads only check state.
     /// </summary>
     internal sealed class Tripwire : IExplosiveItem
     {
-        private static int _nextScatterId = 200_000;
-
-        private readonly int _scatterIdState;
-        private readonly int _scatterIdToPos;
-        private readonly int _scatterIdFromPos;
+        public static implicit operator ulong(Tripwire x) => x.Addr;
 
         private Vector3 _position;
         private Vector3 _fromPosition;
+        private bool _destroyed;
 
         public ulong Addr { get; }
         public bool IsActive { get; private set; }
@@ -27,66 +24,28 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
         {
             Addr = baseAddr;
 
-            var baseId = Interlocked.Add(ref _nextScatterId, 3);
-            _scatterIdState = baseId;
-            _scatterIdToPos = baseId + 1;
-            _scatterIdFromPos = baseId + 2;
-
-            IsActive = ReadIsActive(false);
+            // Position is static — read once at construction
             _position = ReadToPosition(false);
             _fromPosition = ReadFromPosition(false);
+            IsActive = ReadIsActive(false);
             Name = ResolveName();
         }
 
-        public void Refresh()
+        public void OnRefresh(VmmScatter scatter)
         {
-            IsActive = ReadIsActive();
-
-            if (!IsActive)
+            if (_destroyed)
                 return;
 
-            _position = ReadToPosition();
-            _fromPosition = ReadFromPosition();
-
-            if (string.IsNullOrEmpty(Name))
-                Name = ResolveName();
-        }
-
-        public void QueueScatterReads(ScatterReadIndex idx)
-        {
-            if (!IsActive)
-                return;
-
-            idx.AddEntry<int>(_scatterIdState, Addr + Offsets.TripwireSynchronizableObject._tripwireState);
-            idx.AddEntry<Vector3>(_scatterIdToPos, Addr + Offsets.TripwireSynchronizableObject.ToPosition);
-            idx.AddEntry<Vector3>(_scatterIdFromPos, Addr + Offsets.TripwireSynchronizableObject.FromPosition);
-        }
-
-        public void ApplyScatterResults(ScatterReadIndex idx)
-        {
-            if (idx.TryGetResult<int>(_scatterIdState, out var state))
+            scatter.PrepareReadValue<int>(this + Offsets.TripwireSynchronizableObject._tripwireState);
+            scatter.Completed += (_, s) =>
             {
-                var tripState = (SDK.ETripwireState)state;
-                IsActive = tripState is SDK.ETripwireState.Wait or SDK.ETripwireState.Active;
-            }
-
-            if (!IsActive)
-                return;
-
-            if (idx.TryGetResult<Vector3>(_scatterIdToPos, out var toPos))
-            {
-                toPos.Y += 0.175f;
-                _position = toPos;
-            }
-
-            if (idx.TryGetResult<Vector3>(_scatterIdFromPos, out var fromPos))
-            {
-                fromPos.Y += 0.175f;
-                _fromPosition = fromPos;
-            }
-
-            if (string.IsNullOrEmpty(Name))
-                Name = ResolveName();
+                if (s.ReadValue(this + Offsets.TripwireSynchronizableObject._tripwireState, out int nState))
+                {
+                    var state = (SDK.ETripwireState)nState;
+                    _destroyed = state is SDK.ETripwireState.Exploded or SDK.ETripwireState.Inert;
+                    IsActive = state is SDK.ETripwireState.Wait or SDK.ETripwireState.Active;
+                }
+            };
         }
 
         public void Draw(SKCanvas canvas, MapParams mapParams, MapConfig mapCfg, Player.Player localPlayer)

@@ -1,11 +1,10 @@
 using System.Collections;
-using eft_dma_radar.Silk.DMA.ScatterAPI;
 
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
 {
     /// <summary>
     /// Discovers and refreshes explosives (grenades, tripwires, mortar projectiles) in the current raid.
-    /// Uses scatter-batched reads for per-tick updates and direct DMA for discovery.
+    /// Uses VmmScatter for per-tick updates and direct DMA for discovery.
     /// Runs on a dedicated worker thread via <see cref="LocalGameWorld"/>.
     /// </summary>
     internal sealed class ExplosivesManager : IReadOnlyCollection<IExplosiveItem>
@@ -32,71 +31,59 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
         public ICollection<IExplosiveItem> Snapshot => _explosives.Values;
 
         /// <summary>
-        /// Full refresh cycle: scatter-update existing items, discover new ones, prune inactive.
+        /// Full refresh cycle: discover new items, scatter-update existing ones, prune inactive.
         /// Called each tick from the explosives worker thread.
         /// </summary>
         public void Refresh()
         {
             try
             {
-                // 1) Fast path: scatter-batched update of all existing explosives
-                if (!_explosives.IsEmpty)
-                {
-                    using var map = ScatterReadMap.Get();
-                    var round = map.AddRound(useCache: true);
-                    var idx = round[0];
-
-                    // Queue reads
-                    foreach (var explosive in _explosives.Values)
-                    {
-                        try
-                        {
-                            explosive.QueueScatterReads(idx);
-                        }
-                        catch { }
-                    }
-
-                    // Execute scatter if anything was queued
-                    if (idx.Entries.Count > 0)
-                    {
-                        try
-                        {
-                            map.Execute();
-                        }
-                        catch { }
-
-                        // Apply results
-                        foreach (var explosive in _explosives.Values)
-                        {
-                            try
-                            {
-                                explosive.ApplyScatterResults(idx);
-                            }
-                            catch { }
-                        }
-                    }
-
-                    // Prune inactive
-                    _expiredKeys.Clear();
-                    foreach (var kv in _explosives)
-                    {
-                        if (!kv.Value.IsActive)
-                            _expiredKeys.Add(kv.Key);
-                    }
-                    for (int i = 0; i < _expiredKeys.Count; i++)
-                        _explosives.TryRemove(_expiredKeys[i], out _);
-                }
-
-                // 2) Discovery: find new explosives (direct DMA — cheap & infrequent)
+                // 1) Discovery: find new explosives (direct DMA)
                 GetGrenades();
                 GetTripwires();
                 GetMortarProjectiles();
+
+                // 2) Scatter-batched update of all existing explosives
+                var explosives = _explosives.Values;
+                if (explosives.Count == 0)
+                    return;
+
+                using var scatter = Memory.CreateScatter(useCache: false);
+                int queued = 0;
+                foreach (var explosive in explosives)
+                {
+                    try
+                    {
+                        explosive.OnRefresh(scatter);
+                        queued++;
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.WriteRateLimited(AppLogLevel.Warning, $"explosive_{explosive.Addr:X}", TimeSpan.FromSeconds(5),
+                            $"[Explosives] Error refreshing 0x{explosive.Addr:X}: {ex.Message}");
+                    }
+                }
+
+                if (queued > 0)
+                {
+                    try
+                    {
+                        scatter.Execute();
+                    }
+                    catch (VmmSharpEx.VmmException) { }
+                }
+
+                // 3) Prune inactive
+                _expiredKeys.Clear();
+                foreach (var kv in _explosives)
+                {
+                    if (!kv.Value.IsActive)
+                        _expiredKeys.Add(kv.Key);
+                }
+                for (int i = 0; i < _expiredKeys.Count; i++)
+                    _explosives.TryRemove(_expiredKeys[i], out _);
             }
             catch (ObjectDisposedException)
-            {
-                throw;
-            }
-            catch (NullReferenceException)
             {
                 throw;
             }
