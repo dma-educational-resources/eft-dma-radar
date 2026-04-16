@@ -90,6 +90,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 player.Base = playerBase;
                 var entry = new PlayerEntry(playerBase, player, isObserved);
 
+                // Track in player history (non-local, human players only — filtered inside AddOrUpdate)
+                Memory.PlayerHistory.AddOrUpdate(player);
+
+                // Promote to SpecialPlayer if on the watchlist (requires AccountId, so
+                // this only works for players whose AccountId is already resolved at
+                // discovery time — re-checked later when AccountId becomes available).
+                if (!isLocal && player.IsHuman)
+                    CheckWatchlist(player);
+
                 // Stagger initial gear/hands refresh times so newly discovered players
                 // don't all fire in the same registration tick (thundering herd).
                 // Each player gets an incrementing slot that spaces out refreshes.
@@ -97,6 +106,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 var now = DateTime.UtcNow;
                 entry.NextGearRefresh = now.AddMilliseconds(slot * 250);
                 entry.NextHandsRefresh = now.AddMilliseconds(slot * 150);
+                entry.NextHealthRefresh = now.AddMilliseconds(slot * 200);
+
+                // Resolve ObservedHealthController for observed players (used for health status reads).
+                // Non-fatal: if it fails now, health will simply show as Healthy until a retry succeeds.
+                if (isObserved)
+                    TryResolveObservedHealthController(playerBase, entry);
 
                 // Transform + rotation init is deferred to BatchInitTransformsAndRotations()
                 // which runs after all new players are discovered in a single batched scatter.
@@ -120,6 +135,60 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             {
                 Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] CreatePlayerEntry FAILED 0x{playerBase:X} isLocal={isLocal}: {ex.Message}");
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Checks the watchlist for a human player and promotes to <see cref="PlayerType.SpecialPlayer"/>
+        /// if a match is found. Called at discovery and again when AccountId is resolved.
+        /// </summary>
+        private static void CheckWatchlist(Player.Player player)
+        {
+            if (player.Type is PlayerType.SpecialPlayer or PlayerType.Streamer)
+                return; // already flagged
+
+            var match = Memory.PlayerWatchlist.Lookup(player.AccountId);
+            if (match is not null)
+            {
+                player.Type = PlayerType.SpecialPlayer;
+                Log.WriteLine($"[RegisteredPlayers] Watchlist match: {player.Name} → SpecialPlayer (reason: {match.Reason})");
+            }
+        }
+
+        #endregion
+
+        #region Health Controller Resolution
+
+        /// <summary>
+        /// Resolves the ObservedHealthController address for an observed player.
+        /// Chain: ObservedPlayerView → ObservedPlayerController → HealthController.
+        /// Validates via the Player backref at ObservedHealthController.Player.
+        /// </summary>
+        private static void TryResolveObservedHealthController(ulong playerBase, PlayerEntry entry)
+        {
+            try
+            {
+                if (!Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView.ObservedPlayerController, out var opc, false)
+                    || !opc.IsValidVirtualAddress())
+                    return;
+
+                if (!Memory.TryReadPtr(opc + Offsets.ObservedPlayerController.HealthController, out var ohc, false)
+                    || !ohc.IsValidVirtualAddress())
+                    return;
+
+                // Validate: ObservedHealthController.Player should point back to the player base
+                if (!Memory.TryReadValue<ulong>(ohc + Offsets.ObservedHealthController.Player, out var playerBackref, false)
+                    || playerBackref != playerBase)
+                    return;
+
+                entry.ObservedHealthControllerAddr = ohc;
+                Log.Write(AppLogLevel.Debug,
+                    $"[RegisteredPlayers] ObservedHealthController resolved for '{entry.Player.Name}': OHC=0x{ohc:X}");
+            }
+            catch (Exception ex)
+            {
+                Log.Write(AppLogLevel.Debug,
+                    $"[RegisteredPlayers] ObservedHealthController resolve failed for '{entry.Player.Name}': {ex.Message}");
             }
         }
 

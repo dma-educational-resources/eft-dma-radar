@@ -67,6 +67,12 @@ namespace eft_dma_radar.Silk.DMA
         /// <summary>Hideout manager instance — persists across hideout entries.</summary>
         public static HideoutManager Hideout { get; } = new();
 
+        /// <summary>Persistent player history — tracks PMCs seen across sessions.</summary>
+        public static PlayerHistory PlayerHistory { get; } = new();
+
+        /// <summary>Manual player watchlist — persists user-tagged players across sessions.</summary>
+        public static PlayerWatchlist PlayerWatchlist { get; } = new();
+
         public static LocalGameWorld? Game { get; private set; }
         public static string? MapID => Game?.MapID;
         public static RegisteredPlayers? Players => Game?.RegisteredPlayers;
@@ -74,11 +80,15 @@ namespace eft_dma_radar.Silk.DMA
         public static IReadOnlyList<LootItem>? Loot => Game?.Loot;
         public static IReadOnlyList<LootCorpse>? Corpses => Game?.Corpses;
         public static IReadOnlyList<LootContainer>? Containers => Game?.Containers;
+        public static IReadOnlyList<LootAirdrop>? Airdrops => Game?.Airdrops;
         public static IReadOnlyList<Exfil>? Exfils => Game?.Exfils;
         public static IReadOnlyList<TransitPoint>? Transits => Game?.Transits;
         public static IReadOnlyList<Door>? Doors => Game?.Doors;
         public static IReadOnlyList<QuestLocation>? QuestLocations => Game?.QuestLocations;
         public static eft_dma_radar.Silk.Tarkov.GameWorld.Quests.QuestManager? QuestManager => Game?.QuestManager ?? LobbyQuestReader.QuestManager;
+        public static eft_dma_radar.Silk.Tarkov.GameWorld.Explosives.ExplosivesManager? Explosives => Game?.Explosives;
+        public static eft_dma_radar.Silk.Tarkov.GameWorld.Explosives.BtrTracker? Btr => Game?.Btr;
+        public static IReadOnlyList<eft_dma_radar.Silk.Tarkov.GameWorld.Interactables.Switch>? Switches => Game?.Switches;
 
         #endregion
 

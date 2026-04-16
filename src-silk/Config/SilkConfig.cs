@@ -287,7 +287,13 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Whether the Quest Info panel is open.</summary>
         public bool ShowQuestPanel { get; set; } = false;
 
-        // ── Hideout ─────────────────────────────────────────────────────────────
+        /// <summary>Whether the Player History panel is open.</summary>
+        public bool ShowPlayerHistoryPanel { get; set; } = false;
+
+        /// <summary>Whether the Player Watchlist panel is open.</summary>
+        public bool ShowPlayerWatchlistPanel { get; set; } = false;
+
+        // ── Hideout
 
         /// <summary>Enable hideout stash/area reading when entering the hideout scene.</summary>
         public bool HideoutEnabled { get; set; } = true;
@@ -327,6 +333,29 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>Master toggle for transit point rendering on the radar.</summary>
         public bool ShowTransits { get; set; } = true;
+
+        // ── Explosives ──────────────────────────────────────────────────────────
+
+        /// <summary>Master toggle for explosive rendering on the radar (grenades, tripwires, mortars).</summary>
+        public bool ShowExplosives { get; set; } = true;
+
+        /// <summary>Draw the tripwire line between endpoints (when explosives are enabled).</summary>
+        public bool ShowTripwireLines { get; set; } = true;
+
+        // ── BTR ─────────────────────────────────────────────────────────────────
+
+        /// <summary>Show the BTR vehicle marker on the radar (Streets/Woods only).</summary>
+        public bool ShowBTR { get; set; } = true;
+
+        // ── Airdrops ────────────────────────────────────────────────────────────
+
+        /// <summary>Show airdrop markers on the radar.</summary>
+        public bool ShowAirdrops { get; set; } = true;
+
+        // ── Switches ────────────────────────────────────────────────────────────
+
+        /// <summary>Show switch markers on the radar (power switches, etc.).</summary>
+        public bool ShowSwitches { get; set; } = true;
 
         // ── Doors ───────────────────────────────────────────────────────────────
 

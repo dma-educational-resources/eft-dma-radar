@@ -137,6 +137,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 {
                     player.AccountId = entry.AccountId;
                     ProfileService.Register(entry.AccountId);
+
+                    // Re-check history and watchlist now that we have the account ID
+                    Memory.PlayerHistory.AddOrUpdate(player);
                 }
             }
 

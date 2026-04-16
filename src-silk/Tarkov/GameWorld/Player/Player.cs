@@ -4,6 +4,18 @@ using eft_dma_radar.Silk.Tarkov;
 namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 {
     /// <summary>
+    /// Simplified health status derived from the ETagStatus bitmask.
+    /// Only the health-related bits are surfaced (Healthy, Injured, BadlyInjured, Dying).
+    /// </summary>
+    public enum EHealthStatus
+    {
+        Healthy,
+        Injured,
+        BadlyInjured,
+        Dying,
+    }
+
+    /// <summary>
     /// Player data model — state, classification, and position.
     /// Rendering is in <c>Player.Draw.cs</c>.
     /// </summary>
@@ -84,6 +96,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 
         /// <summary>Whether this player is in a DMA error state (transform read failures).</summary>
         public bool IsError { get; set; }
+
+        /// <summary>
+        /// Observed health status for non-local players.
+        /// Derived from <c>ObservedHealthController.HealthStatus</c> bitmask.
+        /// </summary>
+        public EHealthStatus HealthStatus { get; set; } = EHealthStatus.Healthy;
 
         /// <summary>Whether this player is the local (MainPlayer) player.</summary>
         public virtual bool IsLocalPlayer => false;

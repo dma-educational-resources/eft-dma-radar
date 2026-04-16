@@ -16,6 +16,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         private volatile IReadOnlyList<LootItem> _loot = [];
         private volatile IReadOnlyList<LootCorpse> _corpses = [];
         private volatile IReadOnlyList<LootContainer> _containers = [];
+        private volatile IReadOnlyList<LootAirdrop> _airdrops = [];
         private long _lastRefreshTimestamp;
         private static readonly long RefreshIntervalTicks = (long)(Stopwatch.Frequency * 5); // 5 seconds
 
@@ -42,6 +43,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// <summary>Current static container snapshot (thread-safe read).</summary>
         public IReadOnlyList<LootContainer> Containers => _containers;
 
+        /// <summary>Current airdrop snapshot (thread-safe read).</summary>
+        public IReadOnlyList<LootAirdrop> Airdrops => _airdrops;
+
         public LootManager(ulong localGameWorld)
         {
             _lgw = localGameWorld;
@@ -64,6 +68,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 _loot = [];
                 _corpses = [];
                 _containers = [];
+                _airdrops = [];
                 return;
             }
 
@@ -73,10 +78,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             List<LootItem> lootResult = [];
             List<LootCorpse> corpseResult = [];
             List<LootContainer> containerResult = [];
+            List<LootAirdrop> airdropResult = [];
 
             try
             {
-                ReadLootAndCorpses(ptrs, out lootResult, out corpseResult, out containerResult);
+                ReadLootAndCorpses(ptrs, out lootResult, out corpseResult, out containerResult, out airdropResult);
             }
             catch (Exception ex)
             {
@@ -89,6 +95,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 
             _loot = lootResult;
             _containers = containerResult;
+            _airdrops = airdropResult;
 
             // Carry over previously-read gear/name data to new corpse objects
             var oldCorpses = _corpses;
@@ -182,12 +189,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// </list>
         /// </para>
         /// </summary>
-        private void ReadLootAndCorpses(MemList<ulong> ptrs, out List<LootItem> lootResult, out List<LootCorpse> corpseResult, out List<LootContainer> containerResult)
+        private void ReadLootAndCorpses(MemList<ulong> ptrs, out List<LootItem> lootResult, out List<LootCorpse> corpseResult, out List<LootContainer> containerResult, out List<LootAirdrop> airdropResult)
         {
             // Pending items collected during Phase 1 scatter callbacks
             var pendingLoot = new List<PendingLoot>(ptrs.Count);
             var pendingCorpses = new List<PendingCorpse>();
             var pendingContainers = new List<PendingContainer>();
+            var pendingAirdrops = new List<PendingAirdrop>();
 
             // ── Phase 1: 6-round scatter to resolve pointer chains ──────────────
             using (var map = ScatterReadMap.Get())
@@ -228,9 +236,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                                 !x2.TryGetResult<MemPointer>(4, out var classNamePtr))
                                 return;
 
-                            // ROUND 3: Components array, class name string
+                            // ROUND 3: Components array, class name string, GameObject name pointer
                             round3[i].AddEntry<MemPointer>(5, gameObject + UnityOffsets.GO_Components);
                             round3[i].AddEntry<UTF8String>(6, classNamePtr, 64);
+                            round3[i].AddEntry<MemPointer>(15, gameObject + UnityOffsets.GO_Name);
 
                             round3[i].Callbacks += x3 =>
                             {
@@ -247,7 +256,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                                 else if (className.Contains("Corpse", StringComparison.OrdinalIgnoreCase))
                                     CollectCorpseItem(round4, round5, round6, i, interactiveClass, components, pendingCorpses);
                                 else if (className.Equals("LootableContainer", StringComparison.OrdinalIgnoreCase))
-                                    CollectContainerItem(round4, round5, round6, i, interactiveClass, components, pendingContainers);
+                                {
+                                    // Read objectName to distinguish airdrops ("loot_collider") from normal containers
+                                    x3.TryGetResult<MemPointer>(15, out var goNamePtr);
+                                    CollectContainerItem(round4, round5, round6, i, interactiveClass, components, goNamePtr, pendingContainers, pendingAirdrops);
+                                }
                             };
                         };
                     };
@@ -260,6 +273,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             lootResult = ResolveLootBatched(pendingLoot);
             corpseResult = ResolveCorpsesBatched(pendingCorpses);
             containerResult = ResolveContainersBatched(pendingContainers);
+            airdropResult = ResolveAirdropsBatched(pendingAirdrops);
         }
 
         #region Phase 1 — Scatter Callbacks (collect pending items, no serial reads)
@@ -279,6 +293,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// Stores transform + template address (MongoID resolved in Phase 2) + opened state.
         /// </summary>
         private readonly record struct PendingContainer(ulong TransformInternal, ulong TemplateAddr, bool Searched);
+
+        /// <summary>
+        /// Intermediate airdrop data collected during Phase 1 scatter — transform only.
+        /// </summary>
+        private readonly record struct PendingAirdrop(ulong TransformInternal);
 
         /// <summary>
         /// Scatter callback for loose loot — resolves transform + BSG ID pointers (rounds 4-6),
@@ -363,21 +382,57 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 
         /// <summary>
         /// Scatter callback for static containers — resolves transform + BSG ID pointers (rounds 4-6),
-        /// plus InteractingPlayer for opened state. Adds to pending list. No serial reads.
+        /// plus InteractingPlayer for opened state. Routes airdrops to a separate pending list.
         /// </summary>
         private static void CollectContainerItem(
             ScatterReadRound round4, ScatterReadRound round5, ScatterReadRound round6,
-            int i, ulong interactiveClass, ulong components, List<PendingContainer> pending)
+            int i, ulong interactiveClass, ulong components, ulong goNamePtr,
+            List<PendingContainer> pending, List<PendingAirdrop> pendingAirdrops)
         {
-            // Round 4: transform chain start + ItemOwner + InteractingPlayer
+            // Round 4: transform chain start + ItemOwner + InteractingPlayer + objectName string
             round4[i].AddEntry<MemPointer>(7, components + 0x08);
             round4[i].AddEntry<MemPointer>(8, interactiveClass + Offsets.LootableContainer.ItemOwner);
             round4[i].AddEntry<ulong>(13, interactiveClass + Offsets.LootableContainer.InteractingPlayer);
+            if (goNamePtr.IsValidVirtualAddress())
+                round4[i].AddEntry<UTF8String>(16, goNamePtr, 64);
 
             round4[i].Callbacks += x4 =>
             {
-                if (!x4.TryGetResult<MemPointer>(7, out var t1) ||
-                    !x4.TryGetResult<MemPointer>(8, out var itemOwner))
+                if (!x4.TryGetResult<MemPointer>(7, out var t1))
+                    return;
+
+                // Check if this is an airdrop by objectName
+                if (x4.TryGetResult<UTF8String>(16, out var objectNameRaw))
+                {
+                    string? objectName = objectNameRaw;
+                    if (!string.IsNullOrEmpty(objectName) &&
+                        objectName.Equals("loot_collider", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Airdrop — only need transform chain, skip BSG ID resolution
+                        round5[i].AddEntry<MemPointer>(9, t1 + UnityOffsets.Comp_ObjectClass);
+
+                        round5[i].Callbacks += x5 =>
+                        {
+                            if (!x5.TryGetResult<MemPointer>(9, out var t2))
+                                return;
+
+                            round6[i].AddEntry<MemPointer>(11, t2 + 0x10);
+
+                            round6[i].Callbacks += x6 =>
+                            {
+                                if (!x6.TryGetResult<MemPointer>(11, out var transformInternal))
+                                    return;
+
+                                lock (pendingAirdrops)
+                                    pendingAirdrops.Add(new PendingAirdrop(transformInternal));
+                            };
+                        };
+                        return;
+                    }
+                }
+
+                // Normal container path
+                if (!x4.TryGetResult<MemPointer>(8, out var itemOwner))
                     return;
 
                 x4.TryGetResult<ulong>(13, out var interactingPlayer);
@@ -649,6 +704,98 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 return Vector3.Zero;
 
             return pos;
+        }
+
+        /// <summary>
+        /// Resolves all pending airdrop items in batched DMA operations.
+        /// Uses the standard 3-batch transform pattern (same as corpses — position only, no BSG ID).
+        /// </summary>
+        private static List<LootAirdrop> ResolveAirdropsBatched(List<PendingAirdrop> pending)
+        {
+            if (pending.Count == 0)
+                return [];
+
+            var result = new List<LootAirdrop>(pending.Count);
+            var hierarchies = new ulong[pending.Count];
+            var indices = new int[pending.Count];
+            var verticesPtrs = new ulong[pending.Count];
+            var indicesPtrs = new ulong[pending.Count];
+
+            using (var s1 = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    var ti = pending[i].TransformInternal;
+                    s1.PrepareReadValue<ulong>(ti + UnityOffsets.TransformAccess.HierarchyOffset);
+                    s1.PrepareReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset);
+                }
+                s1.Execute();
+
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    var ti = pending[i].TransformInternal;
+                    s1.ReadValue<ulong>(ti + UnityOffsets.TransformAccess.HierarchyOffset, out hierarchies[i]);
+                    s1.ReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset, out indices[i]);
+                }
+            }
+
+            using (var s2 = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    if (!hierarchies[i].IsValidVirtualAddress() || indices[i] < 0 || indices[i] > 150_000)
+                        continue;
+                    s2.PrepareReadValue<ulong>(hierarchies[i] + UnityOffsets.TransformHierarchy.VerticesOffset);
+                    s2.PrepareReadValue<ulong>(hierarchies[i] + UnityOffsets.TransformHierarchy.IndicesOffset);
+                }
+                s2.Execute();
+
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    if (!hierarchies[i].IsValidVirtualAddress() || indices[i] < 0 || indices[i] > 150_000)
+                        continue;
+                    s2.ReadValue<ulong>(hierarchies[i] + UnityOffsets.TransformHierarchy.VerticesOffset, out verticesPtrs[i]);
+                    s2.ReadValue<ulong>(hierarchies[i] + UnityOffsets.TransformHierarchy.IndicesOffset, out indicesPtrs[i]);
+                }
+            }
+
+            using (var s3 = Memory.GetScatter(VmmFlags.NOCACHE))
+            {
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    if (!verticesPtrs[i].IsValidVirtualAddress() || !indicesPtrs[i].IsValidVirtualAddress())
+                        continue;
+                    int vertCount = indices[i] + 1;
+                    s3.PrepareReadArray<TrsX>(verticesPtrs[i], vertCount);
+                    s3.PrepareReadArray<int>(indicesPtrs[i], vertCount);
+                }
+                s3.Execute();
+
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    try
+                    {
+                        if (!verticesPtrs[i].IsValidVirtualAddress() || !indicesPtrs[i].IsValidVirtualAddress())
+                            continue;
+
+                        int vertCount = indices[i] + 1;
+                        var vertices = s3.ReadArray<TrsX>(verticesPtrs[i], vertCount);
+                        var parentIndices = s3.ReadArray<int>(indicesPtrs[i], vertCount);
+                        if (vertices is null || parentIndices is null ||
+                            vertices.Length < vertCount || parentIndices.Length < vertCount)
+                            continue;
+
+                        var pos = ComputeTransformPosition(vertices, parentIndices, indices[i]);
+                        if (pos == Vector3.Zero)
+                            continue;
+
+                        result.Add(new LootAirdrop(pos));
+                    }
+                    catch { }
+                }
+            }
+
+            return result;
         }
 
         /// <summary>

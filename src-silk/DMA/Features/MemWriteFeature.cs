@@ -18,6 +18,7 @@ namespace eft_dma_radar.Silk.DMA.Features
         {
             Instance = Activator.CreateInstance<T>();
             IFeature.Register(Instance);
+            Log.WriteLine($"[MemWriteFeature] Registered: {typeof(T).Name}");
         }
 
         public virtual bool Enabled { get; set; }

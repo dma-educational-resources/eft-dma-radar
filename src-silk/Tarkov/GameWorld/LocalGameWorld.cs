@@ -1,7 +1,9 @@
 using eft_dma_radar.Silk.Misc.Workers;
+using eft_dma_radar.Silk.Tarkov.GameWorld.Explosives;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Interactables;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using eft_dma_radar.Silk.Tarkov.Unity.IL2CPP;
+using Switch = eft_dma_radar.Silk.Tarkov.GameWorld.Interactables.Switch;
 using VmmSharpEx;
 
 using static eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets;
@@ -49,10 +51,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private ExfilManager? _exfilManager;
         private Quests.QuestManager? _questManager;
         private CameraManager? _cameraManager;
+        private ExplosivesManager? _explosivesManager;
+        private BtrTracker? _btrTracker;
+        private IReadOnlyList<Switch>? _switches;
         private int _disposed; // 0 = active, 1 = disposed (int for Interlocked.Exchange)
         private WorkerThread? _realtimeWorker;
         private WorkerThread? _registrationWorker;
         private WorkerThread? _cameraWorker;
+        private WorkerThread? _explosivesWorker;
 
         // Deferred CameraManager retry state — used by the camera worker
         private int _cameraRetryAttempts;
@@ -140,6 +146,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <summary>Current snapshot of static containers in the raid.</summary>
         public IReadOnlyList<LootContainer> Containers => _lootManager.Containers;
 
+        /// <summary>Current snapshot of airdrop containers in the raid.</summary>
+        public IReadOnlyList<LootAirdrop> Airdrops => _lootManager.Airdrops;
+
         /// <summary>Current snapshot of exfiltration points in the raid.</summary>
         public IReadOnlyList<Exfil>? Exfils => _exfilManager?.Exfils;
 
@@ -154,6 +163,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>Quest zone locations for the current map.</summary>
         public IReadOnlyList<Quests.QuestLocation>? QuestLocations => _questManager?.LocationConditions;
+
+        /// <summary>Active explosives (grenades, tripwires, mortars) in the current raid.</summary>
+        public ExplosivesManager? Explosives => _explosivesManager;
+
+        /// <summary>BTR vehicle tracker (Streets/Woods only).</summary>
+        public BtrTracker? Btr => _btrTracker;
+
+        /// <summary>Static switch markers for the current map (resolved from <see cref="SwitchData"/>).</summary>
+        public IReadOnlyList<Switch>? Switches => _switches;
 
         /// <summary>
         /// Suppresses the stale GameWorld guard for the next <see cref="Dispose"/> call
@@ -323,6 +341,18 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             _registeredPlayers = new RegisteredPlayers(gameWorldBase, mapId);
             _lootManager = new LootManager(gameWorldBase);
             _interactablesManager = new InteractablesManager(gameWorldBase);
+            _explosivesManager = new ExplosivesManager(gameWorldBase);
+            _btrTracker = new BtrTracker(gameWorldBase);
+
+            // Resolve static switch markers for this map (if any)
+            var switchPositions = SwitchData.GetSwitchesForMap(mapId);
+            if (switchPositions is not null)
+            {
+                var switches = new List<Switch>(switchPositions.Count);
+                foreach (var (name, pos) in switchPositions)
+                    switches.Add(new Switch(name, pos));
+                _switches = switches;
+            }
 
             // Pre-warm CameraManager static data (sig scans, offset cache)
             // Non-blocking: if it fails, advanced aimview simply won't activate.
@@ -362,6 +392,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 SleepMode = WorkerSleepMode.DynamicSleep
             };
             _registrationWorker.PerformWork += RegistrationWorker_PerformWork;
+
+            _explosivesWorker = new WorkerThread
+            {
+                Name = "Explosives Worker",
+                ThreadPriority = ThreadPriority.BelowNormal,
+                SleepDuration = TimeSpan.FromMilliseconds(100),
+                SleepMode = WorkerSleepMode.DynamicSleep
+            };
+            _explosivesWorker.PerformWork += ExplosivesWorker_PerformWork;
         }
 
         #endregion
@@ -395,6 +434,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             _registrationWorker?.Start();
             _realtimeWorker?.Start();
             _cameraWorker?.Start();
+            _explosivesWorker?.Start();
         }
 
         /// <summary>
@@ -423,12 +463,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             _realtimeWorker?.Dispose();
             _cameraWorker?.Dispose();
             _registrationWorker?.Dispose();
+            _explosivesWorker?.Dispose();
             _realtimeWorker = null;
             _cameraWorker = null;
             _registrationWorker = null;
+            _explosivesWorker = null;
 
             MatchingProgressResolver.Reset();
             DogtagCache.Clear();
+            Memory.PlayerHistory.Reset(); // Clear per-raid dedup tracking (entries persist)
         }
 
         #endregion
@@ -697,6 +740,48 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             {
                 _lastTransformValidation = now;
                 _registeredPlayers.ValidateTransforms();
+            }
+        }
+
+        /// <summary>
+        /// Explosives work tick (100ms, BelowNormal priority).
+        /// Discovers and refreshes grenades, tripwires, mortar projectiles, and BTR.
+        /// Runs on its own thread so it never delays player registration or position reads.
+        /// </summary>
+        private void ExplosivesWorker_PerformWork(CancellationToken ct)
+        {
+            if (_disposed != 0) return;
+
+            // Don't start reading explosives until we have a local player
+            if (_localPlayerAddr == 0) return;
+
+            if (_registeredPlayers.LocalPlayerLost)
+            {
+                HandleRaidEnded("Explosives Worker");
+                return;
+            }
+
+            try
+            {
+                // Explosives: grenades, tripwires, mortar projectiles
+                _explosivesManager?.Refresh();
+
+                // BTR vehicle tracking
+                _btrTracker?.Refresh();
+            }
+            catch (RaidEnded)
+            {
+                HandleRaidEnded("Explosives Worker");
+            }
+            catch (VmmException ex)
+            {
+                Log.WriteRateLimited(AppLogLevel.Warning, "explosives_worker", TimeSpan.FromSeconds(5),
+                    $"[ExplosivesWorker] Transient DMA error (continuing): {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Log.WriteRateLimited(AppLogLevel.Warning, "explosives_worker", TimeSpan.FromSeconds(5),
+                    $"[ExplosivesWorker] Error: {ex.GetType().Name}: {ex.Message}");
             }
         }
 

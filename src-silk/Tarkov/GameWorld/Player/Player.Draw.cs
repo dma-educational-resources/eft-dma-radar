@@ -61,7 +61,32 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         // Cached info line — avoids per-frame string allocation
         private int _cachedInfoH = int.MinValue;
         private int _cachedInfoD = int.MinValue;
+        private EHealthStatus _cachedInfoHealth = EHealthStatus.Healthy;
         private string? _cachedInfo;
+
+        // Health status display strings — pre-allocated, no per-frame cost
+        private static readonly string[] HealthLabels =
+        [
+            "",              // Healthy — nothing shown
+            "Injured",       // Injured
+            "Badly Injured", // BadlyInjured
+            "Dying",         // Dying
+        ];
+
+        // Health status paint — small colored indicator
+        private static readonly SKPaint _healthPaintInjured = new()
+        {
+            Color = new SKColor(255, 200, 0, 220),
+            IsStroke = false,
+            IsAntialias = true,
+        };
+
+        private static readonly SKPaint _healthPaintDying = new()
+        {
+            Color = new SKColor(255, 60, 60, 230),
+            IsStroke = false,
+            IsAntialias = true,
+        };
 
         /// <summary>
         /// Draws this player on the radar canvas.
@@ -94,19 +119,32 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 {
                     int h = (int)(Position.Y - localPlayer.Position.Y);
                     int d = (int)Vector3.Distance(localPlayer.Position, Position);
+                    var health = HealthStatus;
 
-                    if (h != _cachedInfoH || d != _cachedInfoD)
+                    if (h != _cachedInfoH || d != _cachedInfoD || health != _cachedInfoHealth)
                     {
                         _cachedInfoH = h;
                         _cachedInfoD = d;
-                        _cachedInfo = string.Create(null, stackalloc char[32], $"{h:+0;-0}m  {d:N0}m");
+                        _cachedInfoHealth = health;
+
+                        string hd = string.Create(null, stackalloc char[32], $"{h:+0;-0}m  {d:N0}m");
+                        _cachedInfo = health != EHealthStatus.Healthy
+                            ? $"{hd}  {HealthLabels[(int)health]}"
+                            : hd;
                     }
 
-                    DrawLabel(canvas, pos, textPaint, name, _cachedInfo);
+                    var infoPaint = health switch
+                    {
+                        EHealthStatus.Dying or EHealthStatus.BadlyInjured => _healthPaintDying,
+                        EHealthStatus.Injured => _healthPaintInjured,
+                        _ => _infoPaint,
+                    };
+
+                    DrawLabel(canvas, pos, textPaint, name, _cachedInfo, infoPaint);
                 }
                 else
                 {
-                    DrawLabel(canvas, pos, textPaint, name, null);
+                    DrawLabel(canvas, pos, textPaint, name, null, _infoPaint);
                 }
             }
         }
@@ -220,7 +258,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// <summary>
         /// Draws the player name + optional compact H/D info line.
         /// </summary>
-        private static void DrawLabel(SKCanvas canvas, SKPoint point, SKPaint textPaint, string name, string? info)
+        private static void DrawLabel(SKCanvas canvas, SKPoint point, SKPaint textPaint, string name, string? info, SKPaint infoPaint)
         {
             float x = point.X + DotRadius + 4f;
             float y = point.Y + 4.5f;
@@ -234,7 +272,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             {
                 float y2 = y + 12f;
                 canvas.DrawText(info, x + 1, y2 + 1, _infoFont, _infoShadow);
-                canvas.DrawText(info, x, y2, _infoFont, _infoPaint);
+                canvas.DrawText(info, x, y2, _infoFont, infoPaint);
             }
         }
 

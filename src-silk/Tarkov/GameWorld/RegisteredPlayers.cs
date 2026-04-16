@@ -53,6 +53,17 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         // Hands refresh interval per player (seconds) — faster than gear since items swap often
         private const int HandsRefreshIntervalSec = 3;
 
+        // Health status refresh interval per player (seconds) — moderate rate, just a single int read
+        private const int HealthRefreshIntervalSec = 3;
+
+        // Local player energy/hydration refresh interval (seconds)
+        private const int EnergyHydrationRefreshIntervalSec = 3;
+
+        // ETagStatus flag bits used for health classification
+        private const int ETagDying = 8192;
+        private const int ETagBadlyInjured = 4096;
+        private const int ETagInjured = 2048;
+
         // Maximum gear + hands refreshes per registration tick — prevents thundering-herd spikes
         // when many players are discovered at once or periodic timers align.
         private const int MaxRefreshesPerTick = 2;
@@ -184,6 +195,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             // Cached PWA _isAiming address (local player only) — set once during discovery,
             // batched into the realtime scatter so the ADS state is read without extra DMA calls.
             public ulong IsAimingAddr;
+
+            // Observed health controller address — resolved once during discovery for observed players.
+            // Used by the registration worker to periodically read HealthStatus.
+            public ulong ObservedHealthControllerAddr;
+
+            // Health refresh tracking — rate-limited like gear/hands
+            public DateTime NextHealthRefresh;
 
             // Per-player skeleton — created on the registration worker, updated on the camera worker.
             // Written by registration/camera worker, read by render thread — volatile on the skeleton ref
@@ -481,7 +499,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         // Re-check DogtagCache for players with a ProfileId but no resolved name yet.
                         // Corpse dogtags may have been seeded since the last gear refresh.
                         if (entry.Player.ProfileId is not null && entry.Player.AccountId is null)
-                            DogtagCache.TryApplyIdentity(entry.Player);
+                        {
+                            if (DogtagCache.TryApplyIdentity(entry.Player) && entry.Player.AccountId is not null)
+                                CheckWatchlist(entry.Player);
+                        }
                     }
 
                     // Hands refresh (rate-limited per player, budgeted per tick)
@@ -491,6 +512,23 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         HandsManager.Refresh(entry.Base, entry.Player, entry.IsObserved);
                         entry.Player.HandsReady = true;
                         refreshBudget--;
+                    }
+
+                    // Health status refresh — lightweight single int read, not budgeted
+                    if (now >= entry.NextHealthRefresh)
+                    {
+                        entry.NextHealthRefresh = now.AddSeconds(HealthRefreshIntervalSec);
+
+                        if (entry.IsObserved)
+                        {
+                            // Observed player: read ETagStatus from ObservedHealthController
+                            UpdateObservedHealthStatus(entry);
+                        }
+                        else if (entry.Player is Player.LocalPlayer lp)
+                        {
+                            // Local player: read energy/hydration
+                            lp.UpdateEnergyHydration(entry.Base);
+                        }
                     }
                 }
                 else
@@ -519,6 +557,37 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         }
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Reads the ETagStatus bitmask from the ObservedHealthController and maps it
+        /// to the simplified <see cref="Player.EHealthStatus"/> enum.
+        /// </summary>
+        private static void UpdateObservedHealthStatus(PlayerEntry entry)
+        {
+            var ohc = entry.ObservedHealthControllerAddr;
+            if (ohc == 0)
+                return; // Not yet resolved — will stay Healthy
+
+            try
+            {
+                if (!Memory.TryReadValue<int>(ohc + Offsets.ObservedHealthController.HealthStatus, out var tag, false))
+                    return;
+
+                // ETagStatus is a [Flags] enum — check from most severe to least
+                if ((tag & ETagDying) != 0)
+                    entry.Player.HealthStatus = Player.EHealthStatus.Dying;
+                else if ((tag & ETagBadlyInjured) != 0)
+                    entry.Player.HealthStatus = Player.EHealthStatus.BadlyInjured;
+                else if ((tag & ETagInjured) != 0)
+                    entry.Player.HealthStatus = Player.EHealthStatus.Injured;
+                else
+                    entry.Player.HealthStatus = Player.EHealthStatus.Healthy;
+            }
+            catch
+            {
+                // Suppressed — transient DMA failure
             }
         }
 

@@ -100,6 +100,11 @@ namespace eft_dma_radar.Silk.UI
         private static int _cachedStatusPmcCount = -1;
         private static string _cachedStatusPlayersText = "";
 
+        // DrawStatusBar: local player energy/hydration
+        private static int _cachedEnergy = -1;
+        private static int _cachedHydration = -1;
+        private static string _cachedEnergyHydrationText = "";
+
         // DrawStatusBar: hideout stash info
         private static int _cachedHideoutItemCount = -1;
         private static long _cachedHideoutTotalValue = -1;
@@ -118,6 +123,9 @@ namespace eft_dma_radar.Silk.UI
         private static readonly Vector4 ColorStatusSeparator = new(0.50f, 0.52f, 0.55f, 1f);
         private static readonly Vector4 ColorRaidDot = new(0.30f, 0.75f, 0.70f, 1f);
         private static readonly Vector4 ColorSaveNotify = new(0.30f, 0.80f, 0.50f, 1f);
+        private static readonly Vector4 ColorEnergyHydrationOk = new(0.55f, 0.72f, 0.55f, 1f);
+        private static readonly Vector4 ColorEnergyHydrationLow = new(0.90f, 0.65f, 0.20f, 1f);
+        private static readonly Vector4 ColorEnergyHydrationCrit = new(0.90f, 0.30f, 0.30f, 1f);
         private static readonly Vector4 ColorFreeModeBtn = new(0.18f, 0.48f, 0.48f, 1.0f);
         private static readonly Vector4 ColorFreeModeBtnHover = new(0.24f, 0.58f, 0.58f, 1.0f);
         private static readonly Vector4 ColorFreeModeBtnActive = new(0.15f, 0.42f, 0.42f, 1.0f);
@@ -291,6 +299,8 @@ namespace eft_dma_radar.Silk.UI
                 HotkeyManagerPanel.IsOpen = Config.ShowHotkeyPanel;
                 HideoutPanel.IsOpen = Config.ShowHideoutPanel;
                 QuestPanel.IsOpen = Config.ShowQuestPanel;
+                PlayerHistoryPanel.IsOpen = Config.ShowPlayerHistoryPanel;
+                PlayerWatchlistPanel.IsOpen = Config.ShowPlayerWatchlistPanel;
 
                 // Auto-open the hideout panel when the player enters the hideout
                 Memory.HideoutEntered += static (_, _) => HideoutPanel.IsOpen = true;
@@ -672,6 +682,68 @@ namespace eft_dma_radar.Silk.UI
                 }
             }
 
+            // Explosives (grenades, tripwires, mortar projectiles)
+            if (Config.ShowExplosives)
+            {
+                var explosives = Memory.Explosives;
+                if (explosives is not null)
+                {
+                    foreach (var item in explosives)
+                    {
+                        if (!item.IsActive)
+                            continue;
+                        if (!worldBounds.Contains(item.Position))
+                            continue;
+                        item.Draw(canvas, mapParams, mapCfg, localPlayer);
+                    }
+                }
+            }
+
+            // BTR vehicle
+            if (Config.ShowBTR)
+            {
+                var btr = Memory.Btr;
+                if (btr is not null && btr.IsActive)
+                {
+                    if (worldBounds.Contains(btr.Position))
+                        btr.Draw(canvas, mapParams, mapCfg, localPlayer);
+                }
+            }
+
+            // Airdrops
+            if (Config.ShowAirdrops)
+            {
+                var airdrops = Memory.Airdrops;
+                if (airdrops is not null)
+                {
+                    foreach (var drop in airdrops)
+                    {
+                        if (!worldBounds.Contains(drop.Position))
+                            continue;
+                        var sp = mapParams.ToScreenPos(MapParams.ToMapPos(drop.Position, mapCfg));
+                        float dist = Vector3.Distance(localPlayer.Position, drop.Position);
+                        drop.Draw(canvas, sp, dist);
+                    }
+                }
+            }
+
+            // Switches (static map data)
+            if (Config.ShowSwitches)
+            {
+                var switches = Memory.Switches;
+                if (switches is not null)
+                {
+                    foreach (var sw in switches)
+                    {
+                        if (!worldBounds.Contains(sw.Position))
+                            continue;
+                        var sp = mapParams.ToScreenPos(MapParams.ToMapPos(sw.Position, mapCfg));
+                        float dist = Vector3.Distance(localPlayer.Position, sw.Position);
+                        sw.Draw(canvas, sp, dist);
+                    }
+                }
+            }
+
             // Group connectors
             if (Config.ConnectGroups && normalPlayers is not null)
                 DrawGroupConnectors(canvas, normalPlayers, map, mapParams);
@@ -859,6 +931,14 @@ namespace eft_dma_radar.Silk.UI
                 if (ImGui.MenuItem("\u25a1 Doors", null, showDoors))
                     Config.ShowDoors = !Config.ShowDoors;
 
+                bool showAirdrops = Config.ShowAirdrops;
+                if (ImGui.MenuItem("\u2708 Airdrops", null, showAirdrops))
+                    Config.ShowAirdrops = !Config.ShowAirdrops;
+
+                bool showSwitches = Config.ShowSwitches;
+                if (ImGui.MenuItem("\u26a1 Switches", null, showSwitches))
+                    Config.ShowSwitches = !Config.ShowSwitches;
+
                 ImGui.Separator();
 
                 // Player display
@@ -904,6 +984,12 @@ namespace eft_dma_radar.Silk.UI
                 if (ImGui.MenuItem("\U0001f4cb Quests", "Q", QuestPanel.IsOpen))
                     QuestPanel.IsOpen = !QuestPanel.IsOpen;
 
+                if (ImGui.MenuItem("\U0001f4d6 Player History", null, PlayerHistoryPanel.IsOpen))
+                    PlayerHistoryPanel.IsOpen = !PlayerHistoryPanel.IsOpen;
+
+                if (ImGui.MenuItem("\U0001f50d Watchlist", null, PlayerWatchlistPanel.IsOpen))
+                    PlayerWatchlistPanel.IsOpen = !PlayerWatchlistPanel.IsOpen;
+
                 ImGui.Separator();
 
                 // Widgets
@@ -927,6 +1013,8 @@ namespace eft_dma_radar.Silk.UI
                     HotkeyManagerPanel.IsOpen = false;
                     HideoutPanel.IsOpen = false;
                     QuestPanel.IsOpen = false;
+                    PlayerHistoryPanel.IsOpen = false;
+                    PlayerWatchlistPanel.IsOpen = false;
                     PlayerInfoWidget.IsOpen = false;
                     LootWidget.IsOpen = false;
                     AimviewWidget.IsOpen = false;
@@ -1031,6 +1119,31 @@ namespace eft_dma_radar.Silk.UI
 
                     ImGui.SameLine(0, 16);
                     ImGui.TextColored(ColorStatusText, _cachedStatusPlayersText);
+
+                    // Energy/Hydration for local player
+                    if (Memory.LocalPlayer is LocalPlayer lp && lp.HealthReady)
+                    {
+                        int energy = (int)lp.Energy;
+                        int hydration = (int)lp.Hydration;
+
+                        if (energy != _cachedEnergy || hydration != _cachedHydration)
+                        {
+                            _cachedEnergy = energy;
+                            _cachedHydration = hydration;
+                            _cachedEnergyHydrationText = $"E:{energy}  H:{hydration}";
+                        }
+
+                        ImGui.SameLine(0, 16);
+                        ImGui.TextColored(ColorStatusSeparator, "\u2502");
+
+                        int minVal = Math.Min(energy, hydration);
+                        var ehColor = minVal > 30 ? ColorEnergyHydrationOk
+                            : minVal > 10 ? ColorEnergyHydrationLow
+                            : ColorEnergyHydrationCrit;
+
+                        ImGui.SameLine(0, 16);
+                        ImGui.TextColored(ehColor, _cachedEnergyHydrationText);
+                    }
                 }
 
                 // Right: save notification
@@ -1068,6 +1181,12 @@ namespace eft_dma_radar.Silk.UI
 
             if (QuestPanel.IsOpen)
                 QuestPanel.Draw();
+
+            if (PlayerHistoryPanel.IsOpen)
+                PlayerHistoryPanel.Draw();
+
+            if (PlayerWatchlistPanel.IsOpen)
+                PlayerWatchlistPanel.Draw();
 
             if (PlayerInfoWidget.IsOpen && InRaid)
                 PlayerInfoWidget.Draw();
@@ -1279,6 +1398,8 @@ namespace eft_dma_radar.Silk.UI
             Config.ShowHotkeyPanel = HotkeyManagerPanel.IsOpen;
             Config.ShowHideoutPanel = HideoutPanel.IsOpen;
             Config.ShowQuestPanel = QuestPanel.IsOpen;
+            Config.ShowPlayerHistoryPanel = PlayerHistoryPanel.IsOpen;
+            Config.ShowPlayerWatchlistPanel = PlayerWatchlistPanel.IsOpen;
 
             Config.Save();
 

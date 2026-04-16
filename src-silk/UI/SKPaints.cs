@@ -221,6 +221,82 @@ namespace eft_dma_radar.Silk.UI
 
         #endregion
 
+        #region Explosive Paints
+
+        /// <summary>Explosive marker fill — bright red/orange.</summary>
+        public static SKPaint PaintExplosives { get; } = NewFillPaint(new SKColor(255, 80, 40));
+
+        /// <summary>Explosive text — same color as marker.</summary>
+        public static SKPaint TextExplosives { get; } = NewTextPaint(new SKColor(255, 80, 40));
+
+        /// <summary>Explosive in-danger fill — brighter red.</summary>
+        public static SKPaint PaintExplosivesDanger { get; } = NewFillPaint(new SKColor(255, 30, 30));
+
+        /// <summary>Explosive in-danger text — brighter red.</summary>
+        public static SKPaint TextExplosivesDanger { get; } = NewTextPaint(new SKColor(255, 30, 30));
+
+        /// <summary>Grenade blast radius circle — translucent red stroke.</summary>
+        public static SKPaint PaintExplosivesRadius { get; } = new()
+        {
+            Color = new SKColor(255, 80, 40, 60),
+            StrokeWidth = 1.5f,
+            IsAntialias = true,
+            Style = SKPaintStyle.Stroke,
+        };
+
+        /// <summary>Tripwire line between endpoints — red stroke.</summary>
+        public static SKPaint PaintTripwireLine { get; } = new()
+        {
+            Color = new SKColor(255, 80, 40),
+            StrokeWidth = 2f,
+            IsAntialias = true,
+            Style = SKPaintStyle.Stroke,
+        };
+
+        #endregion
+
+        #region BTR Paints
+
+        /// <summary>BTR vehicle marker fill — orange (same family as raider).</summary>
+        public static SKPaint PaintBtr { get; } = NewFillPaint(new SKColor(255, 160, 20));
+
+        /// <summary>BTR label text — orange.</summary>
+        public static SKPaint TextBtr { get; } = NewTextPaint(new SKColor(255, 160, 20));
+
+        #endregion
+
+        #region Airdrop Paints
+
+        /// <summary>Airdrop marker fill — bright cyan.</summary>
+        public static SKPaint PaintAirdrop { get; } = new()
+        {
+            Color = new SKColor(0, 200, 255),
+            StrokeWidth = 2.5f,
+            Style = SKPaintStyle.Stroke,
+            IsAntialias = true,
+        };
+
+        /// <summary>Airdrop label text — cyan.</summary>
+        public static SKPaint TextAirdrop { get; } = NewTextPaint(new SKColor(0, 200, 255));
+
+        #endregion
+
+        #region Switch Paints
+
+        /// <summary>Switch marker fill — muted teal.</summary>
+        public static SKPaint PaintSwitch { get; } = new()
+        {
+            Color = new SKColor(100, 200, 180),
+            StrokeWidth = 1.5f,
+            Style = SKPaintStyle.Stroke,
+            IsAntialias = true,
+        };
+
+        /// <summary>Switch label text — muted teal.</summary>
+        public static SKPaint TextSwitch { get; } = NewTextPaint(new SKColor(100, 200, 180));
+
+        #endregion
+
         #region Tooltip Paints
 
         /// <summary>Semi-transparent dark background for mouseover tooltips.</summary>

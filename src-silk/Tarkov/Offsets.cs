@@ -96,6 +96,10 @@ namespace SDK
         }
         public readonly partial struct SynchronizableObjectLogicProcessor
         {
+            // NOTE: The IL2CPP auto-dumper may not update this offset correctly.
+            // If tripwires are not displaying, manually set this to 0x18 (24) in the
+            // AppData cache: %AppData%\eft-dma-radar-silk\il2cpp_offsets.json
+            // Key: "SynchronizableObjectLogicProcessor._activeSynchronizableObjects"
             public static uint _activeSynchronizableObjects = 0x10;
         }
         public readonly partial struct TripwireSynchronizableObject
@@ -855,6 +859,25 @@ namespace SDK
             [FieldOffset(0x8)]
             public readonly ulong Renderers;
         }
+    }
+
+    // ── Game enums ──────────────────────────────────────────────────────────
+
+    public enum SynchronizableObjectType
+    {
+        AirDrop = 0,
+        AirPlane = 1,
+        Tripwire = 2,
+    }
+
+    public enum ETripwireState
+    {
+        None = 0,
+        Wait = 1,
+        Active = 2,
+        Exploding = 3,
+        Exploded = 4,
+        Inert = 5,
     }
 
     // ── Matching / Loading progress enums ────────────────────────────────────
