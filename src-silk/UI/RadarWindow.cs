@@ -302,7 +302,10 @@ namespace eft_dma_radar.Silk.UI
                 PlayerHistoryPanel.IsOpen = Config.ShowPlayerHistoryPanel;
                 PlayerWatchlistPanel.IsOpen = Config.ShowPlayerWatchlistPanel;
 
-                // Auto-open the hideout panel when the player enters the hideout
+                if (Config.ShowEspWidget)
+                    EspWindow.Open();
+
+                // Auto-open the hideout panel
                 Memory.HideoutEntered += static (_, _) => HideoutPanel.IsOpen = true;
 
                 // Wire up the notification callback into the silk Memory module
@@ -1006,6 +1009,14 @@ namespace eft_dma_radar.Silk.UI
 
                 ImGui.Separator();
 
+                // Overlays
+                ImGui.TextDisabled("Overlays");
+
+                if (ImGui.MenuItem("\U0001f441 ESP Window", "E", EspWindow.IsOpen))
+                    EspWindow.Toggle();
+
+                ImGui.Separator();
+
                 if (ImGui.MenuItem("Close All", "Esc"))
                 {
                     SettingsPanel.IsOpen = false;
@@ -1400,8 +1411,12 @@ namespace eft_dma_radar.Silk.UI
             Config.ShowQuestPanel = QuestPanel.IsOpen;
             Config.ShowPlayerHistoryPanel = PlayerHistoryPanel.IsOpen;
             Config.ShowPlayerWatchlistPanel = PlayerWatchlistPanel.IsOpen;
+            Config.ShowEspWidget = EspWindow.IsOpen;
 
             Config.Save();
+
+            // Close ESP window if open
+            EspWindow.Close();
 
             // Signal the memory worker to stop cleanly before we release GPU resources
             Memory.Close();

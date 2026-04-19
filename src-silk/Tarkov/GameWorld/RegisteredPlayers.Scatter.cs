@@ -1,3 +1,4 @@
+using System.Buffers;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using VmmSharpEx;
 using VmmSharpEx.Options;
@@ -73,31 +74,39 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             if (entry.TransformReady)
             {
                 int vertexCount = entry.TransformIndex + 1;
-                var vertices = scatter.ReadArray<TrsX>(entry.VerticesAddr, vertexCount);
-                if (vertices is not null)
+                var rented = ArrayPool<TrsX>.Shared.Rent(vertexCount);
+                try
                 {
-                    posOk = ComputeAndSetPosition(entry, vertices);
-                    if (!posOk)
+                    var vertices = rented.AsSpan(0, vertexCount);
+                    if (scatter.ReadSpan<TrsX>(entry.VerticesAddr, vertices))
                     {
-                        Log.WriteRateLimited(AppLogLevel.Warning,
-                            $"pos_bad_{entry.Base:X}", TimeSpan.FromSeconds(3),
-                            $"[RegisteredPlayers] Position compute failed for '{entry.Player.Name}' (idx={entry.TransformIndex}, verts=0x{entry.VerticesAddr:X})");
-                    }
+                        posOk = ComputeAndSetPosition(entry, vertices);
+                        if (!posOk)
+                        {
+                            Log.WriteRateLimited(AppLogLevel.Warning,
+                                $"pos_bad_{entry.Base:X}", TimeSpan.FromSeconds(3),
+                                $"[RegisteredPlayers] Position compute failed for '{entry.Player.Name}' (idx={entry.TransformIndex}, verts=0x{entry.VerticesAddr:X})");
+                        }
 
-                    // LookPosition for local player — same TransformInternal, same vertices, same result.
-                    // Just copy the already-computed position (avoids a redundant hierarchy walk).
-                    if (posOk && entry.LookTransformReady && entry.Player is Player.LocalPlayer localPlayer)
+                        // LookPosition for local player — same TransformInternal, same vertices, same result.
+                        // Just copy the already-computed position (avoids a redundant hierarchy walk).
+                        if (posOk && entry.LookTransformReady && entry.Player is Player.LocalPlayer localPlayer)
+                        {
+                            localPlayer.LookPosition = entry.Player.Position;
+                            localPlayer.HasLookPosition = true;
+                        }
+                    }
+                    else
                     {
-                        localPlayer.LookPosition = entry.Player.Position;
-                        localPlayer.HasLookPosition = true;
+                        posOk = false;
+                        Log.WriteRateLimited(AppLogLevel.Warning,
+                            $"pos_read_{entry.Base:X}", TimeSpan.FromSeconds(5),
+                            $"[RegisteredPlayers] Position scatter read failed for '{entry.Player.Name}' (verts=0x{entry.VerticesAddr:X}, count={vertexCount})");
                     }
                 }
-                else
+                finally
                 {
-                    posOk = false;
-                    Log.WriteRateLimited(AppLogLevel.Warning,
-                        $"pos_read_{entry.Base:X}", TimeSpan.FromSeconds(5),
-                        $"[RegisteredPlayers] Position scatter read failed for '{entry.Player.Name}' (verts=0x{entry.VerticesAddr:X}, count={vertexCount})");
+                    ArrayPool<TrsX>.Shared.Return(rented);
                 }
             }
             else
@@ -185,7 +194,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <summary>
         /// Computes the world position from a pre-read vertices array and applies it.
         /// </summary>
-        private static bool ComputeAndSetPosition(PlayerEntry entry, TrsX[] vertices)
+        private static bool ComputeAndSetPosition(PlayerEntry entry, ReadOnlySpan<TrsX> vertices)
         {
             try
             {

@@ -825,9 +825,10 @@ function drawGroupConnectors(players, map, cx, cy, rotRad, mapRect) {
   ctx.restore();
 }
 
-function drawPlayers(players, map, cx, cy, rotRad, mapRect, localWorldY, hitList) {
+function drawPlayers(players, map, cx, cy, rotRad, mapRect, localWorldY, hitList, distOrigin) {
   const size = Number(state.playerSize) || 6;
   const haveHeights = (localWorldY != null);
+  const hasDistOrigin = distOrigin && Number.isFinite(distOrigin.worldX);
 
   for (const p of players) {
     if (!p || !p.isActive) continue;
@@ -871,15 +872,23 @@ function drawPlayers(players, map, cx, cy, rotRad, mapRect, localWorldY, hitList
       }
     }
 
-    // Names
+    // Names + Distance
     if (state.showNames) {
+      let label = p.name || "";
+      if (hasDistOrigin && p !== distOrigin) {
+        const dx = p.worldX - distOrigin.worldX;
+        const dy = (p.worldY ?? 0) - (distOrigin.worldY ?? 0);
+        const dz = p.worldZ - distOrigin.worldZ;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        label += " [" + Math.round(dist) + "m]";
+      }
       ctx.save();
       ctx.fillStyle = "rgba(229, 231, 235, 0.85)";
       ctx.font = "600 11px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.shadowColor = "rgba(0,0,0,.7)";
       ctx.shadowBlur = 3;
-      ctx.fillText(p.name || "", px, py - size - 6);
+      ctx.fillText(label, px, py - size - 6);
       ctx.restore();
     }
   }
@@ -1344,9 +1353,22 @@ function updateHover() {
     html += `<div class="t-header"><span class="t-dot" style="background:${col}"></span><span class="t-name">${esc(p.name || "Unknown")}</span></div>`;
     html += `<div class="t-type">${typeName} · <span style="color:var(--${statusClass})">${status}</span></div>`;
 
-    const hasExtra = (p.gearValue > 0) || (readWorldY(p) != null);
+    // Compute distance from local player
+    let distStr = null;
+    const distOrigin = lastFocusPlayer || lastLocalPlayer;
+    if (distOrigin && distOrigin !== p && Number.isFinite(distOrigin.worldX) && Number.isFinite(p.worldX)) {
+      const dx = p.worldX - distOrigin.worldX;
+      const dy = (p.worldY ?? 0) - (distOrigin.worldY ?? 0);
+      const dz = p.worldZ - distOrigin.worldZ;
+      distStr = Math.round(Math.sqrt(dx * dx + dy * dy + dz * dz)) + "m";
+    }
+
+    const hasExtra = (p.gearValue > 0) || (readWorldY(p) != null) || distStr;
     if (hasExtra) {
       html += `<div class="t-sep"></div><div class="t-grid">`;
+      if (distStr) {
+        html += `<span class="k">Distance</span><span class="v">${distStr}</span>`;
+      }
       if (p.gearValue > 0) {
         html += `<span class="k">Gear</span><span class="v">₽${p.gearValue.toLocaleString()}</span>`;
       }
@@ -1514,6 +1536,7 @@ function pinchDist(t) {
    ═══════════════════════════════════════════════════════════════════════════ */
 let lastRotRad = 0;
 let lastLocalPlayer = null;
+let lastFocusPlayer = null;
 
 function frame() {
   requestAnimationFrame(frame);
@@ -1547,6 +1570,7 @@ function frame() {
       updateFollowBadge();
     }
   }
+  lastFocusPlayer = focusPlayer;
 
   // Rotation — always based on local player yaw for map orientation
   const localYaw = local ? (Number(local.yaw) || 0) : 0;
@@ -1592,7 +1616,7 @@ function frame() {
       if (state.showCorpses) drawCorpses(radarData.corpses, map, cx, cy, lastRotRad, mapRect, hitList);
       if (state.showContainers) drawContainers(radarData.containers, map, cx, cy, lastRotRad, mapRect, hitList, local);
       if (state.showLoot) drawLoot(radarData.loot, map, cx, cy, lastRotRad, mapRect, readWorldY(local), hitList);
-      if (state.showPlayers) drawPlayers(players, map, cx, cy, lastRotRad, mapRect, readWorldY(local), hitList);
+      if (state.showPlayers) drawPlayers(players, map, cx, cy, lastRotRad, mapRect, readWorldY(local), hitList, focusPlayer);
     }
   }
 

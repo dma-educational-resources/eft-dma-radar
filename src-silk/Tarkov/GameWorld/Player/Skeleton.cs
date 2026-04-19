@@ -1,3 +1,4 @@
+using System.Buffers;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using VmmSharpEx;
 using VmmSharpEx.Options;
@@ -244,22 +245,31 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                     if (!entry.Ready)
                         continue;
 
-                    var vertices = scatter.ReadArray<TrsX>(entry.VerticesAddr, entry.TransformIndex + 1);
-                    if (vertices is null)
-                        continue;
-
+                    int vcount = entry.TransformIndex + 1;
+                    var rented = ArrayPool<TrsX>.Shared.Rent(vcount);
                     try
                     {
-                        var worldPos = TrsX.ComputeWorldPosition(vertices, entry.CachedIndices!, entry.TransformIndex);
-                        if (float.IsFinite(worldPos.X) && float.IsFinite(worldPos.Y) && float.IsFinite(worldPos.Z))
+                        var vertices = rented.AsSpan(0, vcount);
+                        if (!scatter.ReadSpan<TrsX>(entry.VerticesAddr, vertices))
+                            continue;
+
+                        try
                         {
-                            entry.WorldPosition = worldPos;
-                            entry.HasPosition = true;
+                            var worldPos = TrsX.ComputeWorldPosition(vertices, entry.CachedIndices!, entry.TransformIndex);
+                            if (float.IsFinite(worldPos.X) && float.IsFinite(worldPos.Y) && float.IsFinite(worldPos.Z))
+                            {
+                                entry.WorldPosition = worldPos;
+                                entry.HasPosition = true;
+                            }
+                        }
+                        catch
+                        {
+                            // Transient failure — keep last valid position
                         }
                     }
-                    catch
+                    finally
                     {
-                        // Transient failure — keep last valid position
+                        ArrayPool<TrsX>.Shared.Return(rented);
                     }
                 }
             }

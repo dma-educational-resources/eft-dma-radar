@@ -1,3 +1,4 @@
+using System.Buffers;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using VmmSharpEx.Options;
 
@@ -341,19 +342,25 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Interactables
                     if (!verticesPtrs[i].IsValidVirtualAddress() || !indicesPtrs[i].IsValidVirtualAddress())
                         continue;
 
+                    int vertCount = indices[i] + 1;
+                    var rentedV = ArrayPool<TrsX>.Shared.Rent(vertCount);
+                    var rentedI = ArrayPool<int>.Shared.Rent(vertCount);
                     try
                     {
-                        int vertCount = indices[i] + 1;
-                        var vertices = s9.ReadArray<TrsX>(verticesPtrs[i], vertCount);
-                        var parentIndices = s9.ReadArray<int>(indicesPtrs[i], vertCount);
-
-                        if (vertices is null || parentIndices is null ||
-                            vertices.Length < vertCount || parentIndices.Length < vertCount)
+                        var vertices = rentedV.AsSpan(0, vertCount);
+                        var parentIndices = rentedI.AsSpan(0, vertCount);
+                        if (!s9.ReadSpan<TrsX>(verticesPtrs[i], vertices) ||
+                            !s9.ReadSpan<int>(indicesPtrs[i], parentIndices))
                             continue;
 
                         positions[i] = ComputeTransformPosition(vertices, parentIndices, indices[i]);
                     }
                     catch { }
+                    finally
+                    {
+                        ArrayPool<TrsX>.Shared.Return(rentedV);
+                        ArrayPool<int>.Shared.Return(rentedI);
+                    }
                 }
             }
 
@@ -398,7 +405,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Interactables
         /// <summary>
         /// Pure math — computes world position from pre-read vertices + indices.
         /// </summary>
-        private static Vector3 ComputeTransformPosition(TrsX[] vertices, int[] parentIndices, int index)
+        private static Vector3 ComputeTransformPosition(ReadOnlySpan<TrsX> vertices, ReadOnlySpan<int> parentIndices, int index)
         {
             var pos = TrsX.ComputeWorldPosition(vertices, parentIndices, index);
 

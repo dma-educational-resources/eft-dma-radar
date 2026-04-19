@@ -105,8 +105,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <summary>FPS Camera pointer (unscoped).</summary>
         public ulong FPSCamera { get; }
 
-        /// <summary>Optic Camera pointer (ads/scoped).</summary>
-        public ulong OpticCamera { get; }
+        /// <summary>Optic Camera pointer (ads/scoped). May be resolved lazily after construction.</summary>
+        public ulong OpticCamera { get; private set; }
+
+        /// <summary>Whether we've already attempted lazy optic camera resolution.</summary>
+        private bool _opticResolved;
 
         /// <summary>Counter for rate-limiting the scoped check (4 sequential DMA reads).</summary>
         private int _scopeCheckTick;
@@ -136,10 +139,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         {
             FPSCamera = fpsCamera;
             OpticCamera = opticCamera;
+            _opticResolved = opticCamera != 0;
             IsActive = true;
 
             Log.WriteLine($"[CameraManager] FPSCamera:   0x{FPSCamera:X}");
-            Log.WriteLine($"[CameraManager] OpticCamera: 0x{OpticCamera:X}");
+            if (opticCamera != 0)
+                Log.WriteLine($"[CameraManager] OpticCamera: 0x{OpticCamera:X}");
+            else
+                Log.WriteLine("[CameraManager] OpticCamera: not yet resolved (will resolve on ADS)");
         }
 
         /// <summary>
@@ -296,6 +303,27 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         {
             IsADS = localPlayer?.IsADS ?? false;
 
+            // Lazy optic camera resolution — attempt once when ADS is first detected
+            if (IsADS && !_opticResolved && !OpticCamera.IsValidVirtualAddress())
+            {
+                _opticResolved = true; // Only try once
+                if (TryResolveOpticCameraFromInstance(out var optic) && optic.IsValidVirtualAddress())
+                {
+                    OpticCamera = optic;
+                    Log.WriteLine($"[CameraManager] OpticCamera lazily resolved: 0x{optic:X}");
+                }
+                else if (_allCamerasAddr.IsValidVirtualAddress())
+                {
+                    // Try AllCameras fallback for optic only
+                    TryResolveOpticViaAllCameras(out optic);
+                    if (optic.IsValidVirtualAddress())
+                    {
+                        OpticCamera = optic;
+                        Log.WriteLine($"[CameraManager] OpticCamera lazily resolved via AllCameras: 0x{optic:X}");
+                    }
+                }
+            }
+
             // Rate-limit the scoped check — it does 4 sequential DMA reads.
             // Only re-evaluate every Nth tick; when not ADS, skip entirely.
             if (IsADS && ++_scopeCheckTick >= ScopeCheckInterval)
@@ -415,7 +443,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 Log.WriteLine($"[CameraManager] CameraManager.Instance @ 0x{_eftCameraManagerInstance:X}");
                 if (TryResolveViaCameraManagerInstance(out fpsCamera, out opticCamera))
                 {
-                    Log.WriteLine("[CameraManager] Using CameraManager.Instance cameras.");
+                    Log.WriteLine($"[CameraManager] Using CameraManager.Instance — FPS: 0x{fpsCamera:X}, Optic: {(opticCamera != 0 ? $"0x{opticCamera:X}" : "deferred")}");
                     return true;
                 }
                 Log.WriteLine("[CameraManager] Instance found but camera fields unreadable — falling back.");
@@ -444,7 +472,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             if (!_eftCameraManagerInstance.IsValidVirtualAddress())
                 return false;
 
-            // FPS camera
+            // FPS camera (required)
             if (!Memory.TryReadPtr(_eftCameraManagerInstance + Offsets.EFTCameraManager.Camera, out var fpsCameraRef, false))
                 return false;
 
@@ -461,14 +489,30 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 return false;
             }
 
-            // Optic camera
+            // Optic camera (optional — resolved lazily when ADS is detected)
+            TryResolveOpticCameraFromInstance(out opticCamera);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Best-effort optic camera resolution from the CameraManager.Instance.
+        /// Failures are silently ignored — optic camera is optional.
+        /// </summary>
+        private static bool TryResolveOpticCameraFromInstance(out ulong opticCamera)
+        {
+            opticCamera = 0;
+
+            if (!_eftCameraManagerInstance.IsValidVirtualAddress())
+                return false;
+
             if (!Memory.TryReadPtr(_eftCameraManagerInstance + Offsets.EFTCameraManager.OpticCameraManager, out var opticCameraManager, false))
                 return false;
 
             if (!Memory.TryReadPtr(opticCameraManager + Offsets.OpticCameraManager.Camera, out var opticCameraRef, false))
                 return false;
 
-            if (!TryReadObjectClassName(opticCameraRef, out name, 32)
+            if (!TryReadObjectClassName(opticCameraRef, out var name, 32)
                 || !string.Equals(name, "Camera", StringComparison.Ordinal))
                 return false;
 
@@ -476,6 +520,36 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 return false;
 
             return true;
+        }
+
+        /// <summary>
+        /// Lazy optic-only resolution via AllCameras list.
+        /// </summary>
+        private static bool TryResolveOpticViaAllCameras(out ulong opticCamera)
+        {
+            opticCamera = 0;
+            try
+            {
+                if (!_allCamerasAddr.IsValidVirtualAddress())
+                    return false;
+
+                if (!Memory.TryReadPtr(_allCamerasAddr, out var allCamerasPtr, false))
+                    return false;
+
+                if (!Memory.TryReadPtr(allCamerasPtr + 0x0, out var itemsPtr, false) ||
+                    !Memory.TryReadValue<int>(allCamerasPtr + 0x8, out var count, false))
+                    return false;
+
+                if (!itemsPtr.IsValidVirtualAddress() || count <= 0 || count > 1024)
+                    return false;
+
+                FindCamerasByName(itemsPtr, count, out _, out opticCamera);
+                return opticCamera.IsValidVirtualAddress();
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         /// <summary>
@@ -509,7 +583,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 if (!opticCamera.IsValidVirtualAddress())
                     opticCamera = 0;
 
-                return fpsCamera != 0 && opticCamera != 0;
+                return fpsCamera != 0; // Optic camera is optional
             }
             catch (Exception ex)
             {

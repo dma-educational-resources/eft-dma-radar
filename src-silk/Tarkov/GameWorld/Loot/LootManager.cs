@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Frozen;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
 using eft_dma_radar.Silk.Tarkov.Unity;
@@ -574,19 +575,29 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                             continue;
 
                         int vertCount = indices[i] + 1;
-                        var vertices = s3.ReadArray<TrsX>(verticesPtrs[i], vertCount);
-                        var parentIndices = s3.ReadArray<int>(indicesPtrs[i], vertCount);
-                        if (vertices is null || parentIndices is null ||
-                            vertices.Length < vertCount || parentIndices.Length < vertCount)
-                            continue;
+                        var rentedV = ArrayPool<TrsX>.Shared.Rent(vertCount);
+                        var rentedI = ArrayPool<int>.Shared.Rent(vertCount);
+                        try
+                        {
+                            var vertices = rentedV.AsSpan(0, vertCount);
+                            var parentIndices = rentedI.AsSpan(0, vertCount);
+                            if (!s3.ReadSpan<TrsX>(verticesPtrs[i], vertices) ||
+                                !s3.ReadSpan<int>(indicesPtrs[i], parentIndices))
+                                continue;
 
-                        var pos = ComputeTransformPosition(vertices, parentIndices, indices[i]);
-                        if (pos == Vector3.Zero)
-                            continue;
+                            var pos = ComputeTransformPosition(vertices, parentIndices, indices[i]);
+                            if (pos == Vector3.Zero)
+                                continue;
 
-                        var item = new LootItem(marketItem, pos);
-                        item.RefreshImportance();
-                        result.Add(item);
+                            var item = new LootItem(marketItem, pos);
+                            item.RefreshImportance();
+                            result.Add(item);
+                        }
+                        finally
+                        {
+                            ArrayPool<TrsX>.Shared.Return(rentedV);
+                            ArrayPool<int>.Shared.Return(rentedI);
+                        }
                     }
                     catch { }
                 }
@@ -670,17 +681,27 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                             continue;
 
                         int vertCount = indices[i] + 1;
-                        var vertices = s3.ReadArray<TrsX>(verticesPtrs[i], vertCount);
-                        var parentIndices = s3.ReadArray<int>(indicesPtrs[i], vertCount);
-                        if (vertices is null || parentIndices is null ||
-                            vertices.Length < vertCount || parentIndices.Length < vertCount)
-                            continue;
+                        var rentedV = ArrayPool<TrsX>.Shared.Rent(vertCount);
+                        var rentedI = ArrayPool<int>.Shared.Rent(vertCount);
+                        try
+                        {
+                            var vertices = rentedV.AsSpan(0, vertCount);
+                            var parentIndices = rentedI.AsSpan(0, vertCount);
+                            if (!s3.ReadSpan<TrsX>(verticesPtrs[i], vertices) ||
+                                !s3.ReadSpan<int>(indicesPtrs[i], parentIndices))
+                                continue;
 
-                        var pos = ComputeTransformPosition(vertices, parentIndices, indices[i]);
-                        if (pos == Vector3.Zero)
-                            continue;
+                            var pos = ComputeTransformPosition(vertices, parentIndices, indices[i]);
+                            if (pos == Vector3.Zero)
+                                continue;
 
-                        result.Add(new LootCorpse(pending[i].InteractiveClass, pos));
+                            result.Add(new LootCorpse(pending[i].InteractiveClass, pos));
+                        }
+                        finally
+                        {
+                            ArrayPool<TrsX>.Shared.Return(rentedV);
+                            ArrayPool<int>.Shared.Return(rentedI);
+                        }
                     }
                     catch { }
                 }
@@ -693,7 +714,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// Pure math — computes world position from pre-read vertices + indices.
         /// No DMA reads. Shared by loot and corpse resolution.
         /// </summary>
-        private static Vector3 ComputeTransformPosition(TrsX[] vertices, int[] parentIndices, int index)
+        private static Vector3 ComputeTransformPosition(ReadOnlySpan<TrsX> vertices, ReadOnlySpan<int> parentIndices, int index)
         {
             var pos = TrsX.ComputeWorldPosition(vertices, parentIndices, index);
 
@@ -779,17 +800,27 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                             continue;
 
                         int vertCount = indices[i] + 1;
-                        var vertices = s3.ReadArray<TrsX>(verticesPtrs[i], vertCount);
-                        var parentIndices = s3.ReadArray<int>(indicesPtrs[i], vertCount);
-                        if (vertices is null || parentIndices is null ||
-                            vertices.Length < vertCount || parentIndices.Length < vertCount)
-                            continue;
+                        var rentedV = ArrayPool<TrsX>.Shared.Rent(vertCount);
+                        var rentedI = ArrayPool<int>.Shared.Rent(vertCount);
+                        try
+                        {
+                            var vertices = rentedV.AsSpan(0, vertCount);
+                            var parentIndices = rentedI.AsSpan(0, vertCount);
+                            if (!s3.ReadSpan<TrsX>(verticesPtrs[i], vertices) ||
+                                !s3.ReadSpan<int>(indicesPtrs[i], parentIndices))
+                                continue;
 
-                        var pos = ComputeTransformPosition(vertices, parentIndices, indices[i]);
-                        if (pos == Vector3.Zero)
-                            continue;
+                            var pos = ComputeTransformPosition(vertices, parentIndices, indices[i]);
+                            if (pos == Vector3.Zero)
+                                continue;
 
-                        result.Add(new LootAirdrop(pos));
+                            result.Add(new LootAirdrop(pos));
+                        }
+                        finally
+                        {
+                            ArrayPool<TrsX>.Shared.Return(rentedV);
+                            ArrayPool<int>.Shared.Return(rentedI);
+                        }
                     }
                     catch { }
                 }
@@ -917,17 +948,27 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                             continue;
 
                         int vertCount = indices[i] + 1;
-                        var vertices = s3.ReadArray<TrsX>(verticesPtrs[i], vertCount);
-                        var parentIndices = s3.ReadArray<int>(indicesPtrs[i], vertCount);
-                        if (vertices is null || parentIndices is null ||
-                            vertices.Length < vertCount || parentIndices.Length < vertCount)
-                            continue;
+                        var rentedV = ArrayPool<TrsX>.Shared.Rent(vertCount);
+                        var rentedI = ArrayPool<int>.Shared.Rent(vertCount);
+                        try
+                        {
+                            var vertices = rentedV.AsSpan(0, vertCount);
+                            var parentIndices = rentedI.AsSpan(0, vertCount);
+                            if (!s3.ReadSpan<TrsX>(verticesPtrs[i], vertices) ||
+                                !s3.ReadSpan<int>(indicesPtrs[i], parentIndices))
+                                continue;
 
-                        var pos = ComputeTransformPosition(vertices, parentIndices, indices[i]);
-                        if (pos == Vector3.Zero)
-                            continue;
+                            var pos = ComputeTransformPosition(vertices, parentIndices, indices[i]);
+                            if (pos == Vector3.Zero)
+                                continue;
 
-                        result.Add(new LootContainer(bsgId, containerItem.ShortName, pos, pending[i].Searched));
+                            result.Add(new LootContainer(bsgId, containerItem.ShortName, pos, pending[i].Searched));
+                        }
+                        finally
+                        {
+                            ArrayPool<TrsX>.Shared.Return(rentedV);
+                            ArrayPool<int>.Shared.Return(rentedI);
+                        }
                     }
                     catch { }
                 }

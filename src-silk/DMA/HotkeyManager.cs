@@ -90,6 +90,19 @@ internal static class HotkeyManager
         new("ConnectGroups", "Connect Groups", "Widgets",
             "Toggle squad connection lines",
             static e => { if (e.IsDown) SilkProgram.Config.ConnectGroups = !SilkProgram.Config.ConnectGroups; }),
+
+        // ESP
+        new("ToggleEspWindow", "Toggle ESP Window", "ESP",
+            "Open/close the ESP overlay window",
+            static e => { if (e.IsDown) eft_dma_radar.Silk.UI.ESP.EspWindow.Toggle(); }),
+
+        new("EspCycleRenderMode", "Cycle ESP Render Mode", "ESP",
+            "Cycle player render mode: None → Bones → Box → HeadDot",
+            static e => { if (e.IsDown) eft_dma_radar.Silk.UI.ESP.EspWindow.CycleRenderMode(); }),
+
+        new("EspToggleCrosshair", "Toggle ESP Crosshair", "ESP",
+            "Show/hide the center crosshair overlay on the ESP window",
+            static e => { if (e.IsDown) { SilkProgram.Config.EspShowCrosshair = !SilkProgram.Config.EspShowCrosshair; SilkProgram.Config.MarkDirty(); } }),
     ];
 
     /// <summary>Lookup from action ID to definition, for fast access.</summary>

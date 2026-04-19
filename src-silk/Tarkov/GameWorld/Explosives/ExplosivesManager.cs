@@ -50,12 +50,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
 
                 using var scatter = Memory.CreateScatter(useCache: false);
                 int queued = 0;
+                // Track which explosives contributed entries so we can identify the bad one on failure
+                var contributors = new List<(ulong Addr, string Kind)>(explosives.Count);
                 foreach (var explosive in explosives)
                 {
                     try
                     {
                         explosive.OnRefresh(scatter);
                         queued++;
+                        contributors.Add((explosive.Addr, explosive.GetType().Name));
                     }
                     catch (Exception ex)
                     {
@@ -70,7 +73,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
                     {
                         scatter.Execute();
                     }
-                    catch (VmmSharpEx.VmmException) { }
+                    catch (VmmSharpEx.VmmException ex)
+                    {
+                        // Don't silently swallow — surface the addresses so we can diagnose which
+                        // explosive has a stale pointer. Rate-limited so it doesn't spam each tick.
+                        var sb = new StringBuilder();
+                        sb.Append("[Explosives] Scatter failed (").Append(queued).Append(" entries): ")
+                          .Append(ex.Message).Append(" | contributors=[");
+                        for (int i = 0; i < contributors.Count; i++)
+                        {
+                            if (i > 0) sb.Append(", ");
+                            sb.Append(contributors[i].Kind).Append("@0x").Append(contributors[i].Addr.ToString("X"));
+                        }
+                        sb.Append(']');
+                        Log.WriteRateLimited(AppLogLevel.Warning, "explosives_scatter_fail", TimeSpan.FromSeconds(5), sb.ToString());
+                    }
                 }
 
                 // 3) Prune inactive

@@ -25,5 +25,6 @@ global using eft_dma_radar.Silk.Tarkov.GameWorld.Quests;
 global using eft_dma_radar.Silk.Config;
 global using eft_dma_radar.Silk.Tarkov.Unity.Collections;
 global using eft_dma_radar.Silk.UI;
+global using eft_dma_radar.Silk.UI.ESP;
 global using eft_dma_radar.Silk.UI.Radar.Maps;
 global using eft_dma_radar.Silk.Tarkov.Features.MemoryWrites;

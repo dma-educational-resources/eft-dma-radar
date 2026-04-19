@@ -293,6 +293,50 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Whether the Player Watchlist panel is open.</summary>
         public bool ShowPlayerWatchlistPanel { get; set; } = false;
 
+        /// <summary>Whether the ESP overlay widget is open.</summary>
+        public bool ShowEspWidget { get; set; } = false;
+
+        /// <summary>Show player boxes/labels on the ESP overlay.</summary>
+        public bool EspShowPlayers { get; set; } = true;
+
+        /// <summary>Show loot labels on the ESP overlay.</summary>
+        public bool EspShowLoot { get; set; } = true;
+        public bool EspShowBones { get; set; } = true;
+
+        /// <summary>
+        /// ESP per-player render mode: 0 = None (labels only), 1 = Bones,
+        /// 2 = Box (+ optional bones via <see cref="EspShowBones"/>), 3 = HeadDot.
+        /// Cycled by the "Cycle ESP Render Mode" hotkey.
+        /// </summary>
+        public int EspRenderMode { get; set; } = 2;
+
+        /// <summary>Show a center crosshair overlay on the ESP window.</summary>
+        public bool EspShowCrosshair { get; set; } = false;
+
+        /// <summary>Crosshair style: 0 = Plus, 1 = Cross, 2 = Circle, 3 = Dot, 4 = Square, 5 = Diamond.</summary>
+        public int EspCrosshairType { get; set; } = 0;
+
+        /// <summary>Crosshair scale multiplier.</summary>
+        public float EspCrosshairScale { get; set; } = 1f;
+
+        /// <summary>Show FPS counter in the top-left of the ESP window.</summary>
+        public bool EspShowFps { get; set; } = true;
+
+        /// <summary>Target FPS for the ESP window (independent of the radar FPS).</summary>
+        public int EspTargetFps { get; set; } = 144;
+
+        /// <summary>Show the status text banner at the top-center of the ESP window.</summary>
+        public bool EspShowStatusText { get; set; } = true;
+
+        /// <summary>Show local player energy/hydration bars on the ESP window.</summary>
+        public bool EspShowEnergyHydration { get; set; } = false;
+
+        /// <summary>Maximum distance (meters) for ESP player rendering.</summary>
+        public float EspPlayerDistance { get; set; } = 500f;
+
+        /// <summary>Maximum distance (meters) for ESP loot rendering.</summary>
+        public float EspLootDistance { get; set; } = 100f;
+
         // ── Hideout
 
         /// <summary>Enable hideout stash/area reading when entering the hideout scene.</summary>
@@ -486,6 +530,13 @@ namespace eft_dma_radar.Silk.Config
             GameMonitorHeight = Math.Clamp(GameMonitorHeight, 480, 4320);
 
             DoorLootProximity = Math.Clamp(DoorLootProximity, 1f, 200f);
+
+            EspPlayerDistance = Math.Clamp(EspPlayerDistance, 10f, 2000f);
+            EspLootDistance = Math.Clamp(EspLootDistance, 10f, 500f);
+            EspRenderMode = Math.Clamp(EspRenderMode, 0, 3);
+            EspCrosshairType = Math.Clamp(EspCrosshairType, 0, 5);
+            EspCrosshairScale = Math.Clamp(EspCrosshairScale, 0.5f, 5f);
+            EspTargetFps = Math.Clamp(EspTargetFps, 0, 360);
 
             LootMinPrice = Math.Max(LootMinPrice, 0);
             LootImportantPrice = Math.Max(LootImportantPrice, 0);

@@ -35,6 +35,8 @@ namespace eft_dma_radar.Silk
                 Config = SilkConfig.Load();
                 Log.WriteLine("[SilkProgram] Config loaded OK.");
 
+                ExceptionTracer.Install();
+
                 SetHighPerformanceMode();
 
                 Memory.ModuleInit(Config);
