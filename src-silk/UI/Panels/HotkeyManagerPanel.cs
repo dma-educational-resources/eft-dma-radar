@@ -31,14 +31,10 @@ namespace eft_dma_radar.Silk.UI.Panels
         public static void Draw()
         {
             bool isOpen = IsOpen;
-            ImGui.SetNextWindowSize(new Vector2(460, 400), ImGuiCond.FirstUseEver);
-            if (!ImGui.Begin("\u2328 Hotkeys", ref isOpen, ImGuiWindowFlags.NoCollapse))
-            {
-                IsOpen = isOpen;
-                ImGui.End();
-                return;
-            }
+            using var scope = PanelWindow.Begin("\u2328 Hotkeys", ref isOpen, new Vector2(460, 400));
             IsOpen = isOpen;
+            if (!scope.Visible)
+                return;
 
             ImGui.Spacing();
 
@@ -47,7 +43,6 @@ namespace eft_dma_radar.Silk.UI.Panels
                 ImGui.TextColored(new Vector4(1f, 0.6f, 0.2f, 1f),
                     "\u26a0 Input manager not initialized.");
                 ImGui.TextWrapped("Hotkeys require an active DMA connection. They will activate once a raid starts.");
-                ImGui.End();
                 return;
             }
 
@@ -62,8 +57,6 @@ namespace eft_dma_radar.Silk.UI.Panels
             ImGui.Spacing();
             ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f),
                 "Hotkeys work via DMA \u2014 they read the gaming PC's keyboard state.");
-
-            ImGui.End();
         }
 
         /// <summary>

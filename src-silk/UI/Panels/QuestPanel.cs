@@ -97,14 +97,10 @@ namespace eft_dma_radar.Silk.UI.Panels
         public static void Draw()
         {
             bool isOpen = IsOpen;
-            ImGui.SetNextWindowSize(new Vector2(500, 580), ImGuiCond.FirstUseEver);
-            if (!ImGui.Begin("\U0001f4cb Quests", ref isOpen, ImGuiWindowFlags.NoCollapse))
-            {
-                IsOpen = isOpen;
-                ImGui.End();
-                return;
-            }
+            using var scope = PanelWindow.Begin("\u2756 Quests", ref isOpen, new Vector2(500, 580));
             IsOpen = isOpen;
+            if (!scope.Visible)
+                return;
 
             DrawFilters();
             ImGui.Separator();
@@ -113,7 +109,6 @@ namespace eft_dma_radar.Silk.UI.Panels
             if (questManager is null)
             {
                 ImGui.TextColored(ColGrey, "Waiting for game connection...");
-                ImGui.End();
                 return;
             }
 
@@ -121,7 +116,6 @@ namespace eft_dma_radar.Silk.UI.Panels
             if (activeQuests.Count == 0)
             {
                 ImGui.TextColored(ColGrey, "No active quests found.");
-                ImGui.End();
                 return;
             }
 
@@ -156,7 +150,6 @@ namespace eft_dma_radar.Silk.UI.Panels
             if (_cachedShownCount == 0)
             {
                 ImGui.TextColored(ColDim, "  No quests match current filters.");
-                ImGui.End();
                 return;
             }
 
@@ -166,8 +159,6 @@ namespace eft_dma_radar.Silk.UI.Panels
                 var (trader, quests) = _cachedGroups[t];
                 DrawTraderGroup(trader, quests);
             }
-
-            ImGui.End();
         }
 
         #region Filters
@@ -389,7 +380,7 @@ namespace eft_dma_radar.Silk.UI.Panels
                             {
                                 var key = keySlot[a];
                                 var keyName = GetItemDisplayName(key.Id, key.ShortName ?? key.Name);
-                                ImGui.TextColored(ColMagenta, $"      \U0001f511 {keyName}");
+                                ImGui.TextColored(ColMagenta, $"      \u26bf {keyName}");
                             }
                         }
                     }
@@ -401,7 +392,7 @@ namespace eft_dma_radar.Silk.UI.Panels
                     if (apiObj.MarkerItem is not null && !string.IsNullOrEmpty(apiObj.MarkerItem.Id))
                     {
                         var name = GetItemDisplayName(apiObj.MarkerItem.Id, apiObj.MarkerItem.ShortName ?? apiObj.MarkerItem.Name);
-                        ImGui.TextColored(ColOrange, $"      \U0001f4cd {name}");
+                        ImGui.TextColored(ColOrange, $"      \u2691 {name}");
                     }
                 }
 
@@ -413,13 +404,13 @@ namespace eft_dma_radar.Silk.UI.Panels
                         var itemName = GetItemDisplayName(apiObj.Item.Id, apiObj.Item.Name);
                         var countTag = apiObj.Count > 1 ? $" x{apiObj.Count}" : "";
                         var firTag = apiObj.FoundInRaid ? " (FIR)" : "";
-                        ImGui.TextColored(ColOrange, $"      \U0001f4e6 {itemName}{countTag}{firTag}");
+                        ImGui.TextColored(ColOrange, $"      \u25c7 {itemName}{countTag}{firTag}");
                     }
                     if (apiObj.QuestItem is not null && !string.IsNullOrEmpty(apiObj.QuestItem.Id))
                     {
                         var itemName = apiObj.QuestItem.ShortName ?? apiObj.QuestItem.Name ?? apiObj.QuestItem.Id;
                         var countTag = apiObj.Count > 1 ? $" x{apiObj.Count}" : "";
-                        ImGui.TextColored(ColOrange, $"      \U0001f4e6 {itemName}{countTag}");
+                        ImGui.TextColored(ColOrange, $"      \u25c7 {itemName}{countTag}");
                     }
                 }
             }

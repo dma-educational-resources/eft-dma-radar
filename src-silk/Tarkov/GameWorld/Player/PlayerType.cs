@@ -24,6 +24,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// <summary>Special player (dev, sherpa, etc.).</summary>
         SpecialPlayer,
         /// <summary>Known streamer.</summary>
-        Streamer
+        Streamer,
+        /// <summary>BTR turret operator (AI).</summary>
+        BtrOperator
     }
 }

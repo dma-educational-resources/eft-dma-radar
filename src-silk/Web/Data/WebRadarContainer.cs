@@ -1,6 +1,6 @@
 using eft_dma_radar.Silk.Tarkov.GameWorld.Loot;
 
-namespace eft_dma_radar.Silk.Web.WebRadar.Data
+namespace eft_dma_radar.Silk.Web.Data
 {
     /// <summary>
     /// Flattened container snapshot for the web radar client.

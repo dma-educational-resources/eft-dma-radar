@@ -28,14 +28,10 @@ namespace eft_dma_radar.Silk.UI.Panels
         public static void Draw()
         {
             bool isOpen = IsOpen;
-            ImGui.SetNextWindowSize(new Vector2(420, 560), ImGuiCond.FirstUseEver);
-            if (!ImGui.Begin("\u25a3 Loot Filters", ref isOpen, ImGuiWindowFlags.NoCollapse))
-            {
-                IsOpen = isOpen;
-                ImGui.End();
-                return;
-            }
+            using var scope = PanelWindow.Begin("\u25a3 Loot Filters", ref isOpen, new Vector2(420, 560));
             IsOpen = isOpen;
+            if (!scope.Visible)
+                return;
 
             DrawStatusBar();
             ImGui.Spacing();
@@ -45,8 +41,6 @@ namespace eft_dma_radar.Silk.UI.Panels
             DrawWishlistBlacklistSection();
             DrawOptionsSection();
             DrawFooter();
-
-            ImGui.End();
         }
 
         // ── Status bar ───────────────────────────────────────────────────────
@@ -148,22 +142,22 @@ namespace eft_dma_radar.Silk.UI.Panels
 
             // Row 1
             bool showMeds = Config.LootShowMeds;
-            if (ImGui.Checkbox("\U0001fa79 Meds", ref showMeds))
+            if (ImGui.Checkbox("\u271a Meds", ref showMeds))
                 Config.LootShowMeds = showMeds;
 
             ImGui.SameLine(0, 20);
             bool showFood = Config.LootShowFood;
-            if (ImGui.Checkbox("\U0001f354 Food", ref showFood))
+            if (ImGui.Checkbox("\u2615 Food", ref showFood))
                 Config.LootShowFood = showFood;
 
             ImGui.SameLine(0, 20);
             bool showBP = Config.LootShowBackpacks;
-            if (ImGui.Checkbox("\U0001f392 Backpacks", ref showBP))
+            if (ImGui.Checkbox("\u25c8 Backpacks", ref showBP))
                 Config.LootShowBackpacks = showBP;
 
             // Row 2
             bool showKeys = Config.LootShowKeys;
-            if (ImGui.Checkbox("\U0001f511 Keys", ref showKeys))
+            if (ImGui.Checkbox("\u26bf Keys", ref showKeys))
                 Config.LootShowKeys = showKeys;
 
             ImGui.SameLine(0, 20);

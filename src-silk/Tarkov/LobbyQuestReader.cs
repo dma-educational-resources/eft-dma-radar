@@ -4,7 +4,7 @@ using eft_dma_radar.Silk.Tarkov.Unity.IL2CPP;
 
 using SilkUtils = eft_dma_radar.Silk.Misc.Utils;
 
-namespace eft_dma_radar.Silk.DMA
+namespace eft_dma_radar.Silk.Tarkov
 {
     /// <summary>
     /// Background lobby quest reader that polls the player's profile from TarkovApplication

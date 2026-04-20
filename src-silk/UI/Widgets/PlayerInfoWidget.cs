@@ -31,16 +31,11 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 return;
 
             bool isOpen = IsOpen;
-            ImGui.SetNextWindowSize(new Vector2(460, 350), ImGuiCond.FirstUseEver);
             ImGui.SetNextWindowSizeConstraints(new Vector2(320, MIN_HEIGHT), new Vector2(700, MAX_HEIGHT));
-
-            if (!ImGui.Begin("Players", ref isOpen, ImGuiWindowFlags.NoCollapse))
-            {
-                IsOpen = isOpen;
-                ImGui.End();
-                return;
-            }
+            using var scope = PanelWindow.Begin("Players", ref isOpen, new Vector2(460, 350));
             IsOpen = isOpen;
+            if (!scope.Visible)
+                return;
 
             var localPos = localPlayer.Position;
 
@@ -76,7 +71,6 @@ namespace eft_dma_radar.Silk.UI.Widgets
             if (_hostilePlayers.Count == 0)
             {
                 ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), "No human hostiles detected");
-                ImGui.End();
                 return;
             }
 
@@ -180,7 +174,6 @@ namespace eft_dma_radar.Silk.UI.Widgets
             }
 
             ImGui.PopStyleVar();
-            ImGui.End();
         }
 
         #region Colors

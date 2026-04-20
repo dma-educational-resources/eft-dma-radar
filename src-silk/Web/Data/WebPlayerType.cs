@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Silk.Web.WebRadar.Data
+namespace eft_dma_radar.Silk.Web.Data
 {
     /// <summary>
     /// Player type classification for the web radar client.

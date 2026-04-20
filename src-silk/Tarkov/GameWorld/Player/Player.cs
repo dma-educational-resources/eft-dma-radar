@@ -173,6 +173,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// <summary>Short name of the chambered ammo, if a weapon is held. Null otherwise.</summary>
         public string? InHandsAmmo { get; set; }
 
+        /// <summary>True when the item currently in hands is classified as a weapon (DB "Weapon" category).</summary>
+        public bool IsWeaponInHands { get; internal set; }
+
         /// <summary>Whether hands data has been read at least once for this player.</summary>
         public bool HandsReady { get; set; }
 

@@ -302,15 +302,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             var lFoot = ProjectBone(Bones.HumanLFoot, contentMin, widgetW, widgetH);
             var rFoot = ProjectBone(Bones.HumanRFoot, contentMin, widgetW, widgetH);
 
-            // Anchor must be valid
-            if (!mid.HasValue)
+            // Pick the first available torso-ish anchor. Previously this required
+            // HumanSpine2 (mid) specifically — if it was clipped behind the camera
+            // or its position hadn't been resolved yet, the whole skeleton was
+            // suppressed and the widget fell back to a dot. Any of the torso bones
+            // (or head/neck as a last resort) is good enough to anchor the fallback
+            // segments for missing joints.
+            Vector2? anchor = mid ?? upper ?? lower ?? pelvis ?? neck ?? head;
+            if (!anchor.HasValue)
             {
                 HasScreenData = false;
                 return false;
             }
 
             // Fallback: use anchor for any bone that failed projection
-            var midV = mid.Value;
+            var midV = anchor.Value;
 
             int idx = 0;
             // Head → neck → upper → mid → lower → pelvis (spine)

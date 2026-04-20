@@ -60,11 +60,19 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private WorkerThread? _cameraWorker;
         private WorkerThread? _explosivesWorker;
 
-        // Deferred CameraManager retry state — used by the camera worker
+        // Deferred CameraManager retry state — used by the camera worker.
+        // Uses a time budget with adaptive backoff rather than a fixed attempt cap,
+        // so slow raid loads (map streaming, server queue, etc.) don't exhaust retries.
         private int _cameraRetryAttempts;
         private DateTime _nextCameraRetry;
-        private const int MaxCameraRetries = 30;               // ~30 attempts
-        private static readonly TimeSpan CameraRetryInterval = TimeSpan.FromSeconds(1);
+        private DateTime _cameraRetryDeadline;
+        private bool _cameraRetryExhaustedLogged;
+        private static readonly TimeSpan CameraRetryBudget = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan CameraRetryIntervalFast = TimeSpan.FromSeconds(1);
+        private static readonly TimeSpan CameraRetryIntervalSlow = TimeSpan.FromSeconds(3);
+        private static readonly TimeSpan CameraRetryIntervalMax = TimeSpan.FromSeconds(5);
+        private const int CameraRetryFastAttempts = 15;        // first ~15s: 1s interval
+        private const int CameraRetrySlowAttempts = 45;        // next ~90s: 3s interval, then 5s
 
         // The address of the LocalPlayer at raid start — used to detect extraction/death
         private ulong _localPlayerAddr;
@@ -472,6 +480,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             MatchingProgressResolver.Reset();
             DogtagCache.Clear();
             Memory.PlayerHistory.Reset(); // Clear per-raid dedup tracking (entries persist)
+            Player.Plugins.PlayerListManager.Reset();
         }
 
         #endregion
@@ -508,6 +517,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             {
                 ThrowIfRaidEnded();
                 _registeredPlayers.UpdateRealtimeData();
+
+                // High-alert facing check — cheap math, updates per-player IsFacingLocalPlayer.
+                if (_registeredPlayers.LocalPlayer is Player.LocalPlayer lp)
+                {
+                    try { Player.Plugins.HighAlertManager.Tick(lp, _registeredPlayers); }
+                    catch { /* non-fatal */ }
+                }
             }
             catch (RaidEnded)
             {
@@ -587,20 +603,39 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         }
 
         /// <summary>
-        /// Attempts to create the CameraManager on a rate-limited schedule.
+        /// Attempts to create the CameraManager on a rate-limited, adaptive schedule.
         /// Called from the camera worker when <see cref="_cameraManager"/> is null.
-        /// Gives up after <see cref="MaxCameraRetries"/> attempts.
+        /// Retries with backoff (1s → 3s → 5s) until <see cref="CameraRetryBudget"/> elapses.
         /// </summary>
         private void TryDeferredCameraInit()
         {
-            if (_cameraRetryAttempts >= MaxCameraRetries)
-                return; // Exhausted — don't spam logs
-
             var now = DateTime.UtcNow;
+
+            // Lazily set the deadline on the first retry tick.
+            if (_cameraRetryDeadline == default)
+                _cameraRetryDeadline = now + CameraRetryBudget;
+
+            if (now >= _cameraRetryDeadline)
+            {
+                if (!_cameraRetryExhaustedLogged)
+                {
+                    _cameraRetryExhaustedLogged = true;
+                    Log.WriteLine($"[CameraWorker] CameraManager failed after {_cameraRetryAttempts} attempts over {CameraRetryBudget.TotalSeconds:F0}s — advanced aimview disabled for this raid.");
+                }
+                return;
+            }
+
             if (now < _nextCameraRetry)
                 return;
 
-            _nextCameraRetry = now + CameraRetryInterval;
+            // Adaptive backoff: fast at first, then slow down so we don't waste DMA bandwidth
+            // while the raid is still loading, but still keep trying for several minutes.
+            TimeSpan interval =
+                _cameraRetryAttempts < CameraRetryFastAttempts ? CameraRetryIntervalFast :
+                _cameraRetryAttempts < CameraRetrySlowAttempts ? CameraRetryIntervalSlow :
+                                                                 CameraRetryIntervalMax;
+
+            _nextCameraRetry = now + interval;
             _cameraRetryAttempts++;
 
             _cameraManager = CameraManager.TryCreate();
@@ -609,14 +644,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             {
                 Log.WriteLine($"[CameraWorker] CameraManager initialized on deferred attempt #{_cameraRetryAttempts}.");
             }
-            else if (_cameraRetryAttempts >= MaxCameraRetries)
-            {
-                Log.WriteLine($"[CameraWorker] CameraManager failed after {MaxCameraRetries} attempts — advanced aimview disabled for this raid.");
-            }
             else
             {
-                Log.WriteRateLimited(AppLogLevel.Debug, "cam_retry", TimeSpan.FromSeconds(5),
-                    $"[CameraWorker] CameraManager retry {_cameraRetryAttempts}/{MaxCameraRetries}...");
+                var remaining = _cameraRetryDeadline - now;
+                Log.WriteRateLimited(AppLogLevel.Debug, "cam_retry", TimeSpan.FromSeconds(10),
+                    $"[CameraWorker] CameraManager retry #{_cameraRetryAttempts} (next in {interval.TotalSeconds:F0}s, {remaining.TotalSeconds:F0}s budget left)...");
             }
         }
 

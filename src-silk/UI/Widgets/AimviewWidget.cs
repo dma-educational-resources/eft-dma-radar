@@ -10,9 +10,6 @@ namespace eft_dma_radar.Silk.UI.Widgets
     /// </summary>
     internal static class AimviewWidget
     {
-        private const int MaxVisibleLoot = 12;
-        private const int MaxVisibleCorpses = 6;
-        private const int MaxVisibleContainers = 8;
         private const float LabelLineHeight = 14f;
 
         // Cached ImGui colors — initialized on first use (ImGui context must exist)
@@ -72,27 +69,20 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 return;
 
             bool isOpen = IsOpen;
-            ImGui.SetNextWindowSize(new Vector2(360, 240), ImGuiCond.FirstUseEver);
             ImGui.SetNextWindowSizeConstraints(new Vector2(200, 140), new Vector2(800, 600));
 
             var flags = ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
 
-            if (!ImGui.Begin("Aimview", ref isOpen, flags))
-            {
-                IsOpen = isOpen;
-                ImGui.End();
-                return;
-            }
+            using var scope = PanelWindow.Begin("Aimview", ref isOpen, new Vector2(360, 240), flags);
             IsOpen = isOpen;
+            if (!scope.Visible)
+                return;
 
             var contentMin = ImGui.GetCursorScreenPos();
             var contentSize = ImGui.GetContentRegionAvail();
 
             if (contentSize.X < 10 || contentSize.Y < 10)
-            {
-                ImGui.End();
                 return;
-            }
 
             ImGui.InvisibleButton("##aimview_canvas", contentSize);
 
@@ -170,9 +160,16 @@ namespace eft_dma_radar.Silk.UI.Widgets
             // 2) Players — always on top
             if (allPlayers is not null)
             {
+                bool hideAI = config.AimviewHideAIPlayers;
+                bool allowSkeleton = config.AimviewShowSkeleton;
+                bool showLabels = config.AimviewShowPlayerLabels;
+
                 foreach (var player in allPlayers)
                 {
                     if (player.IsLocalPlayer || !player.IsActive || !player.IsAlive || !player.HasValidPosition)
+                        continue;
+
+                    if (hideAI && IsAIPlayer(player.Type))
                         continue;
 
                     var worldPos = player.Position;
@@ -192,7 +189,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
 
                     // Draw skeleton bones in advanced mode — replaces the dot when available
                     bool drewSkeleton = false;
-                    if (projCtx.UseAdvanced)
+                    if (allowSkeleton && projCtx.UseAdvanced)
                     {
                         var skeleton = player.Skeleton;
                         if (skeleton is not null && skeleton.IsInitialized)
@@ -221,14 +218,16 @@ namespace eft_dma_radar.Silk.UI.Widgets
                         labelOffset = 4f;
                     }
 
-                    string label = $"{player.Name} ({(int)dist}m)";
-                    DrawLabel(drawList, label, screenX, screenY, labelOffset, color,
-                        projCtx.ContentMin, projCtx.ContentMax);
+                    if (showLabels)
+                    {
+                        string label = $"{player.Name} ({(int)dist}m)";
+                        DrawLabel(drawList, label, screenX, screenY, labelOffset, color,
+                            projCtx.ContentMin, projCtx.ContentMax);
+                    }
                 }
             }
 
             drawList.AddRect(projCtx.ContentMin, projCtx.ContentMax, _colorBorder);
-            ImGui.End();
         }
 
         /// <summary>
@@ -243,6 +242,13 @@ namespace eft_dma_radar.Silk.UI.Widgets
             if (loot is null)
                 return;
 
+            var cfg = SilkProgram.Config;
+            int minValue = cfg.AimviewMinLootValue;
+            int maxVisible = cfg.AimviewMaxLoot;
+            if (maxVisible <= 0)
+                return;
+            bool showLabels = cfg.AimviewShowItemLabels;
+
             int count = 0;
             for (int i = 0; i < loot.Count; i++)
             {
@@ -250,6 +256,8 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 int price = item.DisplayPrice;
                 var result = item.Evaluate(price);
                 if (!result.Visible)
+                    continue;
+                if (minValue > 0 && price < minValue && !result.Wishlisted)
                     continue;
 
                 var worldPos = item.Position;
@@ -275,7 +283,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 return;
 
             SortProjected(_lootBuf.AsSpan(0, count));
-            int visible = Math.Min(count, MaxVisibleLoot);
+            int visible = Math.Min(count, maxVisible);
 
             for (int i = 0; i < visible; i++)
             {
@@ -291,6 +299,9 @@ namespace eft_dma_radar.Silk.UI.Widgets
                     pos + new Vector2(0, half), pos + new Vector2(-half, 0),
                     _colorDotOutline);
             }
+
+            if (!showLabels)
+                return;
 
             int usedCount = 0;
             for (int i = 0; i < visible; i++)
@@ -315,6 +326,12 @@ namespace eft_dma_radar.Silk.UI.Widgets
             var corpses = Memory.Corpses;
             if (corpses is null)
                 return;
+
+            var cfg = SilkProgram.Config;
+            int maxVisible = cfg.AimviewMaxCorpses;
+            if (maxVisible <= 0)
+                return;
+            bool showLabels = cfg.AimviewShowItemLabels;
 
             int count = 0;
             for (int i = 0; i < corpses.Count; i++)
@@ -341,7 +358,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 return;
 
             SortProjected(_corpseBuf.AsSpan(0, count));
-            int visible = Math.Min(count, MaxVisibleCorpses);
+            int visible = Math.Min(count, maxVisible);
 
             for (int i = 0; i < visible; i++)
             {
@@ -353,6 +370,9 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 drawList.AddLine(pos + new Vector2(-s, -s), pos + new Vector2(s, s), _colorCorpse, 1.5f);
                 drawList.AddLine(pos + new Vector2(-s, s), pos + new Vector2(s, -s), _colorCorpse, 1.5f);
             }
+
+            if (!showLabels)
+                return;
 
             int usedCount = 0;
             for (int i = 0; i < visible; i++)
@@ -381,6 +401,10 @@ namespace eft_dma_radar.Silk.UI.Widgets
             var config = SilkProgram.Config;
             bool hideSearched = config.HideSearchedContainers;
             var selectedIds = config.SelectedContainers;
+            int maxVisible = config.AimviewMaxContainers;
+            if (maxVisible <= 0)
+                return;
+            bool showLabels = config.AimviewShowItemLabels;
 
             int count = 0;
             for (int i = 0; i < containers.Count; i++)
@@ -408,7 +432,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 return;
 
             SortProjected(_containerBuf.AsSpan(0, count));
-            int visible = Math.Min(count, MaxVisibleContainers);
+            int visible = Math.Min(count, maxVisible);
 
             for (int i = 0; i < visible; i++)
             {
@@ -421,6 +445,9 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 drawList.AddRect(tl, br, _colorContainer, 0f, ImDrawFlags.None, 1.4f);
             }
 
+            if (!showLabels)
+                return;
+
             int usedCount = 0;
             for (int i = 0; i < visible; i++)
             {
@@ -432,6 +459,10 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 DrawLabelAt(drawList, p.Label, p.ScreenX, labelY, p.Color, ctx.ContentMin, ctx.ContentMax);
             }
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsAIPlayer(PlayerType type) => type is
+            PlayerType.AIScav or PlayerType.AIRaider or PlayerType.AIBoss;
 
         /// <summary>
         /// Returns an ImGui color (packed uint) for the given player type.

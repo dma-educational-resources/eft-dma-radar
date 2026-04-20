@@ -133,7 +133,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             }
             catch (Exception ex)
             {
-                Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] CreatePlayerEntry FAILED 0x{playerBase:X} isLocal={isLocal}: {ex.Message}");
+                // Rate-limit per-pointer — the registration worker retries failed addresses
+                // on a backoff schedule and will log the same address repeatedly otherwise.
+                Log.WriteRateLimited(AppLogLevel.Warning, $"create_entry_{playerBase:X}", TimeSpan.FromSeconds(5),
+                    $"[RegisteredPlayers] CreatePlayerEntry FAILED 0x{playerBase:X} isLocal={isLocal}: {ex.Message}");
                 return null;
             }
         }

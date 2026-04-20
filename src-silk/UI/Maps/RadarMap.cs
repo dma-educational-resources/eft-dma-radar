@@ -1,6 +1,6 @@
 using Svg.Skia;
 
-namespace eft_dma_radar.Silk.UI.Radar.Maps
+namespace eft_dma_radar.Silk.UI.Maps
 {
     /// <summary>
     /// Rasterizes and draws a multi-layer SVG map.

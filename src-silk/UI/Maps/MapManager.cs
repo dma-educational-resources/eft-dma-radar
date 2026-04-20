@@ -1,6 +1,6 @@
 using System.Collections.Frozen;
 
-namespace eft_dma_radar.Silk.UI.Radar.Maps
+namespace eft_dma_radar.Silk.UI.Maps
 {
     /// <summary>
     /// Manages map configs and the currently active <see cref="RadarMap"/>.

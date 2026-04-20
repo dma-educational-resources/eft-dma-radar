@@ -10,11 +10,11 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 
 using eft_dma_radar.Silk.Misc.Data;
-using eft_dma_radar.Silk.Web.WebRadar.Data;
+using eft_dma_radar.Silk.Web.Data;
 
 using Open.Nat;
 
-namespace eft_dma_radar.Silk.Web.WebRadar
+namespace eft_dma_radar.Silk.Web
 {
     /// <summary>
     /// Lightweight HTTP server for the web radar.

@@ -56,14 +56,10 @@ namespace eft_dma_radar.Silk.UI.Panels
         public static void Draw()
         {
             bool isOpen = IsOpen;
-            ImGui.SetNextWindowSize(new Vector2(600, 650), ImGuiCond.FirstUseEver);
-            if (!ImGui.Begin("\U0001f3e0 Hideout", ref isOpen, ImGuiWindowFlags.NoCollapse))
-            {
-                IsOpen = isOpen;
-                ImGui.End();
-                return;
-            }
+            using var scope = PanelWindow.Begin("\u2302 Hideout", ref isOpen, new Vector2(600, 650));
             IsOpen = isOpen;
+            if (!scope.Visible)
+                return;
 
             DrawToolbar();
             ImGui.Separator();
@@ -73,8 +69,6 @@ namespace eft_dma_radar.Silk.UI.Panels
 
             if (_showUpgrades)
                 DrawUpgradesSection();
-
-            ImGui.End();
         }
 
         // ── Toolbar ──────────────────────────────────────────────────────────

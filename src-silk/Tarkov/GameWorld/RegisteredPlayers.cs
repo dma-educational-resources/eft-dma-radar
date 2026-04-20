@@ -496,6 +496,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         entry.Player.GearReady = true;
                         refreshBudget--;
 
+                        // Boss-guard identification heuristic (map-specific).
+                        try { Player.Plugins.GuardManager.Evaluate(entry.Player, Memory.MapID); }
+                        catch { /* non-fatal */ }
+
+                        // Stable PMC display name assignment.
+                        try { Player.Plugins.PlayerListManager.GetOrAssign(entry.Player); }
+                        catch { /* non-fatal */ }
+
                         // Re-check DogtagCache for players with a ProfileId but no resolved name yet.
                         // Corpse dogtags may have been seeded since the last gear refresh.
                         if (entry.Player.ProfileId is not null && entry.Player.AccountId is null)
@@ -512,6 +520,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         HandsManager.Refresh(entry.Base, entry.Player, entry.IsObserved);
                         entry.Player.HandsReady = true;
                         refreshBudget--;
+
+                        // Firearm detail refresh (fire mode + mag counts) — piggybacks on hands interval.
+                        try { Player.Plugins.FirearmManager.Refresh(entry.Base, entry.Player); }
+                        catch { /* non-fatal */ }
                     }
 
                     // Health status refresh — lightweight single int read, not budgeted
@@ -672,6 +684,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         // Reusable buffer for skeleton update — avoids per-tick allocation
         private readonly Player.Skeleton?[] _skeletonUpdateBuf = new Player.Skeleton?[MaxPlayerCount];
+
+        /// <summary>
+        /// Drops the cached skeleton for a player so the camera worker re-creates it
+        /// from scratch on the next <see cref="TryInitSkeletons"/> pass. Must be called
+        /// whenever the player's main Transform changes (re-init, mass invalidation,
+        /// auto-invalidation after repeated position failures) because the skeleton
+        /// caches bone TransformInternal pointers rooted in the old hierarchy.
+        /// </summary>
+        private static void InvalidateSkeleton(PlayerEntry entry)
+        {
+            if (entry.Skeleton is null)
+                return;
+            entry.Skeleton = null;
+            entry.Player.Skeleton = null;
+        }
 
 
 

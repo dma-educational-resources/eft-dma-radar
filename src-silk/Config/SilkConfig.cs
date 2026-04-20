@@ -229,6 +229,30 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Show nearby static containers in the aimview widget.</summary>
         public bool AimviewShowContainers { get; set; } = true;
 
+        /// <summary>Draw skeleton bones for players in the aimview (advanced mode only; falls back to dot when off or unavailable).</summary>
+        public bool AimviewShowSkeleton { get; set; } = true;
+
+        /// <summary>Draw "Name (Xm)" labels under players in the aimview.</summary>
+        public bool AimviewShowPlayerLabels { get; set; } = true;
+
+        /// <summary>Draw labels under loot / corpse / container markers in the aimview.</summary>
+        public bool AimviewShowItemLabels { get; set; } = true;
+
+        /// <summary>Hide AI players (AIScav / AIRaider / AIBoss) from the aimview to reduce clutter.</summary>
+        public bool AimviewHideAIPlayers { get; set; } = false;
+
+        /// <summary>Minimum item price (₽) for loot to appear in the aimview. 0 = show everything the loot filter already allows.</summary>
+        public int AimviewMinLootValue { get; set; } = 0;
+
+        /// <summary>Maximum number of loot markers drawn at once.</summary>
+        public int AimviewMaxLoot { get; set; } = 12;
+
+        /// <summary>Maximum number of corpse markers drawn at once.</summary>
+        public int AimviewMaxCorpses { get; set; } = 6;
+
+        /// <summary>Maximum number of container markers drawn at once.</summary>
+        public int AimviewMaxContainers { get; set; } = 8;
+
         /// <summary>Max distance (meters) for players to appear in the aimview.</summary>
         public float AimviewPlayerDistance { get; set; } = 300f;
 
@@ -524,6 +548,10 @@ namespace eft_dma_radar.Silk.Config
             AimviewLootDistance = Math.Clamp(AimviewLootDistance, 1f, 500f);
             AimviewEyeHeight = Math.Clamp(AimviewEyeHeight, 0f, 5f);
             AimviewZoom = Math.Clamp(AimviewZoom, 0.5f, 5.0f);
+            AimviewMinLootValue = Math.Max(AimviewMinLootValue, 0);
+            AimviewMaxLoot = Math.Clamp(AimviewMaxLoot, 0, 128);
+            AimviewMaxCorpses = Math.Clamp(AimviewMaxCorpses, 0, 32);
+            AimviewMaxContainers = Math.Clamp(AimviewMaxContainers, 0, 64);
             AimlineLength = Math.Clamp(AimlineLength, 0, 500);
 
             GameMonitorWidth = Math.Clamp(GameMonitorWidth, 640, 7680);

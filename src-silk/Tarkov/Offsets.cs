@@ -96,11 +96,13 @@ namespace SDK
         }
         public readonly partial struct SynchronizableObjectLogicProcessor
         {
-            // NOTE: The IL2CPP auto-dumper may not update this offset correctly.
-            // If tripwires are not displaying, manually set this to 0x18 (24) in the
-            // AppData cache: %AppData%\eft-dma-radar-silk\il2cpp_offsets.json
-            // Key: "SynchronizableObjectLogicProcessor._activeSynchronizableObjects"
-            public static uint _activeSynchronizableObjects = 0x10;
+            // Resolved at runtime from IL2CPP field `_staticSynchronizableObjects`
+            // (see Il2CppDumperSchema). The C# name is kept as `_activeSynchronizableObjects`
+            // for backwards compatibility with existing call sites. If tripwires ever stop
+            // displaying after a game update, delete the AppData cache
+            // (%AppData%\eft-dma-radar-silk\il2cpp_offsets.json) and restart to force a
+            // fresh dump — or override this key in the cache.
+            public static uint _activeSynchronizableObjects = 0x18;
         }
         public readonly partial struct TripwireSynchronizableObject
         {

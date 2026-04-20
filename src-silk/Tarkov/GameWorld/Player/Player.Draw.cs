@@ -207,11 +207,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             // Base length — shorter for AI, configurable for humans
             float length = IsHuman ? config.AimlineLength : MathF.Min(config.AimlineLength * 0.5f, 10f);
 
-            // High Alert — extend aimline when hostile is facing local player
-            if (config.HighAlert && IsHostile && localPlayer is not null)
+            // High Alert — extend aimline when hostile is facing local player.
+            // Reuses the cached flag from HighAlertManager (updated every realtime tick)
+            // so we don't redo the Distance + Normalize + Acos + Log math per frame.
+            if (config.HighAlert && IsHostile && IsFacingLocalPlayer)
             {
-                if (IsFacingTarget(localPlayer))
-                    length = HighAlertLength;
+                length = HighAlertLength;
             }
 
             if (length <= 0f)
@@ -224,35 +225,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 
             canvas.DrawLine(startX, startY, endX, endY, _aimlineOutline);
             canvas.DrawLine(startX, startY, endX, endY, aimlinePaint);
-        }
-
-        /// <summary>
-        /// Checks if this player is facing the target player within a distance-based angle threshold.
-        /// Uses the 3D direction vectors from yaw + facing direction vs. direction to target.
-        /// </summary>
-        private bool IsFacingTarget(Player target, float maxDist = 500f)
-        {
-            float distance = Vector3.Distance(Position, target.Position);
-            if (distance > maxDist || distance < 1f)
-                return false;
-
-            // Direction from this player to target (3D)
-            var dirToTarget = Vector3.Normalize(target.Position - Position);
-
-            // Convert yaw to a forward direction vector (EFT: yaw 0 = North/+Z)
-            float yawRad = RotationYaw * DegToRad;
-            (float sinYaw, float cosYaw) = MathF.SinCos(yawRad);
-            var forward = new Vector3(sinYaw, 0f, cosYaw);
-
-            float dot = Vector3.Dot(forward, dirToTarget);
-            float angle = MathF.Acos(float.Clamp(dot, -1f, 1f)) * (180f / MathF.PI);
-
-            // Non-linear angle threshold — tighter at long range, looser at close range
-            float threshold = 31.36f - 3.52f * MathF.Log(MathF.Abs(0.627f - 15.69f * distance));
-            if (threshold < 1f)
-                threshold = 1f;
-
-            return angle <= threshold;
         }
 
         /// <summary>

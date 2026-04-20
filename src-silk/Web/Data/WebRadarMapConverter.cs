@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Silk.Web.WebRadar.Data
+namespace eft_dma_radar.Silk.Web.Data
 {
     /// <summary>
     /// Converts a <see cref="MapConfig"/> to a <see cref="WebRadarMapInfo"/> for the web client.

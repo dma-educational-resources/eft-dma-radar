@@ -37,28 +37,21 @@ namespace eft_dma_radar.Silk.UI.Panels
         public static void Draw()
         {
             bool isOpen = IsOpen;
-            ImGui.SetNextWindowSize(new Vector2(620, 450), ImGuiCond.FirstUseEver);
-            if (!ImGui.Begin("\U0001f4d6 Player History", ref isOpen, ImGuiWindowFlags.NoCollapse))
-            {
-                IsOpen = isOpen;
-                ImGui.End();
-                return;
-            }
+            using var scope = PanelWindow.Begin("\u2630 Player History", ref isOpen, new Vector2(620, 450));
             IsOpen = isOpen;
+            if (!scope.Visible)
+                return;
 
             var history = Memory.PlayerHistory;
             if (history is null)
             {
                 ImGui.TextColored(ColGrey, "Player history not available.");
-                ImGui.End();
                 return;
             }
 
             DrawToolbar(history);
             ImGui.Separator();
             DrawTable(history);
-
-            ImGui.End();
         }
 
         private static void DrawToolbar(PlayerHistory history)

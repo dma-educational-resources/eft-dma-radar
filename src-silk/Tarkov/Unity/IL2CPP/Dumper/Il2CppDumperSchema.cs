@@ -126,7 +126,11 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             C("SynchronizableObject", [F("Type")]),
 
             // SynchronizableObjectLogicProcessor
-            C("SynchronizableObjectLogicProcessor", [F("_activeSynchronizableObjects")]),
+            // NOTE: Dump from `_staticSynchronizableObjects` (the list that actually contains
+            // placed tripwires in current builds). Historically this struct exposed
+            // `_activeSynchronizableObjects` at the same slot; we keep the C# field name for
+            // backwards compatibility but resolve the offset from the correct IL2CPP field.
+            C("SynchronizableObjectLogicProcessor", [F("_staticSynchronizableObjects", "_activeSynchronizableObjects")]),
 
             // TripwireSynchronizableObject
             C("TripwireSynchronizableObject", [

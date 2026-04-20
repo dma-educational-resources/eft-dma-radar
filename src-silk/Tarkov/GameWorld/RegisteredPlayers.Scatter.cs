@@ -155,6 +155,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     entry.TransformInitFailures = 0;
                     entry.NextTransformRetry = default;
                     entry.ConsecutiveErrors = 0; // Reset so we don't immediately re-trigger
+                    InvalidateSkeleton(entry);
                 }
             }
             else
@@ -295,6 +296,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     if (TryReinitFromTransformInternal(entry))
                     {
                         SyncLookTransform(entry);
+                        // Skeleton caches bone transform pointers rooted in the old hierarchy —
+                        // drop it so TryInitSkeletons re-walks the chain against the new vertices.
+                        InvalidateSkeleton(entry);
                         fastReinitOk++;
                         Log.WriteLine($"[RegisteredPlayers] Transform changed for '{entry.Player.Name}' — fast re-init OK (verts 0x{entry.VerticesAddr:X})");
                     }
@@ -324,6 +328,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         entry.LookTransformReady = false;
                         entry.TransformInitFailures = 0;
                         entry.NextTransformRetry = default;
+                        InvalidateSkeleton(entry);
                     }
                 }
                 else
@@ -337,6 +342,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         entry.LookTransformReady = false;
                         entry.TransformInitFailures = 0;
                         entry.NextTransformRetry = default;
+                        InvalidateSkeleton(entry);
                         TryInitTransform(entry.Base, entry);
                         SyncLookTransform(entry);
                     }
@@ -423,7 +429,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             }
             catch (Exception ex)
             {
-                Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitTransform FAILED '{entry.Player.Name}' 0x{playerBase:X}: {ex.Message}");
+                // Rate-limit per-pointer: a freshly spawned ObservedPlayerView can fail its
+                // pointer chain several times in a row before the game finishes populating it.
+                // The first failure is logged as a warning, subsequent ones downgrade to debug
+                // so the output window doesn't drown in identical lines.
+                Log.WriteRateLimited(AppLogLevel.Warning, $"init_tx_{playerBase:X}", TimeSpan.FromSeconds(5),
+                    $"[RegisteredPlayers] TryInitTransform FAILED '{entry.Player.Name}' 0x{playerBase:X}: {ex.Message}");
                 entry.TransformReady = false;
             }
         }
@@ -532,7 +543,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             }
             catch (Exception ex)
             {
-                Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitRotation FAILED '{entry.Player.Name}' 0x{playerBase:X}: {ex.Message}");
+                // Rate-limit per-pointer (see TryInitTransform for rationale).
+                Log.WriteRateLimited(AppLogLevel.Warning, $"init_rot_{playerBase:X}", TimeSpan.FromSeconds(5),
+                    $"[RegisteredPlayers] TryInitRotation FAILED '{entry.Player.Name}' 0x{playerBase:X}: {ex.Message}");
                 entry.RotationReady = false;
             }
         }

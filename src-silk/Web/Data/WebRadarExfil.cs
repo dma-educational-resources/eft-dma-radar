@@ -1,6 +1,6 @@
 using eft_dma_radar.Silk.Tarkov.GameWorld.Exits;
 
-namespace eft_dma_radar.Silk.Web.WebRadar.Data
+namespace eft_dma_radar.Silk.Web.Data
 {
     /// <summary>
     /// Flattened exfil snapshot for the web radar client.

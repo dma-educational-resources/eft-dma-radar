@@ -65,7 +65,7 @@ namespace eft_dma_radar.Silk
                     {
                         try
                         {
-                            await eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.StartAsync(
+                            await eft_dma_radar.Silk.Web.WebRadarServer.StartAsync(
                                 Config.WebRadarPort,
                                 TimeSpan.FromMilliseconds(Config.WebRadarTickMs)).ConfigureAwait(false);
                         }
@@ -88,8 +88,8 @@ namespace eft_dma_radar.Silk
             }
             finally
             {
-                if (eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.IsRunning)
-                    eft_dma_radar.Silk.Web.WebRadar.WebRadarServer.StopAsync().GetAwaiter().GetResult();
+                if (eft_dma_radar.Silk.Web.WebRadarServer.IsRunning)
+                    eft_dma_radar.Silk.Web.WebRadarServer.StopAsync().GetAwaiter().GetResult();
 
                 HotkeyManager.UnregisterAll();
                 InputManager.Shutdown();

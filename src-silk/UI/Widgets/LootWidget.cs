@@ -41,16 +41,11 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 return;
 
             bool isOpen = IsOpen;
-            ImGui.SetNextWindowSize(new Vector2(480, 360), ImGuiCond.FirstUseEver);
             ImGui.SetNextWindowSizeConstraints(new Vector2(360, 180), new Vector2(700, 800));
-
-            if (!ImGui.Begin("Loot", ref isOpen, ImGuiWindowFlags.NoCollapse))
-            {
-                IsOpen = isOpen;
-                ImGui.End();
-                return;
-            }
+            using var scope = PanelWindow.Begin("Loot", ref isOpen, new Vector2(480, 360));
             IsOpen = isOpen;
+            if (!scope.Visible)
+                return;
 
             // Build grouped snapshot
             _groups.Clear();
@@ -111,14 +106,11 @@ namespace eft_dma_radar.Silk.UI.Widgets
             if (visibleCount == 0)
             {
                 ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), "No loot matches current filters");
-                ImGui.End();
                 return;
             }
 
             // Table
             DrawTable();
-
-            ImGui.End();
         }
 
         private static void DrawSummary(int visible, long totalValue, int total)

@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Silk.Web.WebRadar.Data
+namespace eft_dma_radar.Silk.Web.Data
 {
     /// <summary>
     /// Top-level radar state snapshot sent to the web client via <c>/api/radar</c>.

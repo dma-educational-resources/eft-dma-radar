@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Silk.UI.Radar.Maps
+namespace eft_dma_radar.Silk.UI.Maps
 {
     /// <summary>
     /// Precomputed coordinate parameters for drawing the map on screen.

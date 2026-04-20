@@ -21,8 +21,22 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
         /// TypeInfoTableRva as the version fingerprint since it is stable within a
         /// single game build and changes when the binary changes).
         /// </summary>
+        /// <summary>
+        /// Bump this whenever the schema's <em>meaning</em> changes in a way that
+        /// makes previously-cached values wrong (e.g. switching which IL2CPP field
+        /// a C# offset is sourced from). Old caches with a lower version are
+        /// discarded, forcing a fresh live dump.
+        /// </summary>
+        private const int CacheSchemaVersion = 2;
+
         private sealed class OffsetCache
         {
+            /// <summary>
+            /// Schema version the cache was written with. See <see cref="CacheSchemaVersion"/>.
+            /// Missing / older values cause the cache to be discarded.
+            /// </summary>
+            public int SchemaVersion { get; set; }
+
             /// <summary>
             /// <see cref="Offsets.Special.TypeInfoTableRva"/> at the time the cache
             /// was written. Used as a build-version fingerprint: if this no longer
@@ -72,6 +86,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
 
                 var cache = new OffsetCache
                 {
+                    SchemaVersion = CacheSchemaVersion,
                     TypeInfoTableRva = Offsets.Special.TypeInfoTableRva,
                     GameAssemblyTimestamp = timestamp,
                     GameAssemblySizeOfImage = sizeOfImage,
@@ -166,6 +181,13 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
 
                 if (cache is null || cache.Fields.Count == 0)
                     return false;
+
+                if (cache.SchemaVersion < CacheSchemaVersion)
+                {
+                    Log.WriteLine(
+                        $"[Il2CppDumper] Fast cache schema outdated (cached={cache.SchemaVersion} current={CacheSchemaVersion}) — will perform fresh dump.");
+                    return false;
+                }
 
                 // Old cache files won't have PE fields → values default to 0 → mismatch → fall through.
                 if (cache.GameAssemblyTimestamp != timestamp || cache.GameAssemblySizeOfImage != sizeOfImage)

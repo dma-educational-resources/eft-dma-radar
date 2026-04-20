@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Silk.DMA;
+namespace eft_dma_radar.Silk.Misc.Input;
 
 /// <summary>
 /// Describes one possible hotkey action: unique ID, display name, category, and handler delegate.

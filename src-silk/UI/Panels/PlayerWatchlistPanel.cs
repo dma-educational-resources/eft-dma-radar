@@ -38,20 +38,15 @@ namespace eft_dma_radar.Silk.UI.Panels
         public static void Draw()
         {
             bool isOpen = IsOpen;
-            ImGui.SetNextWindowSize(new Vector2(600, 420), ImGuiCond.FirstUseEver);
-            if (!ImGui.Begin("\U0001f50d Player Watchlist", ref isOpen, ImGuiWindowFlags.NoCollapse))
-            {
-                IsOpen = isOpen;
-                ImGui.End();
-                return;
-            }
+            using var scope = PanelWindow.Begin("\u2315 Player Watchlist", ref isOpen, new Vector2(600, 420));
             IsOpen = isOpen;
+            if (!scope.Visible)
+                return;
 
             var watchlist = Memory.PlayerWatchlist;
             if (watchlist is null)
             {
                 ImGui.TextColored(ColGrey, "Watchlist not available.");
-                ImGui.End();
                 return;
             }
 
@@ -60,8 +55,6 @@ namespace eft_dma_radar.Silk.UI.Panels
             DrawToolbar(watchlist);
             ImGui.Separator();
             DrawTable(watchlist);
-
-            ImGui.End();
         }
 
         private static void DrawAddSection(PlayerWatchlist watchlist)

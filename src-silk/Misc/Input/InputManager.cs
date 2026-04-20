@@ -1,7 +1,7 @@
 using VmmSharpEx;
 using VmmSharpEx.Extensions.Input;
 
-namespace eft_dma_radar.Silk.DMA;
+namespace eft_dma_radar.Silk.Misc.Input;
 
 /// <summary>
 /// DMA-based keyboard/mouse input manager using <see cref="VmmInputManager"/>.

@@ -1,4 +1,4 @@
-namespace eft_dma_radar.Silk.UI.Radar.Maps
+namespace eft_dma_radar.Silk.UI.Maps
 {
     /// <summary>
     /// Interface for a radar map that can draw itself and provide coordinate parameters.

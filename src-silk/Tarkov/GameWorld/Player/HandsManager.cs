@@ -48,9 +48,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 if (!Memory.TryReadPtr(handsController + itemOffset, out var itemBase, false) || itemBase == 0)
                     return;
 
-                // Fast path — item hasn't changed
+                // Fast path — item pointer hasn't changed. Skip the identity re-read, but still
+                // refresh chambered ammo for weapons: the chamber contents change every shot even
+                // though the weapon pointer is stable.
                 if (_cachedItemAddr.TryGetValue(playerBase, out var cached) && cached == itemBase)
+                {
+                    if (player.IsWeaponInHands)
+                        TryReadChamberedAmmo(player, itemBase);
                     return;
+                }
 
                 // Item changed — read the new item identity
                 _cachedItemAddr[playerBase] = itemBase;
@@ -61,6 +67,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 // Non-critical — silently reset on failure
                 player.InHandsItem = null;
                 player.InHandsAmmo = null;
+                player.IsWeaponInHands = false;
                 _cachedItemAddr.TryRemove(playerBase, out _);
             }
         }
@@ -75,6 +82,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             {
                 player.InHandsItem = null;
                 player.InHandsAmmo = null;
+                player.IsWeaponInHands = false;
                 return;
             }
 
@@ -83,6 +91,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             {
                 player.InHandsItem = null;
                 player.InHandsAmmo = null;
+                player.IsWeaponInHands = false;
                 return;
             }
 
@@ -95,6 +104,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 // If weapon, try to read chambered ammo
                 bool isWeapon = Array.Exists(dbItem.Categories,
                     static c => c.Equals("Weapon", StringComparison.OrdinalIgnoreCase));
+                player.IsWeaponInHands = isWeapon;
                 if (isWeapon)
                     TryReadChamberedAmmo(player, itemBase);
                 else
@@ -114,6 +124,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                     player.InHandsItem = "Item";
                 }
                 player.InHandsAmmo = null;
+                player.IsWeaponInHands = false;
             }
         }
 
@@ -175,5 +186,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         {
             _cachedItemAddr.TryRemove(playerBase, out _);
         }
+
+        /// <summary>
+        /// Returns the held-item address most recently observed by <see cref="Refresh"/>,
+        /// or 0 if nothing has been cached for this player yet. Consumed by
+        /// <see cref="Plugins.FirearmManager"/> so it doesn't re-walk the hands pointer chain.
+        /// </summary>
+        internal static ulong GetCachedItem(ulong playerBase) =>
+            _cachedItemAddr.TryGetValue(playerBase, out var addr) ? addr : 0UL;
     }
 }
