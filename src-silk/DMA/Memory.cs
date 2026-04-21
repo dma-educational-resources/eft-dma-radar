@@ -86,6 +86,7 @@ namespace eft_dma_radar.Silk.DMA
         public static IReadOnlyList<Door>? Doors => Game?.Doors;
         public static IReadOnlyList<QuestLocation>? QuestLocations => Game?.QuestLocations;
         public static eft_dma_radar.Silk.Tarkov.GameWorld.Quests.QuestManager? QuestManager => Game?.QuestManager ?? LobbyQuestReader.QuestManager;
+        public static eft_dma_radar.Silk.Tarkov.GameWorld.Profile.WishlistManager? WishlistManager => Game?.WishlistManager;
         public static eft_dma_radar.Silk.Tarkov.GameWorld.Explosives.ExplosivesManager? Explosives => Game?.Explosives;
         public static eft_dma_radar.Silk.Tarkov.GameWorld.Explosives.BtrTracker? Btr => Game?.Btr;
         public static IReadOnlyList<eft_dma_radar.Silk.Tarkov.GameWorld.Interactables.Switch>? Switches => Game?.Switches;
@@ -127,6 +128,7 @@ namespace eft_dma_radar.Silk.DMA
             GameObjectManager.ResetCachedAddresses();
             MatchingProgressResolver.Reset();
             Hideout.Reset();
+            KillfeedManager.Reset();
             LobbyQuestReader.InvalidateCache();
             eft_dma_radar.Silk.Tarkov.QuestPlanner.QuestPlannerWorker.InvalidateCache();
             GameStopped?.Invoke(null, EventArgs.Empty);
@@ -184,14 +186,14 @@ namespace eft_dma_radar.Silk.DMA
             var vmmVer = FileVersionInfo.GetVersionInfo("vmm.dll").FileVersion;
             var lcVer = FileVersionInfo.GetVersionInfo("leechcore.dll").FileVersion;
 
-            var args = new List<string> { "-norefresh", "-device", config.DeviceStr, "-waitinitialize" };
+            var args = new List<string>(["-norefresh", "-device", config.DeviceStr, "-waitinitialize"]);
 
             try
             {
                 if (config.MemMapEnabled && !File.Exists(MemMapFile))
                 {
                     Log.WriteLine("[Memory] No MemMap, generating...");
-                    _vmm = new Vmm(args.ToArray());
+                    _vmm = new Vmm([.. args]);
                     _vmm.GetMemoryMap(applyMap: true, outputFile: MemMapFile);
                     _vmm.Dispose();
                 }
@@ -199,7 +201,7 @@ namespace eft_dma_radar.Silk.DMA
                 if (config.MemMapEnabled)
                     args.AddRange(["-memmap", MemMapFile]);
 
-                _vmm = new Vmm(args.ToArray());
+                _vmm = new Vmm([.. args]);
                 _vmm.RegisterAutoRefresh(RefreshOption.MemoryPartial, TimeSpan.FromMilliseconds(300));
                 _vmm.RegisterAutoRefresh(RefreshOption.TlbPartial, TimeSpan.FromSeconds(2));
 

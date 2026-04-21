@@ -411,6 +411,23 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Master toggle for transit point rendering on the radar.</summary>
         public bool ShowTransits { get; set; } = true;
 
+        // ── Killfeed ────────────────────────────────────────────────────────────
+
+        /// <summary>Show the killfeed overlay on the radar canvas.</summary>
+        public bool ShowKillFeed { get; set; } = true;
+
+        /// <summary>Maximum number of killfeed entries shown at once (1–10).</summary>
+        public int KillFeedMaxEntries { get; set; } = 6;
+
+        /// <summary>Seconds before a killfeed entry expires and disappears (10–600).</summary>
+        public int KillFeedTtlSeconds { get; set; } = 120;
+
+        /// <summary>Killfeed overlay X position in canvas pixels. -1 = anchor top-right (default).</summary>
+        public float KillFeedPosX { get; set; } = -1f;
+
+        /// <summary>Killfeed overlay Y position in canvas pixels. -1 = anchor top-right (default).</summary>
+        public float KillFeedPosY { get; set; } = -1f;
+
         // ── Explosives ──────────────────────────────────────────────────────────
 
         /// <summary>Master toggle for explosive rendering on the radar (grenades, tripwires, mortars).</summary>
@@ -477,6 +494,21 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Price source for loot values (0 = Best, 1 = Flea, 2 = Trader).</summary>
         public int LootPriceSource { get; set; } = 0;
 
+        /// <summary>Base radius (px) used for loot dot rendering on the radar.</summary>
+        public float LootDotSize { get; set; } = 3f;
+
+        /// <summary>Font size (px) used for loot labels on the radar.</summary>
+        public float LootLabelFontSize { get; set; } = 11f;
+
+        /// <summary>Show a small up/down arrow next to loot items above/below the local player.</summary>
+        public bool LootShowHeightArrows { get; set; } = true;
+
+        /// <summary>Meters of vertical offset (±) before an up/down arrow is drawn on a loot item.</summary>
+        public float LootHeightArrowThreshold { get; set; } = 1.8f;
+
+        /// <summary>Append the exact vertical delta (e.g. "+4m") to the loot label when above threshold.</summary>
+        public bool LootShowHeightDelta { get; set; } = false;
+
         // ── Loot Category Toggles ──────────────────────────────────────────────
 
         /// <summary>Always show medical items (bypasses price filter).</summary>
@@ -493,6 +525,24 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>Always show wishlisted items (bypasses all filters).</summary>
         public bool LootShowWishlist { get; set; } = true;
+
+        /// <summary>Include the in-game WishlistManager (favorites set inside Tarkov itself).</summary>
+        public bool LootUseIngameWishlist { get; set; } = true;
+
+        /// <summary>Show in-game wishlist items in the Quests group (EWishlistGroup=0).</summary>
+        public bool LootWishlistGroupQuests { get; set; } = true;
+
+        /// <summary>Show in-game wishlist items in the Hideout group (EWishlistGroup=1).</summary>
+        public bool LootWishlistGroupHideout { get; set; } = true;
+
+        /// <summary>Show in-game wishlist items in the Trading group (EWishlistGroup=2).</summary>
+        public bool LootWishlistGroupTrading { get; set; } = true;
+
+        /// <summary>Show in-game wishlist items in the Equipment group (EWishlistGroup=3).</summary>
+        public bool LootWishlistGroupEquipment { get; set; } = true;
+
+        /// <summary>Show in-game wishlist items in the Other group (EWishlistGroup=4).</summary>
+        public bool LootWishlistGroupOther { get; set; } = true;
 
         // ── Profiles ────────────────────────────────────────────────────────────
 

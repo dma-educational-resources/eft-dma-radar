@@ -51,7 +51,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
                     }
                     else
                     {
-                        _parent.TryRemove(Addr, out IExplosiveItem _);
+                        _parent.TryRemove(Addr, out IExplosiveItem? _);
                     }
                 }
             };

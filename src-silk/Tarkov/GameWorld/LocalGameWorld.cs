@@ -50,6 +50,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private readonly InteractablesManager _interactablesManager;
         private ExfilManager? _exfilManager;
         private Quests.QuestManager? _questManager;
+        private Profile.WishlistManager? _wishlistManager;
         private CameraManager? _cameraManager;
         private ExplosivesManager? _explosivesManager;
         private BtrTracker? _btrTracker;
@@ -168,6 +169,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>Quest manager for the current raid session (null until local player discovered).</summary>
         public Quests.QuestManager? QuestManager => _questManager;
+
+        /// <summary>In-game wishlist manager (null until local player discovered).</summary>
+        public Profile.WishlistManager? WishlistManager => _wishlistManager;
 
         /// <summary>Quest zone locations for the current map.</summary>
         public IReadOnlyList<Quests.QuestLocation>? QuestLocations => _questManager?.LocationConditions;
@@ -750,6 +754,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             // Quest data refresh (rate-limited internally to once per 2s)
             _questManager?.Refresh();
 
+            // In-game wishlist refresh (rate-limited internally to once per 3s)
+            _wishlistManager?.Refresh();
+
             // Interactables (doors) — discovery + state refresh (rate-limited internally)
             _interactablesManager.Refresh();
 
@@ -840,6 +847,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 {
                     _questManager = new Quests.QuestManager(lp.ProfilePtr, MapID);
                     Log.WriteLine($"[LocalGameWorld] QuestManager initialized — profile @ 0x{lp.ProfilePtr:X}");
+
+                    try
+                    {
+                        _wishlistManager = new Profile.WishlistManager(lp.ProfilePtr);
+                        Log.WriteLine($"[LocalGameWorld] WishlistManager initialized — {_wishlistManager.Items.Count} item(s).");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.WriteLine($"[LocalGameWorld] WishlistManager init failed: {ex.Message}");
+                    }
                 }
 
                 // Attempt CameraManager init now — if it fails (raid still loading),

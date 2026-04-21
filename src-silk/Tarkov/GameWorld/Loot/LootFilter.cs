@@ -79,6 +79,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             /// <summary>Whether the item is required for an active quest.</summary>
             public bool QuestRequired { get; init; }
 
+            /// <summary>
+            /// Price tier for visual emphasis. 0 = normal, 1 = important, 2 = rare, 3 = top.
+            /// </summary>
+            public byte Tier { get; init; }
+
             public static readonly FilterResult Hidden = new() { Visible = false };
         }
 
@@ -118,8 +123,22 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             if (_filterData.IsBlacklisted(item.BsgId))
                 return FilterResult.Hidden;
 
-            // Wishlist — always visible if enabled
-            bool wishlisted = config.LootShowWishlist && _filterData.IsWishlisted(item.BsgId);
+            // Wishlist — always visible if enabled.
+            // Two sources: persistent local filter list (lootfilters.json) and the
+            // in-game WishlistManager (favourites set inside Tarkov itself), the latter
+            // filtered by per-group toggles (Quests / Hideout / Trading / Equipment / Other).
+            bool ingameWL = false;
+            if (config.LootUseIngameWishlist)
+            {
+                var wm = Memory.WishlistManager;
+                if (wm is not null)
+                {
+                    int group = wm.GetGroup(item.BsgId);
+                    if (group >= 0 && IsWishlistGroupEnabled(config, group))
+                        ingameWL = true;
+                }
+            }
+            bool wishlisted = config.LootShowWishlist && (_filterData.IsWishlisted(item.BsgId) || ingameWL);
             if (wishlisted)
             {
                 return new FilterResult
@@ -127,6 +146,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                     Visible = true,
                     Important = IsImportant(displayPrice),
                     Wishlisted = true,
+                    Tier = GetTier(displayPrice),
                 };
             }
 
@@ -141,6 +161,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                         Visible = true,
                         Important = true,
                         QuestRequired = true,
+                        Tier = GetTier(displayPrice),
                     };
                 }
             }
@@ -158,6 +179,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                     Visible = true,
                     Important = IsImportant(displayPrice),
                     CategoryMatch = true,
+                    Tier = GetTier(displayPrice),
                 };
             }
 
@@ -172,6 +194,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             {
                 Visible = true,
                 Important = IsImportant(displayPrice),
+                Tier = GetTier(displayPrice),
             };
         }
 
@@ -187,7 +210,32 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         public static bool IsImportant(int displayPrice) =>
             displayPrice >= SilkProgram.Config.LootImportantPrice;
 
+        /// <summary>
+        /// Value tier for a given price. 0 = normal, 1 = important, 2 = rare (2×), 3 = top (5×).
+        /// </summary>
+        public static byte GetTier(int displayPrice)
+        {
+            int threshold = SilkProgram.Config.LootImportantPrice;
+            if (threshold <= 0 || displayPrice < threshold)
+                return 0;
+            if (displayPrice >= threshold * 5L)
+                return 3;
+            if (displayPrice >= threshold * 2L)
+                return 2;
+            return 1;
+        }
+
         // ── Internal helpers ─────────────────────────────────────────────────
+
+        private static bool IsWishlistGroupEnabled(SilkConfig config, int group) => group switch
+        {
+            0 => config.LootWishlistGroupQuests,
+            1 => config.LootWishlistGroupHideout,
+            2 => config.LootWishlistGroupTrading,
+            3 => config.LootWishlistGroupEquipment,
+            4 => config.LootWishlistGroupOther,
+            _ => true,
+        };
 
         private static bool PassesNameSearch(TarkovMarketItem item)
         {

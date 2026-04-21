@@ -38,6 +38,8 @@ namespace eft_dma_radar.Silk.UI.Panels
             DrawSearchSection();
             DrawPriceSection();
             DrawCategorySection();
+            DrawWishlistSettingsSection();
+            DrawIngameWishlistSection();
             DrawWishlistBlacklistSection();
             DrawOptionsSection();
             DrawFooter();
@@ -166,6 +168,123 @@ namespace eft_dma_radar.Silk.UI.Panels
                 Config.LootShowWishlist = showWL;
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Show wishlisted items regardless of price filter");
+        }
+
+        // ── Wishlist Settings (in-game wishlist groups) ──────────────────────
+
+        private static readonly string[] _groupLabels =
+        [
+            "Quests", "Hideout", "Trading", "Equipment", "Other",
+        ];
+
+        private static void DrawWishlistSettingsSection()
+        {
+            if (!ImGui.CollapsingHeader("Wishlist Settings"))
+                return;
+
+            bool showWL = Config.LootShowWishlist;
+            if (ImGui.Checkbox("Show wishlisted items", ref showWL))
+                Config.LootShowWishlist = showWL;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Always show wishlisted items, bypassing price/category filters.");
+
+            bool useIngame = Config.LootUseIngameWishlist;
+            if (ImGui.Checkbox("Use in-game wishlist", ref useIngame))
+                Config.LootUseIngameWishlist = useIngame;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Include items you marked as favourites inside Tarkov itself\n(read live from the in-game WishlistManager).");
+
+            if (!Config.LootUseIngameWishlist)
+                ImGui.BeginDisabled();
+
+            ImGui.TextDisabled("Include groups:");
+
+            // 3 + 2 layout
+            bool gQuests = Config.LootWishlistGroupQuests;
+            if (ImGui.Checkbox("Quests", ref gQuests)) Config.LootWishlistGroupQuests = gQuests;
+            ImGui.SameLine(0, 16);
+            bool gHideout = Config.LootWishlistGroupHideout;
+            if (ImGui.Checkbox("Hideout", ref gHideout)) Config.LootWishlistGroupHideout = gHideout;
+            ImGui.SameLine(0, 16);
+            bool gTrading = Config.LootWishlistGroupTrading;
+            if (ImGui.Checkbox("Trading", ref gTrading)) Config.LootWishlistGroupTrading = gTrading;
+
+            bool gEquip = Config.LootWishlistGroupEquipment;
+            if (ImGui.Checkbox("Equipment", ref gEquip)) Config.LootWishlistGroupEquipment = gEquip;
+            ImGui.SameLine(0, 16);
+            bool gOther = Config.LootWishlistGroupOther;
+            if (ImGui.Checkbox("Other", ref gOther)) Config.LootWishlistGroupOther = gOther;
+
+            if (!Config.LootUseIngameWishlist)
+                ImGui.EndDisabled();
+        }
+
+        // ── In-game Wishlist (live, read-only, grouped) ──────────────────────
+
+        private static void DrawIngameWishlistSection()
+        {
+            var wm = Memory.WishlistManager;
+            int totalCount = wm?.Items.Count ?? 0;
+
+            if (!ImGui.CollapsingHeader($"In-game Wishlist ({totalCount})"))
+                return;
+
+            if (wm is null || totalCount == 0)
+            {
+                ImGui.TextDisabled("Not in raid or wishlist is empty.");
+                return;
+            }
+
+            // Bucket items by group for a cleaner display.
+            var buckets = new List<string>[5];
+            for (int i = 0; i < 5; i++)
+                buckets[i] = new List<string>(8);
+
+            foreach (var kvp in wm.Items)
+            {
+                int g = kvp.Value;
+                if (g >= 0 && g < 5)
+                    buckets[g].Add(kvp.Key);
+            }
+
+            for (int g = 0; g < 5; g++)
+            {
+                var list = buckets[g];
+                if (list.Count == 0)
+                    continue;
+
+                bool enabled = g switch
+                {
+                    0 => Config.LootWishlistGroupQuests,
+                    1 => Config.LootWishlistGroupHideout,
+                    2 => Config.LootWishlistGroupTrading,
+                    3 => Config.LootWishlistGroupEquipment,
+                    4 => Config.LootWishlistGroupOther,
+                    _ => true,
+                };
+
+                string header = $"{_groupLabels[g]} ({list.Count}){(enabled ? string.Empty : " — hidden")}##wlg{g}";
+                if (!ImGui.TreeNodeEx(header))
+                    continue;
+
+                list.Sort(static (a, b) =>
+                    string.Compare(
+                        EftDataManager.AllItems.TryGetValue(a, out var ia) ? ia.ShortName : a,
+                        EftDataManager.AllItems.TryGetValue(b, out var ib) ? ib.ShortName : b,
+                        StringComparison.OrdinalIgnoreCase));
+
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var bsgId = list[i];
+                    string name = ResolveItemName(bsgId);
+                    if (EftDataManager.AllItems.TryGetValue(bsgId, out var item) && item.BestPrice > 0)
+                        ImGui.BulletText($"{name}  ({LootFilter.FormatPrice(item.BestPrice)})");
+                    else
+                        ImGui.BulletText(name);
+                }
+
+                ImGui.TreePop();
+            }
         }
 
         // ── Wishlist / Blacklist ─────────────────────────────────────────────

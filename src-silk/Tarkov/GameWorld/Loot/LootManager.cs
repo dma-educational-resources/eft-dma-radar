@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Frozen;
 using eft_dma_radar.Silk.DMA.ScatterAPI;
+using eft_dma_radar.Silk.Tarkov.GameWorld.Player;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using VmmSharpEx;
 using VmmSharpEx.Options;
@@ -11,9 +12,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
     /// Reads loose loot from the GameWorld LootList.
     /// Also scans corpses for dogtag identity data and equipment.
     /// </summary>
-    internal sealed class LootManager
+    internal sealed class LootManager(ulong localGameWorld)
     {
-        private readonly ulong _lgw;
+        private readonly ulong _lgw = localGameWorld;
         private volatile IReadOnlyList<LootItem> _loot = [];
         private volatile IReadOnlyList<LootCorpse> _corpses = [];
         private volatile IReadOnlyList<LootContainer> _containers = [];
@@ -23,6 +24,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 
         // Track corpses we've already read dogtags from (by interactiveClass address)
         private readonly HashSet<ulong> _processedCorpses = [];
+        private readonly HashSet<ulong> _killfeedPushed = [];
+        private readonly Dictionary<ulong, int> _killfeedAttempts = [];
 
         // Track corpses we've already read equipment from (by interactiveClass address)
         private readonly HashSet<ulong> _processedCorpseGear = [];
@@ -46,11 +49,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 
         /// <summary>Current airdrop snapshot (thread-safe read).</summary>
         public IReadOnlyList<LootAirdrop> Airdrops => _airdrops;
-
-        public LootManager(ulong localGameWorld)
-        {
-            _lgw = localGameWorld;
-        }
 
         /// <summary>
         /// Refreshes loot from memory. Rate-limited to once per <see cref="RefreshInterval"/>.
@@ -190,7 +188,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// </list>
         /// </para>
         /// </summary>
-        private void ReadLootAndCorpses(MemList<ulong> ptrs, out List<LootItem> lootResult, out List<LootCorpse> corpseResult, out List<LootContainer> containerResult, out List<LootAirdrop> airdropResult)
+        private static void ReadLootAndCorpses(MemList<ulong> ptrs, out List<LootItem> lootResult, out List<LootCorpse> corpseResult, out List<LootContainer> containerResult, out List<LootAirdrop> airdropResult)
         {
             // Pending items collected during Phase 1 scatter callbacks
             var pendingLoot = new List<PendingLoot>(ptrs.Count);
@@ -996,11 +994,30 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             {
                 var interactiveClass = corpse.InteractiveClass;
 
-                // Already processed this corpse?
-                if (_processedCorpses.Contains(interactiveClass))
+                // Skip only if both victim seeding AND killfeed push are done.
+                // We intentionally do NOT mark as processed up-front: killer
+                // dogtag fields (KillerName/KillerProfileId/WeaponName) often
+                // populate a tick or two after victim fields, so we need to
+                // retry this corpse until we either push a killfeed event or
+                // exhaust a small retry budget.
+                bool victimDone = _processedCorpses.Contains(interactiveClass);
+                bool killfeedDone = _killfeedPushed.Contains(interactiveClass);
+                if (victimDone && killfeedDone)
                     continue;
 
-                _processedCorpses.Add(interactiveClass);
+                // Cap killfeed retries (e.g. 10 passes ≈ a few seconds) so we
+                // don't re-read corpses whose killer field never populates
+                // (suicides, environment kills, etc).
+                if (victimDone && !killfeedDone)
+                {
+                    _killfeedAttempts.TryGetValue(interactiveClass, out var attempts);
+                    if (attempts >= 10)
+                    {
+                        _killfeedPushed.Add(interactiveClass);
+                        continue;
+                    }
+                    _killfeedAttempts[interactiveClass] = attempts + 1;
+                }
 
                 try
                 {
@@ -1048,6 +1065,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 
                         DogtagCache.Seed(profileId, nickname, accountId, level);
 
+                        // Victim seeded — mark so next pass only re-reads killer.
+                        _processedCorpses.Add(interactiveClass);
+
                         // Store nickname for corpse name resolution
                         if (!string.IsNullOrWhiteSpace(nickname))
                             _corpseNicknames[interactiveClass] = nickname;
@@ -1056,9 +1076,33 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                         var killerProfileId = ReadDogtagString(dogtag + Offsets.DogtagComponent.KillerProfileId);
                         var killerAccountId = ReadDogtagString(dogtag + Offsets.DogtagComponent.KillerAccountId);
                         var killerName = ReadDogtagString(dogtag + Offsets.DogtagComponent.KillerName);
+                        var killerWeapon = ReadDogtagString(dogtag + Offsets.DogtagComponent.WeaponName);
+
+                        // Dogtag WeaponName is often a BSG template id — resolve to a readable name
+                        killerWeapon = ResolveWeaponName(killerWeapon);
 
                         if (!string.IsNullOrWhiteSpace(killerProfileId))
                             DogtagCache.Seed(killerProfileId, killerName, killerAccountId, 0);
+
+                        // Push killfeed event — resolve killer's PlayerType from live player list
+                        if (!string.IsNullOrWhiteSpace(killerName) && !string.IsNullOrWhiteSpace(nickname))
+                        {
+                            var killerSide = PlayerType.Default;
+                            var livePlayers = Memory.Players;
+                            if (livePlayers is not null && !string.IsNullOrWhiteSpace(killerProfileId))
+                            {
+                                foreach (var lp in livePlayers)
+                                {
+                                    if (string.Equals(lp.ProfileId, killerProfileId, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        killerSide = lp.Type;
+                                        break;
+                                    }
+                                }
+                            }
+                            KillfeedManager.Push(killerName, nickname, killerWeapon ?? "", level, killerSide);
+                            _killfeedPushed.Add(interactiveClass);
+                        }
 
                         break; // Only one dogtag per corpse
                     }
@@ -1078,6 +1122,62 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             if (!Memory.TryReadPtr(fieldAddr, out var strPtr) || !strPtr.IsValidVirtualAddress())
                 return null;
             return Memory.TryReadUnityString(strPtr, out var result) ? result : null;
+        }
+
+        /// <summary>
+        /// The dogtag WeaponName field stores a BSG template id (e.g. "5447a9cd4bdc2dbd208b4567").
+        /// Resolve it to a readable short/long name via the item database; fall back to the raw value.
+        /// </summary>
+        private static string ResolveWeaponName(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return string.Empty;
+
+            // The dogtag weapon field may be:
+            //   • a BSG template id (24 hex chars), or
+            //   • an unresolved localization token like "5926bb2186f7744b1c6c6e60 ShortName",
+            //   • or an already-localized name.
+            // Scan for a 24-char hex run and resolve it via the item database.
+            if (TryExtractBsgId(raw, out var bsgId)
+                && Misc.Data.EftDataManager.AllItems.TryGetValue(bsgId, out var item))
+            {
+                if (!string.IsNullOrWhiteSpace(item.ShortName))
+                    return item.ShortName;
+                if (!string.IsNullOrWhiteSpace(item.Name))
+                    return item.Name;
+            }
+            return raw;
+
+            static bool TryExtractBsgId(string s, out string id)
+            {
+                for (int i = 0; i + 24 <= s.Length; i++)
+                {
+                    int j = 0;
+                    while (j < 24)
+                    {
+                        char c = s[i + j];
+                        bool ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+                        if (!ok) break;
+                        j++;
+                    }
+                    if (j == 24)
+                    {
+                        // Must be a standalone token (not part of a longer hex run)
+                        bool leftOk = i == 0 || !IsHex(s[i - 1]);
+                        bool rightOk = i + 24 == s.Length || !IsHex(s[i + 24]);
+                        if (leftOk && rightOk)
+                        {
+                            id = s.Substring(i, 24);
+                            return true;
+                        }
+                    }
+                }
+                id = string.Empty;
+                return false;
+            }
+
+            static bool IsHex(char c) =>
+                (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
         }
 
         #endregion

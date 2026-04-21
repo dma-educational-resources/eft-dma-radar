@@ -211,7 +211,7 @@ namespace eft_dma_radar.Silk.Tarkov.QuestPlanner
             for (int i = 0; i < list.Count; i++)
             {
                 var q = list[i];
-                ulong qfp = Mix((ulong)q.Id.GetHashCode() | ((ulong)statusTag << 56));
+                ulong qfp = Mix((ulong)(uint)q.Id.GetHashCode() | ((ulong)(uint)statusTag << 56));
                 foreach (var cond in q.CompletedConditions)
                     qfp ^= Mix((ulong)cond.GetHashCode());
                 bucket ^= qfp;

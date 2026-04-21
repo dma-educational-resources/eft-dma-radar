@@ -32,6 +32,47 @@ namespace eft_dma_radar.Silk.UI.Panels
                 ImGui.SetTooltip("Show corpse X markers on the radar");
 
             ImGui.Spacing();
+            ImGui.SeparatorText("Loot Markers");
+
+            float dotSize = Config.LootDotSize;
+            ImGui.SetNextItemWidth(120);
+            if (ImGui.SliderFloat("Dot Size", ref dotSize, 1.5f, 8f, "%.1f px"))
+                Config.LootDotSize = dotSize;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Base radius of loot dots. Tier/important bumps are added on top.");
+
+            float labelFont = Config.LootLabelFontSize;
+            ImGui.SetNextItemWidth(120);
+            if (ImGui.SliderFloat("Label Font", ref labelFont, 8f, 22f, "%.0f px"))
+                Config.LootLabelFontSize = labelFont;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Font size of loot labels on the radar.");
+
+            bool heightArrows = Config.LootShowHeightArrows;
+            if (ImGui.Checkbox("Height Arrows (▲/▼)", ref heightArrows))
+                Config.LootShowHeightArrows = heightArrows;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Show an up/down arrow on loot that is above or below your floor.");
+
+            if (Config.LootShowHeightArrows)
+            {
+                ImGui.Indent(16);
+                float thr = Config.LootHeightArrowThreshold;
+                ImGui.SetNextItemWidth(120);
+                if (ImGui.SliderFloat("Height Threshold", ref thr, 0.5f, 5f, "%.1f m"))
+                    Config.LootHeightArrowThreshold = thr;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Vertical distance (±m) before an arrow is drawn.");
+
+                bool showDelta = Config.LootShowHeightDelta;
+                if (ImGui.Checkbox("Show Height (+/-m)", ref showDelta))
+                    Config.LootShowHeightDelta = showDelta;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Append the exact vertical offset in meters to the loot label.");
+                ImGui.Unindent(16);
+            }
+
+            ImGui.Spacing();
             ImGui.SeparatorText("Containers");
 
             bool showContainers = Config.ShowContainers;
@@ -206,6 +247,42 @@ namespace eft_dma_radar.Silk.UI.Panels
                 Config.ShowBTR = showBtr;
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Show the BTR armored vehicle on the radar (Streets/Woods)");
+
+            ImGui.Separator();
+            ImGui.TextDisabled("Killfeed Overlay");
+
+            bool showKf = Config.ShowKillFeed;
+            if (ImGui.Checkbox("Show Killfeed Overlay", ref showKf))
+                Config.ShowKillFeed = showKf;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Draw kill events on the radar canvas (top-right corner).\nOpen the Killfeed panel (\u2620) for the full table and settings.");
+
+            if (Config.ShowKillFeed)
+            {
+                ImGui.Indent(16);
+
+                int maxEnt = Config.KillFeedMaxEntries;
+                ImGui.SetNextItemWidth(80);
+                if (ImGui.SliderInt("Max Entries", ref maxEnt, 1, 10))
+                    Config.KillFeedMaxEntries = maxEnt;
+
+                int ttl = Config.KillFeedTtlSeconds;
+                ImGui.SetNextItemWidth(80);
+                if (ImGui.SliderInt("Entry TTL (s)", ref ttl, 5, 600))
+                    Config.KillFeedTtlSeconds = ttl;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Seconds before a killfeed entry fades out (5–600).");
+
+                if (ImGui.Button("Reset Killfeed Position"))
+                {
+                    Config.KillFeedPosX = -1f;
+                    Config.KillFeedPosY = -1f;
+                }
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Snap the killfeed overlay back to the top-right corner.");
+
+                ImGui.Unindent(16);
+            }
 
             ImGui.EndTabItem();
         }

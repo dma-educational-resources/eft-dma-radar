@@ -292,6 +292,20 @@ namespace eft_dma_radar.Silk.Web
                     {
                         update.Exfils = null;
                     }
+
+                    // Killfeed
+                    var killfeedSnap = Tarkov.GameWorld.Loot.KillfeedManager.Entries;
+                    if (killfeedSnap.Length > 0)
+                    {
+                        var kfArr = new WebRadarKillfeedEntry[killfeedSnap.Length];
+                        for (int i = 0; i < killfeedSnap.Length; i++)
+                            kfArr[i] = WebRadarKillfeedEntry.Create(killfeedSnap[i]);
+                        update.Killfeed = kfArr;
+                    }
+                    else
+                    {
+                        update.Killfeed = null;
+                    }
                 }
                 catch (Exception ex)
                 {

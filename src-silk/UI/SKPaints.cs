@@ -11,6 +11,16 @@ namespace eft_dma_radar.Silk.UI
         public static SKFont FontRegular11 { get; } = new(CustomFonts.Regular, 11) { Subpixel = true };
         public static SKFont FontRegular48 { get; } = new(CustomFonts.Regular, 48) { Subpixel = true };
 
+        // Cached dynamically-sized fonts keyed by rounded size (tenths of a pixel).
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, SKFont> _sizedFonts = new();
+
+        /// <summary>Returns a cached <see cref="SKFont"/> at the requested size (rounded to 0.5px).</summary>
+        public static SKFont GetFont(float size)
+        {
+            int key = (int)MathF.Round(Math.Clamp(size, 6f, 64f) * 2f);
+            return _sizedFonts.GetOrAdd(key, static k => new SKFont(CustomFonts.Regular, k / 2f) { Subpixel = true });
+        }
+
         #endregion
 
         #region Shape/Text Outlines
@@ -109,6 +119,17 @@ namespace eft_dma_radar.Silk.UI
         /// <summary>Font for status subtitle (smaller than title).</summary>
         public static SKFont FontRegular18 { get; } = new(CustomFonts.Regular, 18) { Subpixel = true };
 
+        /// <summary>Font for killfeed entries (medium weight).</summary>
+        public static SKFont FontKillfeed { get; } = new(CustomFonts.Regular, 12) { Subpixel = true };
+
+        /// <summary>Semi-transparent dark background panel for killfeed rows.</summary>
+        public static SKPaint KillfeedBackground { get; } = new()
+        {
+            Color = new SKColor(0, 0, 0, 140),
+            Style = SKPaintStyle.Fill,
+            IsAntialias = false,
+        };
+
         #endregion
 
         #region Loot Paints
@@ -130,6 +151,37 @@ namespace eft_dma_radar.Silk.UI
 
         /// <summary>Wishlisted loot on a different floor — dimmed.</summary>
         public static SKPaint LootWishlistDimmed { get; } = NewTextPaint(new SKColor(0, 230, 255, 100));
+
+        /// <summary>Rare loot (≥ 2× important threshold) — orange.</summary>
+        public static SKPaint LootRare { get; } = NewTextPaint(new SKColor(255, 170, 40));
+
+        /// <summary>Rare loot on a different floor — dimmed.</summary>
+        public static SKPaint LootRareDimmed { get; } = NewTextPaint(new SKColor(255, 170, 40, 110));
+
+        /// <summary>Top-tier loot (≥ 5× important threshold) — gold.</summary>
+        public static SKPaint LootTop { get; } = NewTextPaint(new SKColor(255, 215, 0));
+
+        /// <summary>Top-tier loot on a different floor — dimmed.</summary>
+        public static SKPaint LootTopDimmed { get; } = NewTextPaint(new SKColor(255, 215, 0, 120));
+
+        /// <summary>Halo ring drawn around high-value loot dots for visibility.</summary>
+        public static SKPaint LootHaloRing { get; } = new()
+        {
+            Color = new SKColor(255, 255, 255, 180),
+            StrokeWidth = 1.4f,
+            Style = SKPaintStyle.Stroke,
+            IsAntialias = true,
+        };
+
+        /// <summary>Outline/stroke drawn behind loot height-arrow triangles for contrast.</summary>
+        public static SKPaint LootArrowOutline { get; } = new()
+        {
+            Color = new SKColor(0, 0, 0, 200),
+            StrokeWidth = 1.6f,
+            Style = SKPaintStyle.Stroke,
+            StrokeJoin = SKStrokeJoin.Round,
+            IsAntialias = true,
+        };
 
         /// <summary>Corpse marker fill — muted orange.</summary>
         public static SKPaint PaintCorpse { get; } = NewFillPaint(new SKColor(200, 150, 80, 180));

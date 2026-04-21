@@ -733,10 +733,11 @@ namespace eft_dma_radar.Silk.UI.Panels
                         {
                             for (int z = 0; z < obj.Zones.Count; z++)
                             {
-                                if (obj.Zones[z].Map is not null)
+                                var zone = obj.Zones[z];
+                                if (zone.Map is not null)
                                 {
                                     hasAnyMap = true;
-                                    if (string.Equals(obj.Zones[z].Map.Id, mapBsgId, StringComparison.OrdinalIgnoreCase))
+                                    if (string.Equals(zone.Map.Id, mapBsgId, StringComparison.OrdinalIgnoreCase))
                                         return true;
                                 }
                             }
@@ -767,8 +768,9 @@ namespace eft_dma_radar.Silk.UI.Panels
                     {
                         for (int z = 0; z < obj.Zones.Count; z++)
                         {
-                            if (obj.Zones[z].Map is not null &&
-                                string.Equals(obj.Zones[z].Map.Id, mapBsgId, StringComparison.OrdinalIgnoreCase))
+                            var zoneMap = obj.Zones[z].Map;
+                            if (zoneMap is not null &&
+                                string.Equals(zoneMap.Id, mapBsgId, StringComparison.OrdinalIgnoreCase))
                                 return true;
                         }
                     }

@@ -61,7 +61,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
 
             _transformIndex = Memory.ReadValue<int>(ti + TransformAccess.IndexOffset, false);
             if (_transformIndex < 0 || _transformIndex > 128_000)
-                throw new ArgumentOutOfRangeException(nameof(_transformIndex));
+                throw new ArgumentOutOfRangeException(nameof(baseAddr), _transformIndex, "Transform index out of range");
 
             _vertexCount = _transformIndex + 1;
 
@@ -115,7 +115,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
             {
                 if (s.ReadValue<bool>(this + Offsets.Grenade.IsDestroyed, out bool destroyed) && destroyed)
                 {
-                    _parent.TryRemove(Addr, out IExplosiveItem _);
+                    _parent.TryRemove(Addr, out IExplosiveItem? _);
                     _forceInactive = true;
                     return;
                 }

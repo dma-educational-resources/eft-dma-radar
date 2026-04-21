@@ -186,6 +186,7 @@ namespace eft_dma_radar.Silk.UI
                     HideoutPanel.IsOpen = false;
                     QuestPanel.IsOpen = false;
                     QuestPlannerPanel.IsOpen = false;
+                    KillfeedPanel.IsOpen = false;
                     PlayerHistoryPanel.IsOpen = false;
                     PlayerWatchlistPanel.IsOpen = false;
                     PlayerInfoWidget.IsOpen = false;
@@ -375,6 +376,9 @@ namespace eft_dma_radar.Silk.UI
 
             if (QuestPlannerPanel.IsOpen)
                 QuestPlannerPanel.Draw();
+
+            if (KillfeedPanel.IsOpen)
+                KillfeedPanel.Draw();
 
             if (PlayerHistoryPanel.IsOpen)
                 PlayerHistoryPanel.Draw();

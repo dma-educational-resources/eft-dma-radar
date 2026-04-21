@@ -17,5 +17,6 @@ namespace eft_dma_radar.Silk.Web.Data
         public WebRadarCorpse[]? Corpses { get; set; }
         public WebRadarContainer[]? Containers { get; set; }
         public WebRadarExfil[]? Exfils { get; set; }
+        public WebRadarKillfeedEntry[]? Killfeed { get; set; }
     }
 }

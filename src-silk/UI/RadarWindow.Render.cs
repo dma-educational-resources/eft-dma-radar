@@ -179,8 +179,9 @@ namespace eft_dma_radar.Silk.UI
                         if (!worldBounds.Contains(item.Position))
                             continue;
                         var sp = mapParams.ToScreenPos(MapParams.ToMapPos(item.Position, mapCfg));
-                        bool underMap = item.Position.Y < playerY - 15f;
-                        item.Draw(canvas, sp, price, result, underMap);
+                        float dy = item.Position.Y - playerY;
+                        bool underMap = dy < -15f;
+                        item.Draw(canvas, sp, price, result, underMap, dy);
                         visibleCount++;
                     }
                     LootFilter.SetCounts(visibleCount, loot.Count);
@@ -402,6 +403,109 @@ namespace eft_dma_radar.Silk.UI
 
             // Mouseover tooltips — drawn last so they're always on top
             DrawMouseoverTooltip(canvas, mapParams, map.Config, localPlayer);
+
+            // Killfeed overlay — screen-space, top-right corner
+            if (Config.ShowKillFeed)
+                DrawKillfeed(canvas, canvasSize);
+        }
+
+        /// <summary>
+        /// Draws the killfeed overlay in the top-right corner of the radar canvas.
+        /// Uses a lock-free snapshot from <see cref="KillfeedManager"/>; no alloc per frame.
+        /// </summary>
+        private static void DrawKillfeed(SKCanvas canvas, SKSize canvasSize)
+        {
+            KillfeedManager.PruneExpired();
+            var entries = KillfeedManager.Entries;
+
+            const float LineHeight   = 17f;
+            const float PadX         = 6f;
+            const float PadY         = 4f;
+            const float RightMargin  = 8f;
+            const float TopMargin    = 8f;
+
+            float ttl = Config.KillFeedTtlSeconds;
+
+            // Placeholder when empty so users can confirm the overlay toggle is active.
+            const string EmptyText = "Killfeed — waiting for kills…";
+
+            // Measure the widest entry (or placeholder) to size the background panel
+            float maxW = entries.Length == 0
+                ? SKPaints.FontKillfeed.MeasureText(EmptyText)
+                : 0f;
+            for (int i = 0; i < entries.Length; i++)
+            {
+                float w = SKPaints.FontKillfeed.MeasureText(entries[i].FormatDisplay());
+                if (w > maxW) maxW = w;
+            }
+
+            int lines = Math.Max(entries.Length, 1);
+            float panelW = maxW + PadX * 2f;
+            float panelH = lines * LineHeight + PadY * 2f;
+            float panelX, panelY;
+            if (Config.KillFeedPosX < 0f || Config.KillFeedPosY < 0f)
+            {
+                // Default anchor: top-right corner
+                panelX = canvasSize.Width - panelW - RightMargin;
+                panelY = TopMargin;
+            }
+            else
+            {
+                // User-placed — clamp to canvas
+                panelX = Math.Clamp(Config.KillFeedPosX, 0f, Math.Max(0f, canvasSize.Width - panelW));
+                panelY = Math.Clamp(Config.KillFeedPosY, 0f, Math.Max(0f, canvasSize.Height - panelH));
+            }
+
+            // Publish bounds for input hit-testing (drag handle)
+            KillfeedBounds = new SKRect(panelX, panelY, panelX + panelW, panelY + panelH);
+
+            // Background panel
+            canvas.DrawRect(panelX, panelY, panelW, panelH, SKPaints.KillfeedBackground);
+
+            if (entries.Length == 0)
+            {
+                float tx0 = panelX + PadX;
+                float ty0 = panelY + PadY + LineHeight - 3f;
+                canvas.DrawText(EmptyText, tx0 + 1, ty0 + 1, SKPaints.FontKillfeed, SKPaints.TextShadow);
+                using var placeholder = SKPaints.TextScav.Clone();
+                placeholder.Color = placeholder.Color.WithAlpha(180);
+                canvas.DrawText(EmptyText, tx0, ty0, SKPaints.FontKillfeed, placeholder);
+                return;
+            }
+
+            for (int i = 0; i < entries.Length; i++)
+            {
+                var entry = entries[i];
+                float alpha = ttl > 0
+                    ? Math.Clamp(1f - (float)(entry.AgeSec / ttl), 0.15f, 1f)
+                    : 1f;
+
+                // Pick colour by killer side
+                SKPaint textPaint = entry.KillerSide switch
+                {
+                    Tarkov.GameWorld.Player.PlayerType.Teammate     => SKPaints.TextTeammate,
+                    Tarkov.GameWorld.Player.PlayerType.USEC         => SKPaints.TextUSEC,
+                    Tarkov.GameWorld.Player.PlayerType.BEAR         => SKPaints.TextBEAR,
+                    Tarkov.GameWorld.Player.PlayerType.PScav        => SKPaints.TextPScav,
+                    _                                               => SKPaints.TextScav,
+                };
+
+                float tx = panelX + PadX;
+                float ty = panelY + PadY + LineHeight * i + LineHeight - 3f;
+
+                // Modulate alpha
+                byte a = (byte)(alpha * 255f);
+                var col = textPaint.Color.WithAlpha(a);
+
+                // Shadow
+                canvas.DrawText(entry.FormatDisplay(), tx + 1, ty + 1,
+                    SKPaints.FontKillfeed, SKPaints.TextShadow);
+
+                // Text (reuse existing paint with alpha modulated via temporary color override)
+                using var paint = textPaint.Clone();
+                paint.Color = col;
+                canvas.DrawText(entry.FormatDisplay(), tx, ty, SKPaints.FontKillfeed, paint);
+            }
         }
 
         private static void DrawGroupConnectors(SKCanvas canvas, List<Player> players, RadarMap map, MapParams mapParams)

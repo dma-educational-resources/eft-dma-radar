@@ -352,7 +352,8 @@ namespace SDK
         }
         public readonly partial struct WishlistManager
         {
-            public static uint Items = 0x28;
+            public static uint Items = 0x28;           // _userItems — Dictionary<MongoID, EWishlistGroup>
+            public static uint WishlistItems = 0x30;   // _wishlistItems — Dictionary<MongoID, EWishlistGroup>
         }
         public readonly partial struct PlayerInfo
         {

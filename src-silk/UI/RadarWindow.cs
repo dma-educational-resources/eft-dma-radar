@@ -46,6 +46,11 @@ namespace eft_dma_radar.Silk.UI
         private static Exfil? _mouseOverExfil;
         private static TransitPoint? _mouseOverTransit;
 
+        // Killfeed overlay drag state
+        private static SKRect KillfeedBounds;
+        private static bool _killfeedDragging;
+        private static Vector2 _killfeedDragOffset;
+
         // Map state
         private static bool _freeMode;
         private static Vector2 _mapPanPosition;
