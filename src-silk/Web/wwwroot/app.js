@@ -120,6 +120,10 @@ const defaults = {
   showLoot: true,
   showLootNames: true,
   lootMinPrice: 50000,
+  lootMaxDist: 0,
+  lootSearch: "",
+  lootMode: "all", // all | important | rare | wishlist | quest
+  lootHideNormal: false,
   showContainers: true,
   showContainerNames: true,
   containerMaxDist: 0,
@@ -143,7 +147,10 @@ const defaults = {
     dead:     "#9ca3af",
     loot:     "#a78bfa",
     lootImportant: "#4ade80",
+    lootRare:      "#22d3ee",
+    lootTop:       "#f97316",
     lootWishlist:  "#fbbf24",
+    lootQuest:     "#ef4444",
     container:     "#60a5fa",
     corpse:        "#9ca3af",
     exfilOpen:     "#4ade80",
@@ -219,6 +226,10 @@ const inputs = {
   showLoot:        $("showLoot"),
   showLootNames:   $("showLootNames"),
   lootMinPrice:    $("lootMinPrice"),
+  lootMaxDist:     $("lootMaxDist"),
+  lootSearch:      $("lootSearch"),
+  lootMode:        $("lootMode"),
+  lootHideNormal:  $("lootHideNormal"),
   showContainers:  $('showContainers'),
   showContainerNames: $('showContainerNames'),
   containerMaxDist: $('containerMaxDist'),
@@ -235,7 +246,10 @@ const inputs = {
   deadColor:       $("deadColor"),
   lootColor:       $("lootColor"),
   lootImportantColor: $("lootImportantColor"),
+  lootRareColor:      $("lootRareColor"),
+  lootTopColor:       $("lootTopColor"),
   lootWishlistColor:  $("lootWishlistColor"),
+  lootQuestColor:     $("lootQuestColor"),
   containerColor:  $("containerColor"),
   corpseColor:     $("corpseColor"),
   exfilOpenColor:  $("exfilOpenColor"),
@@ -251,6 +265,7 @@ const rangeValueEls = {
   zoom:       $("zoomVal"),
   pollMs:     $("pollMsVal"),
   lootMinPrice: $("lootMinPriceVal"),
+  lootMaxDist:  $("lootMaxDistVal"),
   aimviewSize:  $("aimviewSizeVal"),
   containerMaxDist: $("containerMaxDistVal"),
 };
@@ -265,6 +280,8 @@ function updateRangeValue(key) {
     el.innerHTML = v + "<small>ms</small>";
   } else if (key === "lootMinPrice") {
     el.textContent = formatPrice(v);
+  } else if (key === "lootMaxDist") {
+    el.textContent = v <= 0 ? "Off" : v + "m";
   } else if (key === "containerMaxDist") {
     el.textContent = v <= 0 ? "Off" : v + "m";
   } else {
@@ -308,6 +325,10 @@ function bindAllInputs() {
   bind(inputs.showLoot, "showLoot");
   bind(inputs.showLootNames, "showLootNames");
   bind(inputs.lootMinPrice, "lootMinPrice");
+  bind(inputs.lootMaxDist, "lootMaxDist");
+  bind(inputs.lootSearch, "lootSearch");
+  bind(inputs.lootMode, "lootMode");
+  bind(inputs.lootHideNormal, "lootHideNormal");
   bind(inputs.showContainers, "showContainers");
   bind(inputs.showContainerNames, "showContainerNames");
   bind(inputs.containerMaxDist, "containerMaxDist");
@@ -324,7 +345,10 @@ function bindAllInputs() {
   bind(inputs.deadColor, "dead", true);
   bind(inputs.lootColor, "loot", true);
   bind(inputs.lootImportantColor, "lootImportant", true);
+  bind(inputs.lootRareColor, "lootRare", true);
+  bind(inputs.lootTopColor, "lootTop", true);
   bind(inputs.lootWishlistColor, "lootWishlist", true);
+  bind(inputs.lootQuestColor, "lootQuest", true);
   bind(inputs.containerColor, "container", true);
   bind(inputs.corpseColor, "corpse", true);
   bind(inputs.exfilOpenColor, "exfilOpen", true);
@@ -365,6 +389,13 @@ listen(inputs.playerSize, "playerSize", false, Number);
 listen(inputs.showLoot, "showLoot");
 listen(inputs.showLootNames, "showLootNames");
 listen(inputs.lootMinPrice, "lootMinPrice", false, Number);
+if (inputs.lootMinPrice) {
+  inputs.lootMinPrice.addEventListener("input", updateLootPresetActive);
+}
+listen(inputs.lootMaxDist, "lootMaxDist", false, Number);
+listen(inputs.lootSearch, "lootSearch");
+listen(inputs.lootMode, "lootMode");
+listen(inputs.lootHideNormal, "lootHideNormal");
 listen(inputs.showContainers, "showContainers");
 listen(inputs.showContainerNames, "showContainerNames");
 listen(inputs.containerMaxDist, "containerMaxDist", false, Number);
@@ -381,7 +412,10 @@ listen(inputs.bossColor, "boss", true);
 listen(inputs.deadColor, "dead", true);
 listen(inputs.lootColor, "loot", true);
 listen(inputs.lootImportantColor, "lootImportant", true);
+listen(inputs.lootRareColor, "lootRare", true);
+listen(inputs.lootTopColor, "lootTop", true);
 listen(inputs.lootWishlistColor, "lootWishlist", true);
+listen(inputs.lootQuestColor, "lootQuest", true);
 listen(inputs.containerColor, "container", true);
 listen(inputs.corpseColor, "corpse", true);
 listen(inputs.exfilOpenColor, "exfilOpen", true);
@@ -438,6 +472,24 @@ function updateFollowBadge() {
 if (inputs.resetSettings) {
   inputs.resetSettings.onclick = () => resetSettings();
 }
+
+/* ── Loot Min Price presets ── */
+function updateLootPresetActive() {
+  document.querySelectorAll(".loot-presets button[data-price]").forEach(b => {
+    const v = Number(b.dataset.price) || 0;
+    b.classList.toggle("active", v === (Number(state.lootMinPrice) || 0));
+  });
+}
+document.querySelectorAll(".loot-presets button[data-price]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const v = Number(btn.dataset.price) || 0;
+    state.lootMinPrice = v;
+    if (inputs.lootMinPrice) inputs.lootMinPrice.value = v;
+    updateRangeValue("lootMinPrice");
+    updateLootPresetActive();
+    saveSettings();
+  });
+});
 
 /* ═══════════════════════════════════════════════════════════════════════════
    HTTP POLLING
@@ -907,17 +959,60 @@ function formatPrice(p) {
    LOOT DRAWING
    ═══════════════════════════════════════════════════════════════════════════ */
 function lootColor(item) {
+  if (item.questItem)  return state.colors.lootQuest;
   if (item.wishlisted) return state.colors.lootWishlist;
+  if (item.tier >= 3)  return state.colors.lootTop;
+  if (item.tier === 2) return state.colors.lootRare;
   if (item.important)  return state.colors.lootImportant;
   return state.colors.loot;
 }
 
-function drawLoot(lootItems, map, cx, cy, rotRad, mapRect, localWorldY, hitList) {
+function lootPasses(item, local) {
+  if (!item) return false;
+
+  // Mode filter (client-side override of server's visibility)
+  const mode = state.lootMode || "all";
+  if (mode === "wishlist") {
+    if (!item.wishlisted) return false;
+  } else if (mode === "quest") {
+    if (!item.questItem) return false;
+  } else if (mode === "important") {
+    if (!(item.important || item.wishlisted || item.questItem || item.categoryMatch)) return false;
+  } else if (mode === "rare") {
+    if (!((item.tier >= 2) || item.wishlisted || item.questItem)) return false;
+  }
+
+  // Price filter — preserve wishlist/quest/category bypass
+  const minPrice = Number(state.lootMinPrice) || 0;
+  if ((item.price || 0) < minPrice && !item.wishlisted && !item.questItem && !item.categoryMatch) return false;
+
+  // "Hide normal" quick-filter (hide tier-0, non-wishlist, non-quest, non-category)
+  if (state.lootHideNormal && !item.important && !item.wishlisted && !item.questItem && !item.categoryMatch) return false;
+
+  // Name search
+  const q = (state.lootSearch || "").trim().toLowerCase();
+  if (q.length > 0) {
+    const n = (item.shortName || "").toLowerCase();
+    const f = (item.name || "").toLowerCase();
+    if (!n.includes(q) && !f.includes(q)) return false;
+  }
+
+  // Distance filter
+  const maxDist = Number(state.lootMaxDist) || 0;
+  if (maxDist > 0 && local && Number.isFinite(local.worldX)) {
+    const dx = item.worldX - local.worldX;
+    const dz = item.worldZ - local.worldZ;
+    if ((dx * dx + dz * dz) > (maxDist * maxDist)) return false;
+  }
+
+  return true;
+}
+
+function drawLoot(lootItems, map, cx, cy, rotRad, mapRect, localWorldY, hitList, local) {
   if (!lootItems || !lootItems.length) return;
 
   for (const item of lootItems) {
-    if (!item) continue;
-    if (item.price < state.lootMinPrice && !item.wishlisted && !item.questItem) continue;
+    if (!lootPasses(item, local)) continue;
 
     const pm = worldToMapUnzoomed(item.worldX, item.worldZ, map);
     const s = mapXYToScreen(pm.x, pm.y, mapRect, cx, cy, rotRad);
@@ -953,7 +1048,7 @@ function drawLoot(lootItems, map, cx, cy, rotRad, mapRect, localWorldY, hitList)
 
     hitList.push({
       kind: "loot", px, py, r: 12,
-      data: { name: item.shortName, price: item.price, wishlisted: item.wishlisted, questItem: item.questItem }
+      data: { name: item.shortName, price: item.price, wishlisted: item.wishlisted, questItem: item.questItem, important: item.important, tier: item.tier }
     });
   }
 }
@@ -1270,8 +1365,7 @@ function drawAimview(camera, players, lootItems, containers) {
   // Draw loot
   if (state.showLoot && lootItems) {
     for (const item of lootItems) {
-      if (!item) continue;
-      if (item.price < state.lootMinPrice && !item.wishlisted && !item.questItem) continue;
+      if (!lootPasses(item, camera)) continue;
       const proj = projectAV(item.worldX, item.worldY, item.worldZ);
       if (!proj) continue;
       const col = lootColor(item);
@@ -1380,13 +1474,16 @@ function updateHover() {
     }
   } else if (found.kind === "loot") {
     const d = found.data;
-    const col = d.wishlisted ? state.colors.lootWishlist : (d.price >= (state.lootMinPrice * 2) ? state.colors.lootImportant : state.colors.loot);
+    const col = lootColor(d);
     html += `<div class="t-header"><span class="t-dot" style="background:${col}"></span><span class="t-name">${esc(d.name)}</span></div>`;
     html += `<div class="t-type">Loot</div>`;
     html += `<div class="t-sep"></div><div class="t-grid">`;
     if (d.price > 0) html += `<span class="k">Price</span><span class="v">₽${d.price.toLocaleString()}</span>`;
-    if (d.wishlisted) html += `<span class="k">Status</span><span class="v" style="color:${state.colors.lootWishlist}">★ Wishlist</span>`;
-    if (d.questItem) html += `<span class="k">Status</span><span class="v" style="color:${state.colors.lootImportant}">Quest Item</span>`;
+    if (d.questItem)   html += `<span class="k">Status</span><span class="v" style="color:${state.colors.lootQuest}">Quest Item</span>`;
+    else if (d.wishlisted) html += `<span class="k">Status</span><span class="v" style="color:${state.colors.lootWishlist}">★ Wishlist</span>`;
+    else if (d.tier >= 3) html += `<span class="k">Tier</span><span class="v" style="color:${state.colors.lootTop}">Top (5×)</span>`;
+    else if (d.tier === 2) html += `<span class="k">Tier</span><span class="v" style="color:${state.colors.lootRare}">Rare (2×)</span>`;
+    else if (d.important) html += `<span class="k">Tier</span><span class="v" style="color:${state.colors.lootImportant}">Important</span>`;
     html += `</div>`;
   } else if (found.kind === "container") {
     const c = found.data;
@@ -1615,7 +1712,7 @@ function frame() {
       if (state.showExfils) drawExfils(radarData.exfils, map, cx, cy, lastRotRad, mapRect, hitList);
       if (state.showCorpses) drawCorpses(radarData.corpses, map, cx, cy, lastRotRad, mapRect, hitList);
       if (state.showContainers) drawContainers(radarData.containers, map, cx, cy, lastRotRad, mapRect, hitList, local);
-      if (state.showLoot) drawLoot(radarData.loot, map, cx, cy, lastRotRad, mapRect, readWorldY(local), hitList);
+      if (state.showLoot) drawLoot(radarData.loot, map, cx, cy, lastRotRad, mapRect, readWorldY(local), hitList, local);
       if (state.showPlayers) drawPlayers(players, map, cx, cy, lastRotRad, mapRect, readWorldY(local), hitList, focusPlayer);
     }
   }
@@ -1712,6 +1809,7 @@ bindAllInputs();
 applyUiFromState();
 updateAllRangeValues();
 updateFollowBadge();
+updateLootPresetActive();
 startPolling();
 fetchRadar();
 fetchContainerTypes();

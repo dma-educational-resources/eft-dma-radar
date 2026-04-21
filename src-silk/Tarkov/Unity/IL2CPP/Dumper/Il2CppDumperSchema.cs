@@ -140,11 +140,15 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                 F("<ToPosition>k__BackingField", "ToPosition"),
             ]),
 
-            // BtrController
-            C("BtrController", [F("<BtrView>k__BackingField", "BtrView")]),
+            // BtrController (singleton with static <Instance>k__BackingField + instance <BtrView>)
+            C("BtrController", [
+                F("<Instance>k__BackingField", "_instance"),
+                F("<BtrView>k__BackingField", "BtrView"),
+                F("<IsBtrPaid>k__BackingField", "IsBtrPaid"),
+            ], s: true, ti: Offsets.Special.BtrController_TypeIndex),
 
             // BTRView
-            C("BTRView", [F("turret"), F("_previousPosition")]),
+            C("BTRView", [F("turret"), F("_previousPosition"), F("_btrState"), F("RouteState"), F("_timeToEndPause")]),
 
             // BTRTurretView
             C("BTRTurretView", [F("_bot", "AttachedBot")]),

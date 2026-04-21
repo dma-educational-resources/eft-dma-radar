@@ -108,10 +108,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 entry.NextHandsRefresh = now.AddMilliseconds(slot * 150);
                 entry.NextHealthRefresh = now.AddMilliseconds(slot * 200);
 
-                // Resolve ObservedHealthController for observed players (used for health status reads).
-                // Non-fatal: if it fails now, health will simply show as Healthy until a retry succeeds.
-                if (isObserved)
-                    TryResolveObservedHealthController(playerBase, entry);
+                // ObservedHealthController resolution is DEFERRED off the registration-critical path.
+                // It is a 3-hop DMA chain that previously ran for every newly discovered observed
+                // player (20+ players on a busy map). It now runs lazily on the first health-refresh
+                // tick for that player, which is already time-staggered. Health simply reads as
+                // Healthy until the lazy resolve succeeds (~3s worst case).
 
                 // Transform + rotation init is deferred to BatchInitTransformsAndRotations()
                 // which runs after all new players are discovered in a single batched scatter.

@@ -88,7 +88,7 @@ namespace eft_dma_radar.Silk.DMA
         public static eft_dma_radar.Silk.Tarkov.GameWorld.Quests.QuestManager? QuestManager => Game?.QuestManager ?? LobbyQuestReader.QuestManager;
         public static eft_dma_radar.Silk.Tarkov.GameWorld.Profile.WishlistManager? WishlistManager => Game?.WishlistManager;
         public static eft_dma_radar.Silk.Tarkov.GameWorld.Explosives.ExplosivesManager? Explosives => Game?.Explosives;
-        public static eft_dma_radar.Silk.Tarkov.GameWorld.Explosives.BtrTracker? Btr => Game?.Btr;
+        public static eft_dma_radar.Silk.Tarkov.GameWorld.Btr.BtrTracker? Btr => Game?.Btr;
         public static IReadOnlyList<eft_dma_radar.Silk.Tarkov.GameWorld.Interactables.Switch>? Switches => Game?.Switches;
 
         #endregion

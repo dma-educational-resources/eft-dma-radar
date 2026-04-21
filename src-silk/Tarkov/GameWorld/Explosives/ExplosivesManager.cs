@@ -18,6 +18,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
         private readonly ulong _localGameWorld;
         private readonly ConcurrentDictionary<ulong, IExplosiveItem> _explosives = new();
         private readonly List<ulong> _expiredKeys = [];
+        // Addresses that have repeatedly failed scatter — skip in discovery for the rest of the raid.
+        private readonly HashSet<ulong> _badAddrs = [];
+        // Per-address consecutive scatter-failure count.
+        private readonly Dictionary<ulong, int> _failCounts = [];
+        private const int MaxConsecutiveFails = 3;
         private ulong _grenadesBase;
 
         public ExplosivesManager(ulong localGameWorld)
@@ -69,14 +74,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
 
                 if (queued > 0)
                 {
+                    bool scatterOk = false;
                     try
                     {
                         scatter.Execute();
+                        scatterOk = true;
                     }
                     catch (VmmSharpEx.VmmException ex)
                     {
-                        // Don't silently swallow — surface the addresses so we can diagnose which
-                        // explosive has a stale pointer. Rate-limited so it doesn't spam each tick.
+                        // Surface the addresses so we can diagnose which explosive has a stale pointer.
+                        // Rate-limited so it doesn't spam each tick.
                         var sb = new StringBuilder();
                         sb.Append("[Explosives] Scatter failed (").Append(queued).Append(" entries): ")
                           .Append(ex.Message).Append(" | contributors=[");
@@ -87,6 +94,33 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
                         }
                         sb.Append(']');
                         Log.WriteRateLimited(AppLogLevel.Warning, "explosives_scatter_fail", TimeSpan.FromSeconds(5), sb.ToString());
+
+                        // Count failures per address — remove from live set now, and if a given address
+                        // keeps failing (likely a permanently stale/recycled pointer that the game still
+                        // re-reports in its grenade list), blacklist it so discovery stops re-adding it.
+                        for (int i = 0; i < contributors.Count; i++)
+                        {
+                            var addr = contributors[i].Addr;
+                            _explosives.TryRemove(addr, out _);
+                            int count = _failCounts.TryGetValue(addr, out var c) ? c + 1 : 1;
+                            if (count >= MaxConsecutiveFails)
+                            {
+                                _badAddrs.Add(addr);
+                                _failCounts.Remove(addr);
+                                Log.WriteLine($"[Explosives] Blacklisting stale 0x{addr:X} after {count} failures");
+                            }
+                            else
+                            {
+                                _failCounts[addr] = count;
+                            }
+                        }
+                    }
+
+                    // Scatter succeeded — any contributor's prior failure streak is over.
+                    if (scatterOk && _failCounts.Count > 0)
+                    {
+                        for (int i = 0; i < contributors.Count; i++)
+                            _failCounts.Remove(contributors[i].Addr);
                     }
                 }
 
@@ -127,6 +161,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
                 foreach (var grenadeAddr in allGrenades)
                 {
                     if (grenadeAddr == 0)
+                        continue;
+
+                    if (_badAddrs.Contains(grenadeAddr))
                         continue;
 
                     if (!_explosives.ContainsKey(grenadeAddr))

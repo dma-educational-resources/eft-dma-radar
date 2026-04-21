@@ -1,4 +1,5 @@
 using eft_dma_radar.Silk.Misc.Workers;
+using eft_dma_radar.Silk.Tarkov.GameWorld.Btr;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Explosives;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Interactables;
 using eft_dma_radar.Silk.Tarkov.Unity;
@@ -521,6 +522,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             {
                 ThrowIfRaidEnded();
                 _registeredPlayers.UpdateRealtimeData();
+
+                // Fast BTR position update — same ~8ms cadence as player transforms so
+                // the BTR marker/ESP never lags behind. Pointer resolution still happens
+                // on the slower explosives worker.
+                _btrTracker?.UpdatePosition();
+
+                // Identify the BTR turret gunner by pointer — authoritative match against
+                // BTRTurretView._bot. Cheap: single dictionary-style scan over _players.
+                try { Player.Plugins.BtrOperatorManager.Tick(_btrTracker, _registeredPlayers); }
+                catch { /* non-fatal */ }
 
                 // High-alert facing check — cheap math, updates per-player IsFacingLocalPlayer.
                 if (_registeredPlayers.LocalPlayer is Player.LocalPlayer lp)

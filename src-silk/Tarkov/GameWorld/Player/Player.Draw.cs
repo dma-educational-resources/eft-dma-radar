@@ -267,6 +267,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 PlayerType.PScav         => (SKPaints.PaintPScav, SKPaints.TextPScav, SKPaints.ChevronPScav, SKPaints.AimlinePScav),
                 PlayerType.AIScav        => (SKPaints.PaintScav, SKPaints.TextScav, SKPaints.ChevronScav, SKPaints.AimlineScav),
                 PlayerType.AIRaider      => (SKPaints.PaintRaider, SKPaints.TextRaider, SKPaints.ChevronRaider, SKPaints.AimlineRaider),
+                PlayerType.BtrOperator   => (SKPaints.PaintBtr, SKPaints.TextBtr, SKPaints.ChevronRaider, SKPaints.AimlineRaider),
                 PlayerType.AIBoss        => (SKPaints.PaintBoss, SKPaints.TextBoss, SKPaints.ChevronBoss, SKPaints.AimlineBoss),
                 PlayerType.SpecialPlayer => (SKPaints.PaintSpecial, SKPaints.TextSpecial, SKPaints.ChevronSpecial, SKPaints.AimlineSpecial),
                 PlayerType.Streamer      => (SKPaints.PaintStreamer, SKPaints.TextStreamer, SKPaints.ChevronStreamer, SKPaints.AimlineStreamer),

@@ -9,10 +9,15 @@ namespace eft_dma_radar.Silk.Web.Data
     {
         public string Name { get; set; } = string.Empty;
         public string ShortName { get; set; } = string.Empty;
+        public string BsgId { get; set; } = string.Empty;
         public int Price { get; set; }
         public bool Important { get; set; }
         public bool Wishlisted { get; set; }
         public bool QuestItem { get; set; }
+        public bool CategoryMatch { get; set; }
+
+        /// <summary>Value tier: 0 = normal, 1 = important, 2 = rare (2×), 3 = top (5×).</summary>
+        public byte Tier { get; set; }
 
         public float WorldX { get; set; }
         public float WorldY { get; set; }
@@ -30,10 +35,13 @@ namespace eft_dma_radar.Silk.Web.Data
             {
                 Name = item.Name,
                 ShortName = item.ShortName,
+                BsgId = item.Id,
                 Price = price,
                 Important = result.Important,
                 Wishlisted = result.Wishlisted,
                 QuestItem = result.QuestRequired,
+                CategoryMatch = result.CategoryMatch,
+                Tier = result.Tier,
                 WorldX = pos.X,
                 WorldY = pos.Y,
                 WorldZ = pos.Z,

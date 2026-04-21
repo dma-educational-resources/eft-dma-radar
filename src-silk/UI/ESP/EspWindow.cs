@@ -467,6 +467,16 @@ namespace eft_dma_radar.Silk.UI.ESP
                 feetWorld = new Vector3(eyePos.X, eyePos.Y - PlayerHeight, eyePos.Z);
             }
 
+            // Snap BTR passengers (turret operator / "scav on top") to the BTR's own XZ
+            // so the ESP box/bones stop jittering relative to the moving vehicle.
+            // Applied after skeleton/fallback resolution so both head and feet move together.
+            var btr = Memory.Btr;
+            if (btr is not null && btr.TrySnapPassengerXZ(ref feetWorld))
+            {
+                headWorld.X = feetWorld.X;
+                headWorld.Z = feetWorld.Z;
+            }
+
             // Project both points
             if (!CameraManager.WorldToScreen(ref headWorld, out var headScreen, true, true))
                 return;

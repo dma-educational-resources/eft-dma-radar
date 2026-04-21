@@ -20,17 +20,20 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         private volatile IReadOnlyList<LootContainer> _containers = [];
         private volatile IReadOnlyList<LootAirdrop> _airdrops = [];
         private long _lastRefreshTimestamp;
+        private int _consecutiveScatterFailures;
         private static readonly long RefreshIntervalTicks = (long)(Stopwatch.Frequency * 5); // 5 seconds
+        private static readonly long FailureBackoffTicks = (long)(Stopwatch.Frequency * 1); // 1 second base backoff
 
         // Track corpses we've already read dogtags from (by interactiveClass address)
         private readonly HashSet<ulong> _processedCorpses = [];
         private readonly HashSet<ulong> _killfeedPushed = [];
         private readonly Dictionary<ulong, int> _killfeedAttempts = [];
 
-        // Track corpses we've already read equipment from (by interactiveClass address)
-        private readonly HashSet<ulong> _processedCorpseGear = [];
+        // interactiveClass → timestamp (Stopwatch ticks) when gear may be re-read
+        private readonly Dictionary<ulong, long> _corpseGearNextReadAt = new();
+        private const double CorpseGearRefreshSeconds = 30.0;
 
-        // interactiveClass → dogtag nickname (populated by ReadCorpseDogtags)
+        // interactiveClass
         private readonly ConcurrentDictionary<ulong, string> _corpseNicknames = new();
 
         // Slot names to skip when reading corpse equipment
@@ -79,53 +82,71 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             List<LootContainer> containerResult = [];
             List<LootAirdrop> airdropResult = [];
 
+            bool scatterOk = false;
             try
             {
                 ReadLootAndCorpses(ptrs, out lootResult, out corpseResult, out containerResult, out airdropResult);
+                scatterOk = true;
             }
             catch (Exception ex)
             {
-                Log.WriteLine($"[LootManager] Unified loot/corpse/container scatter failed: {ex.Message}");
+                Log.WriteRateLimited(AppLogLevel.Warning, "loot_scatter_fail", TimeSpan.FromSeconds(5),
+                    $"[LootManager] Unified loot/corpse/container scatter failed: {ex.Message}");
+                // Back off instead of hammering immediately. Exponential up to the normal refresh interval,
+                // so a transient bad LootList entry doesn't generate scatter spam every tick.
+                int fails = Math.Min(++_consecutiveScatterFailures, 6);
+                long backoff = Math.Min(FailureBackoffTicks << (fails - 1), RefreshIntervalTicks);
+                _lastRefreshTimestamp = now - (RefreshIntervalTicks - backoff);
             }
             finally
             {
                 ptrs.Dispose();
             }
 
-            _loot = lootResult;
-            _containers = containerResult;
-            _airdrops = airdropResult;
+            // Only overwrite cached snapshots on a successful read — stale data is better than blank
+            if (scatterOk)
+            {
+                _consecutiveScatterFailures = 0;
+                _loot = lootResult;
+                _containers = containerResult;
+                _airdrops = airdropResult;
+            }
+            else
+            {
+                // Keep previous snapshots; skip corpse merge and gear reads for this tick
+                return;
+            }
 
             // Carry over previously-read gear/name data to new corpse objects
             var oldCorpses = _corpses;
             if (oldCorpses.Count > 0 && corpseResult.Count > 0)
             {
-                // Build lookup by address for O(1) matching instead of O(n*m) nested loop
-                Dictionary<ulong, LootCorpse>? oldByAddr = null;
+                // Carry over only the resolved display name — equipment is always re-read fresh
+                // so looted/removed items are reflected every refresh cycle.
+                Dictionary<ulong, string>? oldNames = null;
                 foreach (var oc in oldCorpses)
                 {
-                    if (oc.Name != "Corpse" || oc.GearReady)
-                    {
-                        (oldByAddr ??= new(oldCorpses.Count))[oc.InteractiveClass] = oc;
-                    }
+                    if (oc.Name != "Corpse")
+                        (oldNames ??= new(oldCorpses.Count))[oc.InteractiveClass] = oc.Name;
                 }
 
-                if (oldByAddr is not null)
+                if (oldNames is not null)
                 {
                     foreach (var nc in corpseResult)
                     {
-                        if (oldByAddr.TryGetValue(nc.InteractiveClass, out var oc))
-                        {
-                            nc.Name = oc.Name;
-                            nc.GearReady = oc.GearReady;
-                            nc.Equipment = oc.Equipment;
-                            nc.TotalValue = oc.TotalValue;
-                        }
+                        if (oldNames.TryGetValue(nc.InteractiveClass, out var name))
+                            nc.Name = name;
                     }
                 }
             }
 
             _corpses = corpseResult;
+
+            // Prune per-corpse state for corpses that are no longer in the LootList.
+            // Without this, entries grow unbounded across a raid and — worse — IL2CPP can
+            // recycle heap addresses, so a NEW corpse at an old address would inherit the
+            // "processed" flag and skip dogtag/gear reads.
+            PruneCorpseState(corpseResult);
 
             // Dogtag + equipment reads — now iterate only known corpses (typically 0-5),
             // not the entire LootList (hundreds of items).
@@ -138,18 +159,77 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 Log.WriteLine($"[LootManager] Corpse dogtag scan failed: {ex.Message}");
             }
 
-            // Resolve corpse display names from dogtag nicknames + read equipment
+            // Resolve corpse display names from dogtag nicknames + read equipment.
+            // Equipment re-reads are throttled per-corpse (every CorpseGearRefreshSeconds)
+            // so looted/removed items eventually reflect without drowning the scatter pass.
+            var nowTs = Stopwatch.GetTimestamp();
             foreach (var corpse in _corpses)
             {
                 if (_corpseNicknames.TryGetValue(corpse.InteractiveClass, out var nickname))
                     corpse.Name = nickname;
 
-                if (!corpse.GearReady)
+                if (!_corpseGearNextReadAt.TryGetValue(corpse.InteractiveClass, out var nextAt) || nowTs >= nextAt)
+                {
                     ReadCorpseEquipment(corpse);
+                    _corpseGearNextReadAt[corpse.InteractiveClass] =
+                        nowTs + (long)(Stopwatch.Frequency * CorpseGearRefreshSeconds);
+                }
             }
         }
 
         #region LootList Helper
+
+        /// <summary>
+        /// Removes cached per-corpse state for corpses no longer present in the LootList.
+        /// Prevents unbounded growth across a raid and — critically — prevents IL2CPP
+        /// heap-address recycling from carrying stale "processed" flags onto a newly
+        /// spawned corpse, which would otherwise skip dogtag reads and never resolve a name.
+        /// </summary>
+        private void PruneCorpseState(IReadOnlyList<LootCorpse> currentCorpses)
+        {
+            if (_processedCorpses.Count == 0
+                && _killfeedPushed.Count == 0
+                && _killfeedAttempts.Count == 0
+                && _corpseGearNextReadAt.Count == 0
+                && _corpseNicknames.IsEmpty)
+                return;
+
+            var alive = new HashSet<ulong>(currentCorpses.Count);
+            foreach (var c in currentCorpses)
+                alive.Add(c.InteractiveClass);
+
+            _processedCorpses.RemoveWhere(k => !alive.Contains(k));
+            _killfeedPushed.RemoveWhere(k => !alive.Contains(k));
+
+            if (_killfeedAttempts.Count > 0)
+            {
+                List<ulong>? stale = null;
+                foreach (var kv in _killfeedAttempts)
+                    if (!alive.Contains(kv.Key))
+                        (stale ??= new()).Add(kv.Key);
+                if (stale is not null)
+                    foreach (var k in stale)
+                        _killfeedAttempts.Remove(k);
+            }
+
+            if (_corpseGearNextReadAt.Count > 0)
+            {
+                List<ulong>? stale = null;
+                foreach (var kv in _corpseGearNextReadAt)
+                    if (!alive.Contains(kv.Key))
+                        (stale ??= new()).Add(kv.Key);
+                if (stale is not null)
+                    foreach (var k in stale)
+                        _corpseGearNextReadAt.Remove(k);
+            }
+
+            if (!_corpseNicknames.IsEmpty)
+            {
+                foreach (var kv in _corpseNicknames)
+                    if (!alive.Contains(kv.Key))
+                        _corpseNicknames.TryRemove(kv.Key, out _);
+            }
+        }
 
         /// <summary>
         /// Reads the LootList pointer array once, shared by loot, corpse, and dogtag phases.
@@ -597,7 +677,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                             ArrayPool<int>.Shared.Return(rentedI);
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Log.WriteRateLimited(AppLogLevel.Debug, "loot_resolve_fail", TimeSpan.FromSeconds(10),
+                            $"[LootManager] Loot resolve failed: {ex.Message}");
+                    }
                 }
             }
 
@@ -701,7 +785,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                             ArrayPool<int>.Shared.Return(rentedI);
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Log.WriteRateLimited(AppLogLevel.Debug, "corpse_resolve_fail", TimeSpan.FromSeconds(10),
+                            $"[LootManager] Corpse resolve failed: {ex.Message}");
+                    }
                 }
             }
 
@@ -820,7 +908,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                             ArrayPool<int>.Shared.Return(rentedI);
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Log.WriteRateLimited(AppLogLevel.Debug, "airdrop_resolve_fail", TimeSpan.FromSeconds(10),
+                            $"[LootManager] Airdrop resolve failed: {ex.Message}");
+                    }
                 }
             }
 
@@ -968,7 +1060,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                             ArrayPool<int>.Shared.Return(rentedI);
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Log.WriteRateLimited(AppLogLevel.Debug, "container_resolve_fail", TimeSpan.FromSeconds(10),
+                            $"[LootManager] Container resolve failed: {ex.Message}");
+                    }
                 }
             }
 
@@ -1186,16 +1282,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 
         /// <summary>
         /// Reads the equipment slots of a corpse and populates its <see cref="LootCorpse.Equipment"/>
-        /// and <see cref="LootCorpse.TotalValue"/>. Only runs once per corpse (tracked by
-        /// <see cref="_processedCorpseGear"/>).
+        /// and <see cref="LootCorpse.TotalValue"/>. Re-read cadence is gated by
+        /// <see cref="_corpseGearNextReadAt"/> in the corpse refresh loop.
         /// </summary>
         private void ReadCorpseEquipment(LootCorpse corpse)
         {
-            if (_processedCorpseGear.Contains(corpse.InteractiveClass))
-                return;
-
-            _processedCorpseGear.Add(corpse.InteractiveClass);
-
             try
             {
                 // InteractiveClass → Item → Slots array

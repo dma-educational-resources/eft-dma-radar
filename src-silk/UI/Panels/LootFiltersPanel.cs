@@ -133,6 +133,14 @@ namespace eft_dma_radar.Silk.UI.Panels
                 ImGui.TextWrapped("\u26a0 Min price is above important price \u2014 no items will highlight as important.");
                 ImGui.PopStyleColor();
             }
+
+            // Quick filter: only show items at Important tier or above.
+            bool importantOnly = Config.LootImportantOnly;
+            if (ImGui.Checkbox("Important Only", ref importantOnly))
+                Config.LootImportantOnly = importantOnly;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Hide loot below the Important price threshold.\n" +
+                                 "Wishlist, quest, and category items are still shown.");
         }
 
         // ── Categories ───────────────────────────────────────────────────────

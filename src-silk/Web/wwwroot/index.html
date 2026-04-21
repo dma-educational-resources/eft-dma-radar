@@ -102,15 +102,49 @@
         <span class="toggle-switch"><input type="checkbox" id="showLoot"><span class="slider"></span></span>
       </label>
       <label>
+        Loot Names
+        <span class="toggle-switch"><input type="checkbox" id="showLootNames"><span class="slider"></span></span>
+      </label>
+      <label>
+        Search
+        <input type="text" id="lootSearch" placeholder="item name..." class="text-input" autocomplete="off" />
+      </label>
+      <label>
+        Display Mode
+        <select id="lootMode" class="text-input">
+          <option value="all">All (price filter)</option>
+          <option value="important">Important &amp; above</option>
+          <option value="rare">Rare tier (2×) &amp; above</option>
+          <option value="wishlist">Wishlist only</option>
+          <option value="quest">Quest only</option>
+        </select>
+      </label>
+      <label>
         Min Price
         <span class="range-wrap">
-          <input type="range" id="lootMinPrice" min="0" max="500000" step="5000">
+          <input type="range" id="lootMinPrice" min="0" max="1000000" step="5000">
           <span class="range-val" id="lootMinPriceVal">50K</span>
         </span>
       </label>
+      <div class="row loot-presets">
+        <button class="small" data-price="0">Any</button>
+        <button class="small" data-price="10000">10K</button>
+        <button class="small" data-price="50000">50K</button>
+        <button class="small" data-price="100000">100K</button>
+        <button class="small" data-price="200000">200K</button>
+        <button class="small" data-price="500000">500K</button>
+        <button class="small" data-price="1000000">1M</button>
+      </div>
       <label>
-        Loot Names
-        <span class="toggle-switch"><input type="checkbox" id="showLootNames"><span class="slider"></span></span>
+        Max Distance
+        <span class="range-wrap">
+          <input type="range" id="lootMaxDist" min="0" max="500" step="10">
+          <span class="range-val" id="lootMaxDistVal">Off</span>
+        </span>
+      </label>
+      <label>
+        Hide Normal (keep Important / Wishlist / Quest)
+        <span class="toggle-switch"><input type="checkbox" id="lootHideNormal"><span class="slider"></span></span>
       </label>
     </div>
 
@@ -158,7 +192,10 @@
       <h3>Colors</h3>
       <label>Loot <input type="color" id="lootColor"></label>
       <label>Important <input type="color" id="lootImportantColor"></label>
+      <label>Rare (2×) <input type="color" id="lootRareColor"></label>
+      <label>Top (5×) <input type="color" id="lootTopColor"></label>
       <label>Wishlist <input type="color" id="lootWishlistColor"></label>
+      <label>Quest <input type="color" id="lootQuestColor"></label>
       <label>Container <input type="color" id="containerColor"></label>
       <label>Corpse <input type="color" id="corpseColor"></label>
       <label>Exfil Open <input type="color" id="exfilOpenColor"></label>

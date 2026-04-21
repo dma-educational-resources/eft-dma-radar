@@ -114,15 +114,48 @@ namespace SDK
         public readonly partial struct BtrController
         {
             public static uint BtrView = 0x50;
+            /// <summary>
+            /// <c>&lt;IsBtrPaid&gt;k__BackingField</c> — true once a player has paid for the BTR taxi service.
+            /// </summary>
+            public static uint IsBtrPaid = 0x58;
+            /// <summary>
+            /// Static backing field for <c>BtrController.&lt;Instance&gt;k__BackingField</c>.
+            /// Resolved via <see cref="eft_dma_radar.Silk.Tarkov.Unity.IL2CPP.BtrControllerResolver"/>
+            /// against the IL2CPP TypeInfoTable + <see cref="Il2CppClass.StaticFields"/>.
+            /// </summary>
+            public static uint _instance = 0x0;
         }
         public readonly partial struct BTRView
         {
             public static uint turret = 0x60;
+            public static uint CurrentSpeed = 0x80;
+            public static uint MoveSpeed = 0x84;
+            public static uint _btrState = 0x9C;
+            /// <summary>
+            /// <c>EBtrRouteState</c> byte — approach / at-stop / leaving. Useful for
+            /// classifying "parked at passenger stop" vs "stopped in transit".
+            /// </summary>
+            public static uint RouteState = 0xB0;
             public static uint _previousPosition = 0xB4;
+            /// <summary>
+            /// Remaining pause time (ms) at the current passenger stop. Counts down
+            /// while the BTR is waiting; useful as a "leaves in Ns" indicator on radar.
+            /// </summary>
+            public static uint _timeToEndPause = 0xE0;
         }
         public readonly partial struct BTRTurretView
         {
             public static uint AttachedBot = 0x60;
+            /// <summary>
+            /// Observed-build field: direct pointer to the turret gunner's <c>ObservedPlayerView</c>
+            /// (confirmed 2024-build dump: <c>BTRTurretView._bot @ 0x60</c> matched a discovered AIScav).
+            /// Alias kept for readability at call sites.
+            /// </summary>
+            public static uint Bot = 0x60;
+            /// <summary>Target turret yaw in world degrees (0..360). Used to draw the turret aimline on radar.</summary>
+            public static uint TargetTurretRotate = 0x50;
+            /// <summary>Target gun elevation (signed degrees). Not currently used by radar (2D).</summary>
+            public static uint TargetGunsBlockRotate = 0x54;
         }
         public readonly partial struct EffectsController
         {
@@ -742,6 +775,7 @@ namespace SDK
             public static uint TarkovApplication_TypeIndex = 7967;
             public static uint HideoutArea_TypeIndex = 9178;
             public static uint HideoutController_TypeIndex = 9189;
+            public static uint BtrController_TypeIndex = 0;
         }
         public readonly partial struct MatchingProgress
         {

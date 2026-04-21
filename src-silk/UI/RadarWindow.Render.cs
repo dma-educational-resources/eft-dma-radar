@@ -390,13 +390,20 @@ namespace eft_dma_radar.Silk.UI
 
             if (normalPlayers is not null)
             {
+                var btr = Memory.Btr;
                 foreach (var player in normalPlayers)
                 {
                     if (player.IsLocalPlayer)
                         continue;
                     if (!worldBounds.Contains(player.Position))
                         continue;
-                    var sp = mapParams.ToScreenPos(MapParams.ToMapPos(player.Position, mapCfg));
+
+                    // Snap BTR passengers (turret operator / "scav on top") to the BTR's
+                    // own XZ so they stop jittering relative to the moving vehicle.
+                    var drawPos = player.Position;
+                    btr?.TrySnapPassengerXZ(ref drawPos);
+
+                    var sp = mapParams.ToScreenPos(MapParams.ToMapPos(drawPos, mapCfg));
                     player.Draw(canvas, sp, localPlayer);
                 }
             }

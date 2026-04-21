@@ -526,6 +526,13 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Always show wishlisted items (bypasses all filters).</summary>
         public bool LootShowWishlist { get; set; } = true;
 
+        /// <summary>
+        /// Quick filter: when enabled, only Important (tier ≥ 1), wishlisted,
+        /// quest-required, or category-toggled items are shown — all price-only
+        /// loot below the importance threshold is hidden regardless of LootMinPrice.
+        /// </summary>
+        public bool LootImportantOnly { get; set; } = false;
+
         /// <summary>Include the in-game WishlistManager (favorites set inside Tarkov itself).</summary>
         public bool LootUseIngameWishlist { get; set; } = true;
 

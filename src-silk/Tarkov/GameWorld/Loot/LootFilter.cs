@@ -190,11 +190,17 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             if (!PassesNameSearch(item))
                 return FilterResult.Hidden;
 
+            // "Important only" quick filter — hide anything that would not highlight as important.
+            // Wishlist / quest / category items are handled above and bypass this.
+            var tier = GetTier(displayPrice);
+            if (config.LootImportantOnly && tier == 0)
+                return FilterResult.Hidden;
+
             return new FilterResult
             {
                 Visible = true,
                 Important = IsImportant(displayPrice),
-                Tier = GetTier(displayPrice),
+                Tier = tier,
             };
         }
 
@@ -305,6 +311,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             config.LootShowBackpacks = false;
             config.LootShowKeys = false;
             config.LootShowWishlist = true;
+            config.LootImportantOnly = false;
             ClearSearch();
         }
 

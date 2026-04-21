@@ -4,12 +4,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player.Plugins
 {
     /// <summary>
     /// Compact Silk port of WPF's GuardManager. Identifies AI boss-guards on specific maps
-    /// using a small set of equipment heuristics (backpack / helmet / chambered ammo) against
-    /// <see cref="Player.Equipment"/> and <see cref="Player.InHandsItem"/>.
-    ///
-    /// The WPF version also matched weapon-mod loadouts; Silk does not currently track loose
-    /// loot/mods on the player, so that path is omitted. Maps without hardcoded guard data
-    /// (e.g. factory, interchange, laboratory, lighthouse, sandbox) are skipped entirely.
+    /// using a small set of equipment heuristics (backpack / helmet / primary weapon /
+    /// chambered ammo) against <see cref="Player.Equipment"/> and <see cref="Player.InHandsAmmo"/>.
+    /// Maps without hardcoded guard data (factory, interchange, laboratory, lighthouse,
+    /// sandbox) are skipped entirely.
     /// </summary>
     internal static class GuardManager
     {
@@ -19,6 +17,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player.Plugins
         {
             public FrozenSet<string> Backpacks { get; init; } = FrozenSet<string>.Empty;
             public FrozenSet<string> Helmets { get; init; } = FrozenSet<string>.Empty;
+            public FrozenSet<string> Weapons { get; init; } = FrozenSet<string>.Empty;
             public FrozenSet<string> Ammo { get; init; } = FrozenSet<string>.Empty;
             public bool RequireCamperAnd12ga { get; init; } // Woods-only
         }
@@ -53,8 +52,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player.Plugins
                 },
                 ["streets"] = new MapData
                 {
+                    // Headwear slot — includes both helmets and heavy hats worn by Kollontay guards.
                     Backpacks = Set("Attack 2"),
-                    Helmets = Set("Altyn", "LShZ-2DTM", "Maska-1SCh", "Vulkan-5", "ZSh-1-2M"),
+                    Helmets = Set("Altyn", "LShZ-2DTM", "Maska-1SCh", "Vulkan-5", "ZSh-1-2M", "Tor-2"),
+                    // Primary/secondary weapon short-names distinctive to Kollontay's guard kit.
+                    Weapons = Set("PP-9 Klin", "KS-23M", "RPDN", "PP-19-01"),
                     Ammo = Set("m62", "m80", "zvezda", "shrap-10", "pp")
                 },
                 ["woods"] = new MapData
@@ -96,7 +98,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player.Plugins
             if (data.RequireCamperAnd12ga)
                 matched = IsWoodsGuard(player);
             else
-                matched = MatchesBackpack(player, data) || MatchesHelmet(player, data) || MatchesAmmo(player, data);
+                matched = MatchesBackpack(player, data)
+                       || MatchesHelmet(player, data)
+                       || MatchesWeapon(player, data)
+                       || MatchesAmmo(player, data);
 
             if (matched && !player.IsBossGuard)
             {
@@ -120,6 +125,18 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player.Plugins
         {
             if (d.Helmets.Count == 0) return false;
             return p.Equipment.TryGetValue("Headwear", out var h) && h is not null && d.Helmets.Contains(h.Short);
+        }
+
+        private static bool MatchesWeapon(Player p, MapData d)
+        {
+            if (d.Weapons.Count == 0) return false;
+            if (p.Equipment.TryGetValue("FirstPrimaryWeapon", out var w1) && w1 is not null && d.Weapons.Contains(w1.Short))
+                return true;
+            if (p.Equipment.TryGetValue("SecondPrimaryWeapon", out var w2) && w2 is not null && d.Weapons.Contains(w2.Short))
+                return true;
+            if (p.Equipment.TryGetValue("Holster", out var wh) && wh is not null && d.Weapons.Contains(wh.Short))
+                return true;
+            return false;
         }
 
         private static bool MatchesAmmo(Player p, MapData d)

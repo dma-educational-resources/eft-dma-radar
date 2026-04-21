@@ -131,10 +131,32 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 entry.RecoveryCount = 0;
                 entry.ConsecutiveErrors++;
 
+                bool isLocal = entry.Player.IsLocalPlayer;
+
+                // Eager fast re-init: as soon as position has failed twice in a row while
+                // the transform claims to be ready, try the cheap 2-round reinit from the
+                // cached TransformInternal. This usually recovers the player within one
+                // realtime tick (~8ms) instead of waiting for the next registration cycle.
+                // Extra-aggressive for the local player — we can never afford to "flash red".
+                if (!posOk && entry.TransformReady
+                    && entry.ConsecutiveErrors == (isLocal ? 1 : 2)
+                    && TryReinitFromTransformInternal(entry))
+                {
+                    // Fast re-init succeeded — reset error state without any visible glitch.
+                    entry.ConsecutiveErrors = 0;
+                    SyncLookTransform(entry);
+                    return;
+                }
+
                 // Only enter error state for players confirmed by the realtime loop.
                 // Players still warming up (init-only position, no successful realtime read)
                 // should silently re-init rather than flash error indicators.
-                if (entry.ConsecutiveErrors >= ErrorThreshold && !entry.HasError && entry.RealtimeEstablished)
+                // The LOCAL player never enters the error state — we prefer to show a
+                // slightly stale position than to paint the user's own marker red.
+                if (!isLocal
+                    && entry.ConsecutiveErrors >= ErrorThreshold
+                    && !entry.HasError
+                    && entry.RealtimeEstablished)
                 {
                     entry.HasError = true;
                     entry.Player.IsError = true;
@@ -146,8 +168,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 // registration worker re-walks the pointer chain with fresh data.
                 // Players that have never had a valid position (just spawned) get a lower threshold
                 // for faster recovery — the game data is likely still initializing.
+                // The LOCAL player is never force-invalidated from the realtime loop — the
+                // registration worker / ValidateTransforms path owns its recovery so we never
+                // lose the user's own marker for longer than a single validation cycle.
                 int reinitThreshold = entry.RealtimeEstablished ? ReinitThreshold : ReinitThresholdNew;
-                if (!posOk && entry.TransformReady && entry.ConsecutiveErrors >= reinitThreshold)
+                if (!isLocal && !posOk && entry.TransformReady && entry.ConsecutiveErrors >= reinitThreshold)
                 {
                     Log.WriteLine($"[RegisteredPlayers] Auto-invalidating transform for '{entry.Player.Name}' after {entry.ConsecutiveErrors} consecutive position failures");
                     entry.TransformReady = false;
@@ -361,82 +386,90 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// </summary>
         private static void TryInitTransform(ulong playerBase, PlayerEntry entry)
         {
+            // Use Try* variants throughout to avoid exception-as-control-flow.
+            // A freshly-spawned ObservedPlayerView commonly has nulls in its pointer chain
+            // for the first few hundred ms — that is expected, not an error.
+            uint lookOffset = entry.IsObserved
+                ? Offsets.ObservedPlayerView._playerLookRaycastTransform
+                : Offsets.Player._playerLookRaycastTransform;
+
+            if (!Memory.TryReadPtr(playerBase + lookOffset, out var lookTransformPtr, false)
+                || !lookTransformPtr.IsValidVirtualAddress())
+            {
+                entry.TransformReady = false;
+                return;
+            }
+
+            if (!Memory.TryReadPtr(lookTransformPtr + 0x10, out var transformInternal, false)
+                || !transformInternal.IsValidVirtualAddress())
+            {
+                entry.TransformReady = false;
+                return;
+            }
+
+            if (!Memory.TryReadValue<int>(transformInternal + TransformAccess.IndexOffset, out var taIndex, false)
+                || taIndex < 0 || taIndex > 128_000)
+            {
+                entry.TransformReady = false;
+                return;
+            }
+
+            if (!Memory.TryReadPtr(transformInternal + TransformAccess.HierarchyOffset, out var taHierarchy, false)
+                || !taHierarchy.IsValidVirtualAddress())
+            {
+                entry.TransformReady = false;
+                return;
+            }
+
+            if (!Memory.TryReadPtr(taHierarchy + TransformHierarchy.VerticesOffset, out var verticesAddr, false)
+                || !verticesAddr.IsValidVirtualAddress())
+            {
+                entry.TransformReady = false;
+                return;
+            }
+
+            if (!Memory.TryReadPtr(taHierarchy + TransformHierarchy.IndicesOffset, out var indicesAddr, false)
+                || !indicesAddr.IsValidVirtualAddress())
+            {
+                entry.TransformReady = false;
+                return;
+            }
+
+            int[]? indices;
+            TrsX[]? testVertices;
+            Vector3 initPos;
             try
             {
-                uint lookOffset = entry.IsObserved
-                    ? Offsets.ObservedPlayerView._playerLookRaycastTransform
-                    : Offsets.Player._playerLookRaycastTransform;
-
-                // Short chain: _playerLookRaycastTransform → Transform component → TransformInternal
-                var lookTransformPtr = Memory.ReadPtr(playerBase + lookOffset, false);
-                var transformInternal = Memory.ReadPtr(lookTransformPtr + 0x10, false);
-
-                // TransformAccess fields are embedded directly in TransformInternal
-                var taIndex = Memory.ReadValue<int>(transformInternal + TransformAccess.IndexOffset, false);
-                var taHierarchy = Memory.ReadPtr(transformInternal + TransformAccess.HierarchyOffset, false);
-
-                if (taIndex < 0 || taIndex > 128_000)
-                {
-                    Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitTransform '{entry.Player.Name}' 0x{playerBase:X}: bad taIndex={taIndex}");
-                    return;
-                }
-                if (!taHierarchy.IsValidVirtualAddress())
-                {
-                    Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitTransform '{entry.Player.Name}' 0x{playerBase:X}: invalid hierarchy ptr 0x{taHierarchy:X}");
-                    return;
-                }
-
-                var verticesAddr = Memory.ReadPtr(taHierarchy + TransformHierarchy.VerticesOffset, false);
-                var indicesAddr = Memory.ReadPtr(taHierarchy + TransformHierarchy.IndicesOffset, false);
-
-                if (!verticesAddr.IsValidVirtualAddress())
-                {
-                    Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitTransform '{entry.Player.Name}' 0x{playerBase:X}: invalid vertices ptr 0x{verticesAddr:X}");
-                    return;
-                }
-                if (!indicesAddr.IsValidVirtualAddress())
-                {
-                    Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitTransform '{entry.Player.Name}' 0x{playerBase:X}: invalid indices ptr 0x{indicesAddr:X}");
-                    return;
-                }
-
-                // Cache indices once — they never change for the life of the transform
                 int count = taIndex + 1;
-                var indices = Memory.ReadArray<int>(indicesAddr, count, false);
-
-                // Validate that position data is actually readable before committing.
-                var testVertices = Memory.ReadArray<TrsX>(verticesAddr, count, false);
-                if (testVertices is null || !TestPositionCompute(taIndex, indices, testVertices, out var initPos))
+                indices = Memory.ReadArray<int>(indicesAddr, count, false);
+                testVertices = Memory.ReadArray<TrsX>(verticesAddr, count, false);
+                if (testVertices is null || indices is null
+                    || !TestPositionCompute(taIndex, indices, testVertices, out initPos))
                 {
-                    Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitTransform '{entry.Player.Name}' 0x{playerBase:X}: " +
-                        $"pointer chain OK but vertex data not ready (idx={taIndex}, verts=0x{verticesAddr:X})");
-                    return; // Leave TransformReady=false — registration worker will retry
+                    entry.TransformReady = false;
+                    return;
                 }
-
-                entry.TransformInternal = transformInternal;
-                entry.TransformIndex = taIndex;
-                entry.VerticesAddr = verticesAddr;
-                entry.CachedIndices = indices;
-                entry.TransformReady = true;
-
-                // Apply the validated position immediately so the player appears on radar
-                // without waiting for the next realtime scatter tick.
-                entry.Player.Position = initPos;
-                entry.Player.HasValidPosition = true;
-
-                Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitTransform OK '{entry.Player.Name}': " +
-                    $"transformInternal=0x{transformInternal:X}, idx={taIndex}, verts=0x{verticesAddr:X}");
             }
             catch (Exception ex)
             {
-                // Rate-limit per-pointer: a freshly spawned ObservedPlayerView can fail its
-                // pointer chain several times in a row before the game finishes populating it.
-                // The first failure is logged as a warning, subsequent ones downgrade to debug
-                // so the output window doesn't drown in identical lines.
-                Log.WriteRateLimited(AppLogLevel.Warning, $"init_tx_{playerBase:X}", TimeSpan.FromSeconds(5),
-                    $"[RegisteredPlayers] TryInitTransform FAILED '{entry.Player.Name}' 0x{playerBase:X}: {ex.Message}");
+                // ReadArray can still throw on a VMM-level failure (queue full, page missing) —
+                // rate-limited so a single stuck player can't flood the log.
+                Log.WriteRateLimited(AppLogLevel.Debug, $"init_tx_{playerBase:X}", TimeSpan.FromSeconds(5),
+                    $"[RegisteredPlayers] TryInitTransform read failed '{entry.Player.Name}' 0x{playerBase:X}: {ex.Message}");
                 entry.TransformReady = false;
+                return;
             }
+
+            entry.TransformInternal = transformInternal;
+            entry.TransformIndex = taIndex;
+            entry.VerticesAddr = verticesAddr;
+            entry.CachedIndices = indices;
+            entry.TransformReady = true;
+
+            // Apply the validated position immediately so the player appears on radar
+            // without waiting for the next realtime scatter tick.
+            entry.Player.Position = initPos;
+            entry.Player.HasValidPosition = true;
         }
 
         /// <summary>
@@ -446,32 +479,36 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// </summary>
         private static bool TryReinitFromTransformInternal(PlayerEntry entry)
         {
+            var ti = entry.TransformInternal;
+            if (ti == 0)
+                return false;
+
+            if (!Memory.TryReadValue<int>(ti + TransformAccess.IndexOffset, out var taIndex, false)
+                || taIndex < 0 || taIndex > 128_000)
+                return false;
+
+            if (!Memory.TryReadPtr(ti + TransformAccess.HierarchyOffset, out var taHierarchy, false)
+                || !taHierarchy.IsValidVirtualAddress())
+                return false;
+
+            if (!Memory.TryReadPtr(taHierarchy + TransformHierarchy.VerticesOffset, out var verticesAddr, false)
+                || !verticesAddr.IsValidVirtualAddress())
+                return false;
+
+            if (!Memory.TryReadPtr(taHierarchy + TransformHierarchy.IndicesOffset, out var indicesAddr, false)
+                || !indicesAddr.IsValidVirtualAddress())
+                return false;
+
             try
             {
-                var ti = entry.TransformInternal;
-                if (ti == 0)
-                    return false;
-
-                var taIndex = Memory.ReadValue<int>(ti + TransformAccess.IndexOffset, false);
-                var taHierarchy = Memory.ReadPtr(ti + TransformAccess.HierarchyOffset, false);
-
-                if (taIndex < 0 || taIndex > 128_000 || !taHierarchy.IsValidVirtualAddress())
-                    return false;
-
-                var verticesAddr = Memory.ReadPtr(taHierarchy + TransformHierarchy.VerticesOffset, false);
-                var indicesAddr = Memory.ReadPtr(taHierarchy + TransformHierarchy.IndicesOffset, false);
-
-                if (!verticesAddr.IsValidVirtualAddress() || !indicesAddr.IsValidVirtualAddress())
-                    return false;
-
                 int count = taIndex + 1;
                 var indices = Memory.ReadArray<int>(indicesAddr, count, false);
                 var testVertices = Memory.ReadArray<TrsX>(verticesAddr, count, false);
 
-                if (testVertices is null || !TestPositionCompute(taIndex, indices, testVertices, out var reinitPos))
+                if (testVertices is null || indices is null
+                    || !TestPositionCompute(taIndex, indices, testVertices, out var reinitPos))
                     return false;
 
-                // Commit — TransformInternal stays the same, only refresh downstream data
                 entry.TransformIndex = taIndex;
                 entry.VerticesAddr = verticesAddr;
                 entry.CachedIndices = indices;
@@ -512,42 +549,50 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         private static void TryInitRotation(ulong playerBase, PlayerEntry entry)
         {
-            try
+            ulong rotAddr;
+            if (entry.IsObserved)
             {
-                ulong rotAddr;
-                if (entry.IsObserved)
+                if (!Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView.ObservedPlayerController, out var opc, false)
+                    || !opc.IsValidVirtualAddress())
                 {
-                    var opc = Memory.ReadPtr(playerBase + Offsets.ObservedPlayerView.ObservedPlayerController, false);
-                    var mc = Memory.ReadPtrChain(opc, Offsets.ObservedPlayerController.MovementController, false);
-                    rotAddr = mc + Offsets.ObservedMovementController.Rotation;
-                    Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitRotation '{entry.Player.Name}': observed opc=0x{opc:X} mc=0x{mc:X} rotAddr=0x{rotAddr:X}");
-                }
-                else
-                {
-                    var movCtx = Memory.ReadPtr(playerBase + Offsets.Player.MovementContext, false);
-                    rotAddr = movCtx + Offsets.MovementContext._rotation;
-                    Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitRotation '{entry.Player.Name}': client movCtx=0x{movCtx:X} rotAddr=0x{rotAddr:X}");
-                }
-
-                // Validate rotation is sane before caching
-                var rot = Memory.ReadValue<Vector2>(rotAddr, false);
-                if (!float.IsFinite(rot.X) || !float.IsFinite(rot.Y))
-                {
-                    Log.Write(AppLogLevel.Warning, $"[RegisteredPlayers] TryInitRotation '{entry.Player.Name}': non-finite rotation X={rot.X} Y={rot.Y} (addr=0x{rotAddr:X})");
+                    entry.RotationReady = false;
                     return;
                 }
 
-                entry.RotationAddr = rotAddr;
-                entry.RotationReady = true;
-                Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers] TryInitRotation OK '{entry.Player.Name}': initial rot=({rot.X:F1}, {rot.Y:F1})");
+                // MovementController is a two-step chain — walk manually with Try* so a null
+                // intermediate does not throw.
+                var mcOffsets = Offsets.ObservedPlayerController.MovementController;
+                ulong mc = opc;
+                for (int i = 0; i < mcOffsets.Length; i++)
+                {
+                    if (!Memory.TryReadPtr(mc + mcOffsets[i], out mc, false) || !mc.IsValidVirtualAddress())
+                    {
+                        entry.RotationReady = false;
+                        return;
+                    }
+                }
+                rotAddr = mc + Offsets.ObservedMovementController.Rotation;
             }
-            catch (Exception ex)
+            else
             {
-                // Rate-limit per-pointer (see TryInitTransform for rationale).
-                Log.WriteRateLimited(AppLogLevel.Warning, $"init_rot_{playerBase:X}", TimeSpan.FromSeconds(5),
-                    $"[RegisteredPlayers] TryInitRotation FAILED '{entry.Player.Name}' 0x{playerBase:X}: {ex.Message}");
-                entry.RotationReady = false;
+                if (!Memory.TryReadPtr(playerBase + Offsets.Player.MovementContext, out var movCtx, false)
+                    || !movCtx.IsValidVirtualAddress())
+                {
+                    entry.RotationReady = false;
+                    return;
+                }
+                rotAddr = movCtx + Offsets.MovementContext._rotation;
             }
+
+            if (!Memory.TryReadValue<Vector2>(rotAddr, out var rot, false)
+                || !float.IsFinite(rot.X) || !float.IsFinite(rot.Y))
+            {
+                entry.RotationReady = false;
+                return;
+            }
+
+            entry.RotationAddr = rotAddr;
+            entry.RotationReady = true;
         }
 
         #endregion
@@ -1076,6 +1121,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         /// <summary>
         /// Updates backoff state for a failed init attempt (shared by batch and serial paths).
+        /// Schedule is tuned so fresh spawns resolve within ~200ms while stuck pointers don't
+        /// hammer the DMA queue every registration tick.
         /// </summary>
         private static void UpdateInitBackoff(PlayerEntry entry, bool success, bool isTransform, DateTime now)
         {
@@ -1087,10 +1134,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 entry.TransformInitFailures++;
                 double backoffSec = entry.TransformInitFailures switch
                 {
-                    1 => 0.1,
-                    2 => 0.2,
-                    3 => 0.5,
-                    _ => Math.Min(entry.TransformInitFailures * 0.5, 1.0)
+                    1 => 0.05,  // retry almost immediately — game usually populates within 1 tick
+                    2 => 0.15,
+                    3 => 0.35,
+                    4 => 0.75,
+                    5 => 1.5,
+                    6 => 3.0,
+                    _ => 5.0,   // stuck — back off hard, don't spam DMA
                 };
                 entry.NextTransformRetry = now.AddSeconds(backoffSec);
             }
@@ -1099,10 +1149,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 entry.RotationInitFailures++;
                 double backoffSec = entry.RotationInitFailures switch
                 {
-                    1 => 0.1,
-                    2 => 0.2,
-                    3 => 0.5,
-                    _ => Math.Min(entry.RotationInitFailures * 0.5, 1.0)
+                    1 => 0.05,
+                    2 => 0.15,
+                    3 => 0.35,
+                    4 => 0.75,
+                    5 => 1.5,
+                    6 => 3.0,
+                    _ => 5.0,
                 };
                 entry.NextRotationRetry = now.AddSeconds(backoffSec);
             }

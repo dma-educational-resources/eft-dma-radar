@@ -68,6 +68,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         // when many players are discovered at once or periodic timers align.
         private const int MaxRefreshesPerTick = 2;
 
+        // Hard wall-clock budget for the per-player update loop. Once exceeded we stop
+        // issuing new gear/hands/health refreshes this tick and catch up on the next one.
+        // Keeps the registration worker comfortably under 8ms even with spikey DMA latency.
+        private const double PlayerUpdateBudgetMs = 5.5;
+
+        // Precomputed Stopwatch tick count representing PlayerUpdateBudgetMs. Avoids the
+        // per-tick division by Stopwatch.Frequency in the hot update loop.
+        private static readonly long _playerUpdateBudgetTicks =
+            (long)(PlayerUpdateBudgetMs * (Stopwatch.Frequency / 1000.0));
+
         // Random jitter range (seconds) added to gear refresh intervals to prevent timer re-alignment.
         private const double GearRefreshJitterSec = 2.0;
 
@@ -418,8 +428,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             using var scatter = Memory.GetScatter(VmmFlags.NOCACHE);
 
-            // Collect active entries and prepare scatter reads (no delegates, no allocation)
+            // Collect active entries and prepare scatter reads (no delegates, no allocation).
+            // The local player is moved to the FRONT of the processing list so its position
+            // is decoded and applied before any remote players — keeping radar latency for
+            // "me" as low as physically possible on every tick. We append then swap with
+            // index 0 (O(1)) instead of List.Insert(0, …) which would shift the entire list.
             _activeEntries.Clear();
+            int localIdx = -1;
             int transformReady = 0, rotationReady = 0;
             foreach (var kvp in _players)
             {
@@ -427,11 +442,19 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 if (!entry.Player.IsActive)
                     continue;
 
+                if (entry.Player.IsLocalPlayer)
+                    localIdx = _activeEntries.Count;
                 _activeEntries.Add(entry);
+
                 PrepareScatterReads(scatter, entry);
 
                 if (entry.TransformReady) transformReady++;
                 if (entry.RotationReady) rotationReady++;
+            }
+
+            if (localIdx > 0)
+            {
+                (_activeEntries[0], _activeEntries[localIdx]) = (_activeEntries[localIdx], _activeEntries[0]);
             }
 
             if (_activeEntries.Count == 0)
@@ -440,7 +463,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             // Execute single DMA round-trip
             scatter.Execute();
 
-            // Process results inline — no delegate allocation
+            // Process results inline — local player first, so its Position/Rotation are
+            // committed before we touch any remote player.
             foreach (var entry in _activeEntries)
             {
                 ProcessScatterResults(scatter, entry);
@@ -465,6 +489,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         {
             List<ulong>? toRemove = null;
             int refreshBudget = MaxRefreshesPerTick;
+            long budgetStart = Stopwatch.GetTimestamp();
+            long budgetLimitTicks = _playerUpdateBudgetTicks;
 
             foreach (var kvp in _players)
             {
@@ -482,6 +508,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     // Skip expensive gear/hands work if budget is exhausted this tick.
                     // Players that missed their window will catch up in subsequent ticks.
                     if (refreshBudget <= 0)
+                        continue;
+
+                    // Hard wall-clock budget: if we've already spent most of our tick budget
+                    // doing DMA work for earlier players, stop issuing new refreshes this tick.
+                    // The remaining players simply defer to the next tick (100ms away).
+                    if (Stopwatch.GetTimestamp() - budgetStart > budgetLimitTicks)
                         continue;
 
                     var now = DateTime.UtcNow;
@@ -533,6 +565,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                         if (entry.IsObserved)
                         {
+                            // Lazily resolve the ObservedHealthController on first use — moved
+                            // off the critical discovery tick (saves ~3 DMA reads per new observed
+                            // player). Until resolved, HealthStatus stays at Healthy.
+                            if (entry.ObservedHealthControllerAddr == 0)
+                                TryResolveObservedHealthController(entry.Base, entry);
+
                             // Observed player: read ETagStatus from ObservedHealthController
                             UpdateObservedHealthStatus(entry);
                         }
