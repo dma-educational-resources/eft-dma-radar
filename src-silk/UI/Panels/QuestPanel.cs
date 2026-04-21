@@ -180,13 +180,109 @@ namespace eft_dma_radar.Silk.UI.Panels
             if (ImGui.Checkbox("Show Optional", ref showOptional))
                 Config.QuestShowOptional = showOptional;
 
-            // Row 2: map filter combo
+            // Row 2: selected-quest controls
+            var selectedOnly = Config.QuestSelectedOnly;
+            if (ImGui.Checkbox("Selected Only", ref selectedOnly))
+            {
+                Config.QuestSelectedOnly = selectedOnly;
+                Config.Save();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("When enabled, only the selected quest's items and zones are drawn on the radar.\nRight-click a quest to select it.");
+
+            if (!string.IsNullOrEmpty(Config.QuestSelectedId))
+            {
+                ImGui.SameLine();
+                var selName = GetQuestNameById(Config.QuestSelectedId);
+                ImGui.TextColored(ColKappa, $"\u2605 {selName}");
+                ImGui.SameLine();
+                if (ImGui.SmallButton("Clear"))
+                {
+                    Config.QuestSelectedId = "";
+                    Config.Save();
+                }
+            }
+
+            // Row 3: map filter combo
             EnsureMapFilterOptions();
             if (_mapFilterOptions is not null)
             {
                 ImGui.SetNextItemWidth(180);
                 ImGui.Combo("Map", ref _selectedMapIndex, _mapFilterOptions, _mapFilterOptions.Length);
             }
+
+            // Row 4: hidden quests management
+            var hiddenCount = Config.QuestBlacklist?.Count ?? 0;
+            if (hiddenCount > 0)
+            {
+                ImGui.SameLine();
+                if (ImGui.Button($"Hidden ({hiddenCount})"))
+                    ImGui.OpenPopup("quest_hidden_popup");
+            }
+
+            DrawHiddenQuestsPopup();
+        }
+
+        private static void DrawHiddenQuestsPopup()
+        {
+            ImGui.SetNextWindowSize(new Vector2(380, 320), ImGuiCond.Appearing);
+            if (!ImGui.BeginPopup("quest_hidden_popup"))
+                return;
+
+            ImGui.TextColored(ColYellow, "Hidden Quests");
+            ImGui.Separator();
+
+            var blacklist = Config.QuestBlacklist;
+            if (blacklist is null || blacklist.Count == 0)
+            {
+                ImGui.TextColored(ColGrey, "No hidden quests.");
+                ImGui.EndPopup();
+                return;
+            }
+
+            if (ImGui.Button("Clear All"))
+            {
+                blacklist.Clear();
+                Config.Save();
+                ImGui.CloseCurrentPopup();
+                ImGui.EndPopup();
+                return;
+            }
+            ImGui.SameLine();
+            ImGui.TextColored(ColGrey, $"{blacklist.Count} hidden");
+
+            ImGui.Separator();
+            ImGui.BeginChild("hidden_list", new Vector2(0, 220), ImGuiChildFlags.Borders);
+
+            // Iterate over a snapshot so we can mutate the underlying list safely.
+            string? toRestore = null;
+            for (int i = 0; i < blacklist.Count; i++)
+            {
+                var qid = blacklist[i];
+                ImGui.PushID(qid);
+                var name = GetQuestNameById(qid);
+                if (ImGui.SmallButton("Show"))
+                    toRestore = qid;
+                ImGui.SameLine();
+                ImGui.TextUnformatted(name);
+                ImGui.PopID();
+            }
+            ImGui.EndChild();
+
+            if (toRestore is not null)
+            {
+                blacklist.RemoveAll(q => string.Equals(q, toRestore, StringComparison.OrdinalIgnoreCase));
+                Config.Save();
+            }
+
+            ImGui.EndPopup();
+        }
+
+        private static string GetQuestNameById(string questId)
+        {
+            if (EftDataManager.TaskData.TryGetValue(questId, out var task))
+                return task.Name ?? questId;
+            return questId;
         }
 
         private static void EnsureMapFilterOptions()
@@ -281,10 +377,11 @@ namespace eft_dma_radar.Silk.UI.Panels
 
             var collapseIcon = isCollapsed ? "\u25b6" : "\u25bc"; // ▶ / ▼
             var headerCol = allComplete ? ColGreen : ColWhite;
+            bool isSelected = string.Equals(Config.QuestSelectedId, quest.Id, StringComparison.OrdinalIgnoreCase);
 
             ImGui.PushID(quest.Id);
 
-            // Header: icon + kappa star + name + map tag
+            // Header: icon + kappa star + selection star + name + map tag
             ImGui.TextColored(headerCol, collapseIcon);
             ImGui.SameLine();
             if (quest.KappaRequired)
@@ -292,10 +389,15 @@ namespace eft_dma_radar.Silk.UI.Panels
                 ImGui.TextColored(ColKappa, "\u2605");
                 ImGui.SameLine();
             }
+            if (isSelected)
+            {
+                ImGui.TextColored(ColCyan, "\u25c9"); // ◉
+                ImGui.SameLine();
+            }
 
             // Quest name — clickable to toggle collapse
             var questLabel = quest.Name;
-            if (ImGui.Selectable(questLabel, false, ImGuiSelectableFlags.None, new Vector2(ImGui.GetContentRegionAvail().X - 80, 0)))
+            if (ImGui.Selectable(questLabel, isSelected, ImGuiSelectableFlags.None, new Vector2(ImGui.GetContentRegionAvail().X - 80, 0)))
             {
                 if (isCollapsed)
                     _collapsedQuests.Remove(quest.Id);
@@ -311,9 +413,27 @@ namespace eft_dma_radar.Silk.UI.Panels
                 ImGui.TextColored(ColBlue, mapTag);
             }
 
-            // Right-click context menu for blacklisting
+            // Right-click context menu for selection / blacklist
             if (ImGui.BeginPopupContextItem("quest_ctx"))
             {
+                if (isSelected)
+                {
+                    if (ImGui.MenuItem("Deselect Quest"))
+                    {
+                        Config.QuestSelectedId = "";
+                        Config.Save();
+                    }
+                }
+                else
+                {
+                    if (ImGui.MenuItem("Select Quest (Radar)"))
+                    {
+                        Config.QuestSelectedId = quest.Id;
+                        Config.QuestSelectedOnly = true;
+                        Config.Save();
+                    }
+                }
+                ImGui.Separator();
                 if (ImGui.MenuItem("Hide Quest"))
                 {
                     Config.QuestBlacklist.Add(quest.Id);

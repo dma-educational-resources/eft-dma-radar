@@ -186,6 +186,7 @@ namespace eft_dma_radar.Silk.UI
                     HotkeyManagerPanel.IsOpen = false;
                     HideoutPanel.IsOpen = false;
                     QuestPanel.IsOpen = false;
+                    QuestPlannerPanel.IsOpen = false;
                     PlayerInfoWidget.IsOpen = false;
                     LootWidget.IsOpen = false;
                     AimviewWidget.IsOpen = false;

@@ -134,6 +134,7 @@ namespace eft_dma_radar.Silk.UI
                 HotkeyManagerPanel.IsOpen = Config.ShowHotkeyPanel;
                 HideoutPanel.IsOpen = Config.ShowHideoutPanel;
                 QuestPanel.IsOpen = Config.ShowQuestPanel;
+                QuestPlannerPanel.IsOpen = Config.ShowQuestPlannerPanel;
                 PlayerHistoryPanel.IsOpen = Config.ShowPlayerHistoryPanel;
                 PlayerWatchlistPanel.IsOpen = Config.ShowPlayerWatchlistPanel;
 

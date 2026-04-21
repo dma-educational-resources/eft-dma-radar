@@ -112,6 +112,7 @@ namespace eft_dma_radar.Silk.DMA
             SetState(MemoryState.ProcessFound);
             GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
             LobbyQuestReader.Start();
+            eft_dma_radar.Silk.Tarkov.QuestPlanner.QuestPlannerWorker.Start();
             GameStarted?.Invoke(null, EventArgs.Empty);
         }
 
@@ -127,6 +128,7 @@ namespace eft_dma_radar.Silk.DMA
             MatchingProgressResolver.Reset();
             Hideout.Reset();
             LobbyQuestReader.InvalidateCache();
+            eft_dma_radar.Silk.Tarkov.QuestPlanner.QuestPlannerWorker.InvalidateCache();
             GameStopped?.Invoke(null, EventArgs.Empty);
         }
 
@@ -856,6 +858,7 @@ namespace eft_dma_radar.Silk.DMA
             if (_shutdown) return; // idempotent
             _shutdown = true;
             LobbyQuestReader.Stop();
+            eft_dma_radar.Silk.Tarkov.QuestPlanner.QuestPlannerWorker.Stop();
             try { _cts.Cancel(); } catch { }
 
             // Wait for the worker thread to finish — bounded to prevent hung shutdown

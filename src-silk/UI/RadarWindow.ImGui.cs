@@ -145,6 +145,9 @@ namespace eft_dma_radar.Silk.UI
                 if (ImGui.MenuItem("\u2756 Quests", "Q", QuestPanel.IsOpen))
                     QuestPanel.IsOpen = !QuestPanel.IsOpen;
 
+                if (ImGui.MenuItem("\u2741 Quest Planner", null, QuestPlannerPanel.IsOpen))
+                    QuestPlannerPanel.IsOpen = !QuestPlannerPanel.IsOpen;
+
                 if (ImGui.MenuItem("\u2630 Player History", null, PlayerHistoryPanel.IsOpen))
                     PlayerHistoryPanel.IsOpen = !PlayerHistoryPanel.IsOpen;
 
@@ -182,6 +185,7 @@ namespace eft_dma_radar.Silk.UI
                     HotkeyManagerPanel.IsOpen = false;
                     HideoutPanel.IsOpen = false;
                     QuestPanel.IsOpen = false;
+                    QuestPlannerPanel.IsOpen = false;
                     PlayerHistoryPanel.IsOpen = false;
                     PlayerWatchlistPanel.IsOpen = false;
                     PlayerInfoWidget.IsOpen = false;
@@ -368,6 +372,9 @@ namespace eft_dma_radar.Silk.UI
 
             if (QuestPanel.IsOpen)
                 QuestPanel.Draw();
+
+            if (QuestPlannerPanel.IsOpen)
+                QuestPlannerPanel.Draw();
 
             if (PlayerHistoryPanel.IsOpen)
                 PlayerHistoryPanel.Draw();

@@ -200,14 +200,26 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Quests
             var questCompletedConditions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             if (Memory.TryReadPtr(qDataEntry + Offsets.QuestData.CompletedConditions, out var completedHashSetPtr, false))
-                ReadHashSetMongoIds(completedHashSetPtr, questCompletedConditions, allCompletedConditions);
+                MongoIdHashSetReader.Read(completedHashSetPtr, questCompletedConditions, allCompletedConditions);
+
+            // When selection filter is active, only the selected quest contributes
+            // locations/required items to the radar. Other quests are still added to
+            // ActiveQuests so the UI lists them.
+            bool selectedOnly = Config.QuestSelectedOnly && !string.IsNullOrEmpty(Config.QuestSelectedId);
+            bool contributeToRadar = !selectedOnly
+                || string.Equals(Config.QuestSelectedId, qId, StringComparison.OrdinalIgnoreCase);
 
             // Build quest from API data
-            var quest = CreateQuestFromApiData(qId, questCompletedConditions, currentMapBsgId, allLocationConditions);
+            var quest = CreateQuestFromApiData(
+                qId, questCompletedConditions, currentMapBsgId,
+                contributeToRadar ? allLocationConditions : null);
             if (quest is null)
                 return;
 
             activeQuests.Add(quest);
+
+            if (!contributeToRadar)
+                return;
 
             foreach (var item in quest.RequiredItems)
                 allRequiredItems.Add(item);
@@ -221,7 +233,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Quests
             string questId,
             HashSet<string> completedConditions,
             string currentMapBsgId,
-            List<QuestLocation> allLocationConditions)
+            List<QuestLocation>? allLocationConditions)
         {
             if (!EftDataManager.TaskData.TryGetValue(questId, out var taskData))
                 return null;
@@ -274,8 +286,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Quests
                         for (int ri = 0; ri < objective.RequiredItemIds.Count; ri++)
                             requiredItems.Add(objective.RequiredItemIds[ri]);
 
-                        for (int li = 0; li < objective.LocationObjectives.Count; li++)
-                            allLocationConditions.Add(objective.LocationObjectives[li]);
+                        if (allLocationConditions is not null)
+                        {
+                            for (int li = 0; li < objective.LocationObjectives.Count; li++)
+                                allLocationConditions.Add(objective.LocationObjectives[li]);
+                        }
                     }
 
                     objectives.Add(objective);
@@ -459,111 +474,5 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Quests
         }
 
         #endregion
-
-        #region HashSet<MongoID> Reader
-
-        /// <summary>
-        /// Reads MongoIDs from a HashSet&lt;MongoID&gt; in memory and adds them to the result sets.
-        /// </summary>
-        private static void ReadHashSetMongoIds(ulong hashSetPtr, HashSet<string> questConditions, HashSet<string> allConditions)
-        {
-            if (hashSetPtr == 0)
-                return;
-
-            if (!Memory.TryReadPtr(hashSetPtr + IL2CPPHashSet.Entries, out var entriesPtr, false))
-                return;
-
-            if (!Memory.TryReadValue(hashSetPtr + IL2CPPHashSet.Count, out int hashCount, false))
-                return;
-
-            // Fallback count offsets if primary fails
-            if (hashCount <= 0 || hashCount > 100)
-                Memory.TryReadValue(hashSetPtr + 0x20, out hashCount, false);
-            if (hashCount <= 0 || hashCount > 100)
-                Memory.TryReadValue(hashSetPtr + 0x3C, out hashCount, false);
-
-            if (hashCount <= 0 || hashCount > 100)
-                return;
-
-            int found = 0;
-            for (int i = 0; i < hashCount && found < 50; i++)
-            {
-                var entryOffset = (ulong)(i * IL2CPPHashSet.EntrySize);
-                var entryBase = entriesPtr + ManagedArray.FirstElement + entryOffset;
-
-                if (!Memory.TryReadPtr(
-                    entryBase + IL2CPPHashSet.EntryValueOffset + MongoID.StringID, out var stringIdPtr, false))
-                    continue;
-
-                if (stringIdPtr < 0x10000000)
-                    continue;
-
-                var conditionId = Memory.ReadUnityString(stringIdPtr);
-                if (!string.IsNullOrEmpty(conditionId) && conditionId.Length > 10 && conditionId.Length < 100)
-                {
-                    questConditions.Add(conditionId);
-                    allConditions.Add(conditionId);
-                    found++;
-                }
-            }
-        }
-
-        #endregion
     }
-
-    #region Data Models
-
-    /// <summary>
-    /// Represents a quest with its objectives and completion status.
-    /// </summary>
-    internal sealed class Quest
-    {
-        public string Id { get; init; } = string.Empty;
-        public string Name { get; init; } = string.Empty;
-        public bool KappaRequired { get; init; }
-        public List<QuestObjective> Objectives { get; init; } = [];
-        public HashSet<string> RequiredItems { get; init; } = new(StringComparer.OrdinalIgnoreCase);
-        public HashSet<string> CompletedConditions { get; init; } = new(StringComparer.OrdinalIgnoreCase);
-
-        /// <summary>True if all objectives are completed.</summary>
-        public bool IsCompleted
-        {
-            get
-            {
-                for (int i = 0; i < Objectives.Count; i++)
-                {
-                    if (!Objectives[i].IsCompleted)
-                        return false;
-                }
-                return Objectives.Count > 0;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Represents a quest objective with completion status and requirements.
-    /// </summary>
-    internal sealed class QuestObjective
-    {
-        public string Id { get; init; } = string.Empty;
-        public QuestObjectiveType Type { get; init; }
-        public bool Optional { get; init; }
-        public string Description { get; init; } = string.Empty;
-        public bool IsCompleted { get; init; }
-        public List<string> RequiredItemIds { get; init; } = [];
-        public List<QuestLocation> LocationObjectives { get; init; } = [];
-    }
-
-    /// <summary>
-    /// Types of quest objectives.
-    /// </summary>
-    internal enum QuestObjectiveType
-    {
-        FindItem,
-        PlaceItem,
-        VisitLocation,
-        Other,
-    }
-
-    #endregion
 }

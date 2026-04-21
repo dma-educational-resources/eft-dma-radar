@@ -39,6 +39,9 @@ namespace eft_dma_radar.Silk.Misc.Data
 
             [JsonPropertyName("name")]
             public string Name { get; set; } = string.Empty;
+
+            [JsonPropertyName("normalizedName")]
+            public string NormalizedName { get; set; } = string.Empty;
         }
 
         internal sealed class TaskRequirementElement

@@ -311,6 +311,9 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Whether the Quest Info panel is open.</summary>
         public bool ShowQuestPanel { get; set; } = false;
 
+        /// <summary>Whether the Quest Planner panel is open.</summary>
+        public bool ShowQuestPlannerPanel { get; set; } = false;
+
         /// <summary>Whether the Player History panel is open.</summary>
         public bool ShowPlayerHistoryPanel { get; set; } = false;
 
@@ -396,6 +399,12 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>Quest IDs blacklisted from display (user-hidden).</summary>
         public List<string> QuestBlacklist { get; set; } = [];
+
+        /// <summary>When non-empty, only this quest's items/zones are shown on the radar.</summary>
+        public string QuestSelectedId { get; set; } = "";
+
+        /// <summary>When true, only the selected quest's items/zones are drawn on the radar.</summary>
+        public bool QuestSelectedOnly { get; set; } = false;
 
         // ── Transits ────────────────────────────────────────────────────────────
 
