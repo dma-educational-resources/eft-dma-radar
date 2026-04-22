@@ -75,5 +75,11 @@ namespace eft_dma_radar.Silk.Tarkov.Features.MemoryWrites
             _lastEnabledState = default;
             _cachedBlurEffect = default;
         }
+
+        public override void OnRaidEnd()
+        {
+            _lastEnabledState = default;
+            _cachedBlurEffect = default;
+        }
     }
 }

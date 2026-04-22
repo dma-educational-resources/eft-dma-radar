@@ -151,7 +151,7 @@ namespace eft_dma_radar.Silk.Tarkov.Features
                 if (!safeToWrite)
                     return;
 
-                hScatter.Execute(() => true);
+                hScatter.Execute(() => Memory.InRaid && game.IsSafeToWriteMem);
             }
             catch (Exception ex)
             {

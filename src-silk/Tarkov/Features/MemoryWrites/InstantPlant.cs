@@ -68,5 +68,10 @@ namespace eft_dma_radar.Silk.Tarkov.Features.MemoryWrites
         {
             _cachedPlantState = default;
         }
+
+        public override void OnRaidEnd()
+        {
+            _cachedPlantState = default;
+        }
     }
 }

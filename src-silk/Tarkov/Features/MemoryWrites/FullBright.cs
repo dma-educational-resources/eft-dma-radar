@@ -135,5 +135,13 @@ namespace eft_dma_radar.Silk.Tarkov.Features.MemoryWrites
             _resolving           = false;
             LevelSettingsResolver.Reset();
         }
+
+        public override void OnRaidEnd()
+        {
+            _lastEnabledState    = default;
+            _lastBrightness      = default;
+            _cachedLevelSettings = default;
+            _resolving           = false;
+        }
     }
 }

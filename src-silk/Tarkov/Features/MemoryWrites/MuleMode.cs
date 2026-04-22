@@ -117,5 +117,11 @@ namespace eft_dma_radar.Silk.Tarkov.Features.MemoryWrites
             _lastEnabledState = default;
             _cachedPhysical = default;
         }
+
+        public override void OnRaidEnd()
+        {
+            _lastEnabledState = default;
+            _cachedPhysical = default;
+        }
     }
 }

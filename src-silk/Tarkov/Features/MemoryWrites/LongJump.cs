@@ -77,5 +77,12 @@ namespace eft_dma_radar.Silk.Tarkov.Features.MemoryWrites
             _cachedHardSettings = default;
             EftHardSettingsResolver.InvalidateCache();
         }
+
+        public override void OnRaidEnd()
+        {
+            _lastEnabledState = default;
+            _lastMultiplier = default;
+            _cachedHardSettings = default;
+        }
     }
 }

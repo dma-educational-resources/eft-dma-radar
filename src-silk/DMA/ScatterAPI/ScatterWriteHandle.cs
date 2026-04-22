@@ -1,3 +1,4 @@
+using eft_dma_radar.Silk.Misc;
 using VmmSharpEx;
 using VmmSharpEx.Options;
 using VmmSharpEx.Scatter;
@@ -25,6 +26,8 @@ namespace eft_dma_radar.Silk.DMA.ScatterAPI
         public void AddValueEntry<T>(ulong va, T value)
             where T : unmanaged
         {
+            if (!Utils.IsValidVirtualAddress(va))
+                throw new ArgumentException($"Invalid write address 0x{va:X}", nameof(va));
             if (!_handle.PrepareWriteValue<T>(va, in value))
                 throw new Exception("Failed to prepare scatter write entry.");
             Interlocked.Increment(ref _count);
@@ -34,6 +37,8 @@ namespace eft_dma_radar.Silk.DMA.ScatterAPI
         public void AddValueEntry<T>(ulong va, ref T value)
             where T : unmanaged
         {
+            if (!Utils.IsValidVirtualAddress(va))
+                throw new ArgumentException($"Invalid write address 0x{va:X}", nameof(va));
             if (!_handle.PrepareWriteValue<T>(va, in value))
                 throw new Exception("Failed to prepare scatter write entry.");
             Interlocked.Increment(ref _count);
@@ -43,6 +48,8 @@ namespace eft_dma_radar.Silk.DMA.ScatterAPI
         public void AddBufferEntry<T>(ulong va, Span<T> buffer)
             where T : unmanaged
         {
+            if (!Utils.IsValidVirtualAddress(va))
+                throw new ArgumentException($"Invalid write address 0x{va:X}", nameof(va));
             var bytes = MemoryMarshal.AsBytes(buffer);
             if (!_handle.PrepareWriteSpan<byte>(va, bytes))
                 throw new Exception("Failed to prepare scatter write buffer entry.");

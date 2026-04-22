@@ -95,6 +95,14 @@ namespace eft_dma_radar.Silk.Tarkov.Features.MemoryWrites
             return animator;
         }
 
+        public override void OnRaidEnd()
+        {
+            _lastEnabledState    = default;
+            _lastSpeed           = default;
+            _lastOverweightState = default;
+            _cachedAnimator      = default;
+        }
+
         public override void OnRaidStart()
         {
             _lastEnabledState    = default;

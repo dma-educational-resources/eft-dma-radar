@@ -77,5 +77,11 @@ namespace eft_dma_radar.Silk.Tarkov.Features.MemoryWrites
             _currentState    = default;
             _cachedComponent = default;
         }
+
+        public override void OnRaidEnd()
+        {
+            _currentState    = default;
+            _cachedComponent = default;
+        }
     }
 }

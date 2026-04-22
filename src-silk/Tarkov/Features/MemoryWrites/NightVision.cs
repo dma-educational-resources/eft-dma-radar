@@ -63,5 +63,11 @@ namespace eft_dma_radar.Silk.Tarkov.Features.MemoryWrites
             _lastEnabledState = default;
             _cachedComponent  = default;
         }
+
+        public override void OnRaidEnd()
+        {
+            _lastEnabledState = default;
+            _cachedComponent  = default;
+        }
     }
 }
