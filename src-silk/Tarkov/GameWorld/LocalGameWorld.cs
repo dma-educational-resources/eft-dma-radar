@@ -355,7 +355,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             _lootManager = new LootManager(gameWorldBase);
             _interactablesManager = new InteractablesManager(gameWorldBase);
             _explosivesManager = new ExplosivesManager(gameWorldBase);
-            _btrTracker = new BtrTracker(gameWorldBase);
+            // BTR only spawns on Streets and Woods
+            if (mapId.Equals("tarkovstreets", StringComparison.OrdinalIgnoreCase) ||
+                mapId.Equals("woods", StringComparison.OrdinalIgnoreCase))
+                _btrTracker = new BtrTracker(gameWorldBase);
 
             // Resolve static switch markers for this map (if any)
             var switchPositions = SwitchData.GetSwitchesForMap(mapId);
