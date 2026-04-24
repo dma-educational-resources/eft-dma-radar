@@ -1,0 +1,14 @@
+{
+	"mapID": ["Arena_Bowl"],
+	"x": 590,
+	"y": 94,
+	"scale": 9.4,
+	"svgScale" : 2.00,
+	"mapLayers": [
+		{
+			"minHeight": null,
+			"maxHeight": null,
+			"filename": "Arena_Bowl.svg"
+		}
+	]
+}

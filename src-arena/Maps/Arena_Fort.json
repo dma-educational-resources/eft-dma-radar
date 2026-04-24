@@ -1,0 +1,14 @@
+{
+	"mapID": ["Arena_Prison"],
+	"x": 999,
+	"y": 138,
+	"scale": 14.4,
+	"svgScale" : 2.00,
+	"mapLayers": [
+		{
+			"minHeight": null,
+			"maxHeight": null,
+			"filename": "Arena_Fort.svg"
+		}
+	]
+}

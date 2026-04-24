@@ -34,7 +34,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         private const double CorpseGearRefreshSeconds = 30.0;
 
         // interactiveClass
-        private readonly ConcurrentDictionary<ulong, string> _corpseNicknames = new();
+        private readonly Dictionary<ulong, string> _corpseNicknames = new();
 
         // Slot names to skip when reading corpse equipment
         private static readonly FrozenSet<string> _skipSlots =
@@ -191,7 +191,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 && _killfeedPushed.Count == 0
                 && _killfeedAttempts.Count == 0
                 && _corpseGearNextReadAt.Count == 0
-                && _corpseNicknames.IsEmpty)
+                && _corpseNicknames.Count == 0)
                 return;
 
             var alive = new HashSet<ulong>(currentCorpses.Count);
@@ -223,11 +223,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                         _corpseGearNextReadAt.Remove(k);
             }
 
-            if (!_corpseNicknames.IsEmpty)
+            if (_corpseNicknames.Count > 0)
             {
+                List<ulong>? stale = null;
                 foreach (var kv in _corpseNicknames)
                     if (!alive.Contains(kv.Key))
-                        _corpseNicknames.TryRemove(kv.Key, out _);
+                        (stale ??= new()).Add(kv.Key);
+                if (stale is not null)
+                    foreach (var k in stale)
+                        _corpseNicknames.Remove(k);
             }
         }
 
@@ -346,13 +350,19 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 }
 
                 map.Execute();
-            }
+                }
 
-            // ── Phase 2: Batched transform + BSG ID resolution ──────────────────
+                Log.WriteRateLimited(AppLogLevel.Debug, "loot_phase1", TimeSpan.FromSeconds(10),
+                    $"[LootManager] Phase1: list={ptrs.Count} loot={pendingLoot.Count} corpses={pendingCorpses.Count} containers={pendingContainers.Count} airdrops={pendingAirdrops.Count}");
+
+                // ── Phase 2: Batched transform + BSG ID resolution ──────────────────
             lootResult = ResolveLootBatched(pendingLoot);
             corpseResult = ResolveCorpsesBatched(pendingCorpses);
             containerResult = ResolveContainersBatched(pendingContainers);
             airdropResult = ResolveAirdropsBatched(pendingAirdrops);
+
+            Log.WriteRateLimited(AppLogLevel.Debug, "loot_phase2", TimeSpan.FromSeconds(10),
+                $"[LootManager] Phase2: loot={lootResult.Count}/{pendingLoot.Count} corpses={corpseResult.Count}/{pendingCorpses.Count} containers={containerResult.Count}/{pendingContainers.Count} airdrops={airdropResult.Count}/{pendingAirdrops.Count}");
         }
 
         #region Phase 1 — Scatter Callbacks (collect pending items, no serial reads)
@@ -416,8 +426,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                         if (!mongoId.StringID.IsValidVirtualAddress())
                             return;
 
-                        lock (pending)
-                            pending.Add(new PendingLoot(transformInternal, mongoId.StringID));
+                        if (!((ulong)transformInternal).IsValidVirtualAddress())
+                            return;
+
+                        pending.Add(new PendingLoot(transformInternal, mongoId.StringID));
                     };
                 };
             };
@@ -452,8 +464,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                         if (!x6.TryGetResult<MemPointer>(11, out var transformInternal))
                             return;
 
-                        lock (pending)
-                            pending.Add(new PendingCorpse(interactiveClass, transformInternal));
+                        if (!((ulong)transformInternal).IsValidVirtualAddress())
+                            return;
+
+                        pending.Add(new PendingCorpse(interactiveClass, transformInternal));
                     };
                 };
             };
@@ -502,8 +516,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                                 if (!x6.TryGetResult<MemPointer>(11, out var transformInternal))
                                     return;
 
-                                lock (pendingAirdrops)
-                                    pendingAirdrops.Add(new PendingAirdrop(transformInternal));
+                                if (!((ulong)transformInternal).IsValidVirtualAddress())
+                                    return;
+
+                                pendingAirdrops.Add(new PendingAirdrop(transformInternal));
                             };
                         };
                         return;
@@ -540,8 +556,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                         if (!((ulong)template).IsValidVirtualAddress())
                             return;
 
-                        lock (pending)
-                            pending.Add(new PendingContainer(transformInternal, (ulong)template, searched));
+                        if (!((ulong)transformInternal).IsValidVirtualAddress())
+                            return;
+
+                        pending.Add(new PendingContainer(transformInternal, (ulong)template, searched));
                     };
                 };
             };
@@ -580,6 +598,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 for (int i = 0; i < pending.Count; i++)
                 {
                     var ti = pending[i].TransformInternal;
+                    if (!((ulong)ti).IsValidVirtualAddress())
+                        continue;
                     s1.PrepareReadValue<ulong>(ti + UnityOffsets.TransformAccess.HierarchyOffset);
                     s1.PrepareReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset);
                     // Unity string: length at +0x10 (int), chars at +0x14 (UTF-16)
@@ -708,6 +728,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 for (int i = 0; i < pending.Count; i++)
                 {
                     var ti = pending[i].TransformInternal;
+                    if (!((ulong)ti).IsValidVirtualAddress())
+                        continue;
                     s1.PrepareReadValue<ulong>(ti + UnityOffsets.TransformAccess.HierarchyOffset);
                     s1.PrepareReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset);
                 }
@@ -833,6 +855,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 for (int i = 0; i < pending.Count; i++)
                 {
                     var ti = pending[i].TransformInternal;
+                    if (!((ulong)ti).IsValidVirtualAddress())
+                        continue;
                     s1.PrepareReadValue<ulong>(ti + UnityOffsets.TransformAccess.HierarchyOffset);
                     s1.PrepareReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset);
                 }
@@ -967,6 +991,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 for (int i = 0; i < pending.Count; i++)
                 {
                     var ti = pending[i].TransformInternal;
+                    if (!((ulong)ti).IsValidVirtualAddress())
+                        continue;
                     s1.PrepareReadValue<ulong>(ti + UnityOffsets.TransformAccess.HierarchyOffset);
                     s1.PrepareReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset);
                     if (bsgIdStringAddrs[i].IsValidVirtualAddress())

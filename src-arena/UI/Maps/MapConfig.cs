@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
+using eft_dma_radar.Arena.GameWorld.Exits;
 
-namespace eft_dma_radar.Silk.UI.Maps
+namespace eft_dma_radar.Arena.UI.Maps
 {
     /// <summary>
     /// JSON-deserializable map configuration.
@@ -11,13 +12,13 @@ namespace eft_dma_radar.Silk.UI.Maps
         public List<string> MapID { get; init; } = [];
 
         [JsonPropertyName("x")]
-        public float X { get; set; }
+        public float X { get; init; }
 
         [JsonPropertyName("y")]
-        public float Y { get; set; }
+        public float Y { get; init; }
 
         [JsonPropertyName("scale")]
-        public float Scale { get; set; }
+        public float Scale { get; init; }
 
         [JsonPropertyName("svgScale")]
         public float SvgScale { get; init; } = 1f;
@@ -29,31 +30,11 @@ namespace eft_dma_radar.Silk.UI.Maps
         public List<MapLayer> MapLayers { get; init; } = [];
 
         /// <summary>
-        /// Display name derived from the primary map ID.
+        /// Display name derived from the primary map ID. Delegates to the shared
+        /// Arena <see cref="MapNames"/> dictionary so names aren't duplicated.
         /// </summary>
         [JsonIgnore]
-        public string Name => MapID.Count > 0 && _names.TryGetValue(MapID[0], out var n) ? n : MapID.FirstOrDefault() ?? "Unknown";
-
-        private static readonly FrozenDictionary<string, string> _names =
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["bigmap"]          = "Customs",
-                ["interchange"]     = "Interchange",
-                ["rezervbase"]      = "Reserve",
-                ["woods"]           = "Woods",
-                ["lighthouse"]      = "Lighthouse",
-                ["shoreline"]       = "Shoreline",
-                ["tarkovstreets"]   = "Streets of Tarkov",
-                ["sandbox"]         = "Ground Zero",
-                ["sandbox_high"]    = "Ground Zero (High)",
-                ["factory4_day"]    = "Factory (Day)",
-                ["factory4_night"]  = "Factory (Night)",
-                ["laboratory"]      = "The Lab",
-                ["terminal"]        = "Terminal",
-                ["suburbs"]         = "Suburbs",
-                ["city"]            = "City",
-                ["labyrinth"]       = "Labyrinth",
-            }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+        public string Name => MapID.Count > 0 ? MapNames.GetDisplayName(MapID[0]) : "Unknown";
     }
 
     /// <summary>

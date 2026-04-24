@@ -1,3 +1,5 @@
+using eft_dma_radar.Silk.DMA;
+using eft_dma_radar.Silk.UI.Maps;
 using ImGuiNET;
 
 namespace eft_dma_radar.Silk.UI.Panels
@@ -21,6 +23,8 @@ namespace eft_dma_radar.Silk.UI.Panels
                 RadarWindow.FreeMode = freeMode;
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Toggle between player-follow and free-pan  [F]");
+
+            DrawMapSetupSection();
 
             ImGui.Spacing();
             ImGui.SeparatorText("Corpses");
@@ -285,6 +289,51 @@ namespace eft_dma_radar.Silk.UI.Panels
             }
 
             ImGui.EndTabItem();
+        }
+
+        private static void DrawMapSetupSection()
+        {
+            ImGui.Spacing();
+            ImGui.SeparatorText("Map Setup (Calibration)");
+
+            var map = MapManager.Map;
+            if (map is null)
+            {
+                ImGui.TextDisabled("No map loaded.");
+                return;
+            }
+
+            var cfg = map.Config;
+
+            // Live player position readout (X / Z / Y in EFT world space — Z&Y swapped for display)
+            var lp = Memory.LocalPlayer;
+            if (lp is not null)
+            {
+                var pos = lp.Position;
+                ImGui.Text($"Player  X: {pos.X:0.000}   Y: {pos.Z:0.000}   Z: {pos.Y:0.000}");
+            }
+            else
+            {
+                ImGui.TextDisabled("Player position unavailable.");
+            }
+
+            ImGui.SetNextItemWidth(160);
+            float x = cfg.X;
+            if (ImGui.DragFloat("Map X", ref x, 1.0f, -10000f, 10000f, "%.2f"))
+                cfg.X = x;
+
+            ImGui.SetNextItemWidth(160);
+            float y = cfg.Y;
+            if (ImGui.DragFloat("Map Y", ref y, 1.0f, -10000f, 10000f, "%.2f"))
+                cfg.Y = y;
+
+            ImGui.SetNextItemWidth(160);
+            float scale = cfg.Scale;
+            if (ImGui.DragFloat("Map Scale", ref scale, 0.001f, 0.001f, 100f, "%.4f"))
+                cfg.Scale = scale;
+
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Runtime calibration — adjust until your player marker\naligns with your real world position. Not saved to disk.");
         }
     }
 }
