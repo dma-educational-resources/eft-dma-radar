@@ -46,7 +46,7 @@ namespace eft_dma_radar.Arena.Unity.IL2CPP
             // ── GamePlayerOwner (singleton static class) ──────────────────────
             // Resolved via TypeIndex for O(1) lookup
             C("GamePlayerOwner", [
-                F("<_myPlayer>k__BackingField", "_myPlayer"),
+                F("_myPlayer"),
             ], s: true, ti: SDK.Offsets.Special.GamePlayerOwner_TypeIndex),
 
             // ── ClientLocalGameWorld ──────────────────────────────────────────
@@ -59,11 +59,40 @@ namespace eft_dma_radar.Arena.Unity.IL2CPP
             ], cs: "ClientLocalGameWorld"),
 
             // ── ObservedPlayerView (Arena players) ───────────────────────────
-            C("ObservedPlayerView", [
+            C("EFT.NextObservedPlayer.ObservedPlayerView", [
                 F("<NickName>k__BackingField", "NickName"),
-                F("<Side>k__BackingField", "PlayerSide"),
+                F("<Side>k__BackingField", "Side"),
                 F("<IsAI>k__BackingField", "IsAI"),
-            ]),
+            ], cs: "ObservedPlayerView"),
+
+            // ── ObservedPlayerController (for InventoryController ptr) ───────
+            C("EFT.NextObservedPlayer.ObservedPlayerController", [
+                F("<InventoryController>k__BackingField", "InventoryController"),
+            ], cs: "ObservedPlayerController"),
+
+            // ── Inventory chain (armband -> TeamID) ──────────────────────────
+            // Use FQNs: multiple classes share these short names
+            // (e.g. Arena.KillCamera.InventoryController).
+            C("EFT.InventoryLogic.InventoryController", [
+                F("<Inventory>k__BackingField", "Inventory"),
+            ], cs: "InventoryController"),
+            C("EFT.InventoryLogic.Inventory", [
+                F("Equipment"),
+            ], cs: "Inventory"),
+            // Slots is declared on CompoundItem (Equipment inherits it).
+            C("EFT.InventoryLogic.CompoundItem", [
+                F("Slots"),
+            ], cs: "CompoundItem"),
+            C("EFT.InventoryLogic.Slot", [
+                F("<ContainedItem>k__BackingField", "ContainedItem"),
+                F("<ID>k__BackingField", "ID"),
+            ], cs: "Slot"),
+            C("EFT.InventoryLogic.Item", [
+                F("<Template>k__BackingField", "Template"),
+            ], cs: "LootItem"),
+            C("EFT.InventoryLogic.ItemTemplate", [
+                F("<_id>k__BackingField", "_id"),
+            ], cs: "ItemTemplate"),
         ];
 
         // ── TypeIndex map ─────────────────────────────────────────────────────

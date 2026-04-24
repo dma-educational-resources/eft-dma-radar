@@ -311,6 +311,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             config.LootShowBackpacks = false;
             config.LootShowKeys = false;
             config.LootShowWishlist = true;
+            config.LootShowQuestItems = true;
             config.LootImportantOnly = false;
             ClearSearch();
         }

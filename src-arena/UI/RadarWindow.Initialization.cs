@@ -96,6 +96,8 @@ namespace eft_dma_radar.Arena.UI
         {
             _surface?.Dispose();
             _renderTarget?.Dispose();
+            _surface = null!;
+            _renderTarget = null!;
 
             var size = _window.FramebufferSize;
             if (size.X <= 0 || size.Y <= 0 || _grContext is null)

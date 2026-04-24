@@ -176,6 +176,13 @@ namespace eft_dma_radar.Silk.UI.Panels
                 Config.LootShowWishlist = showWL;
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Show wishlisted items regardless of price filter");
+
+            ImGui.SameLine(0, 20);
+            bool showQI = Config.LootShowQuestItems;
+            if (ImGui.Checkbox("\u2755 Quest Items", ref showQI))
+                Config.LootShowQuestItems = showQI;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Show loose quest items (pocket watch, Jaeger's letter, etc.)\nIndependent from the active-quest highlighting toggle.");
         }
 
         // ── Wishlist Settings (in-game wishlist groups) ──────────────────────

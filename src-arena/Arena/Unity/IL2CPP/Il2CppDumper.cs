@@ -167,12 +167,22 @@ namespace eft_dma_radar.Arena.Unity.IL2CPP
             var nameToIndex = new Dictionary<string, int>(classes.Count * 2, StringComparer.Ordinal);
             var baseNameSeen = new Dictionary<string, int>(classes.Count, StringComparer.Ordinal);
 
-            foreach (var (name, _, ptr, idx) in classes)
+            foreach (var (name, ns, ptr, idx) in classes)
             {
                 var san = SanitizeName(name);
                 nameLookup.TryAdd(name, ptr);
                 nameToIndex.TryAdd(name, idx);
                 if (san != name) { nameLookup.TryAdd(san, ptr); nameToIndex.TryAdd(san, idx); }
+
+                // Also register namespace-qualified name so schema can disambiguate
+                // classes that share a short name (e.g. Arena.KillCamera.InventoryController
+                // vs EFT.InventoryLogic.InventoryController).
+                if (!string.IsNullOrEmpty(ns))
+                {
+                    var fqn = $"{ns}.{name}";
+                    nameLookup.TryAdd(fqn, ptr);
+                    nameToIndex.TryAdd(fqn, idx);
+                }
 
                 if (baseNameSeen.TryGetValue(san, out int seen))
                 {

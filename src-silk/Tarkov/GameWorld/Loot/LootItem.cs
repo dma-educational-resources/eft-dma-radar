@@ -8,6 +8,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
     {
         private readonly TarkovMarketItem _item = item;
 
+        /// <summary>
+        /// True when this is a loose quest item (ItemTemplate.QuestItem flag) such as
+        /// pocket watches or Jaeger's letter. These don't appear in the market database
+        /// and are visibility-controlled by <see cref="SilkConfig.LootShowQuestItems"/>.
+        /// </summary>
+        public bool IsQuestItem { get; init; }
+
         // Cached label to avoid per-frame string allocation
         private string? _cachedLabel;
         private int _cachedLabelKey = int.MinValue;
@@ -27,13 +34,28 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         public int DisplayPrice => LootFilter.GetDisplayPrice(_item);
 
         /// <summary>Full filter evaluation — visibility, importance, wishlist, category.</summary>
-        public LootFilter.FilterResult Evaluate(int displayPrice) => LootFilter.Evaluate(_item, displayPrice);
+        public LootFilter.FilterResult Evaluate(int displayPrice)
+        {
+            if (IsQuestItem)
+            {
+                if (!SilkProgram.Config.LootShowQuestItems)
+                    return LootFilter.FilterResult.Hidden;
+
+                return new LootFilter.FilterResult
+                {
+                    Visible = true,
+                    Important = true,
+                    QuestRequired = true,
+                };
+            }
+            return LootFilter.Evaluate(_item, displayPrice);
+        }
 
         /// <summary>Whether the item passes current filter criteria.</summary>
-        public bool ShouldDraw() => LootFilter.ShouldDraw(_item, DisplayPrice);
+        public bool ShouldDraw() => Evaluate(DisplayPrice).Visible;
 
         /// <summary>Whether the item passes current filter criteria (pre-computed price).</summary>
-        public bool ShouldDraw(int displayPrice) => LootFilter.ShouldDraw(_item, displayPrice);
+        public bool ShouldDraw(int displayPrice) => Evaluate(displayPrice).Visible;
 
         /// <summary>Whether the item is highlighted as important (cached — call <see cref="RefreshImportance"/> to update).</summary>
         public bool IsImportant => _cachedImportant;

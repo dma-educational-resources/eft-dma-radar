@@ -1,5 +1,7 @@
 namespace eft_dma_radar.Arena.GameWorld
 {
+    using SDK;
+
     /// <summary>
     /// Player type classification (mirrors Silk's PlayerType).
     /// </summary>
@@ -7,6 +9,7 @@ namespace eft_dma_radar.Arena.GameWorld
     {
         Default = 0,
         LocalPlayer,
+        Teammate,
         USEC,
         BEAR,
         PScav,
@@ -45,6 +48,9 @@ namespace eft_dma_radar.Arena.GameWorld
         /// <summary>True if this player is AI-controlled.</summary>
         public bool IsAI;
 
+        /// <summary>Armband-based Arena team id (-1 if unknown / no armband).</summary>
+        public int TeamID = -1;
+
         // ── State (updated each registration tick) ────────────────────────
 
         public bool IsActive;
@@ -78,6 +84,18 @@ namespace eft_dma_radar.Arena.GameWorld
         internal int ConsecutiveErrors;
         internal bool RealtimeEstablished;
 
+        // ── Back-off timers (Environment.TickCount64) ─────────────────────
+        // When non-zero, skip the corresponding init/retry until TickCount64 reaches this value.
+        internal long NextTransformInitTick;
+        internal long NextRotationInitTick;
+        internal long NextTeamIdTick;
+        internal int  TransformInitFailStreak;
+        internal int  RotationInitFailStreak;
+        internal int  TeamIdFailStreak;
+
+        /// <summary>Cached ArmBand slot pointer — avoids re-scanning the equipment slots array on every TeamID read.</summary>
+        internal ulong ArmBandSlotAddr;
+
         public override string ToString()
         {
             var sb = new System.Text.StringBuilder();
@@ -87,6 +105,8 @@ namespace eft_dma_radar.Arena.GameWorld
             // AccountId omitted — Arena server never sends it to other clients
             if (ProfileId is not null)
                 sb.Append(" prof=").Append(ProfileId);
+            if (TeamID >= 0)
+                sb.Append(" team=").Append((ArmbandColorType)TeamID);
             return sb.ToString();
         }
     }

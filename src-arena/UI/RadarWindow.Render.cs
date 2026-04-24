@@ -1,5 +1,6 @@
 using eft_dma_radar.Arena.GameWorld;
 using ImGuiNET;
+using SDK;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 
@@ -125,7 +126,7 @@ namespace eft_dma_radar.Arena.UI
                 if (!p.IsActive || !p.HasValidPosition) continue;
                 if (!worldBounds.Contains(p.Position)) continue;
                 var sp = mapParams.ToScreenPos(MapParams.ToMapPos(p.Position, mapCfg));
-                DrawPlayer(canvas, p, sp, isLocal: p.IsLocalPlayer);
+                DrawPlayer(canvas, p, sp, isLocal: p.IsLocalPlayer, localPos: local.Position);
             }
         }
 
@@ -149,7 +150,8 @@ namespace eft_dma_radar.Arena.UI
             {
                 if (!p.IsActive || !p.HasValidPosition) continue;
                 var sp = WorldToScreen(p.Position, centerWorld, screenCenter);
-                DrawPlayer(canvas, p, sp, isLocal: p.IsLocalPlayer);
+                var lPos = local?.HasValidPosition == true ? local.Position : p.Position;
+                DrawPlayer(canvas, p, sp, isLocal: p.IsLocalPlayer, localPos: lPos);
             }
         }
 
@@ -190,7 +192,7 @@ namespace eft_dma_radar.Arena.UI
                 screenCenter.Y - dz * _pixelsPerMeter);
         }
 
-        private static void DrawPlayer(SKCanvas canvas, Player p, SKPoint sp, bool isLocal)
+        private static void DrawPlayer(SKCanvas canvas, Player p, SKPoint sp, bool isLocal, Vector3 localPos)
         {
             var (fill, text) = GetPlayerPaints(p);
 
@@ -218,8 +220,28 @@ namespace eft_dma_radar.Arena.UI
             {
                 float tx = sp.X + r + 3f;
                 float ty = sp.Y - r;
-                canvas.DrawText(p.Name, tx + 1, ty + 1, SKPaints.FontRegular11, SKPaints.TextShadow);
-                canvas.DrawText(p.Name, tx,     ty,     SKPaints.FontRegular11, text);
+
+                // Silk-style info suffix: signed height (meters) + distance (meters).
+                // Neo Sans Std lacks the ▲/▼ glyphs (they render as tofu),
+                // so we use ASCII signed numbers, matching the Silk radar presentation.
+                string infoTag = string.Empty;
+                if (Config.ShowHeightDiff)
+                {
+                    int h = (int)MathF.Round(p.Position.Y - localPos.Y);
+                    int d = (int)Vector3.Distance(localPos, p.Position);
+                    infoTag = $"  {h:+0;-0;0}m  {d}m";
+                }
+
+                string label;
+                if (Config.ShowTeamTag && p.TeamID >= 0)
+                    label = $"{p.Name} [{(ArmbandColorType)p.TeamID}]{infoTag}";
+                else if (infoTag.Length > 0)
+                    label = $"{p.Name}{infoTag}";
+                else
+                    label = p.Name;
+
+                canvas.DrawText(label, tx + 1, ty + 1, SKPaints.FontRegular11, SKPaints.TextShadow);
+                canvas.DrawText(label, tx,     ty,     SKPaints.FontRegular11, text);
             }
         }
 
@@ -227,6 +249,27 @@ namespace eft_dma_radar.Arena.UI
         {
             if (p.IsLocalPlayer)
                 return (SKPaints.PaintLocalPlayer, SKPaints.TextLocalPlayer);
+
+            // Teammates (same Arena armband team as LocalPlayer) get the teammate highlight.
+            if (p.Type == PlayerType.Teammate)
+                return (SKPaints.PaintTeammate, SKPaints.TextTeammate);
+
+            // Non-teammates: color by armband team when known.
+            if (p.TeamID >= 0)
+            {
+                return (ArmbandColorType)p.TeamID switch
+                {
+                    ArmbandColorType.red     => (SKPaints.PaintTeamRed,     SKPaints.TextTeamRed),
+                    ArmbandColorType.fuchsia => (SKPaints.PaintTeamFuchsia, SKPaints.TextTeamFuchsia),
+                    ArmbandColorType.yellow  => (SKPaints.PaintTeamYellow,  SKPaints.TextTeamYellow),
+                    ArmbandColorType.green   => (SKPaints.PaintTeamGreen,   SKPaints.TextTeamGreen),
+                    ArmbandColorType.azure   => (SKPaints.PaintTeamAzure,   SKPaints.TextTeamAzure),
+                    ArmbandColorType.white   => (SKPaints.PaintTeamWhite,   SKPaints.TextTeamWhite),
+                    ArmbandColorType.blue    => (SKPaints.PaintTeamBlue,    SKPaints.TextTeamBlue),
+                    _                        => (SKPaints.PaintDefault,     SKPaints.TextWhite),
+                };
+            }
+
             return p.Type switch
             {
                 PlayerType.USEC     => (SKPaints.PaintUSEC,   SKPaints.TextUSEC),
@@ -310,6 +353,12 @@ namespace eft_dma_radar.Arena.UI
 
                 bool n = Config.ShowNames;
                 if (ImGui.MenuItem("\u263a Names", null, n)) Config.ShowNames = !n;
+
+                bool tt = Config.ShowTeamTag;
+                if (ImGui.MenuItem("\u25cf Team Tag", null, tt)) Config.ShowTeamTag = !tt;
+
+                bool hd = Config.ShowHeightDiff;
+                if (ImGui.MenuItem("\u2195 Height + Distance", null, hd)) Config.ShowHeightDiff = !hd;
 
                 bool g = Config.ShowGrid;
                 if (ImGui.MenuItem("\u25a6 Grid (no-map fallback)", null, g)) Config.ShowGrid = !g;

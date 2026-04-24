@@ -44,6 +44,7 @@ namespace eft_dma_radar.Arena.UI
 
         // Fills
         public static SKPaint PaintLocalPlayer { get; } = NewFillPaint(new SKColor(50, 205, 50));
+        public static SKPaint PaintTeammate    { get; } = NewFillPaint(new SKColor(100, 220, 100));
         public static SKPaint PaintUSEC        { get; } = NewFillPaint(new SKColor(230, 60, 60));
         public static SKPaint PaintBEAR        { get; } = NewFillPaint(new SKColor(70, 130, 230));
         public static SKPaint PaintPScav       { get; } = NewFillPaint(new SKColor(220, 220, 220));
@@ -53,8 +54,18 @@ namespace eft_dma_radar.Arena.UI
         public static SKPaint PaintGuard       { get; } = NewFillPaint(new SKColor(200, 140, 60));
         public static SKPaint PaintDefault     { get; } = NewFillPaint(new SKColor(200, 200, 200));
 
+        // Armband team fills (indexed by ArmbandColorType)
+        public static SKPaint PaintTeamRed     { get; } = NewFillPaint(new SKColor(230,  60,  60));
+        public static SKPaint PaintTeamFuchsia { get; } = NewFillPaint(new SKColor(230,  80, 200));
+        public static SKPaint PaintTeamYellow  { get; } = NewFillPaint(new SKColor(240, 220,  60));
+        public static SKPaint PaintTeamGreen   { get; } = NewFillPaint(new SKColor( 70, 200,  90));
+        public static SKPaint PaintTeamAzure   { get; } = NewFillPaint(new SKColor( 80, 190, 230));
+        public static SKPaint PaintTeamWhite   { get; } = NewFillPaint(new SKColor(235, 237, 240));
+        public static SKPaint PaintTeamBlue    { get; } = NewFillPaint(new SKColor( 70, 130, 230));
+
         // Text colors (match fills, used for labels)
         public static SKPaint TextLocalPlayer { get; } = NewTextPaint(new SKColor(50, 205, 50));
+        public static SKPaint TextTeammate    { get; } = NewTextPaint(new SKColor(100, 220, 100));
         public static SKPaint TextUSEC        { get; } = NewTextPaint(new SKColor(230, 60, 60));
         public static SKPaint TextBEAR        { get; } = NewTextPaint(new SKColor(70, 130, 230));
         public static SKPaint TextPScav       { get; } = NewTextPaint(new SKColor(220, 220, 220));
@@ -62,6 +73,15 @@ namespace eft_dma_radar.Arena.UI
         public static SKPaint TextRaider      { get; } = NewTextPaint(new SKColor(255, 180, 30));
         public static SKPaint TextBoss        { get; } = NewTextPaint(new SKColor(230, 50, 230));
         public static SKPaint TextGuard       { get; } = NewTextPaint(new SKColor(200, 140, 60));
+
+        // Armband team texts (indexed by ArmbandColorType)
+        public static SKPaint TextTeamRed     { get; } = NewTextPaint(new SKColor(230,  60,  60));
+        public static SKPaint TextTeamFuchsia { get; } = NewTextPaint(new SKColor(230,  80, 200));
+        public static SKPaint TextTeamYellow  { get; } = NewTextPaint(new SKColor(240, 220,  60));
+        public static SKPaint TextTeamGreen   { get; } = NewTextPaint(new SKColor( 70, 200,  90));
+        public static SKPaint TextTeamAzure   { get; } = NewTextPaint(new SKColor( 80, 190, 230));
+        public static SKPaint TextTeamWhite   { get; } = NewTextPaint(new SKColor(235, 237, 240));
+        public static SKPaint TextTeamBlue    { get; } = NewTextPaint(new SKColor( 70, 130, 230));
 
         // Aimline strokes (shared thin line)
         public static SKPaint Aimline { get; } = new()

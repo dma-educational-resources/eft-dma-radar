@@ -9,6 +9,17 @@ namespace eft_dma_radar.Arena.UI
     {
         private static void OnResize(Vector2D<int> size)
         {
+            if (size.X <= 0 || size.Y <= 0)
+            {
+                // Minimized — drop the surface so the render loop skips frames
+                // instead of drawing into a zero-sized / disposed target.
+                _surface?.Dispose();
+                _renderTarget?.Dispose();
+                _surface = null!;
+                _renderTarget = null!;
+                return;
+            }
+
             _gl.Viewport(size);
             CreateSurface();
         }

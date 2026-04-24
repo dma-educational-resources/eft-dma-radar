@@ -63,6 +63,39 @@ namespace SDK
         {
             public static uint MovementController = 0x110; // <MovementController>k__BackingField
             public static uint HealthController   = 0x120; // <HealthController>k__BackingField
+            public static uint InventoryController = 0x10; // <InventoryController>k__BackingField
+        }
+
+        // ── Inventory chain (for armband-based TeamID detection) ─────────────
+        public readonly partial struct InventoryController
+        {
+            public static uint Inventory = 0x120; // <Inventory>k__BackingField
+        }
+
+        public readonly partial struct Inventory
+        {
+            public static uint Equipment = 0x18; // InventoryLogic.Inventory.Equipment (plain field)
+        }
+
+        public readonly partial struct CompoundItem
+        {
+            public static uint Slots = 0x98; // EFT.InventoryLogic.CompoundItem.Slots — Equipment extends this
+        }
+
+        public readonly partial struct Slot
+        {
+            public static uint ContainedItem = 0x58; // <ContainedItem>k__BackingField
+            public static uint ID            = 0x68; // <ID>k__BackingField
+        }
+
+        public readonly partial struct LootItem
+        {
+            public static uint Template = 0x78; // EFT.InventoryLogic.Item <Template>k__BackingField
+        }
+
+        public readonly partial struct ItemTemplate
+        {
+            public static uint _id = 0x110; // <_id>k__BackingField (MongoID valuetype)
         }
 
         // ── ObservedMovementController rotation ──────────────────────────────
@@ -94,6 +127,8 @@ namespace SDK
             public static uint GameWorld        = 0x640;  // EFT.Player [12002] → GameWorld ptr
             public static uint MovementContext  = 0x70;   // <MovementContext>k__BackingField
             public static uint _playerLookRaycastTransform = 0xA88; // EFT.Player._playerLookRaycastTransform
+            // Fallback from EFT-silk; runtime IL2CPP dump will overwrite.
+            public static uint _inventoryController = 0x980;
         }
 
         // ── MovementContext (EFT.MovementContext [12338]) ────────────────────
@@ -155,5 +190,34 @@ namespace SDK
 
             public override string ToString() => $"({X:F2}, {Y:F2}, {Z:F2})";
         }
+
+        /// <summary>
+        /// EFT.MongoID Struct
+        /// </summary>
+        [StructLayout(LayoutKind.Explicit, Pack = 8)]
+        public readonly struct MongoID
+        {
+            [FieldOffset(0x0)]
+            private readonly uint _timeStamp;
+            [FieldOffset(0x8)]
+            private readonly ulong _counter;
+            [FieldOffset(0x10)]
+            private readonly ulong _stringID;
+
+            public readonly ulong StringID => _stringID;
+        }
+    }
+
+    // ── Arena Armband -> TeamID mapping ──────────────────────────────────────
+    // Mirrors the reference example; values are stable template GUIDs.
+    public enum ArmbandColorType
+    {
+        red     = 0,
+        fuchsia = 1,
+        yellow  = 2,
+        green   = 3,
+        azure   = 4,
+        white   = 5,
+        blue    = 6,
     }
 }

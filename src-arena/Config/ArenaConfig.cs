@@ -53,6 +53,12 @@ namespace eft_dma_radar.Arena.Config
         [JsonPropertyName("showNames")]
         public bool ShowNames { get; set; } = true;
 
+        [JsonPropertyName("showTeamTag")]
+        public bool ShowTeamTag { get; set; } = false;
+
+        [JsonPropertyName("showHeightDiff")]
+        public bool ShowHeightDiff { get; set; } = true;
+
         [JsonPropertyName("showGrid")]
         public bool ShowGrid { get; set; } = true;
 

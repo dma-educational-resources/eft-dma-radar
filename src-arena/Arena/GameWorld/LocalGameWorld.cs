@@ -81,6 +81,9 @@ namespace eft_dma_radar.Arena.GameWorld
         public static LocalGameWorld Create(CancellationToken ct)
         {
             WaitForCooldown(ct);
+            // Cooldown has elapsed — clear the stale-base guard so we can reattach
+            // to the same GameWorld instance that the next Arena match reuses.
+            Interlocked.Exchange(ref _lastDisposedBase, 0);
 
             var searchSw = Stopwatch.StartNew();
             bool firstScan = true;
@@ -362,16 +365,12 @@ namespace eft_dma_radar.Arena.GameWorld
 
         /// <summary>
         /// Finds the ClientLocalGameWorld instance.
-        /// Primary: IL2CPP path — GamePlayerOwner.static_fields → _myPlayer → GameWorld.
-        /// Fallback: GOM name-based scan.
+        /// IL2CPP path only: GamePlayerOwner.static_fields → _myPlayer → GameWorld.
         /// Returns 0 if not found.
         /// </summary>
         private static ulong FindGameWorld(bool verbose = false)
         {
-            if (TryGetGameWorldViaIL2CPP(out var gameWorld))
-                return gameWorld;
-
-            return FindGameWorldViaGOM(verbose);
+            return TryGetGameWorldViaIL2CPP(out var gameWorld) ? gameWorld : 0;
         }
 
         /// <summary>
@@ -443,63 +442,6 @@ namespace eft_dma_radar.Arena.GameWorld
             }
 
             return 0;
-        }
-
-        // ────────────────────────────────────────────────────────────────
-        // GOM FALLBACK — Name-based scan
-        // ────────────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Scans the GOM (Game Object Manager) for a GameObject named "GameWorld"
-        /// and walks its component chain to find the ClientLocalGameWorld instance.
-        /// </summary>
-        private static ulong FindGameWorldViaGOM(bool verbose = true)
-        {
-            // Primary: look for "GameWorld" named GameObject
-            var gameObject = GOM.GetGameObjectByName("GameWorld", logCount: verbose);
-            if (verbose)
-                Log.WriteLine($"[LocalGameWorld] GOM 'GameWorld' object = 0x{gameObject:X}");
-
-            if (gameObject != 0)
-            {
-                // Walk: GameObject → ComponentArray.ArrayBase → entry[0] → Comp_ObjectClass
-                if (Memory.TryReadPtr(gameObject + UnityOffsets.GO_Components, out var arrayBase, false))
-                {
-                    if (verbose)
-                        Log.WriteLine($"[LocalGameWorld] ComponentArray.ArrayBase = 0x{arrayBase:X}");
-
-                    // entry[0] Component at arrayBase + 0x8
-                    if (Memory.TryReadPtr(arrayBase + 0x8, out var component, false)
-                        && Memory.TryReadPtr(component + UnityOffsets.Comp_ObjectClass, out var objectClass, false))
-                    {
-                        if (verbose)
-                            Log.WriteLine($"[LocalGameWorld] GameWorld component[0] objectClass = 0x{objectClass:X}");
-                        return objectClass;
-                    }
-                    if (verbose)
-                        Log.WriteLine("[LocalGameWorld] 'GameWorld' component[0] walk failed — trying component[1]");
-
-                    // entry[1] at arrayBase + 0x18
-                    if (Memory.TryReadPtr(arrayBase + 0x18, out var comp1, false)
-                        && Memory.TryReadPtr(comp1 + UnityOffsets.Comp_ObjectClass, out var objClass1, false))
-                    {
-                        if (verbose)
-                            Log.WriteLine($"[LocalGameWorld] GameWorld component[1] objectClass = 0x{objClass1:X}");
-                        return objClass1;
-                    }
-                }
-                if (verbose)
-                    Log.WriteLine("[LocalGameWorld] 'GameWorld' object found but component walk failed entirely");
-            }
-
-            // Fallback: search by IL2CPP class name
-            if (verbose)
-                Log.WriteLine("[LocalGameWorld] Falling back to FindBehaviourByClassName('ClientLocalGameWorld')");
-            GOM.ClearCache();
-            var result = GOM.FindBehaviourByClassName("ClientLocalGameWorld", logCount: verbose);
-            if (verbose)
-                Log.WriteLine($"[LocalGameWorld] FindBehaviourByClassName result = 0x{result:X}");
-            return result;
         }
 
         private static string ReadMapID(ulong gameWorld)

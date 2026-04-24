@@ -527,6 +527,13 @@ namespace eft_dma_radar.Silk.Config
         public bool LootShowWishlist { get; set; } = true;
 
         /// <summary>
+        /// Show loose quest items on the radar (items flagged with
+        /// <c>ItemTemplate.QuestItem</c> such as pocket watches, Jaeger's letter, etc.).
+        /// Independent of <see cref="ShowQuests"/> which controls active-quest highlighting.
+        /// </summary>
+        public bool LootShowQuestItems { get; set; } = true;
+
+        /// <summary>
         /// Quick filter: when enabled, only Important (tier ≥ 1), wishlisted,
         /// quest-required, or category-toggled items are shown — all price-only
         /// loot below the importance threshold is hidden regardless of LootMinPrice.

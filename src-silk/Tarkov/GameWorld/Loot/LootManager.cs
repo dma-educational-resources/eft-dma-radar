@@ -274,6 +274,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// </summary>
         private static void ReadLootAndCorpses(MemList<ulong> ptrs, out List<LootItem> lootResult, out List<LootCorpse> corpseResult, out List<LootContainer> containerResult, out List<LootAirdrop> airdropResult)
         {
+            lootResult = [];
+            corpseResult = [];
+            containerResult = [];
+            airdropResult = [];
+
             // Pending items collected during Phase 1 scatter callbacks
             var pendingLoot = new List<PendingLoot>(ptrs.Count);
             var pendingCorpses = new List<PendingCorpse>();
@@ -349,17 +354,51 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                     };
                 }
 
-                map.Execute();
+                try
+                {
+                    map.Execute();
+                }
+                catch (Exception ex)
+                {
+                    // Phase 1 resolves the pointer chains; if it fails the pending lists are
+                    // typically incomplete. Log and fall through so any partially-collected
+                    // items can still be resolved in Phase 2 — better than blanking the radar.
+                    Log.WriteRateLimited(AppLogLevel.Warning, "loot_phase1_fail", TimeSpan.FromSeconds(5),
+                        $"[LootManager] Phase1 scatter failed: {ex.Message}");
+                }
                 }
 
                 Log.WriteRateLimited(AppLogLevel.Debug, "loot_phase1", TimeSpan.FromSeconds(10),
                     $"[LootManager] Phase1: list={ptrs.Count} loot={pendingLoot.Count} corpses={pendingCorpses.Count} containers={pendingContainers.Count} airdrops={pendingAirdrops.Count}");
 
                 // ── Phase 2: Batched transform + BSG ID resolution ──────────────────
-            lootResult = ResolveLootBatched(pendingLoot);
-            corpseResult = ResolveCorpsesBatched(pendingCorpses);
-            containerResult = ResolveContainersBatched(pendingContainers);
-            airdropResult = ResolveAirdropsBatched(pendingAirdrops);
+            // Each category is resolved independently; a transient scatter failure in one
+            // category must NOT blank the others. Exceptions from any single Resolve* call
+            // are swallowed so partial snapshots can still be returned to the caller.
+            try { lootResult = ResolveLootBatched(pendingLoot); }
+            catch (Exception ex)
+            {
+                Log.WriteRateLimited(AppLogLevel.Warning, "loot_resolve_phase_fail", TimeSpan.FromSeconds(5),
+                    $"[LootManager] Loot resolve phase failed: {ex.Message}");
+            }
+            try { corpseResult = ResolveCorpsesBatched(pendingCorpses); }
+            catch (Exception ex)
+            {
+                Log.WriteRateLimited(AppLogLevel.Warning, "corpse_resolve_phase_fail", TimeSpan.FromSeconds(5),
+                    $"[LootManager] Corpse resolve phase failed: {ex.Message}");
+            }
+            try { containerResult = ResolveContainersBatched(pendingContainers); }
+            catch (Exception ex)
+            {
+                Log.WriteRateLimited(AppLogLevel.Warning, "container_resolve_phase_fail", TimeSpan.FromSeconds(5),
+                    $"[LootManager] Container resolve phase failed: {ex.Message}");
+            }
+            try { airdropResult = ResolveAirdropsBatched(pendingAirdrops); }
+            catch (Exception ex)
+            {
+                Log.WriteRateLimited(AppLogLevel.Warning, "airdrop_resolve_phase_fail", TimeSpan.FromSeconds(5),
+                    $"[LootManager] Airdrop resolve phase failed: {ex.Message}");
+            }
 
             Log.WriteRateLimited(AppLogLevel.Debug, "loot_phase2", TimeSpan.FromSeconds(10),
                 $"[LootManager] Phase2: loot={lootResult.Count}/{pendingLoot.Count} corpses={corpseResult.Count}/{pendingCorpses.Count} containers={containerResult.Count}/{pendingContainers.Count} airdrops={airdropResult.Count}/{pendingAirdrops.Count}");
@@ -370,7 +409,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// <summary>
         /// Intermediate loot data collected during Phase 1 scatter — no serial DMA reads here.
         /// </summary>
-        private readonly record struct PendingLoot(ulong TransformInternal, ulong BsgIdStringAddr);
+        private readonly record struct PendingLoot(
+            ulong TransformInternal,
+            ulong BsgIdStringAddr,
+            bool IsQuestItem,
+            ulong ShortNameUnityString);
 
         /// <summary>
         /// Intermediate corpse data collected during Phase 1 scatter — no serial DMA reads here.
@@ -416,6 +459,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 
                     round6[i].AddEntry<MemPointer>(11, t2 + 0x10);
                     round6[i].AddEntry<Types.MongoID>(12, template + Offsets.ItemTemplate._id);
+                    round6[i].AddEntry<bool>(17, template + Offsets.ItemTemplate.QuestItem);
+                    round6[i].AddEntry<MemPointer>(18, template + Offsets.ItemTemplate.ShortName);
 
                     round6[i].Callbacks += x6 =>
                     {
@@ -429,7 +474,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                         if (!((ulong)transformInternal).IsValidVirtualAddress())
                             return;
 
-                        pending.Add(new PendingLoot(transformInternal, mongoId.StringID));
+                        x6.TryGetResult<bool>(17, out var isQuestItem);
+                        x6.TryGetResult<MemPointer>(18, out var shortNamePtr);
+
+                        pending.Add(new PendingLoot(transformInternal, mongoId.StringID, isQuestItem, shortNamePtr));
                     };
                 };
             };
@@ -589,6 +637,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             var hierarchies = new ulong[pending.Count];
             var indices = new int[pending.Count];
             var bsgIds = new string?[pending.Count];
+            var shortNames = new string?[pending.Count];
             var verticesPtrs = new ulong[pending.Count];
             var indicesPtrs = new ulong[pending.Count];
 
@@ -604,6 +653,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                     s1.PrepareReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset);
                     // Unity string: length at +0x10 (int), chars at +0x14 (UTF-16)
                     s1.PrepareRead(pending[i].BsgIdStringAddr + 0x14, 128);
+
+                    // Quest items rarely exist in the market database — read ShortName
+                    // so we can synthesize a display name for them.
+                    if (pending[i].IsQuestItem && pending[i].ShortNameUnityString.IsValidVirtualAddress())
+                        s1.PrepareRead(pending[i].ShortNameUnityString + 0x14, 128);
                 }
                 s1.Execute();
 
@@ -613,6 +667,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                     s1.ReadValue<ulong>(ti + UnityOffsets.TransformAccess.HierarchyOffset, out hierarchies[i]);
                     s1.ReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset, out indices[i]);
                     bsgIds[i] = s1.ReadString(pending[i].BsgIdStringAddr + 0x14, 128, Encoding.Unicode);
+                    if (pending[i].IsQuestItem && pending[i].ShortNameUnityString.IsValidVirtualAddress())
+                        shortNames[i] = s1.ReadString(pending[i].ShortNameUnityString + 0x14, 128, Encoding.Unicode);
                 }
             }
 
@@ -666,8 +722,30 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                         if (bsgId.Length == 0)
                             continue;
 
-                        if (!EftDataManager.AllItems.TryGetValue(bsgId, out var marketItem))
-                            continue;
+                        bool isQuestItem = pending[i].IsQuestItem;
+                        TarkovMarketItem? marketItem;
+                        if (!EftDataManager.AllItems.TryGetValue(bsgId, out marketItem))
+                        {
+                            if (!isQuestItem)
+                                continue;
+
+                            // Quest items are typically absent from the market DB. Synthesize a
+                            // minimal TarkovMarketItem from the short name we already scattered.
+                            var rawShort = shortNames[i];
+                            string shortName = "Quest Item";
+                            if (!string.IsNullOrEmpty(rawShort))
+                            {
+                                int snt = rawShort.IndexOf('\0');
+                                var s = snt >= 0 ? rawShort[..snt] : rawShort;
+                                if (s.Length > 0) shortName = s;
+                            }
+                            marketItem = new TarkovMarketItem
+                            {
+                                BsgId = bsgId,
+                                Name = shortName,
+                                ShortName = $"Q_{shortName}",
+                            };
+                        }
 
                         if (!verticesPtrs[i].IsValidVirtualAddress() || !indicesPtrs[i].IsValidVirtualAddress())
                             continue;
@@ -687,7 +765,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                             if (pos == Vector3.Zero)
                                 continue;
 
-                            var item = new LootItem(marketItem, pos);
+                            var item = new LootItem(marketItem, pos) { IsQuestItem = isQuestItem };
                             item.RefreshImportance();
                             result.Add(item);
                         }
