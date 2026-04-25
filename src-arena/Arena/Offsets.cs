@@ -127,8 +127,9 @@ namespace SDK
             public static uint GameWorld        = 0x640;  // EFT.Player [12002] → GameWorld ptr
             public static uint MovementContext  = 0x70;   // <MovementContext>k__BackingField
             public static uint _playerLookRaycastTransform = 0xA88; // EFT.Player._playerLookRaycastTransform
-            // Fallback from EFT-silk; runtime IL2CPP dump will overwrite.
-            public static uint _inventoryController = 0x980;
+            // Arena-verified via runtime offset auto-probe (see RegisteredPlayers.ProbeLocalInventoryControllerOffset).
+            // EFT-mainline value here is 0x980; Arena's Player layout has it at 0x9E0.
+            public static uint _inventoryController = 0x9E0;
         }
 
         // ── MovementContext (EFT.MovementContext [12338]) ────────────────────

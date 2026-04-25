@@ -351,8 +351,14 @@ namespace eft_dma_radar.Arena.UI
             var skel = player.Skeleton;
             bool haveSkel = skel is not null && skel.IsInitialized;
 
+            // In Arena, Player.Position comes from the hierarchy's cached world position,
+            // which is the rig root at FEET level (the Aimview widget confirms this by
+            // adding AimviewEyeHeight to it for the local-player camera origin). So fall
+            // back to feet=Position and head=Position+up*PlayerHeight whenever bones can't
+            // give us a sane head/feet pair — otherwise the box sinks underground.
             Vector3 head, feet;
-            var eye = player.Position;
+            var feetFromPos = player.Position;
+            var headFromPos = new Vector3(feetFromPos.X, feetFromPos.Y + PlayerHeightFallback, feetFromPos.Z);
 
             if (haveSkel)
             {
@@ -361,7 +367,7 @@ namespace eft_dma_radar.Arena.UI
                 var rf = skel.GetBonePosition(Bones.HumanRFoot);
                 var pv = skel.GetBonePosition(Bones.HumanPelvis);
 
-                head = (hb.HasValue && IsFinite(hb.Value)) ? hb.Value : eye;
+                head = (hb.HasValue && IsFinite(hb.Value)) ? hb.Value : headFromPos;
 
                 Vector3? footCand = null;
                 if (lf.HasValue && IsFinite(lf.Value) && rf.HasValue && IsFinite(rf.Value))
@@ -371,19 +377,21 @@ namespace eft_dma_radar.Arena.UI
                 else if (pv.HasValue && IsFinite(pv.Value))
                     footCand = new Vector3(pv.Value.X, pv.Value.Y - 0.95f, pv.Value.Z);
 
-                feet = footCand ?? new Vector3(eye.X, eye.Y - PlayerHeightFallback, eye.Z);
+                feet = footCand ?? feetFromPos;
 
                 float hd = head.Y - feet.Y;
                 if (hd < 0.5f || hd > 3.0f)
                 {
-                    head = eye;
-                    feet = new Vector3(eye.X, eye.Y - PlayerHeightFallback, eye.Z);
+                    // Bones disagree with each other (mid-respawn, partial scatter, etc.).
+                    // Fall back to the realtime position as feet, head = feet + height.
+                    head = headFromPos;
+                    feet = feetFromPos;
                 }
             }
             else
             {
-                head = eye;
-                feet = new Vector3(eye.X, eye.Y - PlayerHeightFallback, eye.Z);
+                head = headFromPos;
+                feet = feetFromPos;
             }
 
             if (!CameraManager.WorldToScreen(ref head, out var headScr, true, true)) return;

@@ -103,10 +103,18 @@ namespace eft_dma_radar.Arena.Unity
             int index,
             int maxIterations = 4096)
         {
+            // Arena respawns can leave a cached TransformIndex that points past a freshly-
+            // reallocated (smaller) hierarchy. Guard explicitly so we surface a sentinel
+            // instead of throwing IndexOutOfRangeException that the caller would have to
+            // catch as a first-chance exception on every realtime tick.
+            if ((uint)index >= (uint)vertices.Length || (uint)index >= (uint)parentIndices.Length)
+                return new Vector3(float.NaN, float.NaN, float.NaN);
+
             var pos = vertices[index].T;
             int parent = parentIndices[index];
             int iter = 0;
-            while (parent >= 0 && parent < vertices.Length && iter++ < maxIterations)
+            int maxParent = Math.Min(vertices.Length, parentIndices.Length);
+            while ((uint)parent < (uint)maxParent && iter++ < maxIterations)
             {
                 ref readonly var p = ref vertices[parent];
                 pos = Vector3.Transform(pos, p.Q);

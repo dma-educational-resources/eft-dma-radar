@@ -272,18 +272,15 @@ namespace eft_dma_radar.Arena.GameWorld
                         if (!scatter.ReadSpan<TrsX>(entry.VerticesAddr, vertices))
                             continue;
 
-                        try
+                        var indices = entry.CachedIndices;
+                        if (indices is null || entry.TransformIndex >= indices.Length)
+                            continue;
+
+                        var worldPos = TrsX.ComputeWorldPosition(vertices, indices, entry.TransformIndex);
+                        if (float.IsFinite(worldPos.X) && float.IsFinite(worldPos.Y) && float.IsFinite(worldPos.Z))
                         {
-                            var worldPos = TrsX.ComputeWorldPosition(vertices, entry.CachedIndices!, entry.TransformIndex);
-                            if (float.IsFinite(worldPos.X) && float.IsFinite(worldPos.Y) && float.IsFinite(worldPos.Z))
-                            {
-                                entry.WorldPosition = worldPos;
-                                entry.HasPosition = true;
-                            }
-                        }
-                        catch
-                        {
-                            // Skip individual bone compute failures.
+                            entry.WorldPosition = worldPos;
+                            entry.HasPosition = true;
                         }
                     }
                     finally
