@@ -108,6 +108,17 @@ namespace eft_dma_radar.Arena.GameWorld
         {
             IsReady = false;
             LastUpdateUtc = default;
+
+            // Match teardown: the cached EFT.CameraControl.CameraManager.Instance
+            // pointer almost certainly points at a now-freed singleton. Force the
+            // next match to re-discover it (and the FPS/Optic cameras) from
+            // scratch — otherwise TryResolveCameras keeps trying the stale pointer
+            // forever, the camera never goes READY, and skeleton init (gated on
+            // CameraManager.IsReady) never runs, breaking ESP bones for the round.
+            _eftCameraManagerInstance = default;
+            _lastFpsCamera = default;
+            HasOpticCamera = false;
+            Volatile.Write(ref _refreshRequested, 0);
         }
 
         /// <summary>
@@ -542,6 +553,22 @@ namespace eft_dma_radar.Arena.GameWorld
             {
                 Log.WriteLine($"[CameraManager] Using CameraManager.Instance — FPS: 0x{fpsCamera:X}, Optic: {(opticCamera != 0 ? $"0x{opticCamera:X}" : "deferred")}");
                 return true;
+            }
+
+            // The cached singleton pointer can be stale at the start of a new match
+            // (the previous instance was torn down on match end). Re-find it once
+            // and retry before falling back to the slower AllCameras name scan —
+            // otherwise we may sit in "FPS camera not resolvable yet" for the
+            // entire camera-init budget and skeletons never get created.
+            if (_eftCameraManagerInstance.IsValidVirtualAddress())
+            {
+                _eftCameraManagerInstance = FindCameraManagerInstance();
+                if (_eftCameraManagerInstance.IsValidVirtualAddress() &&
+                    TryResolveViaCameraManagerInstance(out fpsCamera, out opticCamera))
+                {
+                    Log.WriteLine($"[CameraManager] Using CameraManager.Instance (re-resolved) — FPS: 0x{fpsCamera:X}, Optic: {(opticCamera != 0 ? $"0x{opticCamera:X}" : "deferred")}");
+                    return true;
+                }
             }
 
             // Path 2: Unity AllCameras name search
