@@ -62,6 +62,39 @@ namespace eft_dma_radar.Arena.Config
         [JsonPropertyName("showGrid")]
         public bool ShowGrid { get; set; } = true;
 
+        // ── Aimview ───────────────────────────────────────────────────────────
+
+        [JsonPropertyName("aimviewEnabled")]
+        public bool AimviewEnabled { get; set; } = false;
+
+        /// <summary>If true, use the live game ViewMatrix via CameraManager.WorldToScreen.</summary>
+        [JsonPropertyName("aimviewUseAdvanced")]
+        public bool AimviewUseAdvanced { get; set; } = true;
+
+        /// <summary>Hide AI players in the Aimview widget.</summary>
+        [JsonPropertyName("aimviewHideAI")]
+        public bool AimviewHideAI { get; set; } = false;
+
+        /// <summary>Show name + distance labels under each player dot.</summary>
+        [JsonPropertyName("aimviewShowLabels")]
+        public bool AimviewShowLabels { get; set; } = true;
+
+        /// <summary>Draw skeleton bone segments on top of player dots when available (advanced mode only).</summary>
+        [JsonPropertyName("aimviewDrawSkeletons")]
+        public bool AimviewDrawSkeletons { get; set; } = true;
+
+        /// <summary>Maximum render distance (meters).</summary>
+        [JsonPropertyName("aimviewMaxDistance")]
+        public float AimviewMaxDistance { get; set; } = 300f;
+
+        /// <summary>Synthetic-mode zoom factor (only used when advanced mode is off / unavailable).</summary>
+        [JsonPropertyName("aimviewZoom")]
+        public float AimviewZoom { get; set; } = 1.0f;
+
+        /// <summary>Eye height offset above the local player root (meters).</summary>
+        [JsonPropertyName("aimviewEyeHeight")]
+        public float AimviewEyeHeight { get; set; } = 1.5f;
+
         // ── Game / Camera ─────────────────────────────────────────────────────
 
         /// <summary>Width of the game's render resolution (used by CameraManager W2S).</summary>

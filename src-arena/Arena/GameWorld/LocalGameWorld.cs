@@ -238,6 +238,9 @@ namespace eft_dma_radar.Arena.GameWorld
             _registrationWorker = null;
             _cameraWorker = null;
 
+            // Reset camera readiness so the next match logs a fresh READY confirmation.
+            CameraManager.ResetReadiness();
+
             Interlocked.Exchange(ref _lastDisposedBase, _base);
             BeginCooldown();
             Log.WriteLine($"[LocalGameWorld] Disposed (map: {MapID}).");
@@ -282,7 +285,11 @@ namespace eft_dma_radar.Arena.GameWorld
 
             // Wait until local player is discovered before bothering with camera.
             if (_registeredPlayers.LocalPlayer is null)
+            {
+                Log.WriteRateLimited(AppLogLevel.Info, "cam_wait_lp", TimeSpan.FromSeconds(5),
+                    "[CameraWorker] Waiting for LocalPlayer before camera init...");
                 return;
+            }
 
             try
             {
@@ -293,6 +300,14 @@ namespace eft_dma_radar.Arena.GameWorld
                 }
 
                 _cameraManager.UpdateCamera();
+
+                // Skeleton init + bone scatter ride along with the camera worker so
+                // they never contend with the realtime position/rotation scatter.
+                if (CameraManager.IsReady)
+                {
+                    _registeredPlayers.BatchInitSkeletons();
+                    _registeredPlayers.BatchUpdateSkeletons();
+                }
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
@@ -338,13 +353,13 @@ namespace eft_dma_radar.Arena.GameWorld
 
             if (_cameraManager is not null)
             {
-                Log.WriteLine($"[CameraWorker] CameraManager initialized on attempt #{_cameraRetryAttempts}.");
+                Log.WriteLine($"[CameraWorker] CameraManager initialized on attempt #{_cameraRetryAttempts} (FPSCamera=0x{_cameraManager.FPSCamera:X}).");
             }
             else
             {
                 var remaining = _cameraRetryDeadline - now;
-                Log.WriteRateLimited(AppLogLevel.Debug, "cam_retry", TimeSpan.FromSeconds(10),
-                    $"[CameraWorker] CameraManager retry #{_cameraRetryAttempts} (next in {interval.TotalSeconds:F0}s, {remaining.TotalSeconds:F0}s budget left)...");
+                Log.WriteRateLimited(AppLogLevel.Info, "cam_retry", TimeSpan.FromSeconds(3),
+                    $"[CameraWorker] FPS camera not resolvable yet — attempt #{_cameraRetryAttempts} (next in {interval.TotalSeconds:F0}s, {remaining.TotalSeconds:F0}s budget left).");
             }
         }
 
@@ -462,7 +477,7 @@ namespace eft_dma_radar.Arena.GameWorld
 
         #region Cooldown Helpers
 
-        private static void BeginCooldown(int seconds = 12)
+        private static void BeginCooldown(int seconds = 3)
         {
             Interlocked.Exchange(ref _matchCooldownUntilTicks,
                 DateTime.UtcNow.AddSeconds(seconds).Ticks);

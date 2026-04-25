@@ -323,6 +323,7 @@ namespace eft_dma_radar.Arena.UI
             {
                 DrawMainMenuBar();
                 DrawStatusBar();
+                DrawAimviewWidget();
             }
             finally
             {
@@ -362,6 +363,46 @@ namespace eft_dma_radar.Arena.UI
 
                 bool g = Config.ShowGrid;
                 if (ImGui.MenuItem("\u25a6 Grid (no-map fallback)", null, g)) Config.ShowGrid = !g;
+
+                ImGui.Separator();
+
+                bool av = Config.AimviewEnabled;
+                if (ImGui.MenuItem("\u25a3 Aimview", null, av)) Config.AimviewEnabled = !av;
+
+                ImGui.Separator();
+
+                bool esp = EspWindow.IsOpen;
+                if (ImGui.MenuItem("\u25a0 ESP (fullscreen)", "Esc to close", esp))
+                    EspWindow.Toggle();
+
+                if (av && ImGui.BeginMenu("Aimview Options"))
+                {
+                    bool adv = Config.AimviewUseAdvanced;
+                    if (ImGui.MenuItem("Advanced (game camera)", null, adv)) Config.AimviewUseAdvanced = !adv;
+
+                    bool hideAI = Config.AimviewHideAI;
+                    if (ImGui.MenuItem("Hide AI", null, hideAI)) Config.AimviewHideAI = !hideAI;
+
+                    bool lbl = Config.AimviewShowLabels;
+                    if (ImGui.MenuItem("Show Labels", null, lbl)) Config.AimviewShowLabels = !lbl;
+
+                    float dist = Config.AimviewMaxDistance;
+                    if (ImGui.SliderFloat("Max Distance", ref dist, 25f, 1000f, "%.0f m"))
+                        Config.AimviewMaxDistance = dist;
+
+                    if (!Config.AimviewUseAdvanced)
+                    {
+                        float zoom = Config.AimviewZoom;
+                        if (ImGui.SliderFloat("Zoom", ref zoom, 0.5f, 6f, "%.2fx"))
+                            Config.AimviewZoom = zoom;
+
+                        float eye = Config.AimviewEyeHeight;
+                        if (ImGui.SliderFloat("Eye Height", ref eye, 0f, 2.5f, "%.2f m"))
+                            Config.AimviewEyeHeight = eye;
+                    }
+
+                    ImGui.EndMenu();
+                }
 
                 ImGui.EndMenu();
             }

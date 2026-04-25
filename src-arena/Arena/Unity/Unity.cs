@@ -24,9 +24,12 @@ namespace eft_dma_radar.Arena.Unity
         public static class ObjectClass { public const uint MonoBehaviourOffset = 0x10; }
         public static class Camera
         {
-            public static uint ViewMatrix = 0x128;
-            public static uint FOV = 0x1A8;
-            public static uint AspectRatio = 0x518;
+            // Arena Unity 6000.3.6.1f fallbacks (sig-scan still runs first):
+            //   ViewMatrix: Camera::GetWorldToCameraMatrix body -> `lea rax, [rcx+88h]`
+            //   FOV:        Camera_CUSTOM_GetGateFittedFieldOfView -> 2nd movss `[rcx+188h]`
+            public static uint ViewMatrix = 0x88;
+            public static uint FOV = 0x188;
+            public static uint AspectRatio = 0x4F8;
             public const uint DerefIsAddedOffset = 0x35;
         }
         public static class List { public const uint ArrOffset = 0x10; public const uint ArrStartOffset = 0x20; }
@@ -65,6 +68,19 @@ namespace eft_dma_radar.Arena.Unity
             /// Cached world-space rotation (Quaternion x,y,z,w) at h+0xC0.
             /// </summary>
             public const uint WorldRotationOffset = 0xC0;
+
+            // ── Bone-chain offsets (used by per-player Skeleton) ──────────
+            // The hierarchy's cached world position at +0xB0 only describes the
+            // hierarchy's ROOT. Bones are joints inside the hierarchy; to compute
+            // their world positions we must walk the vertices/parent-index arrays.
+            // Arena Unity 6 layout — confirmed by live runtime pointer-classification
+            // dump across 5 players: +0x50 → TrsX[] (first entry is the idle
+            // sentinel <0,-1000,0>), +0xA0 → int[] parent indices (first entry = -1
+            // for root, branching pattern matches humanoid skeleton).
+            /// <summary>TransformHierarchy + X → pointer to parent-indices array (int[]).</summary>
+            public const uint IndicesOffset  = 0xA0;
+            /// <summary>TransformHierarchy + X → pointer to vertices array (TrsX[]).</summary>
+            public const uint VerticesOffset = 0x50;
         }
         public static class UnityAnimator { public const uint Speed = 0x4B0; }
     }

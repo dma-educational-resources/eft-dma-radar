@@ -12,7 +12,10 @@ namespace eft_dma_radar.Arena.Unity.IL2CPP
                 "eft-dma-radar-arena",
                 "il2cpp_offsets.json");
 
-        private const int CacheSchemaVersion = 1;
+        // Bump when static (non-dumped) offsets in SDK.Offsets change, so stale caches
+        // that captured the old source defaults are rejected on load.
+        //  v2: PlayerBody.SkeletonRootJoint 0x28 -> 0x30; DizSkinningSkeleton._values confirmed 0x30.
+        private const int CacheSchemaVersion = 2;
 
         private sealed class OffsetCache
         {

@@ -11,10 +11,12 @@ namespace eft_dma_radar.Arena.GameWorld
     /// Arena camera resolver and ViewMatrix/FOV reader.
     /// <para>
     /// Compared to the Tarkov implementation, Arena is intentionally simplified:
-    ///   • No ADS / scoped / optic camera handling (no <c>ProceduralWeaponAnimation</c>
-    ///     pipeline is wired into Arena).
     ///   • Resolution is purely Unity <c>AllCameras</c> + GameObject name search —
     ///     there is no <c>EFT.CameraControl.CameraManager.Instance</c> in Arena.
+    ///   • Both <c>FPS Camera</c> and (when present) <c>Optic Camera</c> /
+    ///     <c>BaseOpticCamera</c> are resolved from the AllCameras list. The optic
+    ///     camera is optional — it may not exist until the local player ADS
+    ///     through a scoped optic.
     /// </para>
     /// <para>
     /// Exposes a static <see cref="WorldToScreen"/> for the (future) ESP overlay.
@@ -26,6 +28,10 @@ namespace eft_dma_radar.Arena.GameWorld
 
         private static ulong _allCamerasAddr;
         private static bool _staticInitDone;
+
+        // -- EFT.CameraControl.CameraManager.Instance state ---------------------
+        private static ulong _eftCameraManagerInstance;
+        private static ulong _eftCameraManagerClassPtr;
 
         // -- Camera offset cache -------------------------------------------------
 
@@ -39,8 +45,11 @@ namespace eft_dma_radar.Arena.GameWorld
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         };
 
+        private const int CameraCacheSchemaVersion = 2;
+
         private sealed class CameraOffsetCache
         {
+            public int SchemaVersion { get; set; }
             public uint UnityPlayerTimestamp { get; set; }
             public uint UnityPlayerSizeOfImage { get; set; }
             public ulong AllCamerasRva { get; set; }
@@ -74,6 +83,30 @@ namespace eft_dma_radar.Arena.GameWorld
         private static float _jitterX;
         private static float _jitterY;
 
+        /// <summary>True once a valid ViewMatrix + FOV has been read at least once this match. Required for ESP/W2S.</summary>
+        public static bool IsReady { get; private set; }
+
+        /// <summary>Last successfully-read FOV (degrees).</summary>
+        public static float FieldOfView => _fov;
+
+        /// <summary>Last successfully-read aspect ratio.</summary>
+        public static float AspectRatio => _aspect;
+
+        /// <summary>Diagnostic: last view-matrix translation (projection's negated forward).</summary>
+        public static Vector3 ViewMatrixTranslation => _viewMatrix.Translation;
+
+        /// <summary>Diagnostic: true if the view matrix has a non-zero translation (i.e. usable for W2S).</summary>
+        public static bool HasUsableViewMatrix => _viewMatrix.Translation.LengthSquared() > 1e-6f;
+
+        /// <summary>UTC time of the last successful camera scatter read.</summary>
+        public static DateTime LastUpdateUtc { get; private set; }
+
+        internal static void ResetReadiness()
+        {
+            IsReady = false;
+            LastUpdateUtc = default;
+        }
+
         /// <summary>
         /// Update the Viewport dimensions for W2S calculations.
         /// Call once at CameraManager init or when config changes.
@@ -89,8 +122,14 @@ namespace eft_dma_radar.Arena.GameWorld
 
         #region Instance Fields
 
-        /// <summary>FPS Camera pointer.</summary>
-        public ulong FPSCamera { get; }
+        /// <summary>FPS Camera pointer (may be re-resolved at runtime if the in-game camera is rebuilt, e.g. after respawn).</summary>
+        public ulong FPSCamera { get; private set; }
+
+        /// <summary>Optic Camera pointer (0 if not currently resolvable — only created when ADS through a scope).</summary>
+        public ulong OpticCamera { get; private set; }
+
+        /// <summary>True if an optic camera is currently resolved and being read.</summary>
+        public static bool HasOpticCamera { get; private set; }
 
         #endregion
 
@@ -102,15 +141,25 @@ namespace eft_dma_radar.Arena.GameWorld
             {
                 _allCamerasAddr = default;
                 _staticInitDone = false;
+                _eftCameraManagerInstance = default;
+                _eftCameraManagerClassPtr = default;
                 IsActive = false;
+                IsReady = false;
+                HasOpticCamera = false;
+                LastUpdateUtc = default;
             };
         }
 
-        private CameraManager(ulong fpsCamera)
+        private CameraManager(ulong fpsCamera, ulong opticCamera)
         {
             FPSCamera = fpsCamera;
+            OpticCamera = opticCamera;
             IsActive = true;
-            Log.WriteLine($"[CameraManager] FPSCamera: 0x{FPSCamera:X}");
+            HasOpticCamera = opticCamera.IsValidVirtualAddress();
+            if (HasOpticCamera)
+                Log.WriteLine($"[CameraManager] FPSCamera: 0x{FPSCamera:X}  OpticCamera: 0x{OpticCamera:X}");
+            else
+                Log.WriteLine($"[CameraManager] FPSCamera: 0x{FPSCamera:X}  (no optic camera resolved yet)");
         }
 
         /// <summary>
@@ -119,10 +168,10 @@ namespace eft_dma_radar.Arena.GameWorld
         /// </summary>
         public static CameraManager? TryCreate()
         {
-            if (!TryResolveFpsCamera(out var fpsCam))
+            if (!TryResolveCameras(out var fpsCam, out var opticCam))
                 return null;
 
-            return new CameraManager(fpsCam);
+            return new CameraManager(fpsCam, opticCam);
         }
 
         /// <summary>
@@ -251,8 +300,18 @@ namespace eft_dma_radar.Arena.GameWorld
         /// </summary>
         public void UpdateCamera()
         {
-            if (!FPSCamera.IsValidVirtualAddress())
-                return;
+            // Detect a stale FPS camera (e.g. local player respawn rebuilt the
+            // FPS camera GameObject and our cached pointer now points at freed
+            // memory). Try to silently re-resolve before doing the scatter read.
+            if (!FPSCamera.IsValidVirtualAddress() || !ValidateCameraMatrix(FPSCamera))
+            {
+                if (!TryRefreshFpsCamera())
+                    return;
+            }
+
+            // Lazily resolve optic camera if it wasn't available at construction
+            // (e.g. the local player started ADS through a scope mid-match).
+            TryRefreshOpticCamera();
 
             ulong vmAddr = FPSCamera + Camera.ViewMatrix;
 
@@ -262,30 +321,394 @@ namespace eft_dma_radar.Arena.GameWorld
             scatter.PrepareReadValue<float>(FPSCamera + Camera.AspectRatio);
             scatter.Execute();
 
+            bool vmOk = false, fovOk = false, arOk = false;
+
             if (scatter.ReadValue<Matrix4x4>(vmAddr, out var vm))
             {
                 _viewMatrix.Update(ref vm);
                 _jitterX = _viewMatrix.JitterX;
                 _jitterY = _viewMatrix.JitterY;
+                vmOk = !float.IsNaN(vm.M11) && !(vm.M11 == 0f && vm.M22 == 0f && vm.M33 == 0f);
             }
 
             if (scatter.ReadValue<float>(FPSCamera + Camera.FOV, out var fov) && fov > 1f && fov < 180f)
+            {
                 _fov = fov;
+                fovOk = true;
+            }
 
             if (scatter.ReadValue<float>(FPSCamera + Camera.AspectRatio, out var aspect) && aspect > 0.1f && aspect < 5f)
+            {
                 _aspect = aspect;
+                arOk = true;
+            }
+
+            if (vmOk && fovOk && arOk)
+            {
+                LastUpdateUtc = DateTime.UtcNow;
+                if (!IsReady)
+                {
+                    IsReady = true;
+                    Log.WriteLine(
+                        $"[CameraManager] READY — FPSCamera=0x{FPSCamera:X} FOV={_fov:F1} AR={_aspect:F3} " +
+                        $"VM.T=<{_viewMatrix.Translation.X:F2},{_viewMatrix.Translation.Y:F2},{_viewMatrix.Translation.Z:F2}> " +
+                        $"jitter=<{_jitterX:F3},{_jitterY:F3}> viewport={ViewportWidth}x{ViewportHeight} — ESP enabled.");
+                }
+                else
+                {
+                    Log.WriteRateLimited(AppLogLevel.Info, "cam_heartbeat", TimeSpan.FromSeconds(15),
+                        $"[CameraManager] Heartbeat OK — FOV={_fov:F1} AR={_aspect:F3} " +
+                        $"T=<{_viewMatrix.Translation.X:F1},{_viewMatrix.Translation.Y:F1},{_viewMatrix.Translation.Z:F1}>");
+                }
+            }
+            else if (IsReady)
+            {
+                Log.WriteRateLimited(AppLogLevel.Warning, "cam_partial", TimeSpan.FromSeconds(5),
+                    $"[CameraManager] Partial read — vm={vmOk} fov={fovOk} ar={arOk} (FPSCamera=0x{FPSCamera:X})");
+
+                // All three reads failing usually means the FPS camera was
+                // rebuilt by the game (respawn / map transition). Re-resolve
+                // it from the singleton so we recover automatically.
+                if (!vmOk && !fovOk && !arOk)
+                    TryRefreshFpsCamera();
+            }
         }
 
         #endregion
 
         #region Camera Resolution
 
+        private DateTime _nextOpticProbeUtc;
+        private DateTime _nextFpsRefreshUtc;
+
         /// <summary>
-        /// Resolves the FPS camera via Unity AllCameras list + GameObject name search.
+        /// Re-resolves the FPS camera pointer when the cached one becomes stale
+        /// (e.g. local player respawn rebuilt the FPS camera GameObject). Rate-
+        /// limited to avoid hammering during transient read failures. Tries the
+        /// CameraManager.Instance singleton first, then falls back to the Unity
+        /// AllCameras name scan.
         /// </summary>
-        private static bool TryResolveFpsCamera(out ulong fpsCamera)
+        private bool TryRefreshFpsCamera()
+        {
+            var now = DateTime.UtcNow;
+            if (now < _nextFpsRefreshUtc)
+                return false;
+            _nextFpsRefreshUtc = now.AddMilliseconds(500);
+
+            // Try the singleton path first (cheap, direct field reads).
+            if (_eftCameraManagerInstance.IsValidVirtualAddress() &&
+                TryResolveViaCameraManagerInstance(out var fpsCam, out var opticCam) &&
+                fpsCam.IsValidVirtualAddress())
+            {
+                if (fpsCam != FPSCamera)
+                {
+                    Log.WriteLine($"[CameraManager] FPSCamera refreshed: 0x{FPSCamera:X} -> 0x{fpsCam:X} (via Instance)");
+                    FPSCamera = fpsCam;
+                    if (opticCam.IsValidVirtualAddress())
+                    {
+                        OpticCamera = opticCam;
+                        HasOpticCamera = true;
+                    }
+                }
+                return true;
+            }
+
+            // Singleton may have been rebuilt too — re-find it once and retry.
+            _eftCameraManagerInstance = FindCameraManagerInstance();
+            if (_eftCameraManagerInstance.IsValidVirtualAddress() &&
+                TryResolveViaCameraManagerInstance(out fpsCam, out opticCam) &&
+                fpsCam.IsValidVirtualAddress())
+            {
+                Log.WriteLine($"[CameraManager] FPSCamera refreshed: 0x{FPSCamera:X} -> 0x{fpsCam:X} (Instance re-resolved)");
+                FPSCamera = fpsCam;
+                if (opticCam.IsValidVirtualAddress())
+                {
+                    OpticCamera = opticCam;
+                    HasOpticCamera = true;
+                }
+                return true;
+            }
+
+            // Last resort: AllCameras name scan.
+            if (TryResolveViaAllCamerasByName(out fpsCam, out opticCam) && fpsCam.IsValidVirtualAddress())
+            {
+                Log.WriteLine($"[CameraManager] FPSCamera refreshed: 0x{FPSCamera:X} -> 0x{fpsCam:X} (via AllCameras)");
+                FPSCamera = fpsCam;
+                if (opticCam.IsValidVirtualAddress())
+                {
+                    OpticCamera = opticCam;
+                    HasOpticCamera = true;
+                }
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Tries to (re)acquire the optic camera periodically while the manager is
+        /// alive. The optic camera typically only exists while the local player is
+        /// aiming through a scoped optic, and may come and go many times per match.
+        /// </summary>
+        private void TryRefreshOpticCamera()
+        {
+            // Probe at most ~2x/sec to avoid hammering the AllCameras list.
+            var now = DateTime.UtcNow;
+            if (now < _nextOpticProbeUtc)
+                return;
+            _nextOpticProbeUtc = now.AddMilliseconds(500);
+
+            // If the current optic is still valid, keep it.
+            if (OpticCamera.IsValidVirtualAddress() && ValidateCameraMatrix(OpticCamera))
+            {
+                if (!HasOpticCamera)
+                {
+                    HasOpticCamera = true;
+                    Log.WriteLine($"[CameraManager] OpticCamera acquired: 0x{OpticCamera:X}");
+                }
+                return;
+            }
+
+            if (TryResolveOpticCamera(out var opticCam) && ValidateCameraMatrix(opticCam))
+            {
+                bool wasResolved = HasOpticCamera;
+                OpticCamera = opticCam;
+                HasOpticCamera = true;
+                if (!wasResolved)
+                    Log.WriteLine($"[CameraManager] OpticCamera acquired: 0x{OpticCamera:X}");
+            }            else if (HasOpticCamera)
+            {
+                Log.WriteLine($"[CameraManager] OpticCamera lost (was 0x{OpticCamera:X}).");
+                OpticCamera = 0;
+                HasOpticCamera = false;
+            }
+        }
+
+        /// <summary>
+        /// Multi-path resolver, mirroring the EFT-silk implementation:
+        ///   1) <c>EFT.CameraControl.CameraManager.Instance</c> (preferred —
+        ///      direct field read, no name scan, gives both FPS + Optic cameras).
+        ///   2) Unity <c>AllCameras</c> list + GameObject name search (fallback).
+        /// The optic camera is optional — it only exists while the local player
+        /// is aiming through a scoped optic.
+        /// </summary>
+        private static bool TryResolveCameras(out ulong fpsCamera, out ulong opticCamera)
+        {
+            // Path 1: EFT.CameraControl.CameraManager.Instance
+            if (!_eftCameraManagerInstance.IsValidVirtualAddress())
+                _eftCameraManagerInstance = FindCameraManagerInstance();
+
+            if (_eftCameraManagerInstance.IsValidVirtualAddress() &&
+                TryResolveViaCameraManagerInstance(out fpsCamera, out opticCamera))
+            {
+                Log.WriteLine($"[CameraManager] Using CameraManager.Instance — FPS: 0x{fpsCamera:X}, Optic: {(opticCamera != 0 ? $"0x{opticCamera:X}" : "deferred")}");
+                return true;
+            }
+
+            // Path 2: Unity AllCameras name search
+            if (TryResolveViaAllCamerasByName(out fpsCamera, out opticCamera))
+            {
+                Log.WriteLine("[CameraManager] Using Unity AllCameras fallback.");
+                return true;
+            }
+
+            fpsCamera = 0;
+            opticCamera = 0;
+            return false;
+        }
+
+        /// <summary>
+        /// Reads the FPS + Optic cameras directly from <c>EFT.CameraControl.CameraManager.Instance</c>.
+        /// Optic camera is optional.
+        /// </summary>
+        private static bool TryResolveViaCameraManagerInstance(out ulong fpsCamera, out ulong opticCamera)
         {
             fpsCamera = 0;
+            opticCamera = 0;
+
+            if (!_eftCameraManagerInstance.IsValidVirtualAddress())
+                return false;
+
+            // FPS camera (required)
+            if (!Memory.TryReadPtr(_eftCameraManagerInstance + SDK.Offsets.EFTCameraManager.Camera, out var fpsCameraRef, false))
+                return false;
+
+            if (!TryReadObjectClassName(fpsCameraRef, out var name, 32) ||
+                !string.Equals(name, "Camera", StringComparison.Ordinal))
+                return false;
+
+            if (!Memory.TryReadPtr(fpsCameraRef + ObjectClass.MonoBehaviourOffset, out fpsCamera, false))
+                return false;
+
+            if (!ValidateCameraMatrix(fpsCamera))
+            {
+                fpsCamera = 0;
+                return false;
+            }
+
+            // Optic camera (optional)
+            TryResolveOpticCameraFromInstance(out opticCamera);
+            return true;
+        }
+
+        /// <summary>
+        /// Best-effort optic camera resolution from <c>CameraManager.Instance</c>.
+        /// Failures are silently ignored — optic camera is optional and only
+        /// exists while the player is ADS through a scope.
+        /// </summary>
+        private static bool TryResolveOpticCameraFromInstance(out ulong opticCamera)
+        {
+            opticCamera = 0;
+
+            if (!_eftCameraManagerInstance.IsValidVirtualAddress())
+                return false;
+
+            if (!Memory.TryReadPtr(_eftCameraManagerInstance + SDK.Offsets.EFTCameraManager.OpticCameraManager, out var opticCameraManager, false) ||
+                !opticCameraManager.IsValidVirtualAddress())
+                return false;
+
+            if (!Memory.TryReadPtr(opticCameraManager + SDK.Offsets.OpticCameraManager.Camera, out var opticCameraRef, false) ||
+                !opticCameraRef.IsValidVirtualAddress())
+                return false;
+
+            if (!TryReadObjectClassName(opticCameraRef, out var name, 32) ||
+                !string.Equals(name, "Camera", StringComparison.Ordinal))
+                return false;
+
+            if (!Memory.TryReadPtr(opticCameraRef + ObjectClass.MonoBehaviourOffset, out opticCamera, false))
+                return false;
+
+            return true;
+        }
+
+        /// <summary>
+        /// Reads a Unity ObjectClass-style name (objectClass -> [+0x0] -> [+0x10] -> cstr).
+        /// </summary>
+        private static bool TryReadObjectClassName(ulong objectClassPtr, out string? name, int maxLen)
+        {
+            name = null;
+            if (!objectClassPtr.IsValidVirtualAddress())
+                return false;
+
+            if (!Memory.TryReadPtrChain(objectClassPtr, ObjClass_ToNamePtr, out var namePtr, false))
+                return false;
+
+            return Memory.TryReadString(namePtr, out name, maxLen, false) && !string.IsNullOrEmpty(name);
+        }
+
+        /// <summary>
+        /// Pattern-scans <c>EFT.CameraControl.CameraManager::get_Instance</c> in
+        /// GameAssembly.dll for the static-fields pointer and reads the singleton
+        /// instance from it. No GOM lookup is needed.
+        /// </summary>
+        private static ulong FindCameraManagerInstance()
+        {
+            try
+            {
+                var gameAssemblyBase = Memory.GameAssemblyBase;
+                if (!gameAssemblyBase.IsValidVirtualAddress())
+                    return 0;
+
+                ulong getInstanceRva = SDK.Offsets.EFTCameraManager.GetInstance_RVA;
+                if (getInstanceRva == 0)
+                    return 0;
+
+                ulong methodAddr = gameAssemblyBase + getInstanceRva;
+
+                Span<byte> methodBytes = stackalloc byte[128];
+                if (!Memory.TryReadBuffer(methodAddr, methodBytes, false))
+                    return 0;
+
+                // Pattern 1: lea rcx, [rip+offset] -> Il2CppClass*
+                for (int i = 0; i < methodBytes.Length - 7; i++)
+                {
+                    if (methodBytes[i] == 0x48 && methodBytes[i + 1] == 0x8D && methodBytes[i + 2] == 0x0D)
+                    {
+                        int disp32 = BitConverter.ToInt32(methodBytes.Slice(i + 3, 4));
+                        ulong classMetadataAddr = methodAddr + (ulong)i + 7 + (ulong)disp32;
+
+                        if (!Memory.TryReadPtr(classMetadataAddr, out var classPtr, false))
+                            continue;
+
+                        var knownOffset = SDK.Offsets.Il2CppClass.StaticFields;
+                        ReadOnlySpan<uint> fallbackOffsets =
+                        [
+                            knownOffset - 0x10, knownOffset - 0x08,
+                            knownOffset + 0x08, knownOffset + 0x10, knownOffset + 0x18,
+                        ];
+
+                        if (TryReadStaticInstance(classPtr, knownOffset, out var instance))
+                        {
+                            _eftCameraManagerClassPtr = classPtr;
+                            return instance;
+                        }
+
+                        foreach (var offset in fallbackOffsets)
+                        {
+                            if (offset == knownOffset) continue;
+                            if (TryReadStaticInstance(classPtr, offset, out instance))
+                            {
+                                _eftCameraManagerClassPtr = classPtr;
+                                return instance;
+                            }
+                        }
+                    }
+                }
+
+                // Pattern 2: mov rax, [rip+offset] -> direct static field
+                for (int i = 32; i < methodBytes.Length - 7; i++)
+                {
+                    if (methodBytes[i] == 0x48 && methodBytes[i + 1] == 0x8B && methodBytes[i + 2] == 0x05)
+                    {
+                        int disp32 = BitConverter.ToInt32(methodBytes.Slice(i + 3, 4));
+                        ulong staticFieldAddr = methodAddr + (ulong)i + 7 + (ulong)disp32;
+
+                        if (!Memory.TryReadPtr(staticFieldAddr, out var instancePtr, false))
+                            continue;
+
+                        if (Memory.TryReadPtr(instancePtr + SDK.Offsets.EFTCameraManager.Camera, out var testCamera, false)
+                            && testCamera.IsValidVirtualAddress())
+                            return instancePtr;
+                    }
+                }
+
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[CameraManager] FindInstance error: {ex.Message}");
+                return 0;
+            }
+        }
+
+        private static bool TryReadStaticInstance(ulong classPtr, uint staticFieldsOffset, out ulong instance)
+        {
+            instance = 0;
+
+            if (!Memory.TryReadPtr(classPtr + staticFieldsOffset, out var staticFieldsPtr, false))
+                return false;
+
+            if (!Memory.TryReadPtr(staticFieldsPtr, out var instancePtr, false))
+                return false;
+
+            if (!Memory.TryReadPtr(instancePtr + SDK.Offsets.EFTCameraManager.Camera, out var testCamera, false) ||
+                !testCamera.IsValidVirtualAddress())
+                return false;
+
+            instance = instancePtr;
+            return true;
+        }
+
+        /// <summary>
+        /// Resolves the FPS camera (required) and optic camera (optional) via the
+        /// Unity AllCameras list + GameObject name search. The optic camera is only
+        /// present when the local player is currently aiming through a scoped optic,
+        /// so a missing optic is NOT a failure.
+        /// </summary>
+        private static bool TryResolveViaAllCamerasByName(out ulong fpsCamera, out ulong opticCamera)
+        {
+            fpsCamera = 0;
+            opticCamera = 0;
 
             try
             {
@@ -302,27 +725,81 @@ namespace eft_dma_radar.Arena.GameWorld
                 if (!itemsPtr.IsValidVirtualAddress() || count <= 0 || count > 1024)
                     return false;
 
-                FindFpsCameraByName(itemsPtr, count, out fpsCamera);
+                FindCamerasByName(itemsPtr, count, out fpsCamera, out opticCamera);
 
                 if (!fpsCamera.IsValidVirtualAddress() || !ValidateCameraMatrix(fpsCamera))
                     fpsCamera = 0;
 
+                if (!opticCamera.IsValidVirtualAddress())
+                    opticCamera = 0;
+
+                // FPS camera is required; optic is optional.
                 return fpsCamera != 0;
             }
             catch (Exception ex)
             {
                 Log.WriteLine($"[CameraManager] AllCameras resolution error: {ex.Message}");
                 fpsCamera = 0;
+                opticCamera = 0;
                 return false;
             }
         }
 
         /// <summary>
-        /// Scans AllCameras list for an "FPS Camera" style name.
+        /// Lazily resolves the optic camera from the AllCameras list. Used to pick up
+        /// an optic camera that appeared after CameraManager was created (e.g. local
+        /// player started ADS through a scope mid-match).
         /// </summary>
-        private static void FindFpsCameraByName(ulong itemsPtr, int count, out ulong fpsCamera)
+        private static bool TryResolveOpticCamera(out ulong opticCamera)
+        {
+            opticCamera = 0;
+
+            // Prefer the singleton path \u2014 reads the optic ref directly off the
+            // CameraManager.Instance + OpticCameraManager chain.
+            if (_eftCameraManagerInstance.IsValidVirtualAddress() &&
+                TryResolveOpticCameraFromInstance(out opticCamera) &&
+                opticCamera.IsValidVirtualAddress())
+            {
+                return true;
+            }
+
+            try
+            {
+                if (!_allCamerasAddr.IsValidVirtualAddress())
+                    return false;
+
+                if (!Memory.TryReadPtr(_allCamerasAddr, out var allCamerasPtr, false))
+                    return false;
+
+                if (!Memory.TryReadPtr(allCamerasPtr + 0x0, out var itemsPtr, false) ||
+                    !Memory.TryReadValue<int>(allCamerasPtr + 0x8, out var count, false))
+                    return false;
+
+                if (!itemsPtr.IsValidVirtualAddress() || count <= 0 || count > 1024)
+                    return false;
+
+                FindCamerasByName(itemsPtr, count, out _, out opticCamera);
+
+                if (!opticCamera.IsValidVirtualAddress())
+                    opticCamera = 0;
+
+                return opticCamera != 0;
+            }
+            catch
+            {
+                opticCamera = 0;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Scans the AllCameras list for "FPS Camera" / "Optic Camera" / "BaseOpticCamera"
+        /// style GameObject names.
+        /// </summary>
+        private static void FindCamerasByName(ulong itemsPtr, int count, out ulong fpsCamera, out ulong opticCamera)
         {
             fpsCamera = 0;
+            opticCamera = 0;
 
             int max = Math.Min(count, 100);
 
@@ -342,12 +819,26 @@ namespace eft_dma_radar.Arena.GameWorld
                 if (!Memory.TryReadString(namePtr, out var goName, 64, false) || string.IsNullOrEmpty(goName))
                     continue;
 
-                if (goName.Contains("FPS", StringComparison.OrdinalIgnoreCase) &&
-                    goName.Contains("Camera", StringComparison.OrdinalIgnoreCase))
-                {
+                bool hasCamera = goName.Contains("Camera", StringComparison.OrdinalIgnoreCase);
+                if (!hasCamera)
+                    continue;
+
+                bool isOptic =
+                    goName.Contains("Optic", StringComparison.OrdinalIgnoreCase) ||
+                    goName.Contains("BaseOptic", StringComparison.OrdinalIgnoreCase);
+
+                bool isFps =
+                    !isOptic &&
+                    goName.Contains("FPS", StringComparison.OrdinalIgnoreCase);
+
+                if (isFps && fpsCamera == 0)
                     fpsCamera = cameraPtr;
-                    return;
-                }
+
+                if (isOptic && opticCamera == 0)
+                    opticCamera = cameraPtr;
+
+                if (fpsCamera != 0 && opticCamera != 0)
+                    break;
             }
         }
 
@@ -476,6 +967,14 @@ namespace eft_dma_radar.Arena.GameWorld
 
         private static readonly CameraOffsetSig[] AspectRatioSigs =
         [
+            // Camera::ResetAspect tail:
+            //   movss [rbx+AspectRatio], xmm1
+            //   cmp   dword ptr [rbx+ProjectionType], 2
+            //   mov   word  ptr [rbx+...], 101h
+            new("F3 0F 11 8B ? ? ? ? 83 BB ? ? ? ? 02 66 C7 83 ? ? ? ? 01 01",
+                4, 4, IsCallSite: false, 0, 0,
+                "Camera::ResetAspect body: movss [rbx+AspectRatio],xmm1"),
+            // Legacy call-site fallback (older builds)
             new("E8 ? ? ? ? F3 44 0F 59 05 ? ? ? ? F3 0F 59 C6",
                 0, 4, IsCallSite: true, TargetBodyDispOffset: 4, TargetBodyDispSize: 4,
                 "AspectRatio call-site: call get_aspect"),
@@ -573,6 +1072,12 @@ namespace eft_dma_radar.Arena.GameWorld
                 if (cache is null)
                     return false;
 
+                if (cache.SchemaVersion != CameraCacheSchemaVersion)
+                {
+                    Log.WriteLine($"[CameraManager] Camera cache schema mismatch (have={cache.SchemaVersion}, expected={CameraCacheSchemaVersion}) — will sig-scan.");
+                    return false;
+                }
+
                 if (cache.UnityPlayerTimestamp != timestamp || cache.UnityPlayerSizeOfImage != sizeOfImage)
                 {
                     Log.WriteLine("[CameraManager] Camera cache PE mismatch — will sig-scan.");
@@ -616,6 +1121,7 @@ namespace eft_dma_radar.Arena.GameWorld
 
                 var cache = new CameraOffsetCache
                 {
+                    SchemaVersion = CameraCacheSchemaVersion,
                     UnityPlayerTimestamp = timestamp,
                     UnityPlayerSizeOfImage = sizeOfImage,
                     AllCamerasRva = _allCamerasAddr - unityBase,

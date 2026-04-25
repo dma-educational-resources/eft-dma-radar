@@ -32,7 +32,8 @@ namespace eft_dma_radar.Arena.GameWorld
         private const int MaxHierarchyIter     = 4000;
         private const int ErrorThreshold       = 3;
         private const int RecoveryThreshold    = 2;
-        private const int ReinitThreshold      = 5;
+        // Arena rounds churn pointers fast — invalidate sooner so retries actually run again.
+        private const int ReinitThreshold      = 3;
         private const int ReinitThresholdNew   = 2;
 
         #endregion
@@ -52,11 +53,13 @@ namespace eft_dma_radar.Arena.GameWorld
         private Player[] _activeSnapshot = _emptyPlayers;
 
         private int _invalidCountStreak;
-        private int _mainPlayerNullStreak;
+        private int _mainPlayerNullStreak; // diagnostic only — not used to trip LocalPlayerLost
 
-        // Arena respawns are fast but not instant; allow MainPlayer to be null for a handful of
-        // registration ticks (~100ms each) before declaring the local player truly lost.
-        private const int MainPlayerNullTicksBeforeLost = 50; // ~5s at 100ms tick
+        // Sustained empty/invalid RegisteredPlayers list is the authoritative match-end signal
+        // for Arena. The MainPlayer pointer flips to null on every death/respawn within a round,
+        // so it cannot be used to detect match end — only an empty RegisteredPlayers list can.
+        // When tripped, LocalGameWorld disposes and the next round is reacquired automatically.
+        private const int InvalidCountTicksBeforeLost = 30; // ~3s at 100ms tick
 
         #endregion
 
@@ -92,20 +95,15 @@ namespace eft_dma_radar.Arena.GameWorld
             if (!Memory.TryReadPtr(_gameWorldBase + Offsets.ClientLocalGameWorld.MainPlayer, out var mainPlayerPtr, false)
                 || !mainPlayerPtr.IsValidVirtualAddress())
             {
-                // MainPlayer temporarily null (e.g. between rounds / during respawn). Keep the
-                // existing LocalPlayer but mark it inactive so the realtime worker stops
-                // scattering against a stale ptr. Only after a sustained null streak do we treat
-                // the session as truly over.
+                // MainPlayer temporarily null — this happens on every death/respawn in Arena
+                // (the GameWorld is reused across rounds and between deaths). Keep the existing
+                // LocalPlayer entry but mark it inactive so the realtime worker stops scattering
+                // against a stale ptr. Do NOT trip LocalPlayerLost here — match-end is signalled
+                // authoritatively by the RegisteredPlayers list going empty (see RefreshRegistration).
                 if (LocalPlayer is not null)
                 {
                     LocalPlayer.IsActive = false;
-                    if (++_mainPlayerNullStreak >= MainPlayerNullTicksBeforeLost)
-                    {
-                        Log.WriteLine($"[RegisteredPlayers] MainPlayer null for {_mainPlayerNullStreak} ticks — local player lost.");
-                        LocalPlayerLost = true;
-                        LocalPlayer = null;
-                        LocalPlayerAddr = 0;
-                    }
+                    _mainPlayerNullStreak++;
                 }
                 return LocalPlayer is not null;
             }
@@ -163,6 +161,7 @@ namespace eft_dma_radar.Arena.GameWorld
             using (ptrs)
             {
                 var count = ptrs.Count;
+                var seen = _seenSet;
                 if (count < 1 || count > MaxPlayerCount)
                 {
                     _invalidCountStreak++;
@@ -170,17 +169,24 @@ namespace eft_dma_radar.Arena.GameWorld
                         $"[RegisteredPlayers] Invalid player count: {count} (addr=0x{listAddr:X}), streak={_invalidCountStreak}");
 
                     // Arena note: the RegisteredPlayers list can legitimately be empty between
-                    // rounds / during respawn while the GameWorld is reused. Do NOT flag
-                    // LocalPlayerLost here — that is handled by TryDiscoverLocalPlayer() based on
-                    // sustained MainPlayer==null, which is the authoritative match-ended signal.
-                    if (_invalidCountStreak > 3)
-                        Thread.Sleep(Math.Min(1000 * _invalidCountStreak, 10_000));
+                    // rounds / during respawn while the GameWorld is reused. Clear any stale
+                    // observed-player entries so the realtime worker stops reading freed memory
+                    // (otherwise we get a flood of VmmException), and trip LocalPlayerLost once
+                    // the empty streak proves the match has actually ended so the LocalGameWorld
+                    // disposes and we re-scan for the next round (no manual restart required).
+                    seen.Clear();
+                    UpdateExistingPlayers(seen); // observed players cleaned; LocalPlayer kept (skipped by IsLocalPlayer guard)
+
+                    if (_invalidCountStreak >= InvalidCountTicksBeforeLost && !LocalPlayerLost)
+                    {
+                        Log.WriteLine($"[RegisteredPlayers] RegisteredPlayers list empty for {_invalidCountStreak} ticks — match ended.");
+                        LocalPlayerLost = true;
+                    }
                     return;
                 }
 
                 _invalidCountStreak = 0;
 
-                var seen = _seenSet;
                 seen.Clear();
 
                 int newDiscovered = 0, invalidPtrs = 0;
@@ -474,6 +480,97 @@ namespace eft_dma_radar.Arena.GameWorld
                 if (nowTick < p.NextRotationInitTick) continue;
                 if (!TryInitRotation(p))
                     ScheduleRotationInitRetry(p, nowTick);
+            }
+        }
+
+        // ── Skeleton init + per-frame bone scatter ────────────────────────
+        // Runs on the camera worker — kept off the realtime position loop so
+        // skeleton reads never interfere with the primary scatter cycle.
+
+        private readonly List<Skeleton?> _skeletonScratch = new(32);
+
+        internal void BatchInitSkeletons()
+        {
+            long nowTick = Environment.TickCount64;
+            int total = 0, attempted = 0, alreadyHave = 0;
+            foreach (var kvp in _players)
+            {
+                var p = kvp.Value;
+                if (!p.IsActive || !p.IsAlive) continue;
+                if (p.IsLocalPlayer) continue;          // never draw LocalPlayer bones
+                total++;
+                if (p.Skeleton is not null) { alreadyHave++; continue; }
+                if (nowTick < p.NextSkeletonInitTick) continue;
+
+                attempted++;
+                var sk = Skeleton.TryCreate(p.Base, isObserved: true);
+                if (sk is null)
+                {
+                    int streak = Math.Min(++p.SkeletonInitFailStreak, 10);
+                    long delayMs = Math.Min(250L << Math.Min(streak, 4), 4_000L); // 250..4000ms
+                    p.NextSkeletonInitTick = nowTick + delayMs;
+                }
+                else
+                {
+                    p.Skeleton = sk;
+                    p.SkeletonInitFailStreak = 0;
+                    p.NextSkeletonInitTick = 0;
+                }
+            }
+
+            if (total > 0)
+            {
+                Log.WriteRateLimited(AppLogLevel.Debug, "skel_status", TimeSpan.FromSeconds(5),
+                    $"[RegisteredPlayers] Skeletons: total={total} ready={alreadyHave} attempted={attempted}");
+            }
+        }
+
+        internal void BatchUpdateSkeletons()
+        {
+            _skeletonScratch.Clear();
+            foreach (var kvp in _players)
+            {
+                var p = kvp.Value;
+                if (!p.IsActive || !p.IsAlive) continue;
+                var sk = p.Skeleton;
+                if (sk is null) continue;
+                _skeletonScratch.Add(sk);
+            }
+            if (_skeletonScratch.Count == 0) return;
+
+            try
+            {
+                Skeleton.UpdateBonePositionsBatched(CollectionsMarshal.AsSpan(_skeletonScratch));
+            }
+            catch (Exception ex)
+            {
+                Log.WriteRateLimited(AppLogLevel.Warning, "skel_upd_err", TimeSpan.FromSeconds(5),
+                    $"[RegisteredPlayers] Skeleton batch update failed: {ex.GetType().Name}: {ex.Message}");
+            }
+
+            // Skeleton-derived position fallback: in Arena the per-player hierarchy transform
+            // can be torn down across respawns/round transitions while bone hierarchies remain
+            // valid. When that happens the realtime worker leaves Position at <0,0,0> and
+            // Aimview filters the player out via its origin-reject gate. Only fall back when
+            // the realtime worker has NOT established a position — otherwise we'd fight the
+            // realtime worker's own Position writes every camera tick and the dot would jump
+            // between hierarchy-root and animated-bone positions. Always use the pelvis so the
+            // chosen point doesn't switch frame-to-frame. Skip the idle <0,-1000,0> sentinel.
+            foreach (var kvp in _players)
+            {
+                var p = kvp.Value;
+                if (!p.IsActive || !p.IsAlive) continue;
+                if (p.RealtimeEstablished) continue; // realtime worker owns Position
+                var sk = p.Skeleton;
+                if (sk is null || !sk.IsInitialized) continue;
+
+                if (sk.GetBonePosition(Bones.HumanPelvis) is not Vector3 wp) continue;
+                if (!float.IsFinite(wp.X) || !float.IsFinite(wp.Y) || !float.IsFinite(wp.Z)) continue;
+                if (wp.Y <= -500f) continue;       // sentinel: not spawned
+                if (wp.LengthSquared() < 1f) continue; // origin garbage
+
+                p.Position = wp;
+                p.HasValidPosition = true;
             }
         }
 
@@ -955,26 +1052,26 @@ namespace eft_dma_radar.Arena.GameWorld
             _ => PlayerType.Default,
         };
 
-        // Back-off for TeamID resolution: double the delay each failure, capped at 30s.
+        // Back-off for TeamID resolution: ramp gently, capped at 5s so respawned players resolve fast.
         private static void ScheduleTeamIdRetry(Player p, long nowTick)
         {
             int streak = Math.Min(++p.TeamIdFailStreak, 10);
-            long delayMs = Math.Min(250L << Math.Min(streak, 7), 30_000L); // 250ms, 500, 1s, 2s, 4s, 8s, 16s, 30s
+            long delayMs = Math.Min(150L << Math.Min(streak, 5), 5_000L); // 150ms .. 5s
             p.NextTeamIdTick = nowTick + delayMs;
         }
 
-        // Back-off for transform/rotation init (called from the scheduling helpers below).
+        // Back-off for transform/rotation init — Arena respawns are fast, keep retries snappy.
         private static void ScheduleTransformInitRetry(Player p, long nowTick)
         {
             int streak = Math.Min(++p.TransformInitFailStreak, 10);
-            long delayMs = Math.Min(100L << Math.Min(streak, 6), 5_000L); // 100ms .. 5s
+            long delayMs = Math.Min(75L << Math.Min(streak, 4), 1_200L); // 75, 150, 300, 600, 1200ms cap
             p.NextTransformInitTick = nowTick + delayMs;
         }
 
         private static void ScheduleRotationInitRetry(Player p, long nowTick)
         {
             int streak = Math.Min(++p.RotationInitFailStreak, 10);
-            long delayMs = Math.Min(100L << Math.Min(streak, 6), 5_000L);
+            long delayMs = Math.Min(75L << Math.Min(streak, 4), 1_200L);
             p.NextRotationInitTick = nowTick + delayMs;
         }
 

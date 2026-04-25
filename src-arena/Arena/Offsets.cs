@@ -139,7 +139,14 @@ namespace SDK
 
         public readonly partial struct PlayerBody
         {
-            public static uint SkeletonRootJoint = 0x28;
+            public static uint SkeletonRootJoint = 0x30;
+        }
+
+        // ── Diz.Skinning.Skeleton ──────────────────────────────────────────
+        // EFT-side: <_values>k__BackingField at 0x30 — verified against silk reference.
+        public readonly partial struct DizSkinningSkeleton
+        {
+            public static uint _values = 0x30;
         }
 
         // ── Unity TrsX (Transform) ──────────────────────────────────────────
@@ -175,6 +182,23 @@ namespace SDK
         {
             public static uint TypeStart = 0;
             public static uint TypeCount = 0;
+        }
+
+        // ── EFT.CameraControl.CameraManager (singleton) ─────────────────────
+        // Field offsets from Arena IL2CPP dump (overwritten at runtime by dumper).
+        // Layout matches EFT-silk: <OpticCameraManager>k__BackingField @ 0x10,
+        // <Camera>k__BackingField @ 0x68. get_Instance RVA from dump.
+        public readonly partial struct EFTCameraManager
+        {
+            public static uint OpticCameraManager = 0x10;
+            public static uint Camera             = 0x68;
+            public static uint GetInstance_RVA    = 0x1BCA160;
+        }
+
+        // ── EFT.CameraControl.OpticCameraManager ────────────────────────────
+        public readonly partial struct OpticCameraManager
+        {
+            public static uint Camera = 0x70;
         }
     }
 

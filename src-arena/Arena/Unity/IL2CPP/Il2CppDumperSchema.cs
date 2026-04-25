@@ -93,6 +93,21 @@ namespace eft_dma_radar.Arena.Unity.IL2CPP
             C("EFT.InventoryLogic.ItemTemplate", [
                 F("<_id>k__BackingField", "_id"),
             ], cs: "ItemTemplate"),
+
+            // ── EFT.CameraControl.OpticCameraManager ─────────────────────────
+            C("OpticCameraManager", [
+                F("<Camera>k__BackingField", "Camera"),
+            ]),
+
+            // ── EFT.CameraControl.CameraManager → EFTCameraManager ───────────
+            // IL2CPP class is "CameraManager"; we alias it to EFTCameraManager
+            // (matches the EFT-silk naming) to avoid clashing with our own
+            // CameraManager type.
+            C("CameraManager", [
+                F("<OpticCameraManager>k__BackingField", "OpticCameraManager"),
+                F("<Camera>k__BackingField", "Camera"),
+                M("get_Instance", "GetInstance_RVA"),
+            ], cs: "EFTCameraManager"),
         ];
 
         // ── TypeIndex map ─────────────────────────────────────────────────────

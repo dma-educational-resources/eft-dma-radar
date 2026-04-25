@@ -96,6 +96,17 @@ namespace eft_dma_radar.Arena.GameWorld
         /// <summary>Cached ArmBand slot pointer — avoids re-scanning the equipment slots array on every TeamID read.</summary>
         internal ulong ArmBandSlotAddr;
 
+        // ── Skeleton / bone data (written by camera worker) ───────────────
+
+        /// <summary>Per-player skeleton (null until resolved; null for LocalPlayer).</summary>
+        internal Skeleton? Skeleton;
+
+        /// <summary>Back-off timer for skeleton init retries.</summary>
+        internal long NextSkeletonInitTick;
+
+        /// <summary>Consecutive skeleton-init failures (for exponential back-off).</summary>
+        internal int SkeletonInitFailStreak;
+
         public override string ToString()
         {
             var sb = new System.Text.StringBuilder();
