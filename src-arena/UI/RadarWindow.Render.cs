@@ -369,11 +369,10 @@ namespace eft_dma_radar.Arena.UI
                 bool av = Config.AimviewEnabled;
                 if (ImGui.MenuItem("\u25a3 Aimview", null, av)) Config.AimviewEnabled = !av;
 
-                ImGui.Separator();
-
-                bool esp = EspWindow.IsOpen;
-                if (ImGui.MenuItem("\u25a0 ESP (fullscreen)", "Esc to close", esp))
-                    EspWindow.Toggle();
+                // ESP (fullscreen) menu temporarily disabled — projection still WIP.
+                // bool esp = EspWindow.IsOpen;
+                // if (ImGui.MenuItem("\u25a0 ESP (fullscreen)", "Esc to close", esp))
+                //     EspWindow.Toggle();
 
                 if (av && ImGui.BeginMenu("Aimview Options"))
                 {
