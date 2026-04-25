@@ -80,8 +80,8 @@ namespace eft_dma_radar.Arena.GameWorld
         private static float _aspect;
         private static readonly ViewMatrix _viewMatrix = new();
 
-        private static float _jitterX;
-        private static float _jitterY;
+        // Last FPS camera pointer used by the worker.
+        private static ulong _lastFpsCamera;
 
         /// <summary>True once a valid ViewMatrix + FOV has been read at least once this match. Required for ESP/W2S.</summary>
         public static bool IsReady { get; private set; }
@@ -98,6 +98,9 @@ namespace eft_dma_radar.Arena.GameWorld
         /// <summary>Diagnostic: true if the view matrix has a non-zero translation (i.e. usable for W2S).</summary>
         public static bool HasUsableViewMatrix => _viewMatrix.Translation.LengthSquared() > 1e-6f;
 
+        /// <summary>World-space position of the live camera (derived from ViewMatrix).</summary>
+        public static Vector3 WorldPosition => _viewMatrix.GetWorldPosition();
+
         /// <summary>UTC time of the last successful camera scatter read.</summary>
         public static DateTime LastUpdateUtc { get; private set; }
 
@@ -106,6 +109,21 @@ namespace eft_dma_radar.Arena.GameWorld
             IsReady = false;
             LastUpdateUtc = default;
         }
+
+        /// <summary>
+        /// Signals the camera worker that the FPS camera GameObject is likely about to be
+        /// rebuilt (e.g. on local player respawn). The next <see cref="UpdateCamera"/> call
+        /// will bypass the normal refresh rate-limit and re-resolve the FPSCamera pointer
+        /// before reading. Cheap to call from any thread.
+        /// </summary>
+        public static void RequestFpsCameraRefresh()
+        {
+            Volatile.Write(ref _refreshRequested, 1);
+        }
+
+        // 1 = a consumer (e.g. RegisteredPlayers on respawn) requested an immediate FPS
+        // camera re-resolve on the next worker tick, bypassing the normal rate-limit.
+        private static int _refreshRequested;
 
         /// <summary>
         /// Update the Viewport dimensions for W2S calculations.
@@ -147,6 +165,7 @@ namespace eft_dma_radar.Arena.GameWorld
                 IsReady = false;
                 HasOpticCamera = false;
                 LastUpdateUtc = default;
+                Volatile.Write(ref _refreshRequested, 0);
             };
         }
 
@@ -208,45 +227,48 @@ namespace eft_dma_radar.Arena.GameWorld
         #region WorldToScreen
 
         /// <summary>
-        /// Translates a 3D world position to a 2D screen position using the live ViewMatrix.
+        /// Translates a 3D world position to a 2D screen position using the live
+        /// Unity <c>worldToCameraMatrix</c> basis + perspective from FOV/AspectRatio.
         /// </summary>
         public static bool WorldToScreen(ref Vector3 worldPos, out Vector2 scrPos, bool onScreenCheck = false, bool useTolerance = false)
         {
+            scrPos = default;
+
             if (worldPos.LengthSquared() < 1f)
-            {
-                scrPos = default;
                 return false;
-            }
 
-            float w = Vector3.Dot(_viewMatrix.Translation, worldPos) + _viewMatrix.M44;
+            // World -> view space (Unity: camera looks down -Z in view space).
+            float vx = Vector3.Dot(_viewMatrix.Right,   worldPos) + _viewMatrix.Translation.X;
+            float vy = Vector3.Dot(_viewMatrix.Up,      worldPos) + _viewMatrix.Translation.Y;
+            float vz = Vector3.Dot(_viewMatrix.Forward, worldPos) + _viewMatrix.Translation.Z;
 
-            if (w < 0.098f)
-            {
-                scrPos = default;
+            // In front of the camera: vz < 0. Reject points at/behind the near plane.
+            float depth = -vz;
+            if (depth < 0.1f)
                 return false;
-            }
 
-            float x = Vector3.Dot(_viewMatrix.Right, worldPos) + _viewMatrix.M14;
-            float y = Vector3.Dot(_viewMatrix.Up, worldPos) + _viewMatrix.M24;
+            if (_fov < 1f || _aspect < 0.01f || ViewportWidth <= 0 || ViewportHeight <= 0)
+                return false;
 
-            // TAA / DLSS jitter compensation
-            x += _jitterX * w;
-            y += _jitterY * w;
+            // Unity Camera.fieldOfView is the vertical FOV in degrees.
+            float tanHalfV = MathF.Tan(_fov * (MathF.PI / 360f)); // (FOV/2) * deg2rad
+            float ndcX = vx / (depth * tanHalfV * _aspect);
+            float ndcY = vy / (depth * tanHalfV);
 
             var center = ViewportCenter;
             scrPos = new Vector2(
-                center.X * (1f + x / w),
-                center.Y * (1f - y / w));
+                center.X + ndcX * center.X,
+                center.Y - ndcY * center.Y);
 
             if (onScreenCheck)
             {
-                int left = useTolerance ? -VIEWPORT_TOLERANCE : 0;
-                int right = useTolerance ? ViewportWidth + VIEWPORT_TOLERANCE : ViewportWidth;
-                int top = useTolerance ? -VIEWPORT_TOLERANCE : 0;
+                int left   = useTolerance ? -VIEWPORT_TOLERANCE : 0;
+                int right  = useTolerance ? ViewportWidth  + VIEWPORT_TOLERANCE : ViewportWidth;
+                int top    = useTolerance ? -VIEWPORT_TOLERANCE : 0;
                 int bottom = useTolerance ? ViewportHeight + VIEWPORT_TOLERANCE : ViewportHeight;
 
                 if (scrPos.X < left || scrPos.X > right ||
-                    scrPos.Y < top || scrPos.Y > bottom)
+                    scrPos.Y < top  || scrPos.Y > bottom)
                 {
                     scrPos = default;
                     return false;
@@ -264,30 +286,37 @@ namespace eft_dma_radar.Arena.GameWorld
             => Vector2.Distance(ViewportCenter, point);
 
         /// <summary>
-        /// Builds a synthetic ViewMatrix from a world-space position and EFT rotation angles,
-        /// using the same transposed convention as the live game view matrix.
+        /// Builds a synthetic <see cref="ViewMatrix"/> (basis + translation in
+        /// view-space) from a world-space eye position and EFT-style yaw/pitch.
+        /// Used as a fallback when the live game ViewMatrix is not yet available.
         /// </summary>
         public static ViewMatrix BuildViewMatrix(Vector3 position, float yawDeg, float pitchDeg)
         {
-            float yaw = yawDeg * (MathF.PI / 180f);
+            float yaw   =  yawDeg   * (MathF.PI / 180f);
             float pitch = -pitchDeg * (MathF.PI / 180f);
-
-            float cy = MathF.Cos(yaw), sy = MathF.Sin(yaw);
+            float cy = MathF.Cos(yaw),   sy = MathF.Sin(yaw);
             float cp = MathF.Cos(pitch), sp = MathF.Sin(pitch);
 
-            var forward = new Vector3(sy * cp, sp, cy * cp);
-            var right = new Vector3(cy, 0f, -sy);
-            var up = new Vector3(-sy * sp, cp, -cy * sp);
+            // World-space basis of the camera.
+            var fwdWorld   = new Vector3(sy * cp, sp,  cy * cp); // looks toward
+            var rightWorld = new Vector3(cy,      0f, -sy);
+            var upWorld    = Vector3.Cross(fwdWorld, rightWorld);
 
-            return new ViewMatrix
+            // Unity worldToCamera convention: Forward axis stored is -fwdWorld
+            // (camera looks down -Z in view space).
+            var fwdView = -fwdWorld;
+
+            var vm = new ViewMatrix
             {
-                Translation = forward,
-                Right = right,
-                Up = up,
-                M44 = -Vector3.Dot(forward, position),
-                M14 = -Vector3.Dot(right, position),
-                M24 = -Vector3.Dot(up, position),
+                Right       = rightWorld,
+                Up          = upWorld,
+                Forward     = fwdView,
+                Translation = new Vector3(
+                    -Vector3.Dot(rightWorld, position),
+                    -Vector3.Dot(upWorld,    position),
+                    -Vector3.Dot(fwdView,    position)),
             };
+            return vm;
         }
 
         #endregion
@@ -303,6 +332,17 @@ namespace eft_dma_radar.Arena.GameWorld
             // Detect a stale FPS camera (e.g. local player respawn rebuilt the
             // FPS camera GameObject and our cached pointer now points at freed
             // memory). Try to silently re-resolve before doing the scatter read.
+            bool forced = Interlocked.Exchange(ref _refreshRequested, 0) != 0;
+            if (forced)
+            {
+                // Reset rate-limit so the refresh actually runs even if a recent
+                // refresh just happened, and clear readiness so consumers wait
+                // until we have a fresh matrix from the new camera.
+                _nextFpsRefreshUtc = default;
+                IsReady = false;
+                TryRefreshFpsCamera();
+            }
+
             if (!FPSCamera.IsValidVirtualAddress() || !ValidateCameraMatrix(FPSCamera))
             {
                 if (!TryRefreshFpsCamera())
@@ -314,6 +354,7 @@ namespace eft_dma_radar.Arena.GameWorld
             TryRefreshOpticCamera();
 
             ulong vmAddr = FPSCamera + Camera.ViewMatrix;
+            _lastFpsCamera = FPSCamera;
 
             using var scatter = Memory.GetScatter(VmmFlags.NOCACHE);
             scatter.PrepareReadValue<Matrix4x4>(vmAddr);
@@ -326,8 +367,6 @@ namespace eft_dma_radar.Arena.GameWorld
             if (scatter.ReadValue<Matrix4x4>(vmAddr, out var vm))
             {
                 _viewMatrix.Update(ref vm);
-                _jitterX = _viewMatrix.JitterX;
-                _jitterY = _viewMatrix.JitterY;
                 vmOk = !float.IsNaN(vm.M11) && !(vm.M11 == 0f && vm.M22 == 0f && vm.M33 == 0f);
             }
 
@@ -352,7 +391,7 @@ namespace eft_dma_radar.Arena.GameWorld
                     Log.WriteLine(
                         $"[CameraManager] READY — FPSCamera=0x{FPSCamera:X} FOV={_fov:F1} AR={_aspect:F3} " +
                         $"VM.T=<{_viewMatrix.Translation.X:F2},{_viewMatrix.Translation.Y:F2},{_viewMatrix.Translation.Z:F2}> " +
-                        $"jitter=<{_jitterX:F3},{_jitterY:F3}> viewport={ViewportWidth}x{ViewportHeight} — ESP enabled.");
+                        $"viewport={ViewportWidth}x{ViewportHeight} — ESP enabled.");
                 }
                 else
                 {
@@ -841,6 +880,18 @@ namespace eft_dma_radar.Arena.GameWorld
                     break;
             }
         }
+
+        /// <summary>
+        /// DumpCameraOffsets has been removed; the live offsets (VM=0x88, FOV=0x188, AR=0x4F8)
+        /// were confirmed during development and are now hard-coded in UnityOffsets.Camera.
+        /// </summary>
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsFiniteMatrix(in Matrix4x4 m) =>
+            float.IsFinite(m.M11) && float.IsFinite(m.M12) && float.IsFinite(m.M13) && float.IsFinite(m.M14) &&
+            float.IsFinite(m.M21) && float.IsFinite(m.M22) && float.IsFinite(m.M23) && float.IsFinite(m.M24) &&
+            float.IsFinite(m.M31) && float.IsFinite(m.M32) && float.IsFinite(m.M33) && float.IsFinite(m.M34) &&
+            float.IsFinite(m.M41) && float.IsFinite(m.M42) && float.IsFinite(m.M43) && float.IsFinite(m.M44);
 
         /// <summary>Quick sanity check for a camera's view matrix.</summary>
         private static bool ValidateCameraMatrix(ulong cameraPtr)

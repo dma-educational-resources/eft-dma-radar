@@ -65,11 +65,17 @@ namespace eft_dma_radar.Arena.UI
 
             var gw = Memory.CurrentGameWorld;
             var local = gw?.LocalPlayer;
-            if (local is null || !local.HasValidPosition)
+
+            // Allow the widget to keep working in spectator/death mode: if local is
+            // missing/invalid but the live camera is tracking another player, render
+            // from the camera world position instead.
+            bool camReady = CameraManager.IsActive && CameraManager.IsReady && CameraManager.HasUsableViewMatrix;
+            bool localOk = local is not null && local.HasValidPosition;
+            if (gw is null || (!localOk && !camReady))
             {
                 Log.WriteRateLimited(AppLogLevel.Debug, "av_no_local", TimeSpan.FromSeconds(2),
-                    $"[Aimview] no local player ready (gw={(gw is null ? "null" : "ok")}, " +
-                    $"local={(local is null ? "null" : $"hasPos={local.HasValidPosition}")})");
+                    $"[Aimview] no local/camera ready (gw={(gw is null ? "null" : "ok")}, " +
+                    $"local={(local is null ? "null" : $"hasPos={local.HasValidPosition}")}, camReady={camReady})");
                 return;
             }
 
@@ -108,10 +114,19 @@ namespace eft_dma_radar.Arena.UI
                 drawList.AddLine(new Vector2(contentMin.X, center.Y), new Vector2(contentMax.X, center.Y), _avColorCrosshair);
                 drawList.AddLine(new Vector2(center.X, contentMin.Y), new Vector2(center.X, contentMax.Y), _avColorCrosshair);
 
-                // Eye position — fall back to body root + configurable offset.
-                var eyePos = new Vector3(local.Position.X,
+                // Eye position — fall back to body root + configurable offset, or to
+                // the live camera world position when local player is dead/missing.
+                Vector3 eyePos;
+                if (localOk)
+                {
+                    eyePos = new Vector3(local!.Position.X,
                                          local.Position.Y + Config.AimviewEyeHeight,
                                          local.Position.Z);
+                }
+                else
+                {
+                    eyePos = CameraManager.WorldPosition;
+                }
 
                 int widgetW = (int)contentSize.X;
                 int widgetH = (int)contentSize.Y;
@@ -124,11 +139,14 @@ namespace eft_dma_radar.Arena.UI
                                    CameraManager.ViewportHeight > 0 &&
                                    CameraManager.HasUsableViewMatrix; // guard: VM.T==0 produces garbage W2S
 
+                // Force advanced mode in spectator/death — synthetic basis needs local yaw/pitch.
+                if (!localOk) useAdvanced = camReady;
+
                 Vector3 forward = default, right = default, up = default;
                 float zoom = Config.AimviewZoom;
-                if (!useAdvanced)
+                if (!useAdvanced && localOk)
                 {
-                    float yaw = local.RotationYaw * (MathF.PI / 180f);
+                    float yaw = local!.RotationYaw * (MathF.PI / 180f);
                     float pitch = local.RotationPitch * (MathF.PI / 180f); // EFT: positive = looking down
                     (float sy, float cy) = MathF.SinCos(yaw);
                     (float sp, float cp) = MathF.SinCos(pitch);
@@ -215,8 +233,8 @@ namespace eft_dma_radar.Arena.UI
 
                 // On-screen HUD line (top-left) so issues are obvious without reading logs.
                 string hud = useAdvanced
-                    ? $"ADV  vp={CameraManager.ViewportWidth}x{CameraManager.ViewportHeight}  drawn={drawn}/{total}"
-                    : $"SYN  yaw={local.RotationYaw:F0} pitch={local.RotationPitch:F0}  drawn={drawn}/{total}";
+                    ? $"ADV  vp={CameraManager.ViewportWidth}x{CameraManager.ViewportHeight}  drawn={drawn}/{total}{(localOk ? "" : "  [spectator]")}"
+                    : $"SYN  yaw={(localOk ? local!.RotationYaw : 0f):F0} pitch={(localOk ? local!.RotationPitch : 0f):F0}  drawn={drawn}/{total}";
                 drawList.AddText(new Vector2(contentMin.X + 5, contentMin.Y + 3), _avColorShadow, hud);
                 drawList.AddText(new Vector2(contentMin.X + 4, contentMin.Y + 2), _avColorCrosshair, hud);
 
@@ -276,8 +294,8 @@ namespace eft_dma_radar.Arena.UI
                         $"[Aimview] mode={(useAdvanced ? "ADV" : "SYN")} " +
                         $"frames={_avFrames} viewport={CameraManager.ViewportWidth}x{CameraManager.ViewportHeight} " +
                         $"widget={widgetW}x{widgetH} " +
-                        $"local=<{local.Position.X:F1},{local.Position.Y:F1},{local.Position.Z:F1}> " +
-                        $"yaw={local.RotationYaw:F1} pitch={local.RotationPitch:F1} | " +
+                        $"eye=<{eyePos.X:F1},{eyePos.Y:F1},{eyePos.Z:F1}> localOk={localOk} " +
+                        $"yaw={(localOk ? local!.RotationYaw : 0f):F1} pitch={(localOk ? local!.RotationPitch : 0f):F1} | " +
                         $"VM.T=<{vmT.X:F2},{vmT.Y:F2},{vmT.Z:F2}> usableVM={CameraManager.HasUsableViewMatrix} " +
                         $"FOV={CameraManager.FieldOfView:F1} AR={CameraManager.AspectRatio:F2} | " +
                         $"cand={_avCandidates} drawn={_avDrawn} " +

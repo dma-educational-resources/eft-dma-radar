@@ -128,6 +128,10 @@ namespace eft_dma_radar.Arena.GameWorld
                 && _players.TryRemove(LocalPlayerAddr, out var oldLocal))
             {
                 Log.WriteLine($"[RegisteredPlayers] LocalPlayer pointer changed 0x{LocalPlayerAddr:X} -> 0x{mainPlayerPtr:X} (respawn)");
+                // Tell the camera worker the FPS camera was almost certainly rebuilt by
+                // the respawn — bypass its normal 500ms rate-limit so ESP/Aimview don't
+                // render against a stale matrix until the next routine refresh.
+                CameraManager.RequestFpsCameraRefresh();
             }
 
             LocalPlayer = player;

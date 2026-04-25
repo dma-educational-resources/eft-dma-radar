@@ -105,6 +105,20 @@ namespace eft_dma_radar.Arena.Config
         [JsonPropertyName("gameMonitorHeight")]
         public int GameMonitorHeight { get; set; } = 1080;
 
+        // ── ESP Window ────────────────────────────────────────────────────────
+
+        /// <summary>If true, the ESP overlay opens borderless fullscreen; otherwise as a resizable window.</summary>
+        [JsonPropertyName("espFullscreen")]
+        public bool EspFullscreen { get; set; } = true;
+
+        /// <summary>Last windowed (non-fullscreen) ESP width.</summary>
+        [JsonPropertyName("espWindowWidth")]
+        public int EspWindowWidth { get; set; } = 1280;
+
+        /// <summary>Last windowed (non-fullscreen) ESP height.</summary>
+        [JsonPropertyName("espWindowHeight")]
+        public int EspWindowHeight { get; set; } = 720;
+
         // ── Persistence ───────────────────────────────────────────────────────
 
         public static ArenaConfig Load()

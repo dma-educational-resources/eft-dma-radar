@@ -54,6 +54,12 @@ namespace eft_dma_radar.Arena.UI
         /// <summary>Opens the ESP window on a dedicated thread. No-op if already open.</summary>
         public static void Open()
         {
+            // Wait briefly for a previous instance to fully shut down (e.g., when toggling fullscreen).
+            var prev = _thread;
+            if (prev is not null && prev.IsAlive)
+            {
+                try { prev.Join(1500); } catch { }
+            }
             if (_running) return;
             _running = true;
             _thread = new Thread(RunWindow)
@@ -88,16 +94,28 @@ namespace eft_dma_radar.Arena.UI
             try
             {
                 var options = WindowOptions.Default;
-                options.Size = new Vector2D<int>(Config.GameMonitorWidth, Config.GameMonitorHeight);
-                options.Position = new Vector2D<int>(0, 0);
+                bool fullscreen = Config.EspFullscreen;
+                if (fullscreen)
+                {
+                    options.Size = new Vector2D<int>(Config.GameMonitorWidth, Config.GameMonitorHeight);
+                    options.Position = new Vector2D<int>(0, 0);
+                    options.WindowBorder = WindowBorder.Hidden;
+                    options.WindowState = WindowState.Fullscreen;
+                }
+                else
+                {
+                    int w = Math.Max(320, Config.EspWindowWidth);
+                    int h = Math.Max(240, Config.EspWindowHeight);
+                    options.Size = new Vector2D<int>(w, h);
+                    options.WindowBorder = WindowBorder.Resizable;
+                    options.WindowState = WindowState.Normal;
+                }
                 options.Title = "Arena ESP";
                 options.VSync = false;
                 options.FramesPerSecond = 60;
                 options.UpdatesPerSecond = 60;
                 options.PreferredStencilBufferBits = 8;
                 options.PreferredBitDepth = new Vector4D<int>(8, 8, 8, 8);
-                options.WindowBorder = WindowBorder.Hidden;
-                options.WindowState = WindowState.Fullscreen;
 
                 _window = SilkWindow.Create(options);
                 _window.Load    += OnLoad;
@@ -153,6 +171,12 @@ namespace eft_dma_radar.Arena.UI
         {
             _gl?.Viewport(size);
             CreateSurface();
+            // Persist the windowed size so it sticks across restarts.
+            if (!Config.EspFullscreen && size.X >= 320 && size.Y >= 240)
+            {
+                Config.EspWindowWidth = size.X;
+                Config.EspWindowHeight = size.Y;
+            }
         }
 
         private static void OnClosing()
@@ -202,7 +226,17 @@ namespace eft_dma_radar.Arena.UI
         private static void OnKeyDown(IKeyboard kb, Key key, int _)
         {
             if (key == Key.Escape)
+            {
                 _window?.Close();
+            }
+            else if (key == Key.F11)
+            {
+                // Toggle fullscreen by closing and reopening with the new mode.
+                Config.EspFullscreen = !Config.EspFullscreen;
+                _running = false;
+                try { _window?.Close(); } catch { }
+                Open();
+            }
         }
 
         #endregion
@@ -234,10 +268,16 @@ namespace eft_dma_radar.Arena.UI
 
                 var gw = Memory.CurrentGameWorld;
                 var local = gw?.LocalPlayer;
+                bool camReady = CameraManager.IsActive && CameraManager.IsReady && CameraManager.HasUsableViewMatrix;
+                // Treat the camera as stale if no scatter read landed in the last ~750ms
+                // (e.g. mid-respawn while FPSCamera is being re-resolved). Drawing against a
+                // matrix from the previous life puts boxes in the wrong place for a moment.
+                bool camStale = camReady && CameraManager.LastUpdateUtc != default
+                    && (DateTime.UtcNow - CameraManager.LastUpdateUtc) > TimeSpan.FromMilliseconds(750);
 
-                if (gw is null || local is null || !CameraManager.IsActive)
+                if (gw is null || !camReady || camStale)
                 {
-                    DrawCenteredText(canvas, "Waiting for Match...");
+                    DrawCenteredText(canvas, camStale ? "Refreshing camera..." : "Waiting for Match...");
                 }
                 else
                 {
@@ -250,10 +290,17 @@ namespace eft_dma_radar.Arena.UI
                         float scaleY = winSize.Y / (float)vpH;
                         canvas.Save();
                         canvas.Scale(scaleX, scaleY);
-                        DrawPlayers(canvas, local, gw.Players);
+                        // Use local player when alive; otherwise fall back to the live camera
+                        // position so spectator/death view still renders other players.
+                        Vector3 originPos = (local is not null && local.HasValidPosition)
+                            ? local.Position
+                            : CameraManager.WorldPosition;
+                        DrawPlayers(canvas, local, originPos, gw.Players);
                         canvas.Restore();
                     }
                 }
+
+                DrawHint(canvas);
 
                 _grContext.Flush();
             }
@@ -272,20 +319,19 @@ namespace eft_dma_radar.Arena.UI
         private static bool IsFinite(Vector3 v) =>
             float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
 
-        private static void DrawPlayers(SKCanvas canvas, Player local, IEnumerable<Player> players)
+        private static void DrawPlayers(SKCanvas canvas, Player? local, Vector3 originPos, IEnumerable<Player> players)
         {
-            var localPos = local.Position;
             float maxSq = MaxSaneDistance * MaxSaneDistance;
 
             foreach (var p in players)
             {
-                if (p.IsLocalPlayer || !p.IsActive || !p.IsAlive || !p.HasValidPosition)
+                if ((local is not null && p.IsLocalPlayer) || !p.IsActive || !p.IsAlive || !p.HasValidPosition)
                     continue;
 
                 var pPos = p.Position;
                 if (!IsFinite(pPos) || pPos.LengthSquared() < 1f) continue;
 
-                float distSq = Vector3.DistanceSquared(localPos, pPos);
+                float distSq = Vector3.DistanceSquared(originPos, pPos);
                 if (!float.IsFinite(distSq) || distSq > maxSq) continue;
 
                 try
@@ -375,11 +421,11 @@ namespace eft_dma_radar.Arena.UI
             }
 
             string dist = $"{(int)distance}m";
-            float dw = SKPaints.FontRegular11.MeasureText(dist);
+            float dw = SKPaints.FontRegular13.MeasureText(dist);
             float dx = cx - dw * 0.5f;
-            float dy = bot + SKPaints.FontRegular11.Size + 2f;
-            canvas.DrawText(dist, dx + 1, dy + 1, SKPaints.FontRegular11, SKPaints.TextShadow);
-            canvas.DrawText(dist, dx, dy, SKPaints.FontRegular11, textPaint);
+            float dy = bot + SKPaints.FontRegular13.Size + 2f;
+            canvas.DrawText(dist, dx + 1, dy + 1, SKPaints.FontRegular13, SKPaints.TextShadow);
+            canvas.DrawText(dist, dx, dy, SKPaints.FontRegular13, textPaint);
         }
 
         private static void DrawCorneredBox(SKCanvas canvas, SKRect box, SKPaint paint)
@@ -471,6 +517,14 @@ namespace eft_dma_radar.Arena.UI
             float x = (size.X - w) * 0.5f;
             float y = size.Y * 0.5f;
             canvas.DrawText(text, x, y, SKPaints.FontRegular48, SKPaints.TextRadarStatus);
+        }
+
+        private static void DrawHint(SKCanvas canvas)
+        {
+            if (_window is null) return;
+            string mode = Config.EspFullscreen ? "Fullscreen" : "Windowed";
+            string hint = $"{mode}  •  F11 toggle fullscreen  •  Esc close";
+            canvas.DrawText(hint, 8f, 18f, SKPaints.FontRegular13, SKPaints.TextRadarStatus);
         }
 
         #endregion
