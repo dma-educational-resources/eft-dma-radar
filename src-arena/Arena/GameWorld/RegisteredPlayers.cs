@@ -548,47 +548,6 @@ namespace eft_dma_radar.Arena.GameWorld
             }
             else posOk = false;
 
-            // Frozen-position-while-yaw-changes detector. The Unity hierarchy worldPos cache
-            // can survive a respawn / round transition unchanged — the read still SUCCEEDS but
-            // returns the same bit-identical Vector3 forever. Meanwhile rotation is sourced
-            // from MovementContext (a separate pointer chain) and keeps refreshing. Symptom:
-            // dot stuck on the map while yaw keeps spinning. When we see N consecutive ticks
-            // of identical position with at least one yaw change, force a transform reinit.
-            // Realtime ticks at ~8ms, so 25 ticks ≈ 200ms of provable freeze.
-            if (posOk && !sentinel && player.TransformReady)
-            {
-                if (player.Position == player.LastObservedPosition)
-                {
-                    player.IdenticalPositionTicks++;
-                    if (player.RotationYaw != player.LastObservedYaw)
-                        player.FrozenPositionTicks++;
-                }
-                else
-                {
-                    player.IdenticalPositionTicks = 0;
-                    player.FrozenPositionTicks = 0;
-                    player.LastObservedPosition = player.Position;
-                }
-                player.LastObservedYaw = player.RotationYaw;
-
-                const int FrozenReinitThreshold = 25;
-                if (player.FrozenPositionTicks >= FrozenReinitThreshold)
-                {
-                    Log.WriteRateLimited(AppLogLevel.Warning, $"frozen_pos_{player.Base:X}", TimeSpan.FromSeconds(5),
-                        $"[RegisteredPlayers] '{player.Name}': position frozen while yaw changing for {player.FrozenPositionTicks} ticks — forcing transform reinit.");
-                    player.TransformReady = false;
-                    player.RealtimeEstablished = false;
-                    player.ConsecutiveErrors = 0;
-                    player.IdenticalPositionTicks = 0;
-                    player.FrozenPositionTicks = 0;
-                }
-            }
-            else
-            {
-                player.IdenticalPositionTicks = 0;
-                player.FrozenPositionTicks = 0;
-            }
-
             // Error tracking / auto-reinit — skip entirely while sentinel so we don't thrash
             // the transform chain for a player who just hasn't spawned yet.
             if (sentinel)

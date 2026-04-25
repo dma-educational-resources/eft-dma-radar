@@ -84,15 +84,6 @@ namespace eft_dma_radar.Arena.GameWorld
         internal int ConsecutiveErrors;
         internal bool RealtimeEstablished;
 
-        /// <summary>Last realtime position written; used to detect a stale Unity worldPos cache.</summary>
-        internal Vector3 LastObservedPosition;
-        /// <summary>Last realtime yaw written; used together with LastObservedPosition to detect freezes.</summary>
-        internal float LastObservedYaw;
-        /// <summary>Number of consecutive realtime reads where Position was bit-identical to the previous tick.</summary>
-        internal int IdenticalPositionTicks;
-        /// <summary>Number of those identical-position ticks where yaw also changed (i.e. player is alive and moving the camera but position is frozen).</summary>
-        internal int FrozenPositionTicks;
-
         /// <summary>
         /// Consecutive registration ticks this player has been absent from the RegisteredPlayers
         /// list. Used as a grace period so transient list-read flickers / invalid pointer hiccups
