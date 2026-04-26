@@ -240,7 +240,7 @@ jobs:
                   },
                   @{
                     name  = "Download"
-                    value = "[EFT]($env:RELEASE_URL) • [Arena]($env:RELEASE_URL) • [WPF]($env:RELEASE_URL)"
+                    value = "[EFT]($env:RELEASE_URL) • [Arena]($env:RELEASE_URL) • [EFT-WPF]($env:RELEASE_URL)"
                   }
                 )
               }
