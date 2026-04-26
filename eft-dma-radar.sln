@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.5.11626.173
@@ -9,11 +9,15 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VmmSharpEx", "lib\VmmSharpE
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src-silk", "src-silk", "{93350626-D752-32FA-2F52-C589771CDCD2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "eft-dma-radar-silk", "src-silk\eft-dma-radar-silk.csproj", "{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "eft-dma-radar", "src-silk\eft-dma-radar.csproj", "{2BFED951-42BB-4E31-9FEE-EC1F41150C2D}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src-arena", "src-arena", "{A06E51BE-9363-DC5A-6DCB-833E3083ADDC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "arena-silk", "src-arena\arena-silk.csproj", "{671B2F4E-249F-4F19-8E0B-9DC4265A407D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "arena-dma-radar", "src-arena\arena-dma-radar.csproj", "{671B2F4E-249F-4F19-8E0B-9DC4265A407D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src-wpf", "src-wpf", "{8F6A5929-BA06-4695-B3BB-48C9AC120CB6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "eft-dma-radar-wpf", "src-wpf\eft-dma-radar-wpf.csproj", "{374F8953-7A17-4AA1-B316-93F5E33D5AFD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -61,6 +65,18 @@ Global
 		{671B2F4E-249F-4F19-8E0B-9DC4265A407D}.Release|x64.Build.0 = Release|x64
 		{671B2F4E-249F-4F19-8E0B-9DC4265A407D}.Release|x86.ActiveCfg = Release|Any CPU
 		{671B2F4E-249F-4F19-8E0B-9DC4265A407D}.Release|x86.Build.0 = Release|Any CPU
+		{374F8953-7A17-4AA1-B316-93F5E33D5AFD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{374F8953-7A17-4AA1-B316-93F5E33D5AFD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{374F8953-7A17-4AA1-B316-93F5E33D5AFD}.Debug|x64.ActiveCfg = Debug|x64
+		{374F8953-7A17-4AA1-B316-93F5E33D5AFD}.Debug|x64.Build.0 = Debug|x64
+		{374F8953-7A17-4AA1-B316-93F5E33D5AFD}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{374F8953-7A17-4AA1-B316-93F5E33D5AFD}.Debug|x86.Build.0 = Debug|Any CPU
+		{374F8953-7A17-4AA1-B316-93F5E33D5AFD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{374F8953-7A17-4AA1-B316-93F5E33D5AFD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{374F8953-7A17-4AA1-B316-93F5E33D5AFD}.Release|x64.ActiveCfg = Release|x64
+		{374F8953-7A17-4AA1-B316-93F5E33D5AFD}.Release|x64.Build.0 = Release|x64
+		{374F8953-7A17-4AA1-B316-93F5E33D5AFD}.Release|x86.ActiveCfg = Release|Any CPU
+		{374F8953-7A17-4AA1-B316-93F5E33D5AFD}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -69,6 +85,7 @@ Global
 		{4E07DF6F-71B0-4A44-B934-E54A6340F47D} = {3A8DF596-E814-FECC-DD4B-D8EF8AAC1A0D}
 		{2BFED951-42BB-4E31-9FEE-EC1F41150C2D} = {93350626-D752-32FA-2F52-C589771CDCD2}
 		{671B2F4E-249F-4F19-8E0B-9DC4265A407D} = {A06E51BE-9363-DC5A-6DCB-833E3083ADDC}
+		{374F8953-7A17-4AA1-B316-93F5E33D5AFD} = {8F6A5929-BA06-4695-B3BB-48C9AC120CB6}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {226CDDDB-E756-47FA-B12B-7CFB825527F3}

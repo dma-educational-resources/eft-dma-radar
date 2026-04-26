@@ -9,7 +9,7 @@ Arena-specific SVG maps sourced from the pre-1.0 arena radar reference
 
 | Phase | Status | Notes |
 |---|---|---|
-| 0 – Project Scaffold | ✅ Done | `src-arena\arena-silk.csproj` builds, references `lib\VmmSharpEx`. No loose native DLLs in `src-arena` — `VmmSharpEx` owns native asset copy. |
+| 0 – Project Scaffold | ✅ Done | `src-arena\arena-dma-radar.csproj` builds, references `lib\VmmSharpEx`. No loose native DLLs in `src-arena` — `VmmSharpEx` owns native asset copy. |
 | 1 – DMA + ScatterAPI | ✅ Done | `src-arena\DMA\Memory.cs` locates `EscapeFromTarkovArena.exe`, resolves `VmmHandle`, `UnityBase`, `GOM`, `GameAssemblyBase`. |
 | 2 – IL2CPP Dumper | ✅ Done | Dumper writes `%AppData%\eft-dma-radar-arena\il2cpp_offsets.json`; `Arena\Offsets.cs` consumes it. |
 | 3 – Unity + GameWorld | ✅ Done | `LocalGameWorld.cs` finds `ClientLocalGameWorld` via GOM, reads `MapID` / `IsInRaid`, starts workers. |
@@ -31,7 +31,7 @@ Known open issues carried into the next phase:
 
 Arena does **not** share scene IDs with EFT. The Arena-specific maps are copied
 into `src-arena\Maps\` and deployed to `<output>\wwwroot\Maps\` via a
-`<Content Include="Maps\**\*.*">` glob in `arena-silk.csproj`. Scene IDs come
+`<Content Include="Maps\**\*.*">` glob in `arena-dma-radar.csproj`. Scene IDs come
 directly from the pre-1.0 arena radar config files and also drive
 `Arena\GameWorld\Exits\MapNames.cs`.
 
@@ -100,7 +100,7 @@ Explicitly **out of scope** for this phase:
 
 - `src-arena\UI\Maps\*` — the ported files above.
 - `src-arena\Maps\` (new, at repo root of `src-arena` or under `src-arena\wwwroot\Maps`)
-  with a `CopyToOutputDirectory=PreserveNewest` rule in `arena-silk.csproj`.
+  with a `CopyToOutputDirectory=PreserveNewest` rule in `arena-dma-radar.csproj`.
   Initial JSON configs:
   - `Maps\Factory.json` → `mapID: ["factory4_day", "factory4_night"]`
   - `Maps\GroundZero.json` → `mapID: ["Sandbox", "Sandbox_High"]`
@@ -130,7 +130,7 @@ Explicitly **out of scope** for this phase:
 1. **Copy map subsystem**: create `src-arena\UI\Maps\` and drop in the four
    ported files with only namespace adjustments.
 2. **Wire maps output folder**: add a `<Content Include="Maps\**\*.*">` glob
-   to `arena-silk.csproj` with `CopyToOutputDirectory=PreserveNewest`. Confirm
+   to `arena-dma-radar.csproj` with `CopyToOutputDirectory=PreserveNewest`. Confirm
    files land under `bin\...\wwwroot\Maps\` (or whatever path `MapManager.MapsDir`
    resolves to — align paths both ways, prefer `wwwroot\Maps` to match silk).
 3. **Seed initial configs**: commit `Factory.json`, `GroundZero.json`,
@@ -216,7 +216,7 @@ eft-dma-radar.sln
 ├── lib/VmmSharpEx/           ← shared DMA lib (referenced by all)
 ├── src-silk/                 ← EFT radar (existing, untouched)
 └── src-arena/                ← NEW: Arena radar
-	├── arena-silk.csproj
+	├── arena-dma-radar.csproj
 	├── Program.cs
 	├── GlobalUsings.cs
 	├── Config/
@@ -378,7 +378,7 @@ The dumper code itself needs **no structural changes** — only the config value
 ### Phase 0 — Project Scaffold *(start here)*
 **Goal:** Compilable empty Arena project in the solution.
 
-1. Create `src-arena/arena-silk.csproj` — target `net10.0-windows7.0`, same `Directory.Build.props`
+1. Create `src-arena/arena-dma-radar.csproj` — target `net10.0-windows7.0`, same `Directory.Build.props`
 2. Add `ProjectReference` to `lib/VmmSharpEx/VmmSharpEx.csproj`
 3. Add project to `eft-dma-radar.sln`
 4. Copy `GlobalUsings.cs` from silk, update namespace to `eft_dma_radar.Arena`

@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <AssemblyName>eft-dma-radar-silk</AssemblyName>
+        <AssemblyName>eft-dma-radar</AssemblyName>
         <RootNamespace>eft_dma_radar.Silk</RootNamespace>
         <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
         <ServerGarbageCollection>true</ServerGarbageCollection>

@@ -23,7 +23,7 @@
 		<Content Include="..\resources\DEFAULT_DATA.json">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
-		<Content Include="..\resources\EXAMPLE_FILTERS.json">
+		<Content Include="..\resources\EXAMPLE_FILTERS.json" Condition="Exists('..\resources\EXAMPLE_FILTERS.json')">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
 		<Content Include="..\LICENSE">
@@ -41,9 +41,9 @@
 	<!-- Embedded Resources (from eft-dma-shared) -->
 	<ItemGroup>
 		<EmbeddedResource Include="..\resources\NeoSansStdRegular.otf" />
-		<EmbeddedResource Include="..\resources\NeoSansStdMedium.otf" />
-		<EmbeddedResource Include="..\resources\NeoSansStdBold.otf" />
-		<EmbeddedResource Include="..\resources\NeoSansStdItalic.otf" />
+		<EmbeddedResource Include="..\resources\NeoSansStdMedium.otf" Condition="Exists('..\resources\NeoSansStdMedium.otf')" />
+		<EmbeddedResource Include="..\resources\NeoSansStdBold.otf" Condition="Exists('..\resources\NeoSansStdBold.otf')" />
+		<EmbeddedResource Include="..\resources\NeoSansStdItalic.otf" Condition="Exists('..\resources\NeoSansStdItalic.otf')" />
 		<EmbeddedResource Include="..\resources\DEFAULT_DATA.json" />
 	</ItemGroup>
 

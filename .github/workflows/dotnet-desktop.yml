@@ -9,6 +9,7 @@ on:
       - 'resources/**'
       - 'src-silk/**'
       - 'src-arena/**'
+      - 'src-wpf/**'
       - 'lib/**'
       - 'version.json'
       - '.github/workflows/**'
@@ -135,7 +136,7 @@ jobs:
 
       - name: Dotnet Publish (EFT)
         run: |
-          dotnet publish src-silk/eft-dma-radar-silk.csproj `
+          dotnet publish src-silk/eft-dma-radar.csproj `
             -c Release `
             -r win-x64 `
             --self-contained false `
@@ -146,7 +147,7 @@ jobs:
 
       - name: Dotnet Publish (Arena)
         run: |
-          dotnet publish src-arena/arena-silk.csproj `
+          dotnet publish src-arena/arena-dma-radar.csproj `
             -c Release `
             -r win-x64 `
             --self-contained false `
@@ -155,17 +156,30 @@ jobs:
             /p:Version=${{ steps.channel.outputs.VERSION }} `
             -o out/arena
 
+      - name: Dotnet Publish (WPF)
+        run: |
+          dotnet publish src-wpf/eft-dma-radar-wpf.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained false `
+            /p:DebugType=None `
+            /p:DebugSymbols=false `
+            /p:Version=${{ steps.channel.outputs.VERSION }} `
+            -o out/wpf
+
       - name: Clean publish output
         shell: pwsh
         run: |
           Remove-Item -Path "out\eft\*.pdb"   -ErrorAction SilentlyContinue
           Remove-Item -Path "out\arena\*.pdb" -ErrorAction SilentlyContinue
+          Remove-Item -Path "out\wpf\*.pdb"   -ErrorAction SilentlyContinue
 
       - name: Create zip archives
         shell: pwsh
         run: |
           Compress-Archive -Path "out\eft\*"   -DestinationPath "eft-dma-radar.zip"
           Compress-Archive -Path "out\arena\*" -DestinationPath "arena-dma-radar.zip"
+          Compress-Archive -Path "out\wpf\*"   -DestinationPath "eft-dma-radar-wpf.zip"
 
       - name: Create GitHub Release
         shell: pwsh
@@ -181,6 +195,7 @@ jobs:
             $env:GH_TAG
             "eft-dma-radar.zip"
             "arena-dma-radar.zip"
+            "eft-dma-radar-wpf.zip"
             "--title", $env:GH_RELEASE_NAME
             "--target", $env:GH_SHA
             "--notes", $env:GH_NOTES
@@ -225,7 +240,7 @@ jobs:
                   },
                   @{
                     name  = "Download"
-                    value = "[EFT]($env:RELEASE_URL) • [Arena]($env:RELEASE_URL)"
+                    value = "[EFT]($env:RELEASE_URL) • [Arena]($env:RELEASE_URL) • [WPF]($env:RELEASE_URL)"
                   }
                 )
               }

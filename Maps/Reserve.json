@@ -1,9 +1,9 @@
 {
 	"mapID": ["rezervbase"],
-	"x": 452.5,
-	"y": 403.25,
-	"scale": 1.4975,
-	"svgScale": 4,
+	"x": 69.750,
+	"y": 55.350,
+	"scale": 0.224,
+	"svgScale": 26,
 	"mapLayers": [
     {
       "minHeight": null,

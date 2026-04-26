@@ -45,7 +45,7 @@ using MessageBox = HandyControl.Controls.MessageBox;
 [assembly: AssemblyVersion("2.0.0.0")]
 [assembly: AssemblyFileVersion("2.0.0.0")]
 [assembly: SupportedOSPlatform("Windows")]
-[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("eft-dma-radar-silk")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("eft-dma-radar")]
 
 namespace eft_dma_radar
 {

@@ -44,7 +44,7 @@ namespace eft_dma_radar.Silk.Tarkov
             {
                 Timeout = TimeSpan.FromSeconds(15),
             };
-            _http.DefaultRequestHeaders.UserAgent.ParseAdd("eft-dma-radar-silk/1.0");
+            _http.DefaultRequestHeaders.UserAgent.ParseAdd("eft-dma-radar/1.0");
         }
 
         /// <summary>

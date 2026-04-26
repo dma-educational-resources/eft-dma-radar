@@ -59,7 +59,7 @@ namespace eft_dma_radar.Silk.Misc
                         Console.OutputEncoding = Encoding.UTF8;
                         Console.SetOut(new StreamWriter(Console.OpenStandardOutput(), Encoding.UTF8) { AutoFlush = true });
                         Console.SetError(new StreamWriter(Console.OpenStandardError(), Encoding.UTF8) { AutoFlush = true });
-                        Console.Title = "eft-dma-radar-silk — Debug Console";
+                        Console.Title = "eft-dma-radar — Debug Console";
                         _consoleAllocated = true;
                     }
                 }

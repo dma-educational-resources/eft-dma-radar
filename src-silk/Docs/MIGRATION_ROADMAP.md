@@ -562,8 +562,10 @@ and bone-based skeleton rendering, and a complete memory write system (FeatureMa
 - [x] Memory writes gated by config flag (`MemWritesEnabled` master toggle + per-feature toggles)
 - [x] `QuestManager` & quest rendering on radar — see Phase 5F below
 - [x] **Hot-path performance audit & optimizations** \u2014 see Phase 5G below
-- [ ] Chams / visual ESP features (requires FeatureManager infrastructure \u2705, pending implementation)
 - [ ] `ResourceJanitor` (GC pressure management)
+- ~~Chams / visual ESP features~~ \u2014 **dropped**: depends on the WPF native/injection ESP
+  overlay path which is no longer enabled in WPF and is not being ported (see Phase 9 \u201cWill
+  not be ported\u201d).
 
 ### 5E. Hideout Manager ✅
 - [x] **HideoutManager** (`Tarkov/Hideout/HideoutManager.cs`) — hideout stash & area reader:
@@ -687,7 +689,8 @@ and bone-based skeleton rendering, and a complete memory write system (FeatureMa
 
 - [ ] `ColorPickerPanel` using ImGui's built-in `ColorEdit3`/`ColorEdit4`
 - [ ] Color categories: Players, Loot tiers, UI elements
-- [ ] Map Setup Helper panel
+- [x] ~~Map Setup Helper panel~~ — done (`UI/Panels/Settings/MapTab.cs` → `DrawMapSetupSection()`,
+  runtime XY/scale calibration, not persisted)
 - [ ] Debug Info Widget (memory stats, FPS graph)
 
 ## Phase 7 — Platform Polish
@@ -701,14 +704,94 @@ and bone-based skeleton rendering, and a complete memory write system (FeatureMa
 - [ ] SilkDispatcher for async UI operations
 
 ## Phase 8 — WPF Deprecation
-> Once Silk.NET is feature-complete, remove the WPF project.
 
-- [ ] Feature parity checklist vs WPF MainWindow
-- [ ] ESP overlay (if applicable)
-- [x] ~~Web Radar~~ — done (Phase 3F, Kestrel HTTP server)
-- [x] ~~Remove WPF ProjectReference from silk `.csproj`~~ — done (Phase 1I)
-- [x] ~~Remove WPF project from solution~~ — done (Phase 1I, renamed `src/` → `src-wpf/`)
-- [ ] Delete `src-wpf/` entirely once feature parity confirmed
+---
+
+## Phase 9 — WPF Parity Audit (remaining gaps)
+> Comprehensive audit of `src-silk` vs `src-wpf` after Phase 5. Only items that are
+> **still active in WPF** and **DMA-only** (no native injection / no overlay window)
+> are listed here. Anything dropped is captured in the "Will not be ported" list below.
+
+### 9A. Memory-Write Features still to port (pure DMA writes)
+- [ ] **BigHead** — scale bone via DMA write (`Tarkov/Features/MemoryWrites/BigHead.cs`)
+- [ ] **FastWeaponOps** — weapon operation speed multipliers
+- [ ] **NoWepMalfPatch** — IL2CPP-safe replacement for the old Mono `GetMalfunctionState`
+  patch (data-based: enforces `Malfunction.None` on weapon templates each tick)
+- [ ] **ClearWeather** — `WeatherController` DMA writes (cloudiness/fog/rain)
+- [ ] **TimeOfDay** — `GameDateTime` DMA write with configurable hour
+- [ ] **DisableGrass** — `TerrainSettings.detailDensity` DMA write
+- [ ] **DisableHeadBobbing** — `ProceduralWeaponAnimation` head-bob masks
+- [ ] **LootThroughWalls** — extends loot raycast through colliders (DMA write to
+  loot interaction layer mask)
+
+### 9B. UI / Panels still to port
+- [ ] **`SettingsSearchControl` + `SettingsSearchIndexing`** — global search across all
+  settings (filter settings tabs by keyword)
+- [ ] **`UserLootFilter`** — named loot filter presets (save/load multiple wishlist+blacklist
+  configurations); silk currently has only one global wishlist/blacklist
+- [ ] **`ColorPickerPanel` + `InterfaceColorOption` / `RadarColorOption`** — user-configurable
+  color theming for player types, loot tiers, UI elements (Phase 6 placeholder)
+- [ ] **`DebugInfoWidget`** — memory stats / FPS graph overlay (Phase 6 placeholder)
+- [ ] **`AmmoHelper`** — ammo penetration/damage tier lookup for tooltips & PlayerInfoWidget
+  in-hands display
+- [ ] **`MonitorHelper` + `MonitorInfo`** — multi-monitor placement / window positioning
+  helpers (only needed if multi-monitor placement is desired in silk)
+- [ ] **`ToolTipsManager`** — centralized hover-tooltip arbitration (low priority; silk's
+  ad-hoc tooltips work)
+
+### 9C. ESP Widgets (Skia overlays inside the silk window)
+> Port these widgets into silk's existing ImGui/Skia widget system (`UI/Widgets/`).
+> They are pure SkiaSharp draw code — no native overlay / no WinForms host needed.
+
+- [ ] **`SKWidget`** — base class for draggable/resizable Skia widgets (port to silk's
+  ImGui-hosted widget pattern, mirroring `AimviewWidget` / `LootWidget`)
+- [ ] **`WidgetClickEvent`** — click/drag event plumbing for widgets
+- [ ] **`ESPWidget`** — generic ESP info overlay base
+- [ ] **`ESPHotkeyWidget`** — current hotkey hints overlay
+- [ ] **`ESPQuestInfoWidget`** — active quest objective list
+- [ ] **`QuestInfoWidget`** — quest objective tracker
+- [ ] **`LootInfoWidget`** — important / wishlisted loot ticker
+- [ ] **`DebugInfoWidget`** — memory stats / FPS graph (also listed under Phase 6)
+
+### 9D. Web Radar payload parity
+- [ ] **`WebRadarDoor`** — door state to web client
+- [ ] **`WebRadarTransit`** — transit points to web client
+- [ ] (silk already adds `WebRadarCorpse`, `WebRadarKillfeedEntry`, `WebRadarLootItem`
+  beyond WPF — these are silk-only enhancements, not regressions)
+
+### 9E. Misc infrastructure (low priority)
+- [ ] **Multi-profile config (`IConfig`)** — silk has only `SilkConfig` singleton;
+  WPF supports multiple named config profiles
+- [ ] **`Notifications` / Growl-style toasts** — in-app non-blocking notifications;
+  silk currently logs only. Could be replaced with a simple ImGui toast widget.
+
+### 9F. Deferred / lower priority
+- [ ] `ResourceJanitor` (GC pressure mgmt) — Phase 5/6
+- [ ] `RateLimiter` / `PrecisionTimer` / `WaitTimer` — silk uses ad-hoc per-call timestamps
+  and `Stopwatch`; only port if a feature actually needs them
+- [ ] `SharedPaints` — silk's `SKPaints` already covers this; only port if a second window
+  needs cross-window paint sharing
+
+### Will NOT be ported
+> These exist in `src-wpf/` but must NOT be added to silk.
+
+- **WinForms ESP overlay window** — `UI/ESP/ESP.cs`, `EspForm` / `EspForm.Designer.cs`,
+  `IESPEntity`, `EspColorOption`, `ESPPlayerRenderMode`, `KillFeedManager` (overlay
+  variant), `UI/Pages/ESPControl.xaml(.cs)`. The ESP **widgets** themselves are still
+  ported into silk's window (see Phase 9C); only the standalone WinForms overlay host
+  is dropped.
+- **HideRaidCode**
+- **RageMode**
+- **WPF-specific UI infrastructure** — `App.xaml(.cs)`, `MainWindow.xaml(.cs)`,
+  `Properties/DesignTimeResources.xaml`, `UI/Resources/AppResources.xaml`,
+  `IconResources.xaml`, `UI/Controls/Controls/*` (KeyInputBox, MessageBox,
+  TextInputWindow, TextValueSlider, LoadingWindow), `UI/Misc/Converters.cs`,
+  `ExpanderManager`, `PanelCoordinator`, `PanelEvents`, `UISharedState`,
+  `StreamingUtils`, `RdpDetector` — all WPF-framework-bound and replaced by the
+  ImGui panel system in silk
+- **Lone map renderer** — `UI/Radar/Maps/Lone*` (`LoneMapManager`, `LoneSvgMap`,
+  `LoneMapConfig`, `LoneMapParams`, `ILoneMap`); silk's `RadarMap` covers all
+  in-app map needs
 
 ---
 
@@ -875,11 +958,10 @@ src-silk/
 2. **Import self-contained subsystems as-is** — IL2CPP dumper, ScatterAPI, SDK offsets
    don't need rewriting; just copy and adjust namespaces
 3. **Each phase should build and run** — no half-broken intermediate states
-4. **VmmSharpEx is shared** — both projects reference `lib/VmmSharpEx` directly
-5. **Pull, don't push** — only bring WPF code into silk when a phase specifically needs it
-6. **The WPF project stays working** — silk migration doesn't break the existing app
-7. **Zero-alloc in hot paths** — cache paints, use struct enumerators, manual loops over LINQ
-8. **FrozenDictionary / FrozenSet for immutable lookups** — item DB, exfil names, loot filters
+4. **VmmSharpEx is shared** — all projects reference `lib/VmmSharpEx` directly
+5. **The WPF project stays working** — silk migration doesn't break the existing app
+6. **Zero-alloc in hot paths** — cache paints, use struct enumerators, manual loops over LINQ
+7. **FrozenDictionary / FrozenSet for immutable lookups** — item DB, exfil names, loot filters
 
 ## Reference
 - WPF project: `src-wpf/` (renamed from `src/`, removed from solution, still functional standalone)
