@@ -25,6 +25,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// <summary>Number of line-segment endpoints in the screen buffer (13 segments × 2).</summary>
         public const int JOINTS_COUNT = 26;
 
+        public bool HasError = false;
+
         /// <summary>
         /// All 16 skeleton bones used for drawing. Order matches WPF's SkeletonBones enum.
         /// </summary>
@@ -207,14 +209,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// This avoids N separate scatter open/execute/close cycles (one per skeleton).
         /// Called from the camera worker thread.
         /// </summary>
-        internal static void UpdateBonePositionsBatched(ReadOnlySpan<Skeleton?> skeletons)
+        internal static void UpdateBonePositionsBatched(ReadOnlySpan<RegisteredPlayers.PlayerEntry> players)
         {
             using var scatter = Memory.GetScatter(VmmFlags.NOCACHE);
 
             // Prepare phase: enqueue all bone vertex reads across all skeletons
-            for (int s = 0; s < skeletons.Length; s++)
+            for (int s = 0; s < players.Length; s++)
             {
-                var skeleton = skeletons[s];
+                var player = players[s];
+                var skeleton = player.Skeleton;
                 if (skeleton is null)
                     continue;
 
@@ -232,9 +235,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             scatter.Execute();
 
             // Process phase: compute world positions from the single scatter result
-            for (int s = 0; s < skeletons.Length; s++)
+            for (int s = 0; s < players.Length; s++)
             {
-                var skeleton = skeletons[s];
+                var player = players[s];
+                var skeleton = player.Skeleton;
                 if (skeleton is null)
                     continue;
 
@@ -265,6 +269,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                         catch
                         {
                             // Transient failure — keep last valid position
+                        }
+
+                        if (entry.HasPosition && !skeleton.HasError &&
+                            MathF.Sqrt(Vector3.DistanceSquared(entry.WorldPosition,
+                                player.Player.Position)) > 10f
+                           )
+                        {
+                            skeleton.HasError = true;
                         }
                     }
                     finally
