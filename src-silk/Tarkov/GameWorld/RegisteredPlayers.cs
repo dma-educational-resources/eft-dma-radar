@@ -738,7 +738,33 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             entry.Player.Skeleton = null;
         }
 
+        #endregion
 
+        #region Debug Dump
+
+        /// <summary>
+        /// Dumps IL2CPP hierarchy for every currently-active player.
+        /// Gated by <see cref="Log.EnableDebugLogging"/> — no-op in normal operation.
+        /// Called by <see cref="LocalGameWorld.DumpAll"/> and the F8 toggle path.
+        /// </summary>
+        internal void DumpAll()
+        {
+            if (!Log.EnableDebugLogging)
+                return;
+
+            foreach (var kvp in _players)
+            {
+                var entry = kvp.Value;
+                try
+                {
+                    DumpPlayerHierarchy(entry.Base, entry.Player.Name, entry.IsObserved);
+                }
+                catch (Exception ex)
+                {
+                    Log.Write(AppLogLevel.Debug, $"DumpPlayerHierarchy failed for '{entry.Player.Name}': {ex.Message}", "RegisteredPlayers");
+                }
+            }
+        }
 
         #endregion
     }

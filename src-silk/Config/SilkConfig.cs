@@ -180,6 +180,16 @@ namespace eft_dma_radar.Silk.Config
         private long _dirtyTimestamp;
         private const long DebounceSaveMs = 500;
 
+        // ── Debug ───────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Enable debug logging at startup (same effect as passing <c>-debug</c> on the command line).
+        /// All <see cref="AppLogLevel.Debug"/> messages and IL2CPP hierarchy dumps are gated by this flag.
+        /// Can also be toggled at runtime with <b>F8</b> (F8 also immediately calls DumpAll on the live session).
+        /// </summary>
+        [JsonPropertyName("debugLogging")]
+        public bool DebugLogging { get; set; } = false;
+
         // ── DMA ─────────────────────────────────────────────────────────────────
 
         /// <summary>FPGA device string passed to MemProcFS (e.g. "fpga", "usb3380").</summary>

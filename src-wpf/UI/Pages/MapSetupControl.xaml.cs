@@ -20,6 +20,7 @@ namespace eft_dma_radar.UI.Pages
         public event EventHandler CloseRequested;
         public event EventHandler BringToFrontRequested;
         public event EventHandler<PanelDragEventArgs> DragRequested;
+        public event EventHandler<PanelResizeEventArgs> ResizeRequested;
         #endregion
 
         public MapSetupControl()
@@ -114,6 +115,34 @@ namespace eft_dma_radar.UI.Pages
             DragHandle.ReleaseMouseCapture();
             DragHandle.MouseMove -= DragHandle_MouseMove;
             DragHandle.MouseLeftButtonUp -= DragHandle_MouseLeftButtonUp;
+        }
+
+        private void ResizeHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            ((UIElement)sender).CaptureMouse();
+            _dragStartPoint = e.GetPosition(this);
+
+            ((UIElement)sender).MouseMove += ResizeHandle_MouseMove;
+            ((UIElement)sender).MouseLeftButtonUp += ResizeHandle_MouseLeftButtonUp;
+        }
+
+        private void ResizeHandle_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                var currentPosition = e.GetPosition(this);
+                var sizeDelta = currentPosition - _dragStartPoint;
+
+                ResizeRequested?.Invoke(this, new PanelResizeEventArgs(sizeDelta.X, sizeDelta.Y));
+                _dragStartPoint = currentPosition;
+            }
+        }
+
+        private void ResizeHandle_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            ((UIElement)sender).ReleaseMouseCapture();
+            ((UIElement)sender).MouseMove -= ResizeHandle_MouseMove;
+            ((UIElement)sender).MouseLeftButtonUp -= ResizeHandle_MouseLeftButtonUp;
         }
         #endregion
     }

@@ -161,6 +161,8 @@ namespace eft_dma_radar.Arena.GameWorld
 
                     Interlocked.Exchange(ref _lastDisposedBase, 0);
                     Log.WriteLine($"[LocalGameWorld] Found live GameWorld @ 0x{gameWorld:X}, map = '{mapId}' ({MapNames.GetDisplayName(mapId)}), players = {regCount}");
+                    if (Log.EnableDebugLogging)
+                        Il2CppDumper.DumpClassFields(gameWorld, "ClientLocalGameWorld (match start)");
                     return new LocalGameWorld(gameWorld, mapId, ct);
                 }
                 catch (Memory.GameNotRunningException) { throw; }
@@ -367,6 +369,39 @@ namespace eft_dma_radar.Arena.GameWorld
         {
             if (_disposed != 0)
                 throw new OperationCanceledException();
+        }
+
+        /// <summary>
+        /// On-demand IL2CPP field dump for the entire live match state.
+        /// Dumps: GameWorld, CameraManager (FPS + Optic), LocalPlayer hierarchy,
+        /// and the full hierarchy of every active observed player.
+        /// Safe to call from any thread; all reads are non-cached.
+        /// </summary>
+        internal void DumpAll()
+        {
+            Log.WriteLine("[Il2CppDumper] ══ DumpAll triggered ══");
+            try
+            {
+                // 1. GameWorld
+                Il2CppDumper.DumpClassFields(_base, $"ClientLocalGameWorld @ 0x{_base:X} (map={MapID})");
+
+                // 2. CameraManager objects
+                if (_cameraManager is not null)
+                {
+                    if (_cameraManager.FPSCamera.IsValidVirtualAddress())
+                        Il2CppDumper.DumpClassFields(_cameraManager.FPSCamera, $"FPSCamera @ 0x{_cameraManager.FPSCamera:X}");
+                    if (_cameraManager.OpticCamera.IsValidVirtualAddress())
+                        Il2CppDumper.DumpClassFields(_cameraManager.OpticCamera, $"OpticCamera @ 0x{_cameraManager.OpticCamera:X}");
+                }
+
+                // 3. All active players (local + observed)
+                _registeredPlayers.DumpAll();
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[Il2CppDumper] DumpAll error: {ex.GetType().Name}: {ex.Message}");
+            }
+            Log.WriteLine("[Il2CppDumper] ══ DumpAll complete ══");
         }
 
         #endregion

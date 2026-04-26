@@ -1836,10 +1836,12 @@ namespace eft_dma_radar
                 }
 
                 var windowWidth = ActualWidth > 0 ? ActualWidth : Width;
-                var windowHeight = ActualHeight > 0 ? ActualHeight : Height;
+                // Panel canvases have Margin="0,32,0,0" so their coordinate space matches
+                // mainContentGrid — use its height, not the full window height.
+                var contentHeight = mainContentGrid.ActualHeight > 0 ? mainContentGrid.ActualHeight : (ActualHeight > 32 ? ActualHeight - 32 : Height - 32);
 
                 if (windowWidth <= 0) windowWidth = 1200;
-                if (windowHeight <= 0) windowHeight = 800;
+                if (contentHeight <= 0) contentHeight = 768;
 
                 bool needsSave = false;
 
@@ -1870,7 +1872,7 @@ namespace eft_dma_radar
                             }
 
                             var maxLeft = windowWidth - posConfig.Width - 10;
-                            var maxTop = windowHeight - posConfig.Height - 10;
+                            var maxTop = contentHeight - posConfig.Height - 10;
 
                             if (posConfig.Left < 0 || posConfig.Left > maxLeft)
                             {
@@ -2249,6 +2251,7 @@ namespace eft_dma_radar
             LootFilterControl.CloseRequested += sharedCloseHandler;
 
             MapSetupControl.DragRequested += sharedDragHandler;
+            MapSetupControl.ResizeRequested += sharedResizeHandler;
             MapSetupControl.CloseRequested += sharedCloseHandler;
 
             SettingsSearchControl.DragRequested += sharedDragHandler;
@@ -2281,7 +2284,7 @@ namespace eft_dma_radar
                 ["MemoryWriting"] = new PanelInfo(MemoryWritingPanel, MemoryWritingCanvas, "MemoryWriting", MIN_MEMORY_WRITING_PANEL_WIDTH, MIN_MEMORY_WRITING_PANEL_HEIGHT),
                 ["ESP"] = new PanelInfo(ESPPanel, ESPCanvas, "ESP", MIN_ESP_PANEL_WIDTH, MIN_ESP_PANEL_HEIGHT),
                 ["LootFilter"] = new PanelInfo(LootFilterPanel, LootFilterCanvas, "LootFilter", MIN_LOOT_FILTER_PANEL_WIDTH, MIN_LOOT_FILTER_PANEL_HEIGHT),
-                ["MapSetup"] = new PanelInfo(MapSetupPanel, MapSetupCanvas, "MapSetup", 300, 300),
+                ["MapSetup"] = new PanelInfo(MapSetupPanel, MapSetupCanvas, "MapSetup", 340, 145),
                 ["SettingsSearch"] = new PanelInfo(SettingsSearchPanel, SettingsSearchCanvas, "SettingsSearch", MIN_SEARCH_SETTINGS_PANEL_WIDTH, MIN_SEARCH_SETTINGS_PANEL_HEIGHT),
                 ["QuestPlanner"] = new PanelInfo(QuestPlannerPanel, QuestPlannerCanvas, "QuestPlanner", MIN_QUEST_PLANNER_PANEL_WIDTH, MIN_QUEST_PLANNER_PANEL_HEIGHT),
                 ["HideoutStash"] = new PanelInfo(HideoutStashPanel, HideoutStashCanvas, "HideoutStash", MIN_HIDEOUT_STASH_PANEL_WIDTH, MIN_HIDEOUT_STASH_PANEL_HEIGHT),

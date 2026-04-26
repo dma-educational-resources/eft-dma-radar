@@ -35,6 +35,12 @@ namespace eft_dma_radar.Silk
                 Config = SilkConfig.Load();
                 Log.WriteLine("[SilkProgram] Config loaded OK.");
 
+                // Wire debug logging from config or -debug command-line argument
+                Log.EnableDebugLogging = Config.DebugLogging ||
+                    (Environment.GetCommandLineArgs()?.Contains("-debug", StringComparer.OrdinalIgnoreCase) ?? false);
+                if (Log.EnableDebugLogging)
+                    Log.WriteLine("[SilkProgram] Debug logging enabled.");
+
                 ExceptionTracer.Install();
 
                 SetHighPerformanceMode();

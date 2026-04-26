@@ -1,13 +1,11 @@
-using System.Buffers;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using eft_dma_radar.Arena.DMA;
 using eft_dma_radar.Arena.Unity;
 using eft_dma_radar.Arena.Unity.Collections;
+using eft_dma_radar.Arena.Unity.IL2CPP;
 using SDK;
-using VmmSharpEx;
 using VmmSharpEx.Options;
-using VmmSharpEx.Scatter;
 
 using static eft_dma_radar.Arena.Unity.UnityOffsets;
 
@@ -24,12 +22,12 @@ namespace eft_dma_radar.Arena.GameWorld
     /// in a single DMA round-trip.
     /// </para>
     /// </summary>
-    internal sealed class RegisteredPlayers
+    internal sealed partial class RegisteredPlayers
     {
         #region Constants
 
         private const int MaxPlayerCount       = 64;
-        // Arena rounds churn pointers fast — invalidate sooner so retries actually run again.
+        // Arena rounds churn pointers fast â€” invalidate sooner so retries actually run again.
         private const int ReinitThreshold      = 3;
         private const int ReinitThresholdNew   = 2;
 
@@ -38,7 +36,7 @@ namespace eft_dma_radar.Arena.GameWorld
         // momentarily return a stale/short snapshot during fast churn / respawns, and many
         // first-chance BadPtr/Vmm exceptions are recoverable. Keeping the entry around for a
         // few extra ticks lets the next tick re-confirm the player instead of churning
-        // remove → re-discover (which makes them disappear from the overlay for ~1s+).
+        // remove â†’ re-discover (which makes them disappear from the overlay for ~1s+).
         private const int MissingTicksBeforeRemoval = 5; // ~500ms
 
         #endregion
@@ -53,7 +51,7 @@ namespace eft_dma_radar.Arena.GameWorld
         private readonly List<Player> _activeList = new(MaxPlayerCount);
 
         // Snapshot of active players, rebuilt by the registration worker after each tick.
-        // The realtime worker reads this via Volatile — no per-tick dictionary enumeration.
+        // The realtime worker reads this via Volatile â€” no per-tick dictionary enumeration.
         private static readonly Player[] _emptyPlayers = [];
         private Player[] _activeSnapshot = _emptyPlayers;
 
@@ -61,7 +59,7 @@ namespace eft_dma_radar.Arena.GameWorld
 
         // Team identity is locked at match start. The first time the local player's armband
         // resolves to a valid TeamID we snapshot it here and reuse it for the remainder of the
-        // match — across deaths, respawns, and MainPlayer pointer flips. This prevents teammate
+        // match â€” across deaths, respawns, and MainPlayer pointer flips. This prevents teammate
         // colors from "swapping" mid-round if a transient armband read on a respawned local
         // entry returns the opposite team. A new match (LocalGameWorld is disposed on
         // LocalPlayerLost) constructs a fresh RegisteredPlayers, so this naturally resets.
@@ -90,7 +88,7 @@ namespace eft_dma_radar.Arena.GameWorld
 
         // Sustained empty/invalid RegisteredPlayers list is the authoritative match-end signal
         // for Arena. The MainPlayer pointer flips to null on every death/respawn within a round,
-        // so it cannot be used to detect match end — only an empty RegisteredPlayers list can.
+        // so it cannot be used to detect match end â€” only an empty RegisteredPlayers list can.
         // When tripped, LocalGameWorld disposes and the next round is reacquired automatically.
         private const int InvalidCountTicksBeforeLost = 30; // ~3s at 100ms tick
 
@@ -114,12 +112,29 @@ namespace eft_dma_radar.Arena.GameWorld
             _mapId = mapId;
         }
 
-        // ── Registration worker ───────────────────────────────────────────────
+        /// <summary>
+        /// Dumps the full IL2CPP hierarchy for every currently active player.
+        /// Called by <see cref="LocalGameWorld.DumpAll"/> when debug logging is toggled on.
+        /// </summary>
+        internal void DumpAll()
+        {
+            foreach (var p in _players.Values)
+            {
+                if (!p.IsActive) continue;
+                try { DumpPlayerHierarchy(p.Base, p.Name, p.IsLocalPlayer); }
+                catch (Exception ex)
+                {
+                    Log.WriteLine($"[RegisteredPlayers] DumpAll failed for '{p.Name}': {ex.Message}");
+                }
+            }
+        }
+
+        // â”€â”€ Registration worker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
         /// Discovers (or re-discovers) the local (MainPlayer) instance from the GameWorld.MainPlayer
         /// pointer. Arena reuses the same GameWorld across deaths/respawns but swaps the MainPlayer
-        /// pointer each round, so this is called every registration tick — not just once — and will
+        /// pointer each round, so this is called every registration tick â€” not just once â€” and will
         /// replace the cached entry whenever the pointer changes.
         /// Returns true when a valid local player is registered.
         /// </summary>
@@ -128,10 +143,10 @@ namespace eft_dma_radar.Arena.GameWorld
             if (!Memory.TryReadPtr(_gameWorldBase + Offsets.ClientLocalGameWorld.MainPlayer, out var mainPlayerPtr, false)
                 || !mainPlayerPtr.IsValidVirtualAddress())
             {
-                // MainPlayer temporarily null — this happens on every death/respawn in Arena
+                // MainPlayer temporarily null â€” this happens on every death/respawn in Arena
                 // (the GameWorld is reused across rounds and between deaths). Keep the existing
                 // LocalPlayer entry but mark it inactive so the realtime worker stops scattering
-                // against a stale ptr. Do NOT trip LocalPlayerLost here — match-end is signalled
+                // against a stale ptr. Do NOT trip LocalPlayerLost here â€” match-end is signalled
                 // authoritatively by the RegisteredPlayers list going empty (see RefreshRegistration).
                 if (LocalPlayer is not null)
                 {
@@ -140,7 +155,7 @@ namespace eft_dma_radar.Arena.GameWorld
                 return LocalPlayer is not null;
             }
 
-            // Same pointer as before → nothing to do, just make sure it's marked active.
+            // Same pointer as before â†’ nothing to do, just make sure it's marked active.
             if (LocalPlayer is not null && LocalPlayerAddr == mainPlayerPtr)
             {
                 LocalPlayer.IsActive = true;
@@ -148,18 +163,18 @@ namespace eft_dma_radar.Arena.GameWorld
                 return true;
             }
 
-            // Pointer changed (respawn / next round) or first discovery — build a fresh entry.
+            // Pointer changed (respawn / next round) or first discovery â€” build a fresh entry.
             var player = CreatePlayerEntry(mainPlayerPtr, isLocal: true);
             if (player is null)
                 return LocalPlayer is not null;
 
-            // Drop the old local entry (if any) — its transform/rotation addrs are now stale.
+            // Drop the old local entry (if any) â€” its transform/rotation addrs are now stale.
             if (LocalPlayer is not null && LocalPlayerAddr != 0
                 && _players.TryRemove(LocalPlayerAddr, out var oldLocal))
             {
                 Log.WriteLine($"[RegisteredPlayers] LocalPlayer pointer changed 0x{LocalPlayerAddr:X} -> 0x{mainPlayerPtr:X} (respawn)");
                 // Tell the camera worker the FPS camera was almost certainly rebuilt by
-                // the respawn — bypass its normal 500ms rate-limit so ESP/Aimview don't
+                // the respawn â€” bypass its normal 500ms rate-limit so ESP/Aimview don't
                 // render against a stale matrix until the next routine refresh.
                 CameraManager.RequestFpsCameraRefresh();
             }
@@ -168,11 +183,18 @@ namespace eft_dma_radar.Arena.GameWorld
             LocalPlayerAddr = mainPlayerPtr;
             _players[mainPlayerPtr] = player;
             Log.WriteLine($"[RegisteredPlayers] LocalPlayer: {player}");
+            if (Log.EnableDebugLogging)
+            {
+                Il2CppDumper.DumpClassFields(mainPlayerPtr, $"LocalPlayer (EFT.Player) @ 0x{mainPlayerPtr:X}");
+                // Dump MovementContext sub-object for rotation chain verification
+                if (Memory.TryReadPtr(mainPlayerPtr + Offsets.Player.MovementContext, out var mc, false) && mc.IsValidVirtualAddress())
+                    Il2CppDumper.DumpClassFields(mc, $"LocalPlayer MovementContext @ 0x{mc:X}");
+            }
             return true;
         }
 
         /// <summary>
-        /// Refreshes the registered player list — discovers new, removes gone.
+        /// Refreshes the registered player list â€” discovers new, removes gone.
         /// Called from the registration worker thread (~100ms interval).
         /// </summary>
         internal void RefreshRegistration()
@@ -213,7 +235,7 @@ namespace eft_dma_radar.Arena.GameWorld
 
                     if (_invalidCountStreak >= InvalidCountTicksBeforeLost && !LocalPlayerLost)
                     {
-                        Log.WriteLine($"[RegisteredPlayers] RegisteredPlayers list empty for {_invalidCountStreak} ticks — match ended.");
+                        Log.WriteLine($"[RegisteredPlayers] RegisteredPlayers list empty for {_invalidCountStreak} ticks â€” match ended.");
                         LocalPlayerLost = true;
                     }
                     return;
@@ -262,8 +284,8 @@ namespace eft_dma_radar.Arena.GameWorld
             {
                 LocalPlayer.TeamID = _matchLocalTeamId;
             }
-            // While not yet locked, keep sampling the local armband each (back-off) tick — even
-            // if LocalPlayer.TeamID is already set — and require N consecutive identical reads
+            // While not yet locked, keep sampling the local armband each (back-off) tick â€” even
+            // if LocalPlayer.TeamID is already set â€” and require N consecutive identical reads
             // before snapshotting into _matchLocalTeamId. This prevents a single transient bad
             // read at match start from poisoning teammate classification for the entire round.
             else if (LocalPlayer is not null && _matchLocalTeamId < 0 && nowTick >= LocalPlayer.NextTeamIdTick)
@@ -281,7 +303,7 @@ namespace eft_dma_radar.Arena.GameWorld
                     bool invValid = invOk && invCtrl.IsValidVirtualAddress();
                     int t = invValid ? GetTeamID(LocalPlayer, invCtrl) : -1;
 
-                    // Hardcoded offset failed to produce a known armband — kick off (or retry) the probe.
+                    // Hardcoded offset failed to produce a known armband â€” kick off (or retry) the probe.
                     if (t < 0 && !_localInvCtrlOffsetProbed && nowTick >= _localInvCtrlNextProbeTick)
                     {
                         ProbeLocalInventoryControllerOffset(LocalPlayer.Base);
@@ -293,7 +315,7 @@ namespace eft_dma_radar.Arena.GameWorld
                         }
                         else
                         {
-                            // Probe failed (armband not equipped yet) — back off so we don't
+                            // Probe failed (armband not equipped yet) â€” back off so we don't
                             // re-scan the entire offset range every team-id tick.
                             _localInvCtrlNextProbeTick = nowTick + 2_000;
                         }
@@ -401,12 +423,12 @@ namespace eft_dma_radar.Arena.GameWorld
                         if (!resolved) ScheduleTeamIdRetry(p, nowTick);
                     }
 
-                    // Re-evaluate teammate classification each tick — but only PROMOTE.
+                    // Re-evaluate teammate classification each tick â€” but only PROMOTE.
                     // Once a player has been classified as Teammate (because their armband
                     // matched the match-locked local team), we never demote them back to a
                     // faction type. Arena's armband reads can transiently flip during a round
                     // due to inventory rebuilds / respawns, and demoting would visibly swap
-                    // teammate/enemy colors mid-match — exactly what the user reported.
+                    // teammate/enemy colors mid-match â€” exactly what the user reported.
                     if (!p.IsAI && p.Type != PlayerType.Teammate && p.TeamID >= 0)
                     {
                         int localTeam = _matchLocalTeamId >= 0
@@ -418,11 +440,11 @@ namespace eft_dma_radar.Arena.GameWorld
                 }
                 else
                 {
-                    // Don't yank the player on the first missed tick — Arena's list read can
+                    // Don't yank the player on the first missed tick â€” Arena's list read can
                     // briefly return a stale/short snapshot during respawn / heavy churn. Keep
                     // the entry alive (but inactive so the realtime worker stops scattering
                     // against possibly-freed memory) until the player has been absent for
-                    // several consecutive ticks. This avoids the visible remove → re-discover
+                    // several consecutive ticks. This avoids the visible remove â†’ re-discover
                     // gap where a still-alive enemy disappears from the overlay for ~1s+.
                     kvp.Value.IsActive = false;
                     kvp.Value.IsAlive = false;
@@ -440,7 +462,7 @@ namespace eft_dma_radar.Arena.GameWorld
                     {
                         LocalPlayerLost = true;
                         LocalPlayer = null;
-                        Log.WriteLine("[RegisteredPlayers] Local player lost — match likely ending.");
+                        Log.WriteLine("[RegisteredPlayers] Local player lost â€” match likely ending.");
                     }
                 }
             }
@@ -459,793 +481,8 @@ namespace eft_dma_radar.Arena.GameWorld
             Volatile.Write(ref _activeSnapshot, snap);
         }
 
-        // ── Realtime scatter worker ───────────────────────────────────────────
-
-        /// <summary>
-        /// Scatter-batched position + rotation reads for all active players.
-        /// Called from the fast realtime worker (~8ms interval).
-        /// </summary>
-        internal void UpdateRealtimeData()
-        {
-            var active = Volatile.Read(ref _activeSnapshot);
-            if (active.Length == 0) return;
-
-            using var scatter = Memory.GetScatter(VmmFlags.NOCACHE);
-
-            int readsQueued = 0;
-            for (int i = 0; i < active.Length; i++)
-            {
-                var player = active[i];
-                if (player.RotationReady)
-                { scatter.PrepareReadValue<Vector2>(player.RotationAddr); readsQueued++; }
-                if (player.TransformReady)
-                {
-                    // VerticesAddr now holds hierarchy + WorldPositionOffset directly.
-                    scatter.PrepareReadValue<Vector3>(player.VerticesAddr);
-                    readsQueued++;
-                }
-            }
-
-            if (readsQueued == 0) return;
-
-            scatter.Execute();
-
-            for (int i = 0; i < active.Length; i++)
-                ProcessScatterResults(scatter, active[i]);
-        }
-
-        private static void ProcessScatterResults(VmmScatter scatter, Player player)
-        {
-            bool rotOk = true, posOk = true;
-
-            // Rotation
-            if (player.RotationReady)
-            {
-                if (scatter.ReadValue<Vector2>(player.RotationAddr, out var rot)
-                    && float.IsFinite(rot.X) && float.IsFinite(rot.Y))
-                {
-                    float yaw = rot.X % 360f;
-                    if (yaw < 0f) yaw += 360f;
-                    if (yaw >= 360f) yaw -= 360f; // guard against tiny negative zero -> 360 after +360
-                    player.RotationYaw = yaw;
-                    player.RotationPitch = rot.Y;
-                }
-                else rotOk = false;
-            }
-
-            // Position — single Vector3 read of the hierarchy's cached world position.
-            // Sentinel <0, -1000, 0> means the player has not been placed in the scene yet
-            // (freshly-spawned / respawning). That is NOT an error — just keep the last known
-            // position (if any) and wait silently for the real TRS to be written.
-            // An EXACT <0, 0, 0> read indicates the hierarchy memory has been zeroed/freed
-            // (stale VerticesAddr after respawn or Unity tearing down the transform). That IS
-            // an error — we must reinit the transform chain, otherwise the player stays "stuck"
-            // at origin while actually moving in-game.
-            bool sentinel = false;
-            if (player.TransformReady)
-            {
-                if (scatter.ReadValue<Vector3>(player.VerticesAddr, out var worldPos)
-                    && float.IsFinite(worldPos.X) && float.IsFinite(worldPos.Y) && float.IsFinite(worldPos.Z))
-                {
-                    if (worldPos.Y <= -500f)
-                    {
-                        sentinel = true; // not spawned yet; don't touch position or error counters
-                    }
-                    else if (worldPos == Vector3.Zero)
-                    {
-                        // Hierarchy likely freed/zeroed — treat as a read error so the auto-reinit
-                        // path kicks in. Don't overwrite last known good position.
-                        posOk = false;
-                    }
-                    else
-                    {
-                        player.Position = worldPos;
-                        player.HasValidPosition = true;
-                        player.RealtimeEstablished = true;
-                    }
-                }
-                else posOk = false;
-            }
-            else posOk = false;
-
-            // Error tracking / auto-reinit — skip entirely while sentinel so we don't thrash
-            // the transform chain for a player who just hasn't spawned yet.
-            if (sentinel)
-            {
-                player.ConsecutiveErrors = 0;
-            }
-            else if (!rotOk || !posOk)
-            {
-                player.ConsecutiveErrors++;
-                int threshold = player.RealtimeEstablished ? ReinitThreshold : ReinitThresholdNew;
-                if (!posOk && player.TransformReady && player.ConsecutiveErrors >= threshold)
-                {
-                    Log.WriteRateLimited(AppLogLevel.Warning, $"reinit_{player.Base:X}", TimeSpan.FromSeconds(5),
-                        $"[RegisteredPlayers] Auto-invalidating transform for '{player.Name}' after {player.ConsecutiveErrors} failures");
-                    player.TransformReady = false;
-                    player.RotationReady = false;
-                    // Release Position ownership so BatchUpdateSkeletons can drive the dot from
-                    // bones while we re-resolve the transform hierarchy. Without this, the dot
-                    // stays frozen at the last position for the full reinit window (often >1s).
-                    player.RealtimeEstablished = false;
-                    player.ConsecutiveErrors = 0;
-                }
-            }
-            else
-            {
-                player.ConsecutiveErrors = 0;
-            }
-        }
-
-        // ── Transform init ────────────────────────────────────────────────────
-
-        internal void BatchInitTransforms()
-        {
-            long nowTick = Environment.TickCount64;
-            foreach (var kvp in _players)
-            {
-                var p = kvp.Value;
-                if (!p.IsActive || p.TransformReady) continue;
-                if (nowTick < p.NextTransformInitTick) continue;
-                if (!TryInitTransform(p))
-                    ScheduleTransformInitRetry(p, nowTick);
-            }
-        }
-
-        internal void BatchInitRotations()
-        {
-            long nowTick = Environment.TickCount64;
-            foreach (var kvp in _players)
-            {
-                var p = kvp.Value;
-                if (!p.IsActive || p.RotationReady) continue;
-                if (nowTick < p.NextRotationInitTick) continue;
-                if (!TryInitRotation(p))
-                    ScheduleRotationInitRetry(p, nowTick);
-            }
-        }
-
-        // ── Skeleton init + per-frame bone scatter ────────────────────────
-        // Runs on the camera worker — kept off the realtime position loop so
-        // skeleton reads never interfere with the primary scatter cycle.
-
-        private readonly List<Skeleton?> _skeletonScratch = new(32);
-
-        internal void BatchInitSkeletons()
-        {
-            long nowTick = Environment.TickCount64;
-            int total = 0, attempted = 0, alreadyHave = 0;
-            foreach (var kvp in _players)
-            {
-                var p = kvp.Value;
-                if (!p.IsActive || !p.IsAlive) continue;
-                if (p.IsLocalPlayer) continue;          // never draw LocalPlayer bones
-                total++;
-                if (p.Skeleton is not null) { alreadyHave++; continue; }
-                if (nowTick < p.NextSkeletonInitTick) continue;
-
-                attempted++;
-                var sk = Skeleton.TryCreate(p.Base, isObserved: true);
-                if (sk is null)
-                {
-                    int streak = Math.Min(++p.SkeletonInitFailStreak, 10);
-                    long delayMs = Math.Min(250L << Math.Min(streak, 4), 4_000L); // 250..4000ms
-                    p.NextSkeletonInitTick = nowTick + delayMs;
-                }
-                else
-                {
-                    p.Skeleton = sk;
-                    p.SkeletonInitFailStreak = 0;
-                    p.NextSkeletonInitTick = 0;
-                }
-            }
-
-            if (total > 0)
-            {
-                Log.WriteRateLimited(AppLogLevel.Debug, "skel_status", TimeSpan.FromSeconds(5),
-                    $"[RegisteredPlayers] Skeletons: total={total} ready={alreadyHave} attempted={attempted}");
-            }
-        }
-
-        internal void BatchUpdateSkeletons()
-        {
-            _skeletonScratch.Clear();
-            foreach (var kvp in _players)
-            {
-                var p = kvp.Value;
-                if (!p.IsActive || !p.IsAlive) continue;
-                var sk = p.Skeleton;
-                if (sk is null) continue;
-                _skeletonScratch.Add(sk);
-            }
-            if (_skeletonScratch.Count == 0) return;
-
-            try
-            {
-                Skeleton.UpdateBonePositionsBatched(CollectionsMarshal.AsSpan(_skeletonScratch));
-            }
-            catch (Exception ex)
-            {
-                Log.WriteRateLimited(AppLogLevel.Warning, "skel_upd_err", TimeSpan.FromSeconds(5),
-                    $"[RegisteredPlayers] Skeleton batch update failed: {ex.GetType().Name}: {ex.Message}");
-            }
-
-            // Skeleton-derived position fallback: in Arena the per-player hierarchy transform
-            // can be torn down across respawns/round transitions while bone hierarchies remain
-            // valid. When that happens the realtime worker leaves Position at <0,0,0> and
-            // Aimview filters the player out via its origin-reject gate.
-            //
-            // We also handle a subtler case: the realtime read can SUCCEED but return a
-            // STALE cached world position (Unity's hierarchy worldPos cache isn't refreshed
-            // every frame for every actor). The symptom is "rotation updates but position is
-            // frozen for ~1-2s". When bones are alive and visibly diverge from the realtime
-            // Position, we override from bones and invalidate the transform so the realtime
-            // worker re-resolves the hierarchy on its next pass.
-            //
-            // The realtime worker stores Position at the rig's FEET level (hierarchy root
-            // cached worldPos). Emit feet-level here too so downstream consumers (ESP box,
-            // Aimview synthetic origin) don't shift vertically when the source switches.
-            // Prefer the lower of the two foot bones; fall back to pelvis - 0.95m if foot
-            // bones aren't ready yet.
-            const float StalePositionDivergenceSq = 1.5f * 1.5f; // metres²
-            foreach (var kvp in _players)
-            {
-                var p = kvp.Value;
-                if (!p.IsActive || !p.IsAlive) continue;
-                var sk = p.Skeleton;
-                if (sk is null || !sk.IsInitialized) continue;
-
-                Vector3? feet = null;
-                var lf = sk.GetBonePosition(Bones.HumanLFoot);
-                var rf = sk.GetBonePosition(Bones.HumanRFoot);
-                if (lf.HasValue && rf.HasValue) feet = lf.Value.Y < rf.Value.Y ? lf : rf;
-                else if (lf.HasValue) feet = lf;
-                else if (rf.HasValue) feet = rf;
-                else if (sk.GetBonePosition(Bones.HumanPelvis) is Vector3 pv)
-                    feet = new Vector3(pv.X, pv.Y - 0.95f, pv.Z);
-
-                if (feet is not Vector3 wp) continue;
-                if (!float.IsFinite(wp.X) || !float.IsFinite(wp.Y) || !float.IsFinite(wp.Z)) continue;
-                if (wp.Y <= -500f) continue;       // sentinel: not spawned
-                if (wp.LengthSquared() < 1f) continue; // origin garbage
-
-                if (!p.RealtimeEstablished)
-                {
-                    // Realtime hasn't taken ownership yet — bones are the only source of truth.
-                    p.Position = wp;
-                    p.HasValidPosition = true;
-                    continue;
-                }
-
-                // Realtime owns Position — but verify it isn't stale. Compare against bones.
-                var delta = wp - p.Position;
-                if (delta.LengthSquared() >= StalePositionDivergenceSq)
-                {
-                    // Realtime read is succeeding but returning a frozen cached worldPos.
-                    // Trust the bones (they're animated every frame) and invalidate the
-                    // transform so the realtime worker rebuilds the hierarchy chain.
-                    p.Position = wp;
-                    p.HasValidPosition = true;
-                    p.TransformReady = false;
-                    p.RealtimeEstablished = false;
-                    p.ConsecutiveErrors = 0;
-                    Log.WriteRateLimited(AppLogLevel.Debug, $"stale_pos_{p.Base:X}", TimeSpan.FromSeconds(5),
-                        $"[RegisteredPlayers] '{p.Name}': realtime position stale (Δ={MathF.Sqrt(delta.LengthSquared()):F1}m) — switched to bone-derived position, invalidating transform.");
-                }
-            }
-        }
-
-        private static bool TryInitTransform(Player player)
-        {
-            uint lookOffset = player.IsLocalPlayer
-                ? Offsets.Player._playerLookRaycastTransform
-                : Offsets.ObservedPlayerView._playerLookRaycastTransform;
-
-            // Step 1: lookTransform managed pointer
-            if (!Memory.TryReadPtr(player.Base + lookOffset, out var lookTransform, false)
-                || !lookTransform.IsValidVirtualAddress())
-            {
-                Log.WriteRateLimited(AppLogLevel.Warning, $"tx_s1_{player.Base:X}", TimeSpan.FromSeconds(5),
-                    $"[RegisteredPlayers] TryInitTransform '{player.Name}': step1 lookTransform failed (base=0x{player.Base:X} off=0x{lookOffset:X})");
-                return false;
-            }
-
-            // Step 2: +0x10 gives the C++ Transform / managed wrapper
-            if (!Memory.TryReadPtr(lookTransform + 0x10, out var transformInternal, false)
-                || !transformInternal.IsValidVirtualAddress())
-            {
-                Log.WriteRateLimited(AppLogLevel.Warning, $"tx_s2_{player.Base:X}", TimeSpan.FromSeconds(5),
-                    $"[RegisteredPlayers] TryInitTransform '{player.Name}': step2 transformInternal failed (lookTransform=0x{lookTransform:X})");
-                return false;
-            }
-
-            // Step 3: resolve native TransformAccess + hierarchy in one call (no double-read race)
-            if (!ResolveNativeTransformInternal(transformInternal, out var nativeTi, out var hierarchy))
-            {
-                Log.WriteRateLimited(AppLogLevel.Warning, $"tx_s3_{player.Base:X}", TimeSpan.FromSeconds(5),
-                    $"[RegisteredPlayers] TryInitTransform '{player.Name}': step3 nativeTI/hierarchy resolve failed (transformInternal=0x{transformInternal:X})");
-                return false;
-            }
-
-            // Step 3b: index sanity (informational — kept so we still log a recognizable
-            // taIndex on the OK line; not used for position lookup anymore).
-            if (!Memory.TryReadValue<int>(nativeTi + TransformAccess.IndexOffset, out var taIndex, false)
-                || taIndex < 0 || taIndex > 128_000)
-            {
-                Log.WriteRateLimited(AppLogLevel.Warning, $"tx_s3b_{player.Base:X}", TimeSpan.FromSeconds(5),
-                    $"[RegisteredPlayers] TryInitTransform '{player.Name}': step3b taIndex out of range (nativeTI=0x{nativeTi:X} taIndex={taIndex})");
-                return false;
-            }
-
-            // Step 4: read the cached world position at hierarchy + WorldPositionOffset.
-            // In Arena Unity 6 the hierarchy stores TRS at h+0xB0/0xC0/0xD0 — no need
-            // to walk a parent-index chain. Each player owns its own hierarchy.
-            ulong worldPosAddr = hierarchy + TransformHierarchy.WorldPositionOffset;
-            if (!Memory.TryReadValue<Vector3>(worldPosAddr, out var initPos, false)
-                || !float.IsFinite(initPos.X) || !float.IsFinite(initPos.Y) || !float.IsFinite(initPos.Z))
-            {
-                Log.WriteRateLimited(AppLogLevel.Warning, $"tx_s4_{player.Base:X}", TimeSpan.FromSeconds(5),
-                    $"[RegisteredPlayers] TryInitTransform '{player.Name}': step4 worldPos read failed (hierarchy=0x{hierarchy:X})");
-                return false;
-            }
-
-            player.TransformInternal = nativeTi;
-            player.TransformIndex    = taIndex;
-            player.VerticesAddr      = worldPosAddr; // realtime worker reads Vector3 here
-            player.CachedIndices     = null;
-            player.TransformReady    = true;
-            player.TransformInitFailStreak = 0;
-            player.NextTransformInitTick = 0;
-
-            // Only apply the position if it is a real spawn (not the <0,-1000,0> sentinel and
-            // not an exact <0,0,0> from a freshly-allocated / zeroed hierarchy) — otherwise the
-            // player would briefly render at origin on the radar and the realtime worker would
-            // flag it as "established" before the TRS has actually been written by Unity.
-            if (initPos.Y > -500f && initPos != Vector3.Zero)
-            {
-                player.Position         = initPos;
-                player.HasValidPosition = true;
-            }
-
-            Log.Write(AppLogLevel.Debug,
-                $"[RegisteredPlayers] Transform OK '{player.Name}': pos={initPos} idx={taIndex}");
-            return true;
-        }
-
-        /// <summary>
-        /// Given a pointer read from <c>lookTransform + 0x10</c>, resolves the actual native
-        /// Unity TransformInternal (TransformAccess) pointer AND the hierarchy pointer it
-        /// dereferences — so the caller can use the hierarchy without a second DMA read.
-        /// <para>
-        /// In some Unity/IL2CPP builds <c>lookTransform + 0x10</c> is already the native pointer;
-        /// in others it is a managed wrapper and the native pointer sits one more hop at <c>+0x10</c>.
-        /// We detect which case applies by checking whether <c>HierarchyOffset</c> yields a valid
-        /// address.  Returns false if neither candidate works.
-        /// </para>
-        /// </summary>
-        private static bool ResolveNativeTransformInternal(
-            ulong candidate,
-            out ulong nativeTI,
-            out ulong hierarchy)
-        {
-            hierarchy = 0;
-
-            // Path A: candidate itself is the native TransformAccess object
-            if (Memory.TryReadPtr(candidate + TransformAccess.HierarchyOffset, out var hA, false)
-                && hA.IsValidVirtualAddress())
-            {
-                nativeTI  = candidate;
-                hierarchy = hA;
-                return true;
-            }
-
-            // Path B: candidate is a managed wrapper; native pointer is one hop deeper at +0x10
-            if (Memory.TryReadPtr(candidate + 0x10, out var inner, false)
-                && inner.IsValidVirtualAddress()
-                && Memory.TryReadPtr(inner + TransformAccess.HierarchyOffset, out var hB, false)
-                && hB.IsValidVirtualAddress())
-            {
-                nativeTI  = inner;
-                hierarchy = hB;
-                return true;
-            }
-
-            nativeTI = 0;
-            return false;
-        }
-
-        // ── Rotation init ─────────────────────────────────────────────────────
-
-        private static bool TryInitRotation(Player player)
-        {
-            ulong rotAddr;
-
-            if (player.IsLocalPlayer)
-            {
-                // Local player: MovementContext → _rotation
-                if (!Memory.TryReadPtr(player.Base + Offsets.Player.MovementContext, out var movCtx, false)
-                    || !movCtx.IsValidVirtualAddress())
-                {
-                    Log.WriteRateLimited(AppLogLevel.Warning, $"rot_s1_{player.Base:X}", TimeSpan.FromSeconds(5),
-                        $"[RegisteredPlayers] TryInitRotation '{player.Name}': movCtx failed (base=0x{player.Base:X})");
-                    return false;
-                }
-                rotAddr = movCtx + Offsets.MovementContext._rotation;
-            }
-            else
-            {
-                // Observed: ObservedPlayerController → MovementController → rotation
-                if (!Memory.TryReadPtr(player.Base + Offsets.ObservedPlayerView.ObservedPlayerController, out var opc, false)
-                    || !opc.IsValidVirtualAddress())
-                {
-                    Log.WriteRateLimited(AppLogLevel.Warning, $"rot_s1_{player.Base:X}", TimeSpan.FromSeconds(5),
-                        $"[RegisteredPlayers] TryInitRotation '{player.Name}': opc failed (base=0x{player.Base:X} off=0x{Offsets.ObservedPlayerView.ObservedPlayerController:X})");
-                    return false;
-                }
-                if (!Memory.TryReadPtr(opc + Offsets.ObservedPlayerController.MovementController, out var mc, false)
-                    || !mc.IsValidVirtualAddress())
-                {
-                    Log.WriteRateLimited(AppLogLevel.Warning, $"rot_s2_{player.Base:X}", TimeSpan.FromSeconds(5),
-                        $"[RegisteredPlayers] TryInitRotation '{player.Name}': mc failed (opc=0x{opc:X} off=0x{Offsets.ObservedPlayerController.MovementController:X})");
-                    return false;
-                }
-                if (!Memory.TryReadPtr(mc + Offsets.ObservedMovementController.StateContext, out var stateCtxPtr, false)
-                    || !stateCtxPtr.IsValidVirtualAddress())
-                {
-                    Log.WriteRateLimited(AppLogLevel.Warning, $"rot_s2b_{player.Base:X}", TimeSpan.FromSeconds(5),
-                        $"[RegisteredPlayers] TryInitRotation '{player.Name}': stateCtx failed (mc=0x{mc:X} off=0x{Offsets.ObservedMovementController.StateContext:X})");
-                    return false;
-                }
-                rotAddr = stateCtxPtr + Offsets.ObservedPlayerStateContext.Rotation;
-            }
-
-            if (!Memory.TryReadValue<Vector2>(rotAddr, out var rot, false)
-                || !float.IsFinite(rot.X) || !float.IsFinite(rot.Y))
-            {
-                Log.WriteRateLimited(AppLogLevel.Warning, $"rot_s3_{player.Base:X}", TimeSpan.FromSeconds(5),
-                    $"[RegisteredPlayers] TryInitRotation '{player.Name}': rot read failed (rotAddr=0x{rotAddr:X})");
-                return false;
-            }
-
-            player.RotationAddr  = rotAddr;
-            player.RotationReady = true;
-            player.RotationInitFailStreak = 0;
-            player.NextRotationInitTick = 0;
-
-            Log.Write(AppLogLevel.Debug,
-                $"[RegisteredPlayers] Rotation OK '{player.Name}': yaw={rot.X:F1}°");
-            return true;
-        }
-
-        // ── Discovery helpers ─────────────────────────────────────────────────
-
-        private Player? CreatePlayerEntry(ulong playerBase, bool isLocal)
-        {
-            try
-            {
-                string name;
-                string? accountId = null;
-                string? profileId = null;
-                PlayerType type;
-                bool isAI = false;
-                int teamId = -1;
-
-                if (isLocal)
-                {
-                    // Arena doesn't expose a readable nickname for the local player — the Profile
-                    // chain is deep and version-dependent. Use a fixed label for now.
-                    name = "LocalPlayer";
-                    type = PlayerType.LocalPlayer;
-
-                    // Arena TeamID (armband color) via Player._inventoryController.
-                    // We do NOT lock _matchLocalTeamId here — the very first armband read at
-                    // match start is the most likely to be wrong (slot still being populated /
-                    // stale ContainedItem from the reused previous-round GameWorld). Only seed
-                    // an initial value; the stability gate in UpdateExistingPlayers requires N
-                    // consecutive matching reads before promoting it to _matchLocalTeamId.
-                    try
-                    {
-                        if (_matchLocalTeamId >= 0)
-                        {
-                            // Already locked from a previous tick (e.g. respawn rebuilds entry).
-                            teamId = _matchLocalTeamId;
-                        }
-                        else if (Memory.TryReadPtr(playerBase + Offsets.Player._inventoryController, out var invCtrl, false)
-                                 && invCtrl.IsValidVirtualAddress())
-                        {
-                            teamId = GetTeamIDForDiscovery(playerBase, isLocal: true, invCtrl);
-                            // Note: stability streak is built/extended in UpdateExistingPlayers,
-                            // not here — we don't want a single discovery-time read to count.
-                        }
-                    }
-                    catch { }
-                }
-                else
-                {
-                    // Observed player (ObservedPlayerView hierarchy)
-                    int sideRaw = Memory.ReadValue<int>(playerBase + Offsets.ObservedPlayerView.Side, false);
-                    isAI = Memory.ReadValue<bool>(playerBase + Offsets.ObservedPlayerView.IsAI, false);
-
-                    // Nickname
-                    if (Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView.NickName, out var nickPtr, false)
-                        && nickPtr.IsValidVirtualAddress())
-                    {
-                        name = Memory.ReadUnityString(nickPtr, 64, false);
-                    }
-                    else
-                    {
-                        name = string.Empty;
-                    }
-
-                    // AccountId: not populated by Arena's server — skipped.
-                    // ProfileId (optional)
-                    if (Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView.ProfileId, out var profPtr, false)
-                        && profPtr.IsValidVirtualAddress())
-                    {
-                        var prof = Memory.ReadUnityString(profPtr, 64, false);
-                        if (!string.IsNullOrEmpty(prof))
-                            profileId = prof;
-                    }
-
-                    // If nickname is empty, use voice-based role for AI or ID-based fallback
-                    if (string.IsNullOrWhiteSpace(name))
-                    {
-                        if (isAI)
-                        {
-                            var voice = TryReadVoiceLine(playerBase);
-                            name = GetAIName(voice ?? string.Empty);
-                        }
-                        else
-                        {
-                            var id = Memory.ReadValue<int>(playerBase + Offsets.ObservedPlayerView.Id, false);
-                            name = sideRaw == 4 ? $"PScav{id}" : $"PMC{id}";
-                        }
-                    }
-
-                    type = isAI
-                        ? GetAIType(TryReadVoiceLine(playerBase) ?? string.Empty)
-                        : FactionFromSide(sideRaw);
-
-                    // Arena TeamID (armband color) via ObservedPlayerController -> InventoryController.
-                    // Only meaningful for humans (AI don't have armbands).
-                    if (!isAI)
-                    {
-                        try
-                        {
-                            if (Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView.ObservedPlayerController, out var opc, false)
-                                && opc.IsValidVirtualAddress()
-                                && Memory.TryReadPtr(opc + Offsets.ObservedPlayerController.InventoryController, out var invCtrl, false)
-                                && invCtrl.IsValidVirtualAddress())
-                            {
-                                teamId = GetTeamIDForDiscovery(playerBase, isLocal: false, invCtrl);
-                            }
-                        }
-                        catch { }
-
-                        // Teammate classification — matches local player's match-locked team.
-                        int localTeam = _matchLocalTeamId >= 0
-                            ? _matchLocalTeamId
-                            : (LocalPlayer?.TeamID ?? -1);
-                        if (teamId != -1 && localTeam >= 0 && localTeam == teamId)
-                            type = PlayerType.Teammate;
-                    }
-                }
-
-                var player = new Player
-                {
-                    Base        = playerBase,
-                    Name        = name,
-                    AccountId   = accountId,
-                    ProfileId   = profileId,
-                    Type        = type,
-                    IsLocalPlayer = isLocal,
-                    IsAI        = isAI,
-                    TeamID      = teamId,
-                    IsActive    = true,
-                    IsAlive     = true,
-                };
-
-                Log.WriteLine($"[RegisteredPlayers] Discovered: {player} @ 0x{playerBase:X} (local={isLocal})");
-
-                return player;
-            }
-            catch (Exception ex)
-            {
-                Log.WriteRateLimited(AppLogLevel.Warning, $"create_{playerBase:X}", TimeSpan.FromSeconds(5),
-                    $"[RegisteredPlayers] CreatePlayerEntry FAILED 0x{playerBase:X}: {ex.Message}");
-                return null;
-            }
-        }
-
-        private static string? TryReadVoiceLine(ulong playerBase)
-        {
-            try
-            {
-                if (!Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView.Voice, out var voicePtr, false)
-                    || !voicePtr.IsValidVirtualAddress())
-                    return null;
-                return Memory.ReadUnityString(voicePtr, 64, false);
-            }
-            catch { return null; }
-        }
-
-        // ── AI role helpers ───────────────────────────────────────────────────
-
-        // Armband template GUID -> Arena TeamID (ArmbandColorType).
-        // Note: the red/blue GUIDs are labelled from the in-game team color, which is the
-        // OPPOSITE of the raw item template name (the "red armband" template is worn by the
-        // in-game "blue team" and vice versa). TeamID equality is what drives teammate
-        // classification, so only the label would be affected either way — these values
-        // match what the player sees on-screen.
-        private static readonly FrozenDictionary<string, int> _armbandTeamIds =
-            new Dictionary<string, int>(StringComparer.Ordinal)
-            {
-                ["63615c104bc92641374a97c8"] = (int)ArmbandColorType.red,
-                ["63615bf35cb3825ded0db945"] = (int)ArmbandColorType.fuchsia,
-                ["63615c36e3114462cd79f7c1"] = (int)ArmbandColorType.yellow,
-                ["63615bfc5cb3825ded0db947"] = (int)ArmbandColorType.green,
-                ["63615bc6ff557272023d56ac"] = (int)ArmbandColorType.azure,
-                ["63615c225cb3825ded0db949"] = (int)ArmbandColorType.white,
-                ["63615be82e60050cb330ef2f"] = (int)ArmbandColorType.blue,
-            }.ToFrozenDictionary(StringComparer.Ordinal);
-
-        /// <summary>
-        /// Returns the Arena TeamID derived from the player's ArmBand slot item template GUID.
-        /// -1 if not found or read fails. Caches the ArmBand slot address on the <paramref name="player"/>
-        /// (if provided) so subsequent reads skip the equipment slot scan.
-        /// </summary>
-        private static int GetTeamID(Player? player, ulong inventoryController)
-            => GetTeamIDInternal(player, inventoryController, diagBase: player?.Base ?? 0, diagIsLocal: player?.IsLocalPlayer ?? false);
-
-        /// <summary>
-        /// Discovery-time variant: lets <see cref="CreatePlayerEntry"/> pass the playerBase and
-        /// isLocal flag explicitly so the diagnostic log can label the read correctly even though
-        /// no Player object exists yet.
-        /// </summary>
-        private static int GetTeamIDForDiscovery(ulong playerBase, bool isLocal, ulong inventoryController)
-            => GetTeamIDInternal(player: null, inventoryController, diagBase: playerBase, diagIsLocal: isLocal);
-
-        private static int GetTeamIDInternal(Player? player, ulong inventoryController, ulong diagBase, bool diagIsLocal)
-        {
-            try
-            {
-                string diagLabel = diagIsLocal ? "LOCAL" : "OBS";
-
-                // Fast path: use cached ArmBand slot ptr if we've resolved it before.
-                if (player is not null && player.ArmBandSlotAddr != 0)
-                {
-                    int teamFast = ReadArmbandTeamFromSlotDiag(player.ArmBandSlotAddr, diagBase, diagLabel);
-                    if (teamFast >= 0) return teamFast;
-                    // Slot went stale (respawn / equipment rebuild) — fall through and rescan.
-                    player.ArmBandSlotAddr = 0;
-                }
-
-                var inventory = Memory.ReadPtr(inventoryController + Offsets.InventoryController.Inventory);
-                var equipment = Memory.ReadPtr(inventory + Offsets.Inventory.Equipment);
-                var slots     = Memory.ReadPtr(equipment + Offsets.CompoundItem.Slots);
-
-                using var slotsArray = MemArray<ulong>.Get(slots);
-                foreach (var slotPtr in slotsArray)
-                {
-                    if (!slotPtr.IsValidVirtualAddress()) continue;
-                    if (!Memory.TryReadPtr(slotPtr + Offsets.Slot.ID, out var slotNamePtr, false)
-                        || !slotNamePtr.IsValidVirtualAddress()) continue;
-
-                    if (Memory.ReadUnityString(slotNamePtr, 32, false) != "ArmBand") continue;
-
-                    if (player is not null) player.ArmBandSlotAddr = slotPtr;
-                    return ReadArmbandTeamFromSlotDiag(slotPtr, diagBase, diagLabel);
-                }
-            }
-            catch { /* transient read failures are expected during player init */ }
-            return -1;
-        }
-
-        // Probes the local Player object for the real <_inventoryController> field offset
-        // by scanning every 8-byte aligned pointer slot in a plausible range and picking the
-        // first one whose Inventory→Equipment→Slots chain contains an "ArmBand" slot whose
-        // ContainedItem template GUID is a known armband GUID. Caches the resolved offset.
-        // Range 0x100..0x1000 covers all observed Arena Player layouts; 8-byte aligned.
-        private void ProbeLocalInventoryControllerOffset(ulong playerBase)
-        {
-            // Don't latch _localInvCtrlOffsetProbed=true until we actually resolve. If the
-            // armband isn't equipped yet at match start, the probe legitimately fails and we
-            // want to keep retrying on subsequent registration ticks until it succeeds.
-
-            const uint scanStart = 0x100;
-            const uint scanEnd   = 0x1000;
-            const uint scanStep  = 0x8;
-
-            int candidates = 0;
-            for (uint off = scanStart; off < scanEnd; off += scanStep)
-            {
-                if (!Memory.TryReadPtr(playerBase + off, out var invCtrl, false)) continue;
-                if (!invCtrl.IsValidVirtualAddress()) continue;
-                if (!Memory.TryReadPtr(invCtrl + Offsets.InventoryController.Inventory, out var inventory, false)
-                    || !inventory.IsValidVirtualAddress()) continue;
-                if (!Memory.TryReadPtr(inventory + Offsets.Inventory.Equipment, out var equipment, false)
-                    || !equipment.IsValidVirtualAddress()) continue;
-                if (!Memory.TryReadPtr(equipment + Offsets.CompoundItem.Slots, out var slots, false)
-                    || !slots.IsValidVirtualAddress()) continue;
-
-                MemArray<ulong>? slotsArray = null;
-                try { slotsArray = MemArray<ulong>.Get(slots, false); }
-                catch { continue; }
-                if (slotsArray is null) continue;
-
-                using (slotsArray)
-                {
-                    int slotCount = slotsArray.Count;
-                    if (slotCount <= 0 || slotCount > 64) continue; // real equipment has ~10-15 slots
-
-                    candidates++;
-                    foreach (var slotPtr in slotsArray)
-                    {
-                        if (!slotPtr.IsValidVirtualAddress()) continue;
-                        if (!Memory.TryReadPtr(slotPtr + Offsets.Slot.ID, out var slotNamePtr, false)
-                            || !slotNamePtr.IsValidVirtualAddress()) continue;
-                        string nm;
-                        try { nm = Memory.ReadUnityString(slotNamePtr, 32, false); }
-                        catch { continue; }
-                        if (nm != "ArmBand") continue;
-
-                        // Confirm by checking the ContainedItem template GUID is a known
-                        // armband GUID (guards against false-positive chains).
-                        int team = ReadArmbandTeamFromSlotDiag(slotPtr, playerBase, label: null);
-                        if (team < 0) continue;
-
-                        _localInvCtrlOffsetResolved = off;
-                        _localInvCtrlOffsetProbed = true;
-                        Log.WriteLine($"[RegisteredPlayers] LocalPlayer _inventoryController offset auto-resolved: base=0x{playerBase:X} +0x{off:X} (team={(ArmbandColorType)team}, candidates scanned={candidates})");
-                        return;
-                    }
-                }
-            }
-
-            // Probe legitimately fails until the armband is equipped (start-of-match grace),
-            // so this gets retried every team-id back-off tick. Keep it Debug + rate-limited
-            // per-base so it doesn't dominate the log on every retry.
-            Log.WriteRateLimited(AppLogLevel.Debug, $"local_invctrl_probe_{playerBase:X}", TimeSpan.FromSeconds(10),
-                $"[RegisteredPlayers] LocalPlayer _inventoryController offset probe pending on base=0x{playerBase:X} (scanned 0x{scanStart:X}..0x{scanEnd:X}, candidates={candidates}); using hardcoded 0x{Offsets.Player._inventoryController:X}");
-        }
-
-        // Diagnostic variant: when label != null, logs the raw GUID + resolved team once per
-        // (playerBase,label) pair every 30s so we can see WHY a player is being classified
-        // the way they are without spamming the log.
-        private static int ReadArmbandTeamFromSlotDiag(ulong slotPtr, ulong playerBase, string? label)
-        {
-            try
-            {
-                if (!Memory.TryReadPtr(slotPtr + Offsets.Slot.ContainedItem, out var containedItem, false)
-                    || !containedItem.IsValidVirtualAddress())
-                    return -1;
-
-                var itemTemplate = Memory.ReadPtr(containedItem + Offsets.LootItem.Template);
-                var mongo = Memory.ReadValue<Types.MongoID>(itemTemplate + Offsets.ItemTemplate._id);
-                var id = Memory.ReadUnityString(mongo.StringID, 64, false);
-
-                if (string.IsNullOrEmpty(id)) return -1;
-                bool known = _armbandTeamIds.TryGetValue(id, out var team);
-                if (label is not null)
-                {
-                    string teamLabel = known ? ((ArmbandColorType)team).ToString() : "UNKNOWN";
-                    Log.WriteRateLimited(AppLogLevel.Debug,
-                        $"armband_diag_{playerBase:X}_{label}",
-                        TimeSpan.FromSeconds(30),
-                        $"[ArmbandDiag] {label} base=0x{playerBase:X} guid={id} -> {teamLabel}");
-                }
-                return known ? team : -1;
-            }
-            catch { return -1; }
-        }
-
-        private static PlayerType FactionFromSide(int sideRaw) => sideRaw switch
-        {
-            1 => PlayerType.USEC,
-            2 => PlayerType.BEAR,
-            4 => PlayerType.PScav,
-            _ => PlayerType.Default,
-        };
+        // ── Shared back-off schedulers ────────────────────────────────────────
+        // Called across all partial files via partial class visibility.
 
         // Back-off for TeamID resolution: ramp gently, capped at 5s so respawned players resolve fast.
         private static void ScheduleTeamIdRetry(Player p, long nowTick)
@@ -1255,7 +492,7 @@ namespace eft_dma_radar.Arena.GameWorld
             p.NextTeamIdTick = nowTick + delayMs;
         }
 
-        // Back-off for transform/rotation init — Arena respawns are fast, keep retries snappy.
+        // Back-off for transform/rotation init â€” Arena respawns are fast, keep retries snappy.
         private static void ScheduleTransformInitRetry(Player p, long nowTick)
         {
             int streak = Math.Min(++p.TransformInitFailStreak, 10);
@@ -1270,32 +507,5 @@ namespace eft_dma_radar.Arena.GameWorld
             p.NextRotationInitTick = nowTick + delayMs;
         }
 
-        private static readonly FrozenDictionary<string, (string Name, PlayerType Type)> _aiRoles =
-            new Dictionary<string, (string, PlayerType)>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Arena_Guard_1"]  = ("Arena Guard",  PlayerType.AIGuard),
-                ["Arena_Guard_2"]  = ("Arena Guard",  PlayerType.AIGuard),
-                ["BossSanitar"]    = ("Sanitar",       PlayerType.AIBoss),
-                ["BossBully"]      = ("Reshala",       PlayerType.AIBoss),
-                ["BossGluhar"]     = ("Gluhar",        PlayerType.AIBoss),
-                ["SectantPriest"]  = ("Priest",        PlayerType.AIBoss),
-                ["SectantWarrior"] = ("Cultist",       PlayerType.AIRaider),
-                ["BossKilla"]      = ("Killa",         PlayerType.AIBoss),
-                ["BossTagilla"]    = ("Tagilla",       PlayerType.AIBoss),
-            }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
-
-        private static string GetAIName(string voice)
-        {
-            if (_aiRoles.TryGetValue(voice, out var role)) return role.Name;
-            return voice.Contains("guard", StringComparison.OrdinalIgnoreCase) ? "Guard" : "Bot";
-        }
-
-        private static PlayerType GetAIType(string voice)
-        {
-            if (_aiRoles.TryGetValue(voice, out var role)) return role.Type;
-            return voice.Contains("guard", StringComparison.OrdinalIgnoreCase)
-                ? PlayerType.AIGuard
-                : PlayerType.AIScav;
-        }
     }
 }

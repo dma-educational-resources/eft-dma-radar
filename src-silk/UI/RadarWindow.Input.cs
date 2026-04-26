@@ -174,6 +174,16 @@ namespace eft_dma_radar.Silk.UI
 
         private static void OnKeyDown(IKeyboard keyboard, Key key, int scancode)
         {
+            // F8 is a global debug toggle — always fires regardless of ImGui focus
+            if (key == Key.F8)
+            {
+                Log.EnableDebugLogging = !Log.EnableDebugLogging;
+                Log.WriteLine($"[RadarWindow] Debug logging {(Log.EnableDebugLogging ? "ON" : "OFF")}");
+                if (Log.EnableDebugLogging)
+                    Memory.Game?.DumpAll();
+                return;
+            }
+
             // Don't handle shortcuts when ImGui text inputs have focus
             if (ImGui.GetIO().WantCaptureKeyboard)
                 return;
@@ -220,8 +230,8 @@ namespace eft_dma_radar.Silk.UI
                     LootWidget.IsOpen = false;
                     AimviewWidget.IsOpen = false;
                     break;
-            }
-        }
+                    }
+                }
 
         #endregion
 

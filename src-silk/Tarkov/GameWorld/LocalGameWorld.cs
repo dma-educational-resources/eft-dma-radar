@@ -1274,6 +1274,32 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         #endregion
 
+        #region Debug Dump
+
+        /// <summary>
+        /// Dumps IL2CPP hierarchy for the GameWorld object and all currently-active players.
+        /// Gated by <see cref="Log.EnableDebugLogging"/> — no-op in normal operation.
+        /// Called from the F8 runtime toggle and can also be called from code at any time.
+        /// </summary>
+        internal void DumpAll()
+        {
+            if (!Log.EnableDebugLogging)
+                return;
+
+            try
+            {
+                Il2CppDumper.DumpClassFields(_base, $"ClientLocalGameWorld @ 0x{_base:X} (map={MapID})");
+            }
+            catch (Exception ex)
+            {
+                Log.Write(AppLogLevel.Debug, $"DumpAll GameWorld failed: {ex.Message}", "LocalGameWorld");
+            }
+
+            _registeredPlayers.DumpAll();
+        }
+
+        #endregion
+
         #region Types
 
         /// <summary>

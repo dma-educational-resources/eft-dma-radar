@@ -134,6 +134,12 @@ namespace eft_dma_radar.Arena.UI
                     _freeMode = !_freeMode;
                     if (!_freeMode) _mapPanPosition = Vector2.Zero;
                     break;
+                case Key.F8:
+                    Log.EnableDebugLogging = !Log.EnableDebugLogging;
+                    Log.WriteLine($"[ArenaProgram] Debug logging {(Log.EnableDebugLogging ? "ENABLED" : "DISABLED")} (F8 toggle)");
+                    if (Log.EnableDebugLogging)
+                        Memory.CurrentGameWorld?.DumpAll();
+                    break;
             }
         }
     }

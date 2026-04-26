@@ -21,6 +21,9 @@ namespace eft_dma_radar.Arena
             try
             {
                 Config = ArenaConfig.Load();
+                var args = Environment.GetCommandLineArgs();
+                Log.EnableDebugLogging = Config.DebugLogging
+                    || (args?.Contains("-debug", StringComparer.OrdinalIgnoreCase) ?? false);
                 Log.WriteLine("[ArenaProgram] Config loaded OK.");
 
                 ExceptionTracer.Install();

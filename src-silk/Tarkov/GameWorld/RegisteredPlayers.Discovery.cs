@@ -1,4 +1,5 @@
 using eft_dma_radar.Silk.Tarkov.Unity;
+using eft_dma_radar.Silk.Tarkov.Unity.IL2CPP;
 using System.Collections.Frozen;
 using static eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets;
 using static SDK.Offsets;
@@ -388,6 +389,76 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 role = new("Raider", PlayerType.AIRaider);
 
             return role;
+        }
+
+        #endregion
+
+        #region Debug Dump
+
+        /// <summary>
+        /// Dumps the full IL2CPP class hierarchy for a single player object.
+        /// For observed players: also dumps OPC, HealthController, MovementController, and PlayerBody.
+        /// Gated by <see cref="Log.EnableDebugLogging"/> — callers should check before calling,
+        /// but this method also returns early if the flag is not set.
+        /// </summary>
+        private static void DumpPlayerHierarchy(ulong playerBase, string playerName, bool isObserved)
+        {
+            if (!Log.EnableDebugLogging)
+                return;
+
+            if (playerBase == 0)
+                return;
+
+            try
+            {
+                var label = isObserved
+                    ? $"ObservedPlayer '{playerName}' (ObservedPlayerView)"
+                    : $"LocalPlayer '{playerName}' (ClientPlayer)";
+
+                Il2CppDumper.DumpClassFields(playerBase, label);
+
+                if (isObserved)
+                {
+                    // OPC hub
+                    if (Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView.ObservedPlayerController, out var opc, false) && opc != 0)
+                    {
+                        Il2CppDumper.DumpClassFields(opc, $"OPC '{playerName}' (ObservedPlayerController)");
+
+                        // HealthController
+                        if (Memory.TryReadPtr(opc + Offsets.ObservedPlayerController.HealthController, out var hc, false) && hc != 0)
+                            Il2CppDumper.DumpClassFields(hc, $"HC '{playerName}' (ObservedHealthController)");
+
+                        // MovementController (2-hop array: OPC→step1@[0]→StateContext@[1])
+                        var mcOffsets = Offsets.ObservedPlayerController.MovementController;
+                        if (Memory.TryReadPtr(opc + mcOffsets[0], out var mc1, false) && mc1 != 0)
+                        {
+                            Il2CppDumper.DumpClassFields(mc1, $"MovCtrl-step1 '{playerName}'");
+                            if (Memory.TryReadPtr(mc1 + mcOffsets[1], out var sc, false) && sc != 0)
+                                Il2CppDumper.DumpClassFields(sc, $"StateContext '{playerName}'");
+                        }
+                    }
+
+                    // PlayerBody
+                    if (Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView.PlayerBody, out var pb, false) && pb != 0)
+                        Il2CppDumper.DumpClassFields(pb, $"PlayerBody '{playerName}'");
+                }
+                else
+                {
+                    // Local player — MovementContext and InventoryController
+                    if (Memory.TryReadPtr(playerBase + Offsets.Player.MovementContext, out var mc, false) && mc != 0)
+                        Il2CppDumper.DumpClassFields(mc, $"MovementContext '{playerName}'");
+
+                    if (Memory.TryReadPtr(playerBase + Offsets.Player._inventoryController, out var ic, false) && ic != 0)
+                        Il2CppDumper.DumpClassFields(ic, $"InventoryController '{playerName}'");
+
+                    if (Memory.TryReadPtr(playerBase + Offsets.Player._playerBody, out var pb, false) && pb != 0)
+                        Il2CppDumper.DumpClassFields(pb, $"PlayerBody '{playerName}'");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Write(AppLogLevel.Debug, $"DumpPlayerHierarchy failed for '{playerName}' @ 0x{playerBase:X}: {ex.Message}", "RegisteredPlayers");
+            }
         }
 
         #endregion

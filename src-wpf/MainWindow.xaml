@@ -266,7 +266,7 @@
         </Canvas>
 
         <!-- general settings panel -->
-        <Canvas Name="GeneralSettingsCanvas" Panel.ZIndex="1000">
+        <Canvas Name="GeneralSettingsCanvas" Panel.ZIndex="1000" Margin="0,32,0,0">
             <Border x:Name="GeneralSettingsPanel"
                     Width="340" Height="600"
                     Canvas.Left="700" Canvas.Top="50"
@@ -280,7 +280,7 @@
         </Canvas>
 
         <!-- loot settings panel -->
-        <Canvas Name="LootSettingsCanvas" Panel.ZIndex="1000">
+        <Canvas Name="LootSettingsCanvas" Panel.ZIndex="1000" Margin="0,32,0,0">
             <Border x:Name="LootSettingsPanel"
                     Width="350" Height="450"
                     Canvas.Left="700" Canvas.Top="50"
@@ -294,7 +294,7 @@
         </Canvas>
 
         <!-- memory writing panel -->
-        <Canvas Name="MemoryWritingCanvas" Panel.ZIndex="1000">
+        <Canvas Name="MemoryWritingCanvas" Panel.ZIndex="1000" Margin="0,32,0,0">
             <Border x:Name="MemoryWritingPanel"
                     Width="350" Height="550"
                     Canvas.Left="650" Canvas.Top="70"
@@ -308,7 +308,7 @@
         </Canvas>
         
         <!-- esp panel -->
-        <Canvas Name="ESPCanvas" Panel.ZIndex="1000">
+        <Canvas Name="ESPCanvas" Panel.ZIndex="1000" Margin="0,32,0,0">
             <Border x:Name="ESPPanel"
                     Width="350" Height="550"
                     Canvas.Left="600" Canvas.Top="90"
@@ -322,7 +322,7 @@
         </Canvas>
 
         <!-- loot filter panel -->
-        <Canvas Name="LootFilterCanvas" Panel.ZIndex="1000">
+        <Canvas Name="LootFilterCanvas" Panel.ZIndex="1000" Margin="0,32,0,0">
             <Border x:Name="LootFilterPanel"
                     Width="350" Height="450"
                     Canvas.Left="550" Canvas.Top="110"
@@ -336,7 +336,7 @@
         </Canvas>
         
         <!-- settings search panel -->
-        <Canvas Name="SettingsSearchCanvas" Panel.ZIndex="1000">
+        <Canvas Name="SettingsSearchCanvas" Panel.ZIndex="1000" Margin="0,32,0,0">
             <Border x:Name="SettingsSearchPanel"
                     Width="420" Height="560"
                     Canvas.Left="760" Canvas.Top="60"
@@ -349,9 +349,9 @@
             </Border>
         </Canvas>
         <!-- map setup panel -->
-        <Canvas Name="MapSetupCanvas" Panel.ZIndex="1000">
+        <Canvas Name="MapSetupCanvas" Panel.ZIndex="1000" Margin="0,32,0,0">
             <Border x:Name="MapSetupPanel"
-                    Width="365" Height="145"
+                    MinWidth="340" MinHeight="145"
                     Canvas.Left="550" Canvas.Top="110"
                     CornerRadius="8"
                     Visibility="Collapsed"
@@ -363,7 +363,7 @@
         </Canvas>
 
         <!-- quest planner panel -->
-        <Canvas Name="QuestPlannerCanvas" Panel.ZIndex="1000">
+        <Canvas Name="QuestPlannerCanvas" Panel.ZIndex="1000" Margin="0,32,0,0">
             <Border x:Name="QuestPlannerPanel"
                     Width="340" Height="600"
                     Canvas.Left="650" Canvas.Top="50"
@@ -377,7 +377,7 @@
         </Canvas>
 
         <!-- hideout stash panel -->
-        <Canvas Name="HideoutStashCanvas" Panel.ZIndex="1000">
+        <Canvas Name="HideoutStashCanvas" Panel.ZIndex="1000" Margin="0,32,0,0">
             <Border x:Name="HideoutStashPanel"
                     Width="540" Height="480"
                     Canvas.Left="500" Canvas.Top="70"
@@ -391,7 +391,7 @@
         </Canvas>
 
         <!-- watchlist panel -->
-        <Canvas Name="WatchlistCanvas" Panel.ZIndex="1000">
+        <Canvas Name="WatchlistCanvas" Panel.ZIndex="1000" Margin="0,32,0,0">
             <Border x:Name="WatchlistPanel"
                     Width="350" Height="450"
                     Canvas.Left="550" Canvas.Top="110"
@@ -405,7 +405,7 @@
         </Canvas>
 
         <!-- player history panel -->
-        <Canvas Name="PlayerHistoryCanvas" Panel.ZIndex="1000">
+        <Canvas Name="PlayerHistoryCanvas" Panel.ZIndex="1000" Margin="0,32,0,0">
             <Border x:Name="PlayerHistoryPanel"
                     Width="490" Height="200"
                     Canvas.Left="550" Canvas.Top="110"

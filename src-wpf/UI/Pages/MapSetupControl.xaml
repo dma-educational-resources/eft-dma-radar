@@ -4,8 +4,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:hc="https://handyorg.github.io/handycontrol"
-             mc:Ignorable="d" 
-             Width="365" Height="145">
+             mc:Ignorable="d"
+             MinWidth="340" MinHeight="145">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -150,6 +150,12 @@
                                       Maximum="10000"/>
                 </Grid>
             </hc:SimpleStackPanel>
+
+            <!-- Resize handle -->
+            <Grid Style="{StaticResource ResizeHandle}"
+                  MouseLeftButtonDown="ResizeHandle_MouseLeftButtonDown">
+                <Path Style="{StaticResource ResizeHandleIcon}"/>
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>
