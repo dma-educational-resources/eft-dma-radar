@@ -150,7 +150,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// Pairs a <see cref="Player.Player"/> with its cached transform data so we can avoid
         /// re-walking the pointer chain on every tick.
         /// </summary>
-        private sealed class PlayerEntry(ulong playerBase, Player.Player player, bool isObserved)
+        internal sealed class PlayerEntry(ulong playerBase, Player.Player player, bool isObserved)
         {
             public readonly ulong Base = playerBase;
             public readonly Player.Player Player = player;
@@ -695,7 +695,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         {
             // Collect active skeletons
             int count = 0;
-            Player.Skeleton?[] skeletons = _skeletonUpdateBuf;
+            PlayerEntry[] players = _playerUpdateBuf;
             foreach (var kvp in _players)
             {
                 var entry = kvp.Value;
@@ -706,22 +706,22 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 if (skeleton is null || !skeleton.TransformsReady)
                     continue;
 
-                if (count < skeletons.Length)
-                    skeletons[count++] = skeleton;
+                if (count < players.Length)
+                    players[count++] = entry;
             }
 
             if (count == 0)
                 return;
 
             // Single scatter for ALL bone vertex arrays across ALL players
-            Player.Skeleton.UpdateBonePositionsBatched(skeletons.AsSpan(0, count));
+            Player.Skeleton.UpdateBonePositionsBatched(players.AsSpan(0, count));
 
             // Clear refs to avoid holding them across ticks
-            Array.Clear(skeletons, 0, count);
+            Array.Clear(players, 0, count);
         }
 
         // Reusable buffer for skeleton update — avoids per-tick allocation
-        private readonly Player.Skeleton?[] _skeletonUpdateBuf = new Player.Skeleton?[MaxPlayerCount];
+        private readonly PlayerEntry[] _playerUpdateBuf = new PlayerEntry[MaxPlayerCount];
 
         /// <summary>
         /// Drops the cached skeleton for a player so the camera worker re-creates it

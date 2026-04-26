@@ -41,6 +41,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         {
             bool rotOk = true;
             bool posOk = true;
+            bool skeletonOk = true;
 
             // --- Rotation ---
             if (entry.RotationReady)
@@ -117,8 +118,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     $"[RegisteredPlayers] Transform not ready for '{entry.Player.Name}' — skipping");
             }
 
+            if (entry.Skeleton != null && entry.Skeleton.TransformsReady && entry.Skeleton.HasError)
+            {
+                skeletonOk = false;
+                Log.WriteLine($"[RegisteredPlayers] Player '{entry.Player.Name}' has skeleton errors, reinit requested.");
+            }
+
             // --- Error state with debounce + recovery hysteresis ---
-            bool tickFailed = !rotOk || !posOk;
+            bool tickFailed = !rotOk || !posOk || !skeletonOk;
 
             // --- ADS state (local player only) ---
             if (entry.IsAimingAddr != 0 && entry.Player is LocalPlayer localP)
@@ -138,7 +145,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 // cached TransformInternal. This usually recovers the player within one
                 // realtime tick (~8ms) instead of waiting for the next registration cycle.
                 // Extra-aggressive for the local player — we can never afford to "flash red".
-                if (!posOk && entry.TransformReady
+                if ((!posOk && entry.TransformReady || !skeletonOk && entry.Skeleton != null && entry.Skeleton.TransformsReady)
                     && entry.ConsecutiveErrors == (isLocal ? 1 : 2)
                     && TryReinitFromTransformInternal(entry))
                 {
@@ -172,7 +179,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 // registration worker / ValidateTransforms path owns its recovery so we never
                 // lose the user's own marker for longer than a single validation cycle.
                 int reinitThreshold = entry.RealtimeEstablished ? ReinitThreshold : ReinitThresholdNew;
-                if (!isLocal && !posOk && entry.TransformReady && entry.ConsecutiveErrors >= reinitThreshold)
+                if (!isLocal && (!posOk && entry.TransformReady && entry.ConsecutiveErrors >= reinitThreshold || !skeletonOk))
                 {
                     Log.WriteLine($"[RegisteredPlayers] Auto-invalidating transform for '{entry.Player.Name}' after {entry.ConsecutiveErrors} consecutive position failures");
                     entry.TransformReady = false;
