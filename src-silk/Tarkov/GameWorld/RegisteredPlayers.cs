@@ -693,7 +693,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// </summary>
         internal void UpdateSkeletons()
         {
-            // Collect active skeletons
+            // Collect active player entries (with valid skeleton)
             int count = 0;
             PlayerEntry[] players = _playerUpdateBuf;
             foreach (var kvp in _players)

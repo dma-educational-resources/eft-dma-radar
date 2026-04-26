@@ -16,6 +16,13 @@ namespace eft_dma_radar.Arena.UI
             {
                 Interlocked.Increment(ref _fpsCounter);
 
+                // Service deferred ESP reopen requests (F11 fullscreen toggle from inside ESP thread).
+                if (EspWindow.ReopenRequested && !EspWindow.IsOpen)
+                {
+                    EspWindow.ReopenRequested = false;
+                    EspWindow.Open();
+                }
+
                 _grContext.ResetContext(
                     GRGlBackendState.RenderTarget |
                     GRGlBackendState.TextureBinding |
@@ -369,12 +376,8 @@ namespace eft_dma_radar.Arena.UI
                 bool av = Config.AimviewEnabled;
                 if (ImGui.MenuItem("\u25a3 Aimview", null, av)) Config.AimviewEnabled = !av;
 
-                bool esp = EspWindow.IsOpen;
-                if (ImGui.MenuItem("\u25a0 ESP", "Esc to close", esp))
-                    EspWindow.Toggle();
-
                 bool espFs = Config.EspFullscreen;
-                if (ImGui.MenuItem("    Fullscreen (F11 in ESP)", null, espFs))
+                if (ImGui.MenuItem("ESP Fullscreen (F11 in ESP)", null, espFs))
                 {
                     Config.EspFullscreen = !espFs;
                     if (EspWindow.IsOpen)
@@ -414,6 +417,30 @@ namespace eft_dma_radar.Arena.UI
                 }
 
                 ImGui.EndMenu();
+            }
+
+            // ESP toggle (top-level button)
+            if (ImGui.Button(EspWindow.IsOpen ? "\u25a0 ESP*" : "\u25a0 ESP"))
+                EspWindow.Toggle();
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Toggle the ESP overlay window  (Esc to close)");
+
+            // Restart Radar button
+            {
+                bool canRestart = Memory.InGame;
+                if (!canRestart)
+                    ImGui.BeginDisabled();
+
+                if (ImGui.Button("\u21bb Restart"))
+                    Memory.RequestRestart();
+
+                if (!canRestart)
+                    ImGui.EndDisabled();
+
+                if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                    ImGui.SetTooltip(canRestart
+                        ? "Restart the radar (re-detect match, players, loot)"
+                        : "Only available while in a match");
             }
 
             // Right-aligned: MapName | FPS

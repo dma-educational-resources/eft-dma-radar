@@ -71,6 +71,23 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         /// <summary>Whether all bone transforms have been resolved (pointer chains walked).</summary>
         public volatile bool TransformsReady;
 
+        /// <summary>
+        /// True when the skeleton hierarchy is producing bone positions that are clearly
+        /// detached from the player's body (e.g. stale TransformInternal after a respawn /
+        /// teleport). Set with hysteresis (<see cref="BadTickThreshold"/> consecutive bad
+        /// ticks) to avoid one-off false positives forcing a transform invalidation.
+        /// Self-clears after a single clean tick.
+        /// </summary>
+
+        /// <summary>Consecutive ticks where any bone's world position diverged from the player.</summary>
+        private int _consecutiveBadTicks;
+
+        /// <summary>Number of consecutive bad ticks before <see cref="HasError"/> is raised.</summary>
+        private const int BadTickThreshold = 3;
+
+        /// <summary>Max distance (meters) from the player's anchor before a bone is considered detached.</summary>
+        private const float MaxBoneDistance = 15f;
+
         /// <summary>Per-bone cached transform data.</summary>
         private sealed class BoneEntry
         {
@@ -216,8 +233,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             // Prepare phase: enqueue all bone vertex reads across all skeletons
             for (int s = 0; s < players.Length; s++)
             {
-                var player = players[s];
-                var skeleton = player.Skeleton;
+                var skeleton = players[s].Skeleton;
                 if (skeleton is null)
                     continue;
 
@@ -237,12 +253,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             // Process phase: compute world positions from the single scatter result
             for (int s = 0; s < players.Length; s++)
             {
-                var player = players[s];
-                var skeleton = player.Skeleton;
+                var playerEntry = players[s];
+                var skeleton = playerEntry.Skeleton;
                 if (skeleton is null)
                     continue;
 
                 var bones = skeleton._bones;
+                int badBones = 0;
                 for (int i = 0; i < bones.Length; i++)
                 {
                     var entry = bones[i];
@@ -271,18 +288,33 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                             // Transient failure — keep last valid position
                         }
 
-                        if (entry.HasPosition && !skeleton.HasError &&
-                            MathF.Sqrt(Vector3.DistanceSquared(entry.WorldPosition,
-                                player.Player.Position)) > 10f
-                           )
+                        // Sanity check: any limb >MaxBoneDistance from the player's root is
+                        // a strong indicator the cached transform hierarchy is stale (e.g.
+                        // post-teleport or post-respawn). We require >=2 bad bones AND
+                        // multiple consecutive bad ticks before flipping HasError so a
+                        // single cross-thread freshness mismatch (Player.Position lagging
+                        // the skeleton scatter by a tick) doesn't drop the marker.
+                        if (entry.HasPosition &&
+                            Vector3.Distance(entry.WorldPosition, playerEntry.Player.Position) > MaxBoneDistance)
                         {
-                            skeleton.HasError = true;
+                            badBones++;
                         }
                     }
                     finally
                     {
                         ArrayPool<TrsX>.Shared.Return(rented);
                     }
+                }
+
+                if (badBones >= 2)
+                {
+                    if (++skeleton._consecutiveBadTicks >= BadTickThreshold)
+                        skeleton.HasError = true;
+                }
+                else
+                {
+                    skeleton._consecutiveBadTicks = 0;
+                    skeleton.HasError = false;
                 }
             }
         }

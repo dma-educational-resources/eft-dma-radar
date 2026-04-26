@@ -31,6 +31,11 @@ namespace eft_dma_radar.Arena.UI
         private static GRBackendRenderTarget? _skRenderTarget;
         private static Thread? _thread;
         private static volatile bool _running;
+        // Set by the ESP thread (F11) to request the main UI thread reopen the window
+        // after a fullscreen toggle. Polled from RadarWindow.OnRender — toggling fullscreen
+        // from inside the ESP thread itself is unsafe (Silk window cannot reopen from its
+        // own thread, and Open() would Join() the calling thread).
+        internal static volatile bool ReopenRequested;
 
         // ── Drawing constants ───────────────────────────────────────────
         private const float PlayerHeightFallback = 1.8f;
@@ -231,11 +236,11 @@ namespace eft_dma_radar.Arena.UI
             }
             else if (key == Key.F11)
             {
-                // Toggle fullscreen by closing and reopening with the new mode.
+                // Toggle fullscreen by closing this window and asking the main UI thread
+                // to reopen it. Calling Open() here would join *this* thread.
                 Config.EspFullscreen = !Config.EspFullscreen;
-                _running = false;
+                ReopenRequested = true;
                 try { _window?.Close(); } catch { }
-                Open();
             }
         }
 

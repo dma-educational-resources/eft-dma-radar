@@ -29,6 +29,15 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
         /// </summary>
         private const int CacheSchemaVersion = 2;
 
+        /// <summary>
+        /// Radar assembly ModuleVersionId — changes on every rebuild. Used to invalidate
+        /// caches automatically when a developer hardcodes a new offset in <see cref="Offsets"/>
+        /// without the game (PE fingerprint) having changed. No need to bump
+        /// <see cref="CacheSchemaVersion"/> manually.
+        /// </summary>
+        private static readonly Guid RadarAssemblyMvid =
+            typeof(Il2CppDumper).Assembly.ManifestModule.ModuleVersionId;
+
         private sealed class OffsetCache
         {
             /// <summary>
@@ -36,6 +45,13 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             /// Missing / older values cause the cache to be discarded.
             /// </summary>
             public int SchemaVersion { get; set; }
+
+            /// <summary>
+            /// Radar assembly MVID at the time the cache was written. Mismatch means
+            /// the radar binary has been rebuilt (potentially with new hardcoded
+            /// offsets) and the cache must be discarded.
+            /// </summary>
+            public Guid RadarAssemblyMvid { get; set; }
 
             /// <summary>
             /// <see cref="Offsets.Special.TypeInfoTableRva"/> at the time the cache
@@ -87,6 +103,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                 var cache = new OffsetCache
                 {
                     SchemaVersion = CacheSchemaVersion,
+                    RadarAssemblyMvid = RadarAssemblyMvid,
                     TypeInfoTableRva = Offsets.Special.TypeInfoTableRva,
                     GameAssemblyTimestamp = timestamp,
                     GameAssemblySizeOfImage = sizeOfImage,
@@ -136,6 +153,12 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                     return false;
                 }
 
+                if (cache.RadarAssemblyMvid != RadarAssemblyMvid)
+                {
+                    Log.WriteLine($"[Il2CppDumper] Radar build changed (MVID {cache.RadarAssemblyMvid} → {RadarAssemblyMvid}) — will perform live dump.");
+                    return false;
+                }
+
                 if (cache.TypeInfoTableRva != expectedRva)
                 {
                     Log.WriteLine(
@@ -181,6 +204,12 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
 
                 if (cache is null || cache.Fields.Count == 0)
                     return false;
+
+                if (cache.RadarAssemblyMvid != RadarAssemblyMvid)
+                {
+                    Log.WriteLine($"[Il2CppDumper] Radar build changed (MVID {cache.RadarAssemblyMvid} → {RadarAssemblyMvid}) — will perform fresh dump.");
+                    return false;
+                }
 
                 if (cache.SchemaVersion < CacheSchemaVersion)
                 {

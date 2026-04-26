@@ -50,6 +50,23 @@ namespace eft_dma_radar.Arena.UI
 
         // Pinned ImGui font data
         private static GCHandle _imguiFontHandle;
+        private static GCHandle _iconGlyphRangesHandle;
+
+        // Icon glyph ranges for the merged symbol font — null-terminated pairs of (first, last).
+        // Mirrors the silk implementation; ImGui.NET uses 16-bit glyphs so non-BMP emoji cannot render.
+        private static readonly ushort[] _iconGlyphRanges =
+        [
+            0x00A0, 0x00FF, // Latin-1 supplement (·, etc.)
+            0x20A0, 0x20CF, // Currency symbols (₽)
+            0x2190, 0x21FF, // Arrows (→, ↻)
+            0x2200, 0x22FF, // Mathematical operators (∴)
+            0x2300, 0x23FF, // Miscellaneous technical (⌂, ⌕, ⌨)
+            0x2500, 0x257F, // Box drawing (─, │)
+            0x25A0, 0x25FF, // Geometric shapes (□▣▲◆◉○◎●◇)
+            0x2600, 0x26FF, // Miscellaneous symbols (☺⚔⚙⚠⚡)
+            0x2700, 0x27BF, // Dingbats (✈, ✓)
+            0               // terminator
+        ];
 
         // Animated status dots
         private static int _statusOrder = 1;

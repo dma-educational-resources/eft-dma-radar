@@ -134,6 +134,33 @@ namespace eft_dma_radar.Arena.UI
                 io.Fonts.GetGlyphRangesDefault());
 
             ImGuiNative.ImFontConfig_destroy(config);
+
+            // Merge system symbol font for Unicode icon glyphs (geometric shapes, arrows, etc.)
+            // so menu entries like "→ Aimlines", "☺ Names", "↻ Restart" don't render as '?'.
+            var symbolFontPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Fonts),
+                "seguisym.ttf");
+
+            if (File.Exists(symbolFontPath))
+            {
+                _iconGlyphRangesHandle = GCHandle.Alloc(_iconGlyphRanges, GCHandleType.Pinned);
+
+                var mergeConfig = ImGuiNative.ImFontConfig_ImFontConfig();
+                mergeConfig->MergeMode = 1;             // Merge into the previously added font
+                mergeConfig->FontDataOwnedByAtlas = 1;  // ImGui owns file-loaded data
+
+                io.Fonts.AddFontFromFileTTF(
+                    symbolFontPath,
+                    13.0f,
+                    new ImFontConfigPtr(mergeConfig),
+                    _iconGlyphRangesHandle.AddrOfPinnedObject());
+
+                ImGuiNative.ImFontConfig_destroy(mergeConfig);
+            }
+            else
+            {
+                Log.WriteLine("[RadarWindow] WARNING: seguisym.ttf not found, icons may render as '?'.");
+            }
         }
 
         private static void ApplyImGuiDarkStyle()

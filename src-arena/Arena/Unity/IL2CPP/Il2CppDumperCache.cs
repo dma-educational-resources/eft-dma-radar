@@ -17,9 +17,16 @@ namespace eft_dma_radar.Arena.Unity.IL2CPP
         //  v2: PlayerBody.SkeletonRootJoint 0x28 -> 0x30; DizSkinningSkeleton._values confirmed 0x30.
         private const int CacheSchemaVersion = 2;
 
+        // Assembly ModuleVersionId — changes on every rebuild. Used to invalidate caches
+        // automatically when a developer hardcodes a new offset in SDK.Offsets without the
+        // game (PE fingerprint) having changed. No need to bump CacheSchemaVersion manually.
+        private static readonly Guid RadarAssemblyMvid =
+            typeof(Il2CppDumper).Assembly.ManifestModule.ModuleVersionId;
+
         private sealed class OffsetCache
         {
             public int SchemaVersion { get; set; }
+            public Guid RadarAssemblyMvid { get; set; }
             public ulong TypeInfoTableRva { get; set; }
             public uint GameAssemblyTimestamp { get; set; }
             public uint GameAssemblySizeOfImage { get; set; }
@@ -40,6 +47,7 @@ namespace eft_dma_radar.Arena.Unity.IL2CPP
                 var cache = new OffsetCache
                 {
                     SchemaVersion = CacheSchemaVersion,
+                    RadarAssemblyMvid = RadarAssemblyMvid,
                     TypeInfoTableRva = SDK.Offsets.Special.TypeInfoTableRva,
                     GameAssemblyTimestamp = timestamp,
                     GameAssemblySizeOfImage = sizeOfImage,
@@ -64,6 +72,11 @@ namespace eft_dma_radar.Arena.Unity.IL2CPP
                 var json = File.ReadAllText(CacheFilePath);
                 var cache = JsonSerializer.Deserialize<OffsetCache>(json, _jsonOpts);
                 if (cache is null || cache.Fields.Count == 0) { Log.WriteLine("[Il2CppDumper] Cache file is empty or corrupt."); return false; }
+                if (cache.RadarAssemblyMvid != RadarAssemblyMvid)
+                {
+                    Log.WriteLine($"[Il2CppDumper] Radar build changed (MVID {cache.RadarAssemblyMvid} → {RadarAssemblyMvid}) — fresh dump required.");
+                    return false;
+                }
                 if (cache.TypeInfoTableRva != expectedRva)
                 {
                     Log.WriteLine($"[Il2CppDumper] Cache RVA mismatch: cached=0x{cache.TypeInfoTableRva:X} current=0x{expectedRva:X} — stale.");
@@ -90,6 +103,11 @@ namespace eft_dma_radar.Arena.Unity.IL2CPP
                 var json = File.ReadAllText(CacheFilePath);
                 var cache = JsonSerializer.Deserialize<OffsetCache>(json, _jsonOpts);
                 if (cache is null || cache.Fields.Count == 0) return false;
+                if (cache.RadarAssemblyMvid != RadarAssemblyMvid)
+                {
+                    Log.WriteLine($"[Il2CppDumper] Radar build changed (MVID {cache.RadarAssemblyMvid} → {RadarAssemblyMvid}) — fresh dump required.");
+                    return false;
+                }
                 if (cache.SchemaVersion < CacheSchemaVersion)
                 {
                     Log.WriteLine($"[Il2CppDumper] Fast cache schema outdated ({cache.SchemaVersion} < {CacheSchemaVersion}) — fresh dump required.");

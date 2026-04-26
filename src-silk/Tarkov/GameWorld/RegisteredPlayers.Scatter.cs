@@ -118,10 +118,19 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     $"[RegisteredPlayers] Transform not ready for '{entry.Player.Name}' — skipping");
             }
 
-            if (entry.Skeleton != null && entry.Skeleton.TransformsReady && entry.Skeleton.HasError)
+            // --- Skeleton sanity ---
+            // The camera worker raises HasError only after several consecutive ticks where
+            // multiple bones are wildly detached from the player root — a strong signal
+            // that the cached transform hierarchy is stale. We feed it through the same
+            // debounce/recovery state as position failures so a flagged skeleton causes
+            // a transform reinit but never instantly drops the player marker.
+            var skeleton = entry.Skeleton;
+            if (skeleton is not null && skeleton.TransformsReady && skeleton.HasError)
             {
                 skeletonOk = false;
-                Log.WriteLine($"[RegisteredPlayers] Player '{entry.Player.Name}' has skeleton errors, reinit requested.");
+                Log.WriteRateLimited(AppLogLevel.Warning,
+                    $"skel_bad_{entry.Base:X}", TimeSpan.FromSeconds(5),
+                    $"[RegisteredPlayers] Skeleton drift detected for '{entry.Player.Name}' — reinit requested");
             }
 
             // --- Error state with debounce + recovery hysteresis ---
@@ -145,13 +154,17 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 // cached TransformInternal. This usually recovers the player within one
                 // realtime tick (~8ms) instead of waiting for the next registration cycle.
                 // Extra-aggressive for the local player — we can never afford to "flash red".
-                if ((!posOk && entry.TransformReady || !skeletonOk && entry.Skeleton != null && entry.Skeleton.TransformsReady)
+                // Skeleton drift triggers the same path so a stale hierarchy is healed without
+                // ever dropping the player marker.
+                if (((!posOk && entry.TransformReady) ||
+                     (!skeletonOk && entry.Skeleton is { TransformsReady: true }))
                     && entry.ConsecutiveErrors == (isLocal ? 1 : 2)
                     && TryReinitFromTransformInternal(entry))
                 {
                     // Fast re-init succeeded — reset error state without any visible glitch.
                     entry.ConsecutiveErrors = 0;
                     SyncLookTransform(entry);
+                    InvalidateSkeleton(entry); // drop stale skeleton so it gets rebuilt clean
                     return;
                 }
 
@@ -179,9 +192,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 // registration worker / ValidateTransforms path owns its recovery so we never
                 // lose the user's own marker for longer than a single validation cycle.
                 int reinitThreshold = entry.RealtimeEstablished ? ReinitThreshold : ReinitThresholdNew;
+                if (!isLocal
+                    && entry.ConsecutiveErrors >= reinitThreshold
+                    && ((!posOk && entry.TransformReady) || !skeletonOk))
                 if (!isLocal && (!posOk && entry.TransformReady && entry.ConsecutiveErrors >= reinitThreshold || !skeletonOk))
                 {
-                    Log.WriteLine($"[RegisteredPlayers] Auto-invalidating transform for '{entry.Player.Name}' after {entry.ConsecutiveErrors} consecutive position failures");
+                    Log.WriteLine($"[RegisteredPlayers] Auto-invalidating transform for '{entry.Player.Name}' after {entry.ConsecutiveErrors} consecutive failures (pos={posOk}, skel={skeletonOk})");
                     entry.TransformReady = false;
                     entry.LookTransformReady = false;
                     entry.TransformInitFailures = 0;
