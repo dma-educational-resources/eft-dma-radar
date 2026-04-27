@@ -9,7 +9,8 @@ namespace eft_dma_radar.Arena.Unity.IL2CPP
     {
         // ── Constants ────────────────────────────────────────────────────────
 
-        private const int MaxTableEntries  = 64;
+        private const int MaxTableEntries = 64;
+        private const int MaxLastResortEntries = 1024;
         private const int EarlyProbeCount  = 16;
         private const int EarlyProbeRequired = 8;
         private const int MidProbeOffset   = 5_000;
@@ -22,9 +23,21 @@ namespace eft_dma_radar.Arena.Unity.IL2CPP
 
         private static readonly (string Sig, int RelOffset, int InstrLen, string Desc)[] TypeInfoTableSigs =
         [
+            // Primary: long unique read-path through sub_18065BF60; very robust across patches
             ("48 8B 05 ? ? ? ? ? ? ? ? ? ? ? 90 48 85 DB 75 ? 48 8D 2D ? ? ? ? 48 89 6C 24 ? 48 8B CD E8 ? ? ? ? 90 ? ? ? 48 85 DB 75 ? 8B CF", 3, 7, "read: mov rax,[rip+rel32] (table lookup)"),
-            ("48 89 05 ? ? ? ? 48 8B 05 ? ? ? ? 8B 48", 3, 7, "write: mov [rip+rel32],rax (init store)"),
-            ("48 89 05 ? ? ? ? 48 8B 05", 3, 7, "write: mov [rip+rel32],rax; mov rax,[rip+rel32] (minimal)"),
+            // Fallback A: index-lookup read at 0x18065d8df — extended with movsxd+test to reduce false-positive risk
+            ("48 8B 0D ? ? ? ? 48 63 D0 ? ? ? ? 48 85 C9 74", 3, 7, "read: mov rcx,[rip+rel32]; movsxd+test (index lookup)"),
+            // Fallback B: full-init write at 0x18065a0ba — trailing E8 removed so a call-target relocation won't break it
+            ("48 89 05 ? ? ? ? 4C 8B 05 ? ? ? ? 48 8B 05 ? ? ? ? 48 63 48 ? BA ? ? ? ? 41 FF D0 48 89 05 ? ? ? ?", 3, 7, "write: mov [rip+rel32],rax; mov r8,[rip+rel32] (full init)"),
+        ];
+
+        // ── Last-resort signatures (only used when all primary sigs fail) ────
+        // These patterns are too broad for normal use (>64 matches) but can still
+        // find the correct RVA via ValidateTypeInfoTable when nothing else works.
+
+        private static readonly (string Sig, int RelOffset, int InstrLen, string Desc)[] LastResortTableSigs =
+        [
+            ("48 89 05 ? ? ? ?", 3, 7, "last-resort: any mov [rip+rel32],rax (wide write)"),
         ];
 
         // ── Resolution pipeline ──────────────────────────────────────────────
@@ -42,6 +55,22 @@ namespace eft_dma_radar.Arena.Unity.IL2CPP
                 sigResults.Add(scanResult);
                 if (result.HasValue && first is null)
                     first = result;
+            }
+
+            // Last-resort pass — only runs when every primary sig produced nothing
+            if (first is null)
+            {
+                if (!quiet) Log.WriteLine($"{LogTag} Primary sigs exhausted, trying last-resort signatures...");
+                for (int i = 0; i < LastResortTableSigs.Length; i++)
+                {
+                    var (sig, relOff, instrLen, desc) = LastResortTableSigs[i];
+                    var (result, scanResult) = TryResolveFromSignature(
+                        TypeInfoTableSigs.Length + i, sig, relOff, instrLen, desc, gaBase, testedRvas,
+                        MaxLastResortEntries);
+                    sigResults.Add(scanResult);
+                    if (result.HasValue && first is null)
+                        first = result;
+                }
             }
 
             bool success;
@@ -73,10 +102,11 @@ namespace eft_dma_radar.Arena.Unity.IL2CPP
         }
 
         private static ((ulong rva, ulong sigAddr, string sig)?, SigScanResult) TryResolveFromSignature(
-            int index, string sig, int relOff, int instrLen, string desc, ulong gaBase, HashSet<ulong> testedRvas)
+            int index, string sig, int relOff, int instrLen, string desc, ulong gaBase, HashSet<ulong> testedRvas,
+            int maxEntries = MaxTableEntries)
         {
             ulong[] sigAddrs;
-            try { sigAddrs = Memory.FindSignatures(sig, GameAssemblyName, MaxTableEntries); }
+            try { sigAddrs = Memory.FindSignatures(sig, GameAssemblyName, maxEntries); }
             catch (Exception ex)
             {
                 Log.WriteLine($"{LogTag} TypeInfoTable sig[{index}] scan error: {ex.Message}");

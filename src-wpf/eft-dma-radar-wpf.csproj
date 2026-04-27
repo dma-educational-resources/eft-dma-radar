@@ -16,6 +16,8 @@
 		<RetainVMGarbageCollection>true</RetainVMGarbageCollection>
 		<DebugType>none</DebugType>
 		<PublishRelease>true</PublishRelease>
+		<Nullable>disable</Nullable>
+		<NoWarn>$(NoWarn);CS0414;CS8600;CS8632</NoWarn>
 	</PropertyGroup>
 
 	<!-- Native DLLs and Resources (native MemProcFS DLLs are now managed locally in lib/VmmSharpEx/native/) -->
@@ -89,6 +91,13 @@
 		<EmbeddedResource Remove="Common\**" />
 		<None Remove="Common\**" />
 		<Page Remove="Common\**" />
+	</ItemGroup>
+
+
+	<ItemGroup>
+	  <Folder Include="Tarkov\API\" />
+	  <Folder Include="Tarkov\Loot\" />
+	  <Folder Include="UI\Pages\Settings\" />
 	</ItemGroup>
 
 </Project>
