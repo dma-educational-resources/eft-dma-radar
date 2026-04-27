@@ -12,7 +12,7 @@ using eft_dma_radar.UI.Misc;
 
 // (Safe to include even if you have global usings)
 
-namespace eft_dma_radar.Tarkov.Features
+namespace eft_dma_radar.Tarkov.Features.MemoryWrites.Chams
 {
     /// <summary>
     /// Manages player chams application, caching, and restoration

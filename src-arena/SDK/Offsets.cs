@@ -64,6 +64,7 @@ namespace SDK
             public static uint MovementController = 0x110; // <MovementController>k__BackingField
             public static uint HealthController   = 0x120; // <HealthController>k__BackingField
             public static uint InventoryController = 0x10; // <InventoryController>k__BackingField
+            public static uint Culling            = 0x100; // <Culling>k__BackingField
         }
 
         // ── Inventory chain (for armband-based TeamID detection) ─────────────
@@ -112,7 +113,8 @@ namespace SDK
 
         public readonly partial struct ObservedPlayerStateContext
         {
-            public static uint Rotation = 0x20; // valuetype Vector2 (yaw X, pitch Y)
+            public static uint Rotation         = 0x20; // valuetype Vector2 (yaw X, pitch Y)
+            public static uint _playerTransform = 0x98; // BifacialTransform — alternative stable transform
         }
 
         // ── GamePlayerOwner (IL2CPP singleton static class) ────────────────────
@@ -140,7 +142,9 @@ namespace SDK
 
         public readonly partial struct PlayerBody
         {
-            public static uint SkeletonRootJoint = 0x30;
+            public static uint PlayerBones      = 0x28; // PlayerBones named-bone references
+            public static uint SkeletonRootJoint = 0x30; // DizSkinningSkeleton — bone transform list
+            public static uint SkeletonHands     = 0x38; // DizSkinningSkeleton for hands
         }
 
         // ── Diz.Skinning.Skeleton ──────────────────────────────────────────

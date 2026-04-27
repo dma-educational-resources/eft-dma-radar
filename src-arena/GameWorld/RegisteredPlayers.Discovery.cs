@@ -23,6 +23,8 @@ namespace eft_dma_radar.Arena.GameWorld
                 PlayerType type;
                 bool isAI = false;
                 int teamId = -1;
+                bool nickSucceeded = true;
+                bool typeSucceeded = true;
 
                 if (isLocal)
                 {
@@ -70,6 +72,8 @@ namespace eft_dma_radar.Arena.GameWorld
                     {
                         name = string.Empty;
                     }
+                    nickSucceeded = !string.IsNullOrWhiteSpace(name);
+                    typeSucceeded = sideRaw != 0;
 
                     // AccountId: not populated by Arena's server ΓÇö skipped.
                     // ProfileId (optional)
@@ -137,9 +141,9 @@ namespace eft_dma_radar.Arena.GameWorld
                     TeamID      = teamId,
                     IsActive    = true,
                     IsAlive     = true,
+                    NameResolved = nickSucceeded,
+                    TypeResolved = typeSucceeded,
                 };
-
-                Log.WriteLine($"[RegisteredPlayers] Discovered: {player} @ 0x{playerBase:X} (local={isLocal})");
 
                 if (Log.EnableDebugLogging)
                     DumpPlayerHierarchy(playerBase, player.Name, isLocal);
@@ -215,9 +219,8 @@ namespace eft_dma_radar.Arena.GameWorld
                     if (Memory.TryReadPtr(opc + Offsets.ObservedPlayerController.InventoryController, out var invCtrl, false) && invCtrl.IsValidVirtualAddress())
                         Il2CppDumper.DumpClassFields(invCtrl, $"ObservedInventoryController '{name}'");
 
-                    // PlayerBody
-                    if (Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView.PlayerBody, out var body, false) && body.IsValidVirtualAddress())
-                        Il2CppDumper.DumpClassFields(body, $"PlayerBody '{name}'");
+                    // Full stability objects (position chain, bone chain)
+                    DumpStabilityObjects(playerBase, name);
                 }
             }
             catch (Exception ex)
@@ -226,10 +229,62 @@ namespace eft_dma_radar.Arena.GameWorld
             }
         }
 
-        // ΓöÇΓöÇ AI role helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        /// <summary>
+        /// Dumps the objects most relevant to position and skeleton stability:
+        /// Culling, BifacialTransform, LookTransform, PlayerBones, DizSkinningSkeleton (root + hands).
+        /// Called at discovery time (via <see cref="DumpPlayerHierarchy"/>) AND periodically
+        /// throughout the match via <see cref="BatchPeriodicDumps"/> so post-respawn state changes
+        /// are captured automatically without needing F8.
+        /// </summary>
+        private static void DumpStabilityObjects(ulong playerBase, string name)
+        {
+            try
+            {
+                if (!Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView.ObservedPlayerController, out var opc, false)
+                    || !opc.IsValidVirtualAddress())
+                    return;
+
+                // Culling — may show why hierarchy transforms go stale (culled players stop updating)
+                if (Memory.TryReadPtr(opc + Offsets.ObservedPlayerController.Culling, out var culling, false) && culling.IsValidVirtualAddress())
+                    Il2CppDumper.DumpClassFields(culling, $"OPC.Culling '{name}'");
+
+                // BifacialTransform from StateContext._playerTransform — alternative stable position source
+                if (Memory.TryReadPtr(opc + Offsets.ObservedPlayerController.MovementController, out var mcBf, false) && mcBf.IsValidVirtualAddress()
+                    && Memory.TryReadPtr(mcBf + Offsets.ObservedMovementController.StateContext, out var scBf, false) && scBf.IsValidVirtualAddress()
+                    && Memory.TryReadPtr(scBf + Offsets.ObservedPlayerStateContext._playerTransform, out var bifacial, false) && bifacial.IsValidVirtualAddress())
+                    Il2CppDumper.DumpClassFields(bifacial, $"StateContext.BifacialTransform '{name}'");
+
+                // lookTransform managed object — the transform we walk for the realtime position read
+                if (Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView._playerLookRaycastTransform, out var lookTransform, false) && lookTransform.IsValidVirtualAddress())
+                    Il2CppDumper.DumpClassFields(lookTransform, $"LookTransform (managed) '{name}'");
+
+                // PlayerBody sub-objects — bone tree layout
+                if (Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView.PlayerBody, out var body, false) && body.IsValidVirtualAddress())
+                {
+                    Il2CppDumper.DumpClassFields(body, $"PlayerBody '{name}'");
+
+                    if (Memory.TryReadPtr(body + Offsets.PlayerBody.PlayerBones, out var playerBones, false) && playerBones.IsValidVirtualAddress())
+                        Il2CppDumper.DumpClassFields(playerBones, $"PlayerBones '{name}'");
+
+                    if (Memory.TryReadPtr(body + Offsets.PlayerBody.SkeletonRootJoint, out var skelRoot, false) && skelRoot.IsValidVirtualAddress())
+                        Il2CppDumper.DumpClassFields(skelRoot, $"DizSkinningSkeleton (SkeletonRootJoint) '{name}'");
+
+                    if (Memory.TryReadPtr(body + Offsets.PlayerBody.SkeletonHands, out var skelHands, false) && skelHands.IsValidVirtualAddress())
+                        Il2CppDumper.DumpClassFields(skelHands, $"DizSkinningSkeleton (SkeletonHands) '{name}'");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.WriteRateLimited(AppLogLevel.Warning, $"stab_dump_{playerBase:X}", TimeSpan.FromSeconds(30),
+                    $"[RegisteredPlayers] DumpStabilityObjects failed for '{name}': {ex.Message}");
+            }
+        }
+
+        // ── AI role helpers
 
         // Armband template GUID -> Arena TeamID (ArmbandColorType).
         // Note: the red/blue GUIDs are labelled from the in-game team color, which is the
+
         // OPPOSITE of the raw item template name (the "red armband" template is worn by the
         // in-game "blue team" and vice versa). TeamID equality is what drives teammate
         // classification, so only the label would be affected either way ΓÇö these values
@@ -431,6 +486,69 @@ namespace eft_dma_radar.Arena.GameWorld
             return voice.Contains("guard", StringComparison.OrdinalIgnoreCase)
                 ? PlayerType.AIGuard
                 : PlayerType.AIScav;
+        }
+
+        // -- Lazy name/type resolver ------------------------------------------------------
+        // Called from UpdateExistingPlayers for observed (non-local) players whose
+        // nickname or side read transiently failed at discovery time (heavy respawn churn).
+        // Retries up to 3 times with exponential back-off then gives up.
+        private const int NameResolveMaxRetries = 3;
+
+        private static void ScheduleNameResolvRetry(Player p, long nowTick)
+        {
+            int streak = Math.Min(++p.NameResolveFailStreak, NameResolveMaxRetries);
+            long delayMs = 200L << streak; // 400, 800, 1600 ms
+            p.NextNameResolveTick = nowTick + delayMs;
+        }
+
+        internal void TryLazyResolveNameAndType(Player p, long nowTick)
+        {
+            // Only retry for non-local players that still have a fallback name or Default type.
+            if (p.IsLocalPlayer || p.IsAI) return;
+            if (p.NameResolved && p.TypeResolved) return;
+            if (p.NameResolveFailStreak >= NameResolveMaxRetries) return;
+            if (nowTick < p.NextNameResolveTick) return;
+
+            bool changed = false;
+            try
+            {
+                if (!p.NameResolved)
+                {
+                    if (Memory.TryReadPtr(p.Base + Offsets.ObservedPlayerView.NickName, out var nickPtr, false)
+                        && nickPtr.IsValidVirtualAddress())
+                    {
+                        var nick = Memory.ReadUnityString(nickPtr, 64, false);
+                        if (!string.IsNullOrWhiteSpace(nick))
+                        {
+                            p.Name = nick;
+                            p.NameResolved = true;
+                            changed = true;
+                        }
+                    }
+                }
+
+                if (!p.TypeResolved)
+                {
+                    int sideRaw = Memory.ReadValue<int>(p.Base + Offsets.ObservedPlayerView.Side, false);
+                    if (sideRaw != 0)
+                    {
+                        var newType = FactionFromSide(sideRaw);
+                        // Re-evaluate teammate classification with match-locked team.
+                        int localTeam = _matchLocalTeamId >= 0
+                            ? _matchLocalTeamId
+                            : (LocalPlayer?.TeamID ?? -1);
+                        if (p.TeamID >= 0 && localTeam >= 0 && p.TeamID == localTeam)
+                            newType = PlayerType.Teammate;
+                        p.Type = newType;
+                        p.TypeResolved = true;
+                        changed = true;
+                    }
+                }
+
+                if (!changed)
+                    ScheduleNameResolvRetry(p, nowTick);
+            }
+            catch { ScheduleNameResolvRetry(p, nowTick); }
         }
     }
 }

@@ -1,6 +1,6 @@
 using System.Runtime;
 
-namespace eft_dma_radar.Common
+namespace eft_dma_radar.Misc
 {
     public static partial class ResourceJanitor
     {

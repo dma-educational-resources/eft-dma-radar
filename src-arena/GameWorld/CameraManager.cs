@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using eft_dma_radar.Arena.Unity;
 using VmmSharpEx;
 using VmmSharpEx.Options;
@@ -351,6 +351,7 @@ namespace eft_dma_radar.Arena.GameWorld
                 // until we have a fresh matrix from the new camera.
                 _nextFpsRefreshUtc = default;
                 IsReady = false;
+                _viewMatrix.Translation = Vector3.Zero; // prevent stale VM.T in next READY log
                 TryRefreshFpsCamera();
             }
 

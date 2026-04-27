@@ -1,5 +1,7 @@
 ﻿using eft_dma_radar.Arena.DMA;
+using eft_dma_radar.Arena.GameWorld.Players;
 using eft_dma_radar.Arena.Unity;
+using eft_dma_radar.Arena.Unity.IL2CPP;
 using SDK;
 using VmmSharpEx;
 using VmmSharpEx.Options;
@@ -66,14 +68,15 @@ namespace eft_dma_radar.Arena.GameWorld
                 else rotOk = false;
             }
 
-            // Position ΓÇö single Vector3 read of the hierarchy's cached world position.
+            // Position — single Vector3 read of the hierarchy's cached world position.
             // Sentinel <0, -1000, 0> means the player has not been placed in the scene yet
-            // (freshly-spawned / respawning). That is NOT an error ΓÇö just keep the last known
+            // (freshly-spawned / respawning). That is NOT an error — just keep the last known
             // position (if any) and wait silently for the real TRS to be written.
-            // An EXACT <0, 0, 0> read indicates the hierarchy memory has been zeroed/freed
-            // (stale VerticesAddr after respawn or Unity tearing down the transform). That IS
-            // an error ΓÇö we must reinit the transform chain, otherwise the player stays "stuck"
-            // at origin while actually moving in-game.
+            // An EXACT <0, 0, 0> read has two interpretations:
+            //  • !RealtimeEstablished (new entry, hierarchy not yet populated): treat as sentinel —
+            //    the hierarchy is still being initialised; waiting silently is correct.
+            //  • RealtimeEstablished (we previously had a real position): treat as error — the
+            //    hierarchy was likely freed/zeroed after a respawn and must be re-resolved.
             bool sentinel = false;
             if (player.TransformReady)
             {
@@ -86,9 +89,19 @@ namespace eft_dma_radar.Arena.GameWorld
                     }
                     else if (worldPos == Vector3.Zero)
                     {
-                        // Hierarchy likely freed/zeroed ΓÇö treat as a read error so the auto-reinit
-                        // path kicks in. Don't overwrite last known good position.
-                        posOk = false;
+                        if (!player.RealtimeEstablished)
+                        {
+                            // Hierarchy not yet populated for a new/respawning entry — treat
+                            // identically to the -1000 sentinel: wait silently, no error.
+                            sentinel = true;
+                        }
+                        else
+                        {
+                            // Previously had a valid position but now reads zero — hierarchy
+                            // was likely freed/zeroed after a respawn. Treat as an error so
+                            // the auto-reinit path kicks in.
+                            posOk = false;
+                        }
                     }
                     else
                     {
@@ -101,31 +114,48 @@ namespace eft_dma_radar.Arena.GameWorld
             }
             else posOk = false;
 
-            // Error tracking / auto-reinit ΓÇö skip entirely while sentinel so we don't thrash
+            // Error tracking / auto-reinit — skip entirely while sentinel so we don't thrash
             // the transform chain for a player who just hasn't spawned yet.
             if (sentinel)
             {
                 player.ConsecutiveErrors = 0;
             }
-            else if (!rotOk || !posOk)
+            else if (!posOk)
             {
-                player.ConsecutiveErrors++;
-                int threshold = player.RealtimeEstablished ? ReinitThreshold : ReinitThresholdNew;
-                if (!posOk && player.TransformReady && player.ConsecutiveErrors >= threshold)
+                // Only position failures drive ConsecutiveErrors / auto-reinit.
+                // Rotation failures are independent: the rotation address can briefly be
+                // unreadable while position is fine (StateContext rebuild during a respawn),
+                // and counting those against the position threshold caused phantom large
+                // ConsecutiveErrors counts that instantly invalidated the transform on the
+                // very first real position failure.
+                if (player.TransformReady)
                 {
-                    Log.WriteRateLimited(AppLogLevel.Warning, $"reinit_{player.Base:X}", TimeSpan.FromSeconds(5),
-                        $"[RegisteredPlayers] Auto-invalidating transform for '{player.Name}' after {player.ConsecutiveErrors} failures");
-                    player.TransformReady = false;
-                    player.RotationReady = false;
-                    // Release Position ownership so BatchUpdateSkeletons can drive the dot from
-                    // bones while we re-resolve the transform hierarchy. Without this, the dot
-                    // stays frozen at the last position for the full reinit window (often >1s).
-                    player.RealtimeEstablished = false;
-                    player.ConsecutiveErrors = 0;
+                    player.ConsecutiveErrors++;
+                    int threshold = player.RealtimeEstablished ? ReinitThreshold : ReinitThresholdNew;
+                    if (player.ConsecutiveErrors >= threshold)
+                    {
+                        Log.WriteRateLimited(AppLogLevel.Warning, $"reinit_{player.Base:X}", TimeSpan.FromSeconds(5),
+                            $"[RegisteredPlayers] Auto-invalidating transform for '{player.Name}' after {player.ConsecutiveErrors} failures");
+                        player.TransformReady = false;
+                        player.RotationReady = false;
+                        // Release Position ownership so BatchUpdateSkeletons can drive the dot from
+                        // bones while we re-resolve the transform hierarchy. Without this, the dot
+                        // stays frozen at the last position for the full reinit window (often >1s).
+                        player.RealtimeEstablished = false;
+                        player.ConsecutiveErrors = 0;
+                        // The bone hierarchy is co-located with the transform; after a pointer churn
+                        // or Unity TRS reset the old VerticesAddr/indices are stale. Clear the
+                        // skeleton so BatchInitSkeletons re-resolves it cleanly instead of rendering
+                        // bones that were read from a freed / recycled memory block.
+                        player.Skeleton = null;
+                        player.SkeletonInitFailStreak = 0;
+                        player.NextSkeletonInitTick = Environment.TickCount64 + 250;
+                    }
                 }
             }
             else
             {
+                // Position succeeded — clear the error counter regardless of rotation state.
                 player.ConsecutiveErrors = 0;
             }
         }
@@ -303,6 +333,11 @@ namespace eft_dma_radar.Arena.GameWorld
                 return false;
             }
 
+            // Dump the lookTransform managed object in debug mode only — avoids ArgumentOutOfRangeException
+            // storms from ReadUnityString during IL2CPP field enumeration in normal play.
+            if (Log.EnableDebugLogging)
+                Il2CppDumper.DumpClassFields(lookTransform, $"TryInitTransform.LookTransform '{player.Name}' @ 0x{player.Base:X}");
+
             // Step 2: +0x10 gives the C++ Transform / managed wrapper
             if (!Memory.TryReadPtr(lookTransform + 0x10, out var transformInternal, false)
                 || !transformInternal.IsValidVirtualAddress())
@@ -349,6 +384,15 @@ namespace eft_dma_radar.Arena.GameWorld
             player.TransformReady    = true;
             player.TransformInitFailStreak = 0;
             player.NextTransformInitTick = 0;
+            // After a successful transform re-init, allow the skeleton to retry promptly.
+            // If the skeleton was cleared during an auto-invalidation its streak may have been
+            // reset already; if it still has an old streak from a previous discovery cycle,
+            // clearing it here ensures the bone chain is re-resolved within one registration tick.
+            if (player.Skeleton is null)
+            {
+                player.SkeletonInitFailStreak = 0;
+                player.NextSkeletonInitTick   = Environment.TickCount64 + 150;
+            }
 
             // Only apply the position if it is a real spawn (not the <0,-1000,0> sentinel and
             // not an exact <0,0,0> from a freshly-allocated / zeroed hierarchy) ΓÇö otherwise the

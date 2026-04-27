@@ -7,7 +7,7 @@ using VmmSharpEx.Options;
 
 using static eft_dma_radar.Arena.Unity.UnityOffsets;
 
-namespace eft_dma_radar.Arena.GameWorld
+namespace eft_dma_radar.Arena.GameWorld.Players
 {
     /// <summary>
     /// Per-player skeleton — resolves the bone pointer chain, batches per-bone
@@ -109,12 +109,22 @@ namespace eft_dma_radar.Arena.GameWorld
                     return null;
                 }
 
+                if (Log.EnableDebugLogging)
+                    Il2CppDumper.DumpClassFields(playerBody, $"Skeleton.PlayerBody @ 0x{playerBase:X}");
                 // Step 2 — SkeletonRootJoint pointer
                 if (!Memory.TryReadPtr(playerBody + Offsets.PlayerBody.SkeletonRootJoint, out var skeletonRoot, false))
                 {
                     Log.WriteRateLimited(AppLogLevel.Warning, $"skel_s2_{playerBase:X}", TimeSpan.FromSeconds(10),
                         $"[Skeleton] step2 FAIL: SkeletonRootJoint unreadable at PlayerBody=0x{playerBody:X} + 0x{Offsets.PlayerBody.SkeletonRootJoint:X}");
                     return null;
+                }
+
+                // Dump the DizSkinningSkeleton only in debug mode — avoids ReadUnityString
+                // ArgumentOutOfRangeException storms during normal play.
+                if (Log.EnableDebugLogging)
+                {
+                    Il2CppDumper.DumpClassFields(playerBody, $"Skeleton.PlayerBody @ 0x{playerBase:X}");
+                    Il2CppDumper.DumpClassFields(skeletonRoot, $"Skeleton.DizSkinningSkeleton @ 0x{playerBase:X}");
                 }
 
                 // Step 3 — DizSkinningSkeleton._values pointer (List<TransformComponent>)

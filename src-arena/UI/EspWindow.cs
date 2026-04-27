@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using eft_dma_radar.Arena.GameWorld;
+using eft_dma_radar.Arena.GameWorld.Players;
 using eft_dma_radar.Arena.Unity;
 using SDK;
 using Silk.NET.Input;

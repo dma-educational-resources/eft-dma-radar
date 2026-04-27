@@ -1,4 +1,5 @@
 using eft_dma_radar.Arena.GameWorld;
+using eft_dma_radar.Arena.GameWorld.Players;
 using ImGuiNET;
 using SDK;
 

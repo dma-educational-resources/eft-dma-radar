@@ -1,5 +1,6 @@
-namespace eft_dma_radar.Arena.GameWorld
+﻿namespace eft_dma_radar.Arena.GameWorld
 {
+    using eft_dma_radar.Arena.GameWorld.Players;
     using SDK;
 
     /// <summary>
@@ -51,6 +52,11 @@ namespace eft_dma_radar.Arena.GameWorld
         /// <summary>Armband-based Arena team id (-1 if unknown / no armband).</summary>
         public int TeamID = -1;
 
+        /// <summary>True once the nickname was successfully read from memory (vs. the PMC/PScav fallback).</summary>
+        internal bool NameResolved;
+        /// <summary>True once the faction/side was successfully resolved from memory (vs. Default).</summary>
+        internal bool TypeResolved;
+
         // ── State (updated each registration tick) ────────────────────────
 
         public bool IsActive;
@@ -96,6 +102,8 @@ namespace eft_dma_radar.Arena.GameWorld
         internal long NextTransformInitTick;
         internal long NextRotationInitTick;
         internal long NextTeamIdTick;
+        internal long NextNameResolveTick;
+        internal int  NameResolveFailStreak;
         internal int  TransformInitFailStreak;
         internal int  RotationInitFailStreak;
         internal int  TeamIdFailStreak;

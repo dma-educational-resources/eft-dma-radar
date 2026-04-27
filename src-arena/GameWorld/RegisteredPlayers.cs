@@ -28,8 +28,8 @@ namespace eft_dma_radar.Arena.GameWorld
 
         private const int MaxPlayerCount       = 64;
         // Arena rounds churn pointers fast â€” invalidate sooner so retries actually run again.
-        private const int ReinitThreshold      = 3;
-        private const int ReinitThresholdNew   = 2;
+        private const int ReinitThreshold    = 5; // 5 consecutive position failures before transform re-init
+        private const int ReinitThresholdNew = 5; // same threshold for new entries (zero worldPos is normal at spawn)
 
         // Grace period (in registration ticks, ~100ms each) before an observed player who has
         // dropped out of the RegisteredPlayers list is actually removed. Arena's list-read can
@@ -90,6 +90,11 @@ namespace eft_dma_radar.Arena.GameWorld
         // for Arena. The MainPlayer pointer flips to null on every death/respawn within a round,
         // so it cannot be used to detect match end â€” only an empty RegisteredPlayers list can.
         // When tripped, LocalGameWorld disposes and the next round is reacquired automatically.
+        private readonly record struct ProfiledPosition(Vector3 Position, float Yaw, float Pitch);
+        private readonly Dictionary<string, ProfiledPosition> _lastPositionByProfile = new(16, StringComparer.Ordinal);
+        // Fallback cache keyed by display name (used when ProfileId read fails at discovery).
+        private readonly Dictionary<string, ProfiledPosition> _lastPositionByName = new(16, StringComparer.OrdinalIgnoreCase);
+
         private const int InvalidCountTicksBeforeLost = 30; // ~3s at 100ms tick
 
         #endregion
@@ -176,6 +181,13 @@ namespace eft_dma_radar.Arena.GameWorld
                 // Tell the camera worker the FPS camera was almost certainly rebuilt by
                 // the respawn â€” bypass its normal 500ms rate-limit so ESP/Aimview don't
                 // render against a stale matrix until the next routine refresh.
+                oldLocal.IsActive          = false;
+                oldLocal.TransformReady    = false;
+                oldLocal.RotationReady     = false;
+                oldLocal.ConsecutiveErrors = 0;
+                // Tell the camera worker the FPS camera was almost certainly rebuilt by
+                // the respawn -- bypass its normal 500ms rate-limit so ESP/Aimview don't
+                // render against a stale matrix until the next routine refresh.
                 CameraManager.RequestFpsCameraRefresh();
             }
 
@@ -257,6 +269,25 @@ namespace eft_dma_radar.Arena.GameWorld
                     var player = CreatePlayerEntry(ptr, isLocal: false);
                     if (player is not null)
                     {
+                        // Restore last-known position from the previous respawn cycle so the
+                        // player appears at their last location immediately instead of <0,0,0>.
+                        bool restoredCache = false;
+                        ProfiledPosition cached = default;
+                        bool foundCache = (player.ProfileId is string pid && _lastPositionByProfile.TryGetValue(pid, out cached))
+                            || (!string.IsNullOrEmpty(player.Name) && _lastPositionByName.TryGetValue(player.Name, out cached));
+                        if (foundCache)
+                        {
+                            player.Position         = cached.Position;
+                            player.HasValidPosition = true;
+                            player.RotationYaw      = cached.Yaw;
+                            player.RotationPitch    = cached.Pitch;
+                            restoredCache           = true;
+                        }
+                        Log.WriteLine($"[RegisteredPlayers] Discovered: {player} @ 0x{ptr:X} (local=False){(restoredCache ? " [cache restored]" : string.Empty)}");
+                        // Delay the first skeleton attempt by 250 ms so Unity has time to write
+                        // PlayerBody before we walk the bone chain — avoids the immediate
+                        // "TryCreate failed — anchor=False, ready=0/16" on newly-spawned entries.
+                        player.NextSkeletonInitTick = Environment.TickCount64 + 250;
                         _players.TryAdd(ptr, player);
                         newDiscovered++;
                     }
@@ -272,7 +303,8 @@ namespace eft_dma_radar.Arena.GameWorld
             // Batch-init transforms and rotations for all active players without them
             BatchInitTransforms();
             BatchInitRotations();
-        }
+
+            }
 
         private void UpdateExistingPlayers(HashSet<ulong> registered)
         {
@@ -395,6 +427,11 @@ namespace eft_dma_radar.Arena.GameWorld
                         kvp.Value.ConsecutiveErrors = 0;
                         kvp.Value.NextTransformInitTick = 0;
                         kvp.Value.NextRotationInitTick = 0;
+                        // Respawn/pointer-churn can rebuild the bone hierarchy at a new address.
+                        // Null the skeleton so BatchInitSkeletons re-resolves the bone chain.
+                        kvp.Value.Skeleton = null;
+                        kvp.Value.SkeletonInitFailStreak = 0;
+                        kvp.Value.NextSkeletonInitTick = 0;
                     }
 
                     kvp.Value.IsActive = true;
@@ -405,6 +442,7 @@ namespace eft_dma_radar.Arena.GameWorld
                     // when they were first discovered. Uses exponential back-off so repeated
                     // failures don't spam scatter reads / first-chance exceptions every tick.
                     var p = kvp.Value;
+                    TryLazyResolveNameAndType(p, nowTick);
                     if (!p.IsAI && p.TeamID < 0 && nowTick >= p.NextTeamIdTick)
                     {
                         bool resolved = false;
@@ -458,11 +496,21 @@ namespace eft_dma_radar.Arena.GameWorld
                 if (_players.TryRemove(key, out var removed))
                 {
                     Log.WriteLine($"[RegisteredPlayers] Removed '{removed.Name}' ({removed.Type}) @ 0x{key:X}");
+                    // Cache last-known position by ProfileId (stable across respawns) so re-discovery
+                    // can restore the player at their prior location instead of <0,0,0>.
+                    if (!removed.IsLocalPlayer && removed.HasValidPosition)
+                    {
+                        var cachedPos = new ProfiledPosition(removed.Position, removed.RotationYaw, removed.RotationPitch);
+                        if (removed.ProfileId is string pid)
+                            _lastPositionByProfile[pid] = cachedPos;
+                        if (!string.IsNullOrEmpty(removed.Name))
+                            _lastPositionByName[removed.Name] = cachedPos;
+                    }
                     if (removed.IsLocalPlayer)
                     {
                         LocalPlayerLost = true;
                         LocalPlayer = null;
-                        Log.WriteLine("[RegisteredPlayers] Local player lost â€” match likely ending.");
+                        Log.WriteLine("[RegisteredPlayers] Local player lost -- match likely ending.");
                     }
                 }
             }
@@ -496,7 +544,7 @@ namespace eft_dma_radar.Arena.GameWorld
         private static void ScheduleTransformInitRetry(Player p, long nowTick)
         {
             int streak = Math.Min(++p.TransformInitFailStreak, 10);
-            long delayMs = Math.Min(75L << Math.Min(streak, 4), 1_200L); // 75, 150, 300, 600, 1200ms cap
+            long delayMs = Math.Min(75L << Math.Min(streak, 5), 2_000L); // 75, 150, 300, 600, 1200, 2000ms cap
             p.NextTransformInitTick = nowTick + delayMs;
         }
 

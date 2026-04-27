@@ -1,5 +1,4 @@
 global using eft_dma_radar;
-global using eft_dma_radar.Common;
 global using eft_dma_radar.Misc;
 global using SDK;
 global using SkiaSharp;
