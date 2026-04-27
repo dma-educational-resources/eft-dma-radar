@@ -307,7 +307,7 @@ These offsets are validated at startup via the offset cache.
   │  [0xAB8] class       <PlayerBones>k__BackingField = 0x28969228C80
   │  [0xB01] bool        <IsYourPlayer>k__BackingField = true                     ← local player flag
   │  [0x940] int         <RaidId>k__BackingField = 1008
-  │  [0x958] string      <VoipID>k__BackingField = "69eb723930a0d164a602e71c"
+  │  [0x958] string      <VoipID>k__BackingField = "<voip_id_••••••••••••••••>"
   │  [0x960] int         <PlayerId>k__BackingField = 5
   ┌ UnityEngine.Object (klass=0x28540353C70, 5 field(s))
   │  [0x10] IntPtr       m_CachedPtr = 0x28542B83E70
@@ -401,7 +401,7 @@ Player + 0x70 → MovementContext ptr → MC + 0xD4 → _rotation (Vector2)
   ┌ EFT.InventoryLogic.PersonItemController (klass=0x28541D69040, 1 field(s))
   │  [0x110] valuetype    Side = 1                                      ← 1=USEC, 2=BEAR (local player = USEC)
   ┌ EFT.InventoryLogic.ItemController (klass=0x28541D698C0, 32 field(s))
-  │  [0xD8] string       <ID>k__BackingField = "69eb723930a0d164a602e71c"  ← Profile ID = VoipID
+  │  [0xD8] string       <ID>k__BackingField = "<profile_id_••••••••••••>"  ← Profile ID = VoipID
   │  [0xF0] string       <Name>k__BackingField = "<username>"                  ← PLAYER NAME (local player)
   │  [0xF8] bool         <CanBeLocalized>k__BackingField = false
   │  [0xE8] class        <RootItem>k__BackingField = 0x28A199425A0
@@ -446,8 +446,8 @@ Player + 0x70 → MovementContext ptr → MC + 0xD4 → _rotation (Vector2)
   │  [0x7C] int          <Id>k__BackingField = 3                                   ← numeric player ID
   │  [0x9C] valuetype    <Side>k__BackingField = 1                                 ← 1=USEC, 2=BEAR, 4=Scav
   │  [0xA8] bool         <IsAI>k__BackingField = false
-  │  [0xB0] string       <ProfileId>k__BackingField = "658492417e32522d830f897b"
-  │  [0xB8] string       <VoipID>k__BackingField = "658492417e32522d830f897b"
+  │  [0xB0] string       <ProfileId>k__BackingField = "<profile_id_••••••••••••>"
+  │  [0xB8] string       <VoipID>k__BackingField = "<voip_id_••••••••••••••••>"
   │  [0xC0] string       <NickName>k__BackingField = "<OPV-1>"                   ← PLAYER NAME (populated!)
   │  [0xC8] string       <AccountId>k__BackingField = ""                           ← empty in Arena
   │  [0xD8] class        <PlayerBones>k__BackingField = 0x28969BE7320
@@ -672,7 +672,7 @@ OPV + 0x28 → OPC + 0x110 → ObsMovCtrl + 0xB0 → StateContext + 0x20 → Rot
   ┌ EFT.InventoryLogic.PersonItemController (klass=0x28541D69040, 1 field(s))
   │  [0x110] valuetype    Side = 1                                       ← 1=USEC (<OPV-1>)
   ┌ EFT.InventoryLogic.ItemController (klass=0x28541D698C0, 32 field(s))
-  │  [0xD8] string        <ID>k__BackingField = "658492417e32522d830f897b"
+  │  [0xD8] string        <ID>k__BackingField = "<profile_id_••••••••••••>"
   │  [0xF0] string        <Name>k__BackingField = "<OPV-1>"             ← PLAYER NAME via IC
   │  [0xE8] class         <RootItem>k__BackingField = 0x28A4B159000       ← root equipment item
 ── End of 'ObservedInventoryController '<OPV-1>'' (5 class(es) in hierarchy) ──
@@ -716,7 +716,7 @@ Same structure for both local and observed players.
   │  [0x88] bool         IsRightLegPistolHolster = false
   │  [0x90] class        _equipment = 0x28A4B159000             ← equipment root (same as IC RootItem)
   │  [0xB0] class        <Equipment>k__BackingField = 0x28A4B159000
-  │  [0xD8] string       _playerProfileID = "658492417e32522d830f897b"
+  │  [0xD8] string       _playerProfileID = "<profile_id_••••••••••••>"
   │  [0xE8] bool         _isYourPlayer = false
   ┌ UnityEngine.Object (klass=0x28540353C70, 5 field(s))
   │  [0x10] IntPtr       m_CachedPtr = 0x28C54C998E0

@@ -318,7 +318,7 @@ Network (non-local) players use the `ObservedPlayerView` component — a complet
 [20:30:10.064] [Il2CppDumper]   │  [0x90] bool         <UsedSimplifiedSkeleton>k__BackingField = false
 [20:30:10.072] [Il2CppDumper]   │  [0x94] valuetype    <Side>k__BackingField = 4
 [20:30:10.076] [Il2CppDumper]   │  [0xA0] bool         <IsAI>k__BackingField = true
-[20:30:10.080] [Il2CppDumper]   │  [0xA8] string       <ProfileId>k__BackingField = "129600000000000000000000"
+[20:30:10.080] [Il2CppDumper]   │  [0xA8] string       <ProfileId>k__BackingField = "<profile_id_••••••••••••>"
 [20:30:10.083] [Il2CppDumper]   │  [0xB0] string       <VoipID>k__BackingField = "1296"
 [20:30:10.087] [Il2CppDumper]   │  [0xB8] string       <NickName>k__BackingField = ""
 [20:30:10.089] [Il2CppDumper]   │  [0xC0] string       <AccountId>k__BackingField = ""
@@ -355,7 +355,7 @@ Network (non-local) players use the `ObservedPlayerView` component — a complet
 | `0x7C` | int | `<Id>k__BackingField` | `37` |
 | `0x94` | valuetype | `<Side>k__BackingField` | `4` (4=Savage/Scav, 1=USEC, 2=BEAR) |
 | `0xA0` | bool | `<IsAI>k__BackingField` | `true` |
-| `0xA8` | string | `<ProfileId>k__BackingField` | `"129600000000000000000000"` |
+| `0xA8` | string | `<ProfileId>k__BackingField` | `"<profile_id_••••••••••••>"` |
 | `0xB8` | string | `<NickName>k__BackingField` | `""` (empty for observed AI/network players) |
 | `0xD8` | class | `<PlayerBody>k__BackingField` | `0x214A26643C0` |
 | `0xE0` | class | `<CharacterController>k__BackingField` | `0x214A27CBA00` |
@@ -375,7 +375,7 @@ Network (non-local) players use the `ObservedPlayerView` component — a complet
 [20:30:13.160] [Il2CppDumper]   │  [0x7C] int          <Id>k__BackingField = 18
 [20:30:13.162] [Il2CppDumper]   │  [0x94] valuetype    <Side>k__BackingField = 1   ← USEC
 [20:30:13.164] [Il2CppDumper]   │  [0xA0] bool         <IsAI>k__BackingField = false
-[20:30:13.166] [Il2CppDumper]   │  [0xA8] string       <ProfileId>k__BackingField = "107200000000000000000000"
+[20:30:13.166] [Il2CppDumper]   │  [0xA8] string       <ProfileId>k__BackingField = "<profile_id_••••••••••••>"
 [20:30:13.168] [Il2CppDumper]   │  [0xB8] string       <NickName>k__BackingField = ""
 [20:30:13.170] [Il2CppDumper]   │  [0xD0] class        <PlayerBones>k__BackingField = 0x21427CB6320
 [20:30:13.172] [Il2CppDumper]   │  [0xD8] class        <PlayerBody>k__BackingField = 0x212ADC75870
@@ -422,7 +422,7 @@ After the main player dumps, each sub-object gets its own hierarchy dump. These 
 [20:30:31.332] [Il2CppDumper]   │  [0xF8] valuetype    Side = 1   ← USEC
 [20:30:31.335] [Il2CppDumper]   ┌ EFT.InventoryLogic.ItemController (klass=0x210008EE3B0, 29 field(s))
 [20:30:31.410] [Il2CppDumper]   │  [0xA0] valuetype    IdSource = 1777235207
-[20:30:31.418] [Il2CppDumper]   │  [0xC0] string       <ID>k__BackingField = "5e1351fe246aeb28245760ab"
+[20:30:31.418] [Il2CppDumper]   │  [0xC0] string       <ID>k__BackingField = "<profile_id_••••••••••••>"
 [20:30:31.424] [Il2CppDumper]   │  [0xD0] class        <RootItem>k__BackingField = 0x2131ED808F0
 [20:30:31.427] [Il2CppDumper]   │  [0xD8] string       <Name>k__BackingField = "<username>"
 [20:30:31.431] [Il2CppDumper]   │  [0xE4] valuetype    <OwnerType>k__BackingField = 0xD500EC0000000000
