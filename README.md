@@ -1,6 +1,7 @@
 # EFT DMA Radar
 
-### Currently Maintained by Keeegi
+> **⚠️ This project is no longer actively maintained.**
+> No further updates, bug fixes, or support will be provided.
 
 ## What is this?
 - This is an up-to-date build of Lone DMA EFT Radar. This is a standalone copy of the software with *No Restrictions*.
