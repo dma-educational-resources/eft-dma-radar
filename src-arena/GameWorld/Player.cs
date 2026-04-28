@@ -91,6 +91,13 @@
         internal bool RealtimeEstablished;
 
         /// <summary>
+        /// TickCount64 timestamp of the last time <see cref="Position"/> actually changed value.
+        /// Used to detect a frozen / stale transform cache: if the read keeps succeeding but
+        /// the value never moves, the WorldPositionOffset slot has stopped being updated by Unity.
+        /// </summary>
+        internal long LastPositionChangeMs;
+
+        /// <summary>
         /// Consecutive registration ticks this player has been absent from the RegisteredPlayers
         /// list. Used as a grace period so transient list-read flickers / invalid pointer hiccups
         /// don't immediately wipe a player who is still alive in the match.

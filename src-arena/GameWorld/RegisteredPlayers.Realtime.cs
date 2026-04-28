@@ -47,6 +47,10 @@ namespace eft_dma_radar.Arena.GameWorld
 
             for (int i = 0; i < active.Length; i++)
                 ProcessScatterResults(scatter, active[i]);
+
+            // Flush the match-position log periodically so the file is usable
+            // during a live match without waiting for match-end.
+            MatchPositionLogger.Flush();
         }
 
         private static void ProcessScatterResults(VmmScatter scatter, Player player)
@@ -81,7 +85,8 @@ namespace eft_dma_radar.Arena.GameWorld
             if (player.TransformReady)
             {
                 if (scatter.ReadValue<Vector3>(player.VerticesAddr, out var worldPos)
-                    && float.IsFinite(worldPos.X) && float.IsFinite(worldPos.Y) && float.IsFinite(worldPos.Z))
+                    && float.IsFinite(worldPos.X) && float.IsFinite(worldPos.Y) && float.IsFinite(worldPos.Z)
+                    && MathF.Abs(worldPos.X) < 4096f && MathF.Abs(worldPos.Y) < 4096f && MathF.Abs(worldPos.Z) < 4096f)
                 {
                     if (worldPos.Y <= -500f)
                     {
@@ -105,9 +110,13 @@ namespace eft_dma_radar.Arena.GameWorld
                     }
                     else
                     {
+                        long now = Environment.TickCount64;
+                        if (worldPos != player.Position)
+                            player.LastPositionChangeMs = now;
                         player.Position = worldPos;
                         player.HasValidPosition = true;
                         player.RealtimeEstablished = true;
+                        MatchPositionLogger.Record(player);
                     }
                 }
                 else posOk = false;
@@ -157,6 +166,30 @@ namespace eft_dma_radar.Arena.GameWorld
             {
                 // Position succeeded — clear the error counter regardless of rotation state.
                 player.ConsecutiveErrors = 0;
+
+                // Freeze detection: the scatter read is succeeding but the WorldPositionOffset
+                // cache slot has stopped being updated by Unity (stale hierarchy cache).
+                // This causes the dot to freeze for 1–8+ seconds even though the player is
+                // moving. Detect by comparing current time to the last time the value actually
+                // changed, and force a transform reinit after a threshold.
+                // 1.5 s chosen to tolerate genuinely stationary players while catching true
+                // cache-frozen states (observed freezes were 2–17 s in match telemetry).
+                const long FreezeThresholdMs = 1500L;
+                if (player.RealtimeEstablished
+                    && player.LastPositionChangeMs > 0
+                    && Environment.TickCount64 - player.LastPositionChangeMs > FreezeThresholdMs)
+                {
+                    Log.WriteRateLimited(AppLogLevel.Warning, $"freeze_{player.Base:X}", TimeSpan.FromSeconds(5),
+                        $"[RegisteredPlayers] '{player.Name}': position frozen for >{FreezeThresholdMs}ms — invalidating transform (stale worldPos cache).");
+                    player.TransformReady = false;
+                    player.RotationReady = false;
+                    player.RealtimeEstablished = false;
+                    player.ConsecutiveErrors = 0;
+                    player.LastPositionChangeMs = 0;
+                    player.Skeleton = null;
+                    player.SkeletonInitFailStreak = 0;
+                    player.NextSkeletonInitTick = Environment.TickCount64 + 250;
+                }
             }
         }
 
@@ -297,6 +330,7 @@ namespace eft_dma_radar.Arena.GameWorld
                     // Realtime hasn't taken ownership yet ΓÇö bones are the only source of truth.
                     p.Position = wp;
                     p.HasValidPosition = true;
+                    MatchPositionLogger.RecordBone(p);
                     continue;
                 }
 
@@ -312,6 +346,8 @@ namespace eft_dma_radar.Arena.GameWorld
                     p.TransformReady = false;
                     p.RealtimeEstablished = false;
                     p.ConsecutiveErrors = 0;
+                    p.LastPositionChangeMs = 0;
+                    MatchPositionLogger.RecordBone(p, wasStale: true);
                     Log.WriteRateLimited(AppLogLevel.Debug, $"stale_pos_{p.Base:X}", TimeSpan.FromSeconds(5),
                         $"[RegisteredPlayers] '{p.Name}': realtime position stale (╬ö={MathF.Sqrt(delta.LengthSquared()):F1}m) ΓÇö switched to bone-derived position, invalidating transform.");
                 }
@@ -384,6 +420,7 @@ namespace eft_dma_radar.Arena.GameWorld
             player.TransformReady    = true;
             player.TransformInitFailStreak = 0;
             player.NextTransformInitTick = 0;
+            player.LastPositionChangeMs  = 0; // reset freeze timer on every transform re-init
             // After a successful transform re-init, allow the skeleton to retry promptly.
             // If the skeleton was cleared during an auto-invalidation its streak may have been
             // reset already; if it still has an old streak from a previous discovery cycle,
@@ -402,6 +439,7 @@ namespace eft_dma_radar.Arena.GameWorld
             {
                 player.Position         = initPos;
                 player.HasValidPosition = true;
+                MatchPositionLogger.RecordInit(player);
             }
 
             Log.Write(AppLogLevel.Debug,

@@ -4,11 +4,15 @@ namespace eft_dma_radar.Arena.Unity
 {
     internal static class UnityOffsets
     {
-        public const uint GO_ObjectClass   = 0x80;
-        public const uint GO_Components    = 0x58;
-        public const uint GO_Name          = 0x88;
-        public const uint Comp_ObjectClass = 0x20;
-        public const uint Comp_GameObject  = 0x58;
+        // All zero on purpose — the UnityPlayer dumper is responsible for
+        // resolving these at runtime. Starting from working values would let
+        // a regression hide behind the fallback. Keep ALL Unity GO/Comp
+        // header offsets at 0 so the dumper has to prove each one.
+        public const uint GO_ObjectClass   = 0x0;
+        public const uint GO_Components    = 0x0;
+        public const uint GO_Name          = 0x0;
+        public const uint Comp_ObjectClass = 0x0;
+        public const uint Comp_GameObject  = 0x0;
         public static readonly uint[] ObjClass_ToNamePtr = [0x0, 0x10];
         public static readonly uint[] TransformChain =
         [
@@ -163,13 +167,18 @@ namespace eft_dma_radar.Arena.Unity
         public readonly ulong NamePtr;
     }
 
-    [StructLayout(LayoutKind.Explicit)]
     internal readonly struct GOM
     {
         private const int MaxWalkNodes = 100_000;
 
-        [FieldOffset(0x20)] public readonly ulong LastActiveNode;
-        [FieldOffset(0x28)] public readonly ulong ActiveNodes;
+        public readonly ulong LastActiveNode;
+        public readonly ulong ActiveNodes;
+
+        private GOM(ulong lastActiveNode, ulong activeNodes)
+        {
+            LastActiveNode = lastActiveNode;
+            ActiveNodes    = activeNodes;
+        }
 
         private static readonly Dictionary<string, ulong> _nameCache = new();
         private static readonly Lock _cacheLock = new();
@@ -177,9 +186,47 @@ namespace eft_dma_radar.Arena.Unity
         public static void ClearCache() { lock (_cacheLock) _nameCache.Clear(); }
 
         private static ulong _cachedGomAddr;
+        // 0 = unknown, 1 = (0x20,0x28), 2 = (0x18,0x20)
+        private static int _cachedLayout;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static GOM Get(ulong gomAddress) => Memory.ReadValue<GOM>(gomAddress, false);
+        // GOM head layout differs across Arena builds — probe at runtime so the
+        // walk uses the build's real LastActiveNode / ActiveNodes pair instead of
+        // hard-coded offsets that may produce a structurally-valid-but-wrong list.
+        public static GOM Get(ulong gomAddress)
+        {
+            if (!ArenaUtils.IsValidVirtualAddress(gomAddress))
+                return default;
+
+            int layout = _cachedLayout;
+            if (layout == 1 && TryReadLayout(gomAddress, 0x20, 0x28, out var g1)) return g1;
+            if (layout == 2 && TryReadLayout(gomAddress, 0x18, 0x20, out var g2)) return g2;
+
+            if (TryReadLayout(gomAddress, 0x20, 0x28, out var probed1))
+            {
+                _cachedLayout = 1;
+                return probed1;
+            }
+            if (TryReadLayout(gomAddress, 0x18, 0x20, out var probed2))
+            {
+                _cachedLayout = 2;
+                return probed2;
+            }
+            return default;
+        }
+
+        private static bool TryReadLayout(ulong gomAddress, uint lastOff, uint activeOff, out GOM gom)
+        {
+            gom = default;
+            if (!Memory.TryReadValue<ulong>(gomAddress + lastOff,   out var last,   false)) return false;
+            if (!Memory.TryReadValue<ulong>(gomAddress + activeOff, out var active, false)) return false;
+            if (!ArenaUtils.IsValidVirtualAddress(last) || !ArenaUtils.IsValidVirtualAddress(active))
+                return false;
+            // Sanity: ActiveNodes must be a LinkedListObject whose ThisObject is a valid VA.
+            if (!Memory.TryReadValue<ulong>(active + 0x10, out var firstThis, false)) return false;
+            if (!ArenaUtils.IsValidVirtualAddress(firstThis)) return false;
+            gom = new GOM(last, active);
+            return true;
+        }
 
         private static readonly (string Sig, int RelOff, int InstrLen, string Desc)[] GomDirectSigs =
         [
@@ -328,6 +375,7 @@ namespace eft_dma_radar.Arena.Unity
         internal static void ResetCachedAddresses()
         {
             _cachedGomAddr = 0;
+            _cachedLayout  = 0;
             ClearCache();
         }
 

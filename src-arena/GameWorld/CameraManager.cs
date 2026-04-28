@@ -83,6 +83,19 @@ namespace eft_dma_radar.Arena.GameWorld
         // Last FPS camera pointer used by the worker.
         private static ulong _lastFpsCamera;
 
+        /// <summary>
+        /// Live FPS camera pointer last used by the worker (0 if none yet). Exposed
+        /// for diagnostics tooling (e.g. <see cref="Unity.UnityPlayerResolver"/>'s
+        /// instance hex dump). Do not use for runtime reads — use the worker's
+        /// <see cref="FPSCamera"/> instance property instead.
+        /// </summary>
+        public static ulong LiveFpsCamera => _lastFpsCamera;
+
+        // One-shot: only kick the UnityPlayer diagnostic dump on the FIRST READY
+        // transition for this process. Subsequent map exits + re-READYs on shutdown
+        // would otherwise overwrite the good in-match dump with a degraded one.
+        private static bool _unityDumpTriggered;
+
         /// <summary>True once a valid ViewMatrix + FOV has been read at least once this match. Required for ESP/W2S.</summary>
         public static bool IsReady { get; private set; }
 
@@ -404,6 +417,15 @@ namespace eft_dma_radar.Arena.GameWorld
                         $"[CameraManager] READY — FPSCamera=0x{FPSCamera:X} FOV={_fov:F1} AR={_aspect:F3} " +
                         $"VM.T=<{_viewMatrix.Translation.X:F2},{_viewMatrix.Translation.Y:F2},{_viewMatrix.Translation.Z:F2}> " +
                         $"viewport={ViewportWidth}x{ViewportHeight} — ESP enabled.");
+                    // Re-trigger the UnityPlayer dump now that a live Camera instance is
+                    // available — section D (pointer-classified hex dump) will be populated.
+                    // One-shot per process: avoid overwriting the good in-match dump
+                    // when IsReady toggles back true during shutdown/teardown.
+                    if (!_unityDumpTriggered)
+                    {
+                        _unityDumpTriggered = true;
+                        Task.Run(Unity.UnityPlayerResolver.Dump);
+                    }
                 }
                 else
                 {

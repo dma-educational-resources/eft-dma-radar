@@ -223,6 +223,7 @@ namespace eft_dma_radar.Arena.GameWorld
 
         public void Start()
         {
+            // MatchPositionLogger.Open(); // CSV logging disabled
             _registrationWorker?.Start();
             _realtimeWorker?.Start();
             _cameraWorker?.Start();
@@ -233,6 +234,7 @@ namespace eft_dma_radar.Arena.GameWorld
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
+            // MatchPositionLogger.Close(); // CSV logging disabled
             _realtimeWorker?.Dispose();
             _registrationWorker?.Dispose();
             _cameraWorker?.Dispose();

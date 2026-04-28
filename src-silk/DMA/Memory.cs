@@ -324,6 +324,79 @@ namespace eft_dma_radar.Silk.DMA
                     // NOTE: CameraManager.Initialize() (AllCameras sig-scan + camera_offsets.json)
                     // is intentionally deferred to Phase 4 (Aimview). Not needed for Phase 1.
 
+                    // Snapshot hardcoded build constants BEFORE any sig-scan
+                    // mutates them (CameraManager.Initialize writes back into
+                    // UnityOffsets.Camera.*). These become the "Cached" column
+                    // in the resolver's final summary table.
+                    uint cachedAllCamerasRva  = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.AllCameras;
+                    uint cachedGomFallbackRva = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.GomFallback;
+                    uint cachedCamViewMatrix  = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.Camera.ViewMatrix;
+                    uint cachedCamFov         = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.Camera.FOV;
+                    uint cachedCamAspect      = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.Camera.AspectRatio;
+                    uint cachedCamDeref       = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.Camera.DerefIsAddedOffset;
+                    uint cachedTaHier         = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.TransformAccess.HierarchyOffset;
+                    uint cachedTaIdx          = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.TransformAccess.IndexOffset;
+                    uint cachedThVerts        = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.TransformHierarchy.VerticesOffset;
+                    uint cachedThIdx          = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.TransformHierarchy.IndicesOffset;
+
+                    // Wire the (game-agnostic) UnityPlayer dumper to this host
+                    // so it can be lifted into other Unity titles unchanged.
+                    // Disabled by default — flip UnityPlayerResolver.Enabled = true
+                    // when investigating a Unity-engine bump.
+                    eft_dma_radar.Silk.Tarkov.Unity.UnityPlayerResolver.Configure(
+                        new eft_dma_radar.Silk.Tarkov.Unity.UnityPlayerResolver.HostConfig
+                        {
+                            Memory               = new MemoryAccessAdapter(),
+                            GetLiveCamera        = () => 0UL, // silk has no LiveFpsCamera accessor; live camera dump skipped
+                            ReadIl2CppClassName  = klass => eft_dma_radar.Silk.Tarkov.Unity.Il2CppClass.ReadName(klass, useCache: true),
+
+                            // Managed (IL2CPP) MonoBehaviour resolution targets — the
+                            // path the radar actually uses at runtime to walk game state.
+                            NamedGameObjectRoots = new[] { "GameWorld", "FPS Camera" },
+                            // ClientLocalGameWorld is reachable only via the GameWorld
+                            // GameObject's ComponentArray (entry[1].Component → Comp_ObjectClass);
+                            // a GOM-wide class-name sweep does not find it on live raids.
+                            BehaviourClassNames  = new[] { "TarkovApplication" },
+
+                            // RESOLVED column — values the host has actually
+                            // sig-scanned this run (post-Initialize, when called).
+                            AllCamerasRva            = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.AllCameras,
+                            GomFallbackRva           = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.GomFallback,
+                            CameraViewMatrix         = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.Camera.ViewMatrix,
+                            CameraFov                = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.Camera.FOV,
+                            CameraAspectRatio        = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.Camera.AspectRatio,
+                            CameraDerefIsAddedOffset = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.Camera.DerefIsAddedOffset,
+                            GoObjectClass            = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.GO_ObjectClass,
+                            GoComponents             = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.GO_Components,
+                            GoName                   = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.GO_Name,
+                            CompObjectClass          = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.Comp_ObjectClass,
+                            CompGameObject           = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.Comp_GameObject,
+                            TaHierarchyOff           = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.TransformAccess.HierarchyOffset,
+                            TaIndexOff               = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.TransformAccess.IndexOffset,
+                            ThVertices               = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.TransformHierarchy.VerticesOffset,
+                            ThIndices                = eft_dma_radar.Silk.Tarkov.Unity.UnityOffsets.TransformHierarchy.IndicesOffset,
+
+                            // CACHED column — hardcoded build constants captured
+                            // before sig scanning. Lets the dump flag drift / engine
+                            // bumps as `!` mismatch rows.
+                            CachedAllCamerasRva         = cachedAllCamerasRva,
+                            CachedGomFallbackRva        = cachedGomFallbackRva,
+                            CachedCameraViewMatrix      = cachedCamViewMatrix,
+                            CachedCameraFov             = cachedCamFov,
+                            CachedCameraAspectRatio     = cachedCamAspect,
+                            CachedCameraDerefIsAddedOff = cachedCamDeref,
+                            CachedTaHierarchyOff        = cachedTaHier,
+                            CachedTaIndexOff            = cachedTaIdx,
+                            CachedThVertices            = cachedThVerts,
+                            CachedThIndices             = cachedThIdx,
+
+                            DumpFilePath         = System.IO.Path.Combine(
+                                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
+                                "eft-dma-radar-silk",
+                                "unity_player_dump.txt"),
+                        });
+                    eft_dma_radar.Silk.Tarkov.Unity.UnityPlayerResolver.Dump();
+
                     SetState(MemoryState.Initializing);
                     Log.WriteLine("[Memory] Game startup OK.");
                     Notify("Game startup OK", NotificationLevel.Info);
@@ -910,6 +983,37 @@ namespace eft_dma_radar.Silk.DMA
         {
             public GameNotRunningException()
                 : base("Game process is no longer running.") { }
+        }
+
+        /// <summary>
+        /// Adapter that exposes the static <see cref="Memory"/> API as the
+        /// game-agnostic <c>IMemoryAccess</c> surface consumed by
+        /// <see cref="eft_dma_radar.Silk.Tarkov.Unity.UnityPlayerResolver"/>.
+        /// </summary>
+        private sealed class MemoryAccessAdapter : eft_dma_radar.Silk.Tarkov.Unity.UnityPlayerResolver.IMemoryAccess
+        {
+            public ulong UnityBase        => Memory.UnityBase;
+            public ulong GameAssemblyBase => Memory.GameAssemblyBase;
+            public ulong GomAddress       => Memory.GOM;
+
+            public ulong   FindSignature (string s, string m)        => Memory.FindSignature(s, m);
+            public ulong[] FindSignatures(string s, string m, int n) => Memory.FindSignatures(s, m, n);
+
+            public bool TryReadValue<T>(ulong a, out T v, bool useCache = false) where T : unmanaged
+                => Memory.TryReadValue(a, out v, useCache);
+            public bool TryReadPtr(ulong a, out ulong v, bool useCache = false)
+                => Memory.TryReadPtr(a, out v, useCache);
+            public bool TryReadBuffer<T>(ulong a, Span<T> b, bool useCache = false) where T : unmanaged
+                => Memory.TryReadBuffer(a, b, useCache);
+            public T[] ReadArray<T>(ulong a, int n, bool useCache = false) where T : unmanaged
+                => Memory.ReadArray<T>(a, n, useCache);
+            public bool TryReadString(ulong a, out string? r, int max = 128, bool useCache = false)
+                => Memory.TryReadString(a, out r, max, useCache);
+            public (uint Timestamp, uint SizeOfImage) ReadPeFingerprint(ulong b)
+                => Memory.ReadPeFingerprint(b);
+
+            public bool IsValidVirtualAddress(ulong va) => va.IsValidVirtualAddress();
+            public void Log(string message)             => eft_dma_radar.Silk.Misc.Log.WriteLine(message);
         }
 
         #endregion
